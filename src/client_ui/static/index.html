@@ -18,7 +18,8 @@
       <textarea id="text" rows="3" placeholder="Type here. Enter to send, Shift+Enter for a new line."></textarea>
       <div class="row">
         <label class="upload" id="uploadLabel" hidden>Upload a file<input type="file" id="file"></label>
-        <button type="submit" id="send">Send</button>
+        <span><button type="button" class="quiet" id="finishBtn" hidden>Finish intake</button>
+        <button type="submit" id="send">Send</button></span>
       </div>
       <div class="hint" id="uploadsHint" hidden></div>
     </form>
@@ -28,6 +29,7 @@
     <div id="evidence" hidden></div>
   </section>
 </main>
+<script src="/static/md.js"></script>
 <script src="/static/client.js"></script>
 </body>
 </html>

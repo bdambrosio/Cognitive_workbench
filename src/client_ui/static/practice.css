@@ -25,3 +25,10 @@ td button.quiet { background: transparent; border: 1px solid var(--rule); color:
 .cmd code { display: block; font-family: var(--mono); font-size: 12px; background: var(--bg); padding: 6px 8px; border-radius: 4px; white-space: pre-wrap; word-break: break-all; cursor: copy; }
 .cmd code:hover { outline: 1px solid var(--accent2); }
 .warn { color: var(--empty); }
+/* the site's stage panel */
+.next { padding: 8px 12px; border: 1px solid var(--rule); border-radius: 6px; background: var(--panel2); margin-bottom: 8px; }
+table.stages td { padding: 3px 8px; }
+.job { margin: 8px 0; font-size: 13px; }
+.buttons { margin: 10px 0; display: flex; gap: 8px; flex-wrap: wrap; }
+.pages { margin: 6px 0 10px; font-size: 13px; }
+.pages a, .job a { color: #6ea0ff; }

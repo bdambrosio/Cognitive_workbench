@@ -52,13 +52,35 @@ until it ends. Marks again, never deletion.
 from __future__ import annotations
 
 import datetime
+import functools
 import json
 import sys
+import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
+if str(REPO / "src") not in sys.path:
+    sys.path.insert(0, str(REPO / "src"))
+
+from utils.file_utils import atomic_write_text                  # noqa: E402
+
+#: ONE WRITER AT A TIME, WITHIN A PROCESS. The site's job thread and its
+#: request handlers both read-modify-write state.json; without this a torn
+#: read (an empty file mid-write) and a lost update were both observed in
+#: tests on 2026-09-05. Across processes the atomic replace in `save` keeps
+#: every read whole; two processes writing the same engagement at once is
+#: not a case the site produces.
+_LOCK = threading.RLock()
+
+
+def _locked(fn):
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        with _LOCK:
+            return fn(*args, **kwargs)
+    return wrapper
 ENGAGEMENTS = REPO / "workflowsv2" / "claims_audit" / "engagements"
 STATE_FILE = "state.json"
 INTAKES = "intakes"
@@ -95,8 +117,7 @@ def load(eng_dir: Path) -> Dict[str, Any]:
 
 
 def save(eng_dir: Path, st: Dict[str, Any]) -> None:
-    (eng_dir / STATE_FILE).write_text(
-        json.dumps(st, indent=1) + "\n", encoding="utf-8")
+    atomic_write_text(eng_dir / STATE_FILE, json.dumps(st, indent=1) + "\n")
 
 
 def stamp() -> str:
@@ -180,6 +201,7 @@ def claim_sources(eng_dir: Path) -> List[str]:
 
 # ---- stages -----------------------------------------------------------------
 
+@_locked
 def set_stage(eng_dir: Path, name: str, value: str, by: Optional[str] = None) -> None:
     if name not in STAGES:
         raise SystemExit(f"no stage '{name}' (have: {', '.join(STAGES)})")
@@ -212,6 +234,7 @@ def running_job(eng_dir: Path) -> Optional[Dict[str, Any]]:
     return None
 
 
+@_locked
 def add_job(eng_dir: Path, kind: str, by: Optional[str] = None,
             log: Optional[str] = None) -> Dict[str, Any]:
     """Record a job as running. Refuses while another job is running: the
@@ -231,6 +254,7 @@ def add_job(eng_dir: Path, kind: str, by: Optional[str] = None,
     return job
 
 
+@_locked
 def update_job(eng_dir: Path, job_id: str, **fields: Any) -> Dict[str, Any]:
     st = load(eng_dir)
     for j in st["jobs"]:
@@ -241,6 +265,7 @@ def update_job(eng_dir: Path, job_id: str, **fields: Any) -> Dict[str, Any]:
     raise SystemExit(f"no job '{job_id}'")
 
 
+@_locked
 def finish_job(eng_dir: Path, job_id: str, exit_code: int,
                error: Optional[str] = None) -> Dict[str, Any]:
     return update_job(eng_dir, job_id, state="done" if exit_code == 0 else "failed",
@@ -269,6 +294,7 @@ def intake_dir(eng_dir: Path, intake_id: str) -> Path:
     return eng_dir / INTAKES / intake_id
 
 
+@_locked
 def new_intake(eng_dir: Path) -> str:
     """Create an intake directory and make it current by clearing the
     explicit choice: most recent wins."""
@@ -284,6 +310,7 @@ def new_intake(eng_dir: Path) -> str:
     return iid
 
 
+@_locked
 def set_current_intake(eng_dir: Path, intake_id: str) -> None:
     if intake_id not in intakes(eng_dir):
         raise SystemExit(f"no intake '{intake_id}' (have: {', '.join(intakes(eng_dir)) or 'none'})")
@@ -292,6 +319,7 @@ def set_current_intake(eng_dir: Path, intake_id: str) -> None:
     save(eng_dir, st)
 
 
+@_locked
 def cancel_intake(eng_dir: Path, intake_id: str) -> None:
     if intake_id not in intakes(eng_dir):
         raise SystemExit(f"no intake '{intake_id}'")
@@ -347,6 +375,7 @@ def current_run(eng_dir: Path, intake_id: Optional[str]) -> Optional[Path]:
     return candidates[-1] if candidates else None
 
 
+@_locked
 def set_current_run(eng_dir: Path, run_name: str) -> None:
     match = [r for r in runs(eng_dir) if r.name == run_name]
     if not match:
@@ -356,6 +385,7 @@ def set_current_run(eng_dir: Path, run_name: str) -> None:
     save(eng_dir, st)
 
 
+@_locked
 def cancel_run(eng_dir: Path, run_name: str) -> None:
     if not any(r.name == run_name for r in runs(eng_dir)):
         raise SystemExit(f"no run '{run_name}' under {eng_dir / MERGED}")

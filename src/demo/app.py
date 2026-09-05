@@ -31,11 +31,9 @@ import hashlib
 import json
 import logging
 import os
-import queue
 import secrets
 import shutil
 import sys
-import threading
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
@@ -51,6 +49,7 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect  # noqa: E4
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles                    # noqa: E402
 
+from client_ui.registry import Registry                        # noqa: E402
 from demo.redact import Redactor, banner                       # noqa: E402
 
 logger = logging.getLogger("demo")
@@ -73,57 +72,18 @@ def load_demo_config(eng_dir: Path) -> Dict[str, Any]:
     return cfg
 
 
-class Worker:
-    """One thread per live visitor; every turn of theirs runs on it in order,
-    and waits its turn on the process-wide semaphore."""
-
-    def __init__(self, sem: threading.Semaphore) -> None:
-        self.q: "queue.Queue[tuple]" = queue.Queue()
-        self.sem = sem
-        self.busy = False
-        self.t = threading.Thread(target=self._run, daemon=True)
-        self.t.start()
-
-    def _run(self) -> None:
-        while True:
-            fn, loop, fut = self.q.get()
-            if fn is None:
-                return
-            with self.sem:
-                self.busy = True
-                try:
-                    res = fn()
-                    loop.call_soon_threadsafe(fut.set_result, res)
-                except Exception as e:                         # noqa: BLE001
-                    logger.exception("turn failed")
-                    loop.call_soon_threadsafe(fut.set_exception, e)
-                finally:
-                    self.busy = False
-
-    async def run(self, fn):
-        loop = asyncio.get_running_loop()
-        fut = loop.create_future()
-        self.q.put((fn, loop, fut))
-        return await fut
-
-    def stop(self) -> None:
-        self.q.put((None, None, None))
-
-
-class Visitors:
-    """The registry: sid → live session, built on demand, evicted LRU."""
+class Visitors(Registry):
+    """The registry keyed by visitor sid, plus the visitor accounting: turns
+    taken, sessions opened per address per hour, the visitor log."""
 
     def __init__(self, build, cfg: Dict[str, Any], log_path: Path) -> None:
-        self.build = build
+        super().__init__(build, max_live=int(cfg["max_live"]),
+                         turns_in_flight=int(cfg["turns_in_flight"]))
         self.cfg = cfg
         self.log_path = log_path
-        self.live: Dict[str, Dict[str, Any]] = {}
         self.turns: Dict[str, int] = {}
         self.created: Dict[str, float] = {}
         self.by_ip: Dict[str, List[float]] = {}
-        self.sem = threading.Semaphore(int(cfg["turns_in_flight"]))
-        self.waiting = 0
-        self.lock = threading.Lock()
         self._load_log()
 
     def _load_log(self) -> None:
@@ -161,37 +121,10 @@ class Visitors:
     def known(self, sid: str) -> bool:
         return sid in self.created
 
-    def get(self, sid: str) -> Dict[str, Any]:
-        """The live entry for a visitor, building the session if needed and
-        evicting the least recently used above the cap."""
-        with self.lock:
-            e = self.live.get(sid)
-            if e:
-                e["last"] = time.time()
-                return e
-            while len(self.live) >= int(self.cfg["max_live"]):
-                oldest = min(self.live, key=lambda k: self.live[k]["last"])
-                self._close(oldest)
-            session = self.build(sid)
-            e = {"session": session, "worker": Worker(self.sem), "last": time.time()}
-            self.live[sid] = e
-            return e
-
-    def _close(self, sid: str) -> None:
-        e = self.live.pop(sid, None)
-        if not e:
-            return
-        e["worker"].stop()
-        try:
-            e["session"].close()
-        except Exception as ex:                                # noqa: BLE001
-            logger.warning("close %s: %s", sid[:8], ex)
-        self.log("evict", sid)
-
-    def close_all(self) -> None:
-        with self.lock:
-            for sid in list(self.live):
-                self._close(sid)
+    def _close(self, sid) -> None:
+        if sid in self.live:
+            super()._close(sid)
+            self.log("evict", sid)
 
 
 def sweep_worlds(scenarios: Path, prefix: str, keep_days: int) -> int:

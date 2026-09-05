@@ -33,11 +33,9 @@ import argparse
 import asyncio
 import logging
 import os
-import queue
 import re
 import secrets
 import sys
-import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
@@ -51,6 +49,8 @@ for p in (str(REPO), str(REPO / "src")):
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect  # noqa: E402
 from fastapi.responses import FileResponse, JSONResponse                         # noqa: E402
 from fastapi.staticfiles import StaticFiles                                       # noqa: E402
+
+from client_ui.registry import Worker                                            # noqa: E402
 
 logger = logging.getLogger("client_ui")
 STATIC = HERE / "static"
@@ -75,45 +75,10 @@ def _announce(rel: str, data: bytes) -> str:
     return head + " Its contents:]\n\n" + text
 
 
-class Worker:
-    """One thread, one queue: every turn runs on it, in order."""
-
-    def __init__(self, session) -> None:
-        self.session = session
-        self.q: "queue.Queue[tuple]" = queue.Queue()
-        self.busy = False
-        self.t = threading.Thread(target=self._run, name="client-ui-worker", daemon=True)
-        self.t.start()
-
-    def _run(self) -> None:
-        while True:
-            fn, loop, fut = self.q.get()
-            if fn is None:
-                return
-            self.busy = True
-            try:
-                res = fn()
-                loop.call_soon_threadsafe(fut.set_result, res)
-            except Exception as e:                             # noqa: BLE001
-                logger.exception("turn failed")
-                loop.call_soon_threadsafe(fut.set_exception, e)
-            finally:
-                self.busy = False
-
-    async def run(self, fn):
-        loop = asyncio.get_running_loop()
-        fut = loop.create_future()
-        self.q.put((fn, loop, fut))
-        return await fut
-
-    def stop(self) -> None:
-        self.q.put((None, None, None))
-
-
 def make_app(session, kind: str, token: str) -> FastAPI:
     """`session` is an IntakeSession or PostSession (or a test double with
     the same methods); `kind` is "intake" or "post"."""
-    worker = Worker(session)
+    worker = Worker()
     sockets: Set[WebSocket] = set()
     state: Dict[str, Any] = {"opened": False}
 

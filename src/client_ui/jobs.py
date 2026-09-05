@@ -99,6 +99,18 @@ def surface_file(eng_dir: Path, claim_source: str) -> Path:
     return eng_dir / state.SURFACE / f"{slug(claim_source)}.surface.json"
 
 
+def latest_enumeration_run(eng_dir: Path, claim_source: str) -> Optional[Path]:
+    """The most recent enumeration run of this source that left a
+    claims.json, by the world-name fragment enumerate_steps gives it."""
+    runs = eng_dir / "runs"
+    if not runs.is_dir():
+        return None
+    frag = f"_enum_{eng_dir.name}_{slug(claim_source)}_"
+    hits = sorted(p for p in runs.iterdir()
+                  if p.is_dir() and frag in p.name and (p / "claims.json").is_file())
+    return hits[-1] if hits else None
+
+
 def enumerate_steps(eng_dir: Path, model: str, ts: str) -> List[Step]:
     steps: List[Step] = []
     for src in state.claim_sources(eng_dir):

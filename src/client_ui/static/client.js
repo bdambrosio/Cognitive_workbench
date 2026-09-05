@@ -1,8 +1,10 @@
 // The client page: one websocket, two panes. No framework.
 (function () {
   const token = new URLSearchParams(location.search).get("token") || "";
-  // The client page carries a token on the URL; the public demo carries none
-  // and identifies the visitor by cookie instead.
+  // The single-session page carries a token on the URL; the public demo
+  // carries none and identifies the visitor by cookie; the site carries the
+  // identity in a cookie or, locally, in ?as=. The page's query string is
+  // passed along whole.
   const tq = token ? "?token=" + encodeURIComponent(token) : "";
   const $ = (id) => document.getElementById(id);
   const messages = $("messages"), doc = $("doc"), evidence = $("evidence"), text = $("text"), send = $("send");
@@ -12,49 +14,11 @@
   let sources = [];             // post: the claim sources, for a bare "claim N"
   let lastReply = "";           // post: the agent's last words, so a reload reopens what they named
 
-  function esc(s) {
-    return String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
-  }
-
-  // ---- a small markdown renderer for the agent's replies ----
-  // Paragraphs, headings, bullet and numbered lists, fenced code, inline code,
-  // bold and italic. Everything is escaped first; nothing else is HTML.
-  function inline(s) {
-    return esc(s)
-      .replace(/`([^`]+)`/g, "<code>$1</code>")
-      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-      .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
-  }
-  function md(s) {
-    const out = [];
-    const lines = String(s || "").replace(/\r/g, "").split("\n");
-    let i = 0;
-    while (i < lines.length) {
-      const l = lines[i];
-      if (/^```/.test(l)) {
-        const buf = []; i++;
-        while (i < lines.length && !/^```/.test(lines[i])) buf.push(lines[i++]);
-        i++; out.push("<pre>" + esc(buf.join("\n")) + "</pre>"); continue;
-      }
-      const h = /^(#{1,3})\s+(.*)$/.exec(l);
-      if (h) { out.push("<h" + h[1].length + ">" + inline(h[2]) + "</h" + h[1].length + ">"); i++; continue; }
-      if (/^\s*[-*]\s+/.test(l)) {
-        const items = [];
-        while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*[-*]\s+/, ""));
-        out.push("<ul>" + items.map((t) => "<li>" + inline(t) + "</li>").join("") + "</ul>"); continue;
-      }
-      if (/^\s*\d+[.)]\s+/.test(l)) {
-        const items = [];
-        while (i < lines.length && /^\s*\d+[.)]\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*\d+[.)]\s+/, ""));
-        out.push("<ol>" + items.map((t) => "<li>" + inline(t) + "</li>").join("") + "</ol>"); continue;
-      }
-      if (!l.trim()) { i++; continue; }
-      const buf = [];
-      while (i < lines.length && lines[i].trim() && !/^(```|#{1,3}\s|\s*[-*]\s|\s*\d+[.)]\s)/.test(lines[i])) buf.push(lines[i++]);
-      out.push("<p>" + buf.map(inline).join("<br>") + "</p>");
-    }
-    return out.join("");
-  }
+  // The renderer is shared (md.js); this page also runs under the site's
+  // engagement paths, so every address is relative to the page's own path.
+  const esc = window.mdlib.esc, md = window.mdlib.render;
+  const base = location.pathname.replace(/\/$/, "");
+  const qs = location.search || tq;
 
   function addMessage(who, body, cls) {
     const el = document.createElement("div");
@@ -99,6 +63,24 @@
     if (firstChanged) { const el = $(firstChanged); if (el) el.scrollIntoView({block: "center", behavior: "smooth"}); }
     $("uploadLabel").hidden = false;
     if (d.uploads_dir) { $("uploadsHint").hidden = false; $("uploadsHint").textContent = "files for the seller go to: " + d.uploads_dir; }
+    // On the site the client finishes the intake from the page; the button
+    // is enabled once every slot is filled and stays until the practice
+    // has what it needs.
+    const fb = $("finishBtn");
+    if (fb && d.finish) {
+      fb.hidden = false;
+      fb.disabled = !d.finish.allowed || d.finish.done;
+      fb.textContent = d.finish.done ? "Intake finished" : "Finish intake";
+      fb.title = d.finish.allowed ? "" : "Every slot of the form has to be filled first.";
+    }
+  }
+  async function finishIntake() {
+    const fb = $("finishBtn");
+    fb.disabled = true;
+    const r = await fetch(base + "/api/finish" + qs, {method: "POST"});
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { addMessage("error", j.detail || ("finish failed: " + r.status), "error"); fb.disabled = false; return; }
+    addMessage("agent", "The intake is finished. " + ((j.next || {}).text || ""));
   }
 
   // ---- the report, and the evidence pane ----
@@ -173,7 +155,7 @@
   // ---- the websocket ----
   function connect() {
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    ws = new WebSocket(proto + "://" + location.host + "/ws" + tq);
+    ws = new WebSocket(proto + "://" + location.host + base + "/ws" + qs);
     ws.onopen = () => { $("conn").textContent = "connected"; };
     ws.onclose = () => { $("conn").textContent = "disconnected — retrying"; setTimeout(connect, 2000); };
     ws.onmessage = (ev) => {
@@ -212,12 +194,13 @@
     text.value = "";
   }
   $("compose").addEventListener("submit", (e) => { e.preventDefault(); submit(); });
+  if ($("finishBtn")) $("finishBtn").addEventListener("click", finishIntake);
   text.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } });
   $("file").addEventListener("change", async (e) => {
     const f = e.target.files[0];
     if (!f) return;
     const body = new FormData(); body.append("file", f);
-    const r = await fetch("/api/upload" + tq, {method: "POST", body});
+    const r = await fetch(base + "/api/upload" + qs, {method: "POST", body});
     if (!r.ok) addMessage("error", "upload failed: " + r.status, "error");
     e.target.value = "";
   });

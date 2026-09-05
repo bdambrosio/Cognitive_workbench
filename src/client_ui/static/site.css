@@ -1,0 +1,45 @@
+/* The engagement home and the claim surface, on the client page's palette. */
+main.site { grid-template-columns: minmax(360px, 5fr) minmax(360px, 6fr); }
+main.site.one { grid-template-columns: 1fr; }
+main.site section { overflow-y: auto; padding: 20px 28px; }
+main.site #stages { border-right: 1px solid var(--rule); }
+main.site h2 { font-size: 17px; margin: 0 0 12px; }
+.muted { color: var(--muted); }
+.mono { font-family: var(--mono); font-size: 13px; }
+.next { padding: 10px 14px; border: 1px solid var(--rule); border-radius: 6px; background: var(--panel2); }
+.next .who { font-family: var(--mono); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; margin-right: 8px; }
+.next .who.client { color: var(--ok); }
+.next .who.practice { color: var(--muted); }
+.stagelist { list-style: none; margin: 16px 0; padding: 0; }
+.stagelist li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 10px; border-left: 3px solid var(--rule); margin-bottom: 4px; }
+.stagelist li.done { border-left-color: var(--ok); }
+.stagelist li.current { border-left-color: var(--accent2); background: var(--panel2); }
+.stagelist li.todo { color: var(--muted); }
+.stagelist .mark { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.links { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
+.links .btn { display: block; padding: 10px 14px; border: 1px solid var(--rule); border-radius: 6px; text-decoration: none; color: var(--text); background: var(--panel); }
+.links .btn:hover { border-color: var(--accent2); }
+.letter { max-width: 760px; }
+.letter h1 { font-size: 20px; }
+.letter p { margin: .6em 0; }
+.accept { margin-top: 16px; }
+.tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 3px; margin-left: 8px; border: 1px solid var(--rule); color: var(--muted); vertical-align: middle; }
+.tag.current { color: var(--ok); border-color: var(--ok); }
+.source { margin-bottom: 32px; }
+table.claims { border-collapse: collapse; width: 100%; font-size: 14px; }
+table.claims th, table.claims td { border-bottom: 1px solid var(--rule); padding: 6px 8px; text-align: left; vertical-align: top; }
+table.claims th { color: var(--muted); font-weight: 500; font-size: 12px; }
+table.claims td.id { font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+table.claims td.quote { font-style: italic; color: var(--muted); max-width: 320px; overflow-wrap: anywhere; }
+table.claims td.statement { overflow-wrap: anywhere; }
+header a, .site a { color: #6ea0ff; }
+table.claims td[contenteditable] { outline: 1px dashed var(--rule); }
+table.claims td[contenteditable]:focus { outline: 1px solid var(--accent2); }
+table.claims tr.dropped td { text-decoration: line-through; opacity: .5; }
+table.claims td.comments { min-width: 220px; }
+table.claims .c { font-size: 13px; margin-bottom: 4px; }
+table.claims .c .by { color: var(--muted); font-family: var(--mono); font-size: 11px; }
+form.comment { display: flex; gap: 4px; margin-top: 4px; }
+form.comment input { flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--rule); border-radius: 4px; padding: 3px 6px; font: inherit; font-size: 13px; }
+form.comment button { padding: 3px 9px; font-size: 12px; }
+.actions { margin-top: 12px; display: flex; gap: 8px; }

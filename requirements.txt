@@ -22,6 +22,8 @@ websockets>=12.0
 # --- Web frontends (--ui, --resource-browser) ---
 fastapi>=0.116.0
 uvicorn[standard]>=0.35.0
+# The client site verifies Cloudflare Access tokens (src/client_ui/access.py).
+pyjwt[crypto]>=2.8
 
 # --- LLM clients ---
 # Cloud:
