@@ -937,6 +937,16 @@ def emit_findings(loop, method_text: str, claim_source: Path,
         f"The claim source for this run is `{claim_source.name}`. Its text, "
         f"with the line numbers your citations refer to:\n\n"
         f"{numbered(claim_source)}\n\n"
+        # A cited line of the claim source is the assertion restated, not
+        # evidence about it. Two runs on 2026-09-04, once the subagent could
+        # cite verbatim, cited README badge lines and rated the badge claims
+        # as holding; METHOD §2 makes the other materials the evidence
+        # sources and says nothing about this case in the adjudication's
+        # own words, so it is said here.
+        f"A line of the claim source is the claim, not evidence for it: a "
+        f"citation into `{claim_source.name}` restates the assertion and settles "
+        f"nothing. Evidence is what the other supplied materials show, per "
+        f"METHOD \u00a72 and \u00a77.\n\n"
         f"THE FROZEN CLAIM SURFACE. These are the claims you enumerated, and "
         f"the surface does not change. Adjudicate every one of them, and refer "
         f"to each by its id:\n\n"
