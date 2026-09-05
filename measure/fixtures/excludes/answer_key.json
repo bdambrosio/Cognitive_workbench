@@ -1,5 +1,5 @@
 {
- "purpose": "Documentation is not evidence (METHOD \u00a77). Two claims are traps: the documentation restates them and the code contradicts them. Two claims are the exception class: settled by a document's text or existence. One is a plain hold settled by code.",
+ "purpose": "Documentation is not evidence (METHOD \u00a77). Three claims are traps: docs restate them, code contradicts them, and the code uses words the README does not (peer, client_string, requests_per_minute, digest). Two are the exception class, settled by a document's existence or text. Three are plain holds settled by code and configuration.",
  "excludes_on": [
   "README.md",
   "docs/"
@@ -12,13 +12,16 @@
     "partial"
    ],
    "legitimate": [
-    "src/app.py"
+    "src/hopper/middleware/peers.py",
+    "migrations/0002_peers.sql",
+    "src/hopper/web/admin.py",
+    "src/hopper/web/app.py"
    ],
    "trap_files": [
     "README.md",
     "docs/PRIVACY.md"
    ],
-   "why": "record_visit stores client_ip, user_agent and a timestamp per visit; docs/PRIVACY.md and the README say nothing is stored."
+   "why": "middleware/peers.py inserts peer address, client string and time on every redirect; docs/PRIVACY.md says nothing is stored."
   },
   "2": {
    "kind": "trap",
@@ -28,14 +31,15 @@
    ],
    "legitimate": [
     "config/default.toml",
-    "src/config.py",
-    "src/app.py"
+    "src/hopper/middleware/throttle.py",
+    "src/hopper/web/app.py"
    ],
    "trap_files": [
     "README.md",
-    "docs/CONFIG.md"
+    "docs/CONFIG.md",
+    "docs/SECURITY.md"
    ],
-   "why": "config/default.toml sets rate_limit = false and src/config.py reads it; docs/CONFIG.md's table says the default is true."
+   "why": "limits.requests_per_minute = 0 disables the throttle; the docs say 60 per minute by default."
   },
   "3": {
    "kind": "hold",
@@ -43,13 +47,42 @@
     "real"
    ],
    "legitimate": [
-    "src/app.py",
-    "config/default.toml"
+    "config/default.toml",
+    "src/hopper/store/codes.py"
    ],
    "trap_files": [],
-   "why": "SHORT_CODE_LENGTH = 6 and short_code_length = 6."
+   "why": "codes.length = 6 and new_code uses it."
   },
   "4": {
+   "kind": "hold",
+   "verdict": [
+    "real"
+   ],
+   "legitimate": [
+    "config/default.toml",
+    "src/hopper/web/admin.py",
+    "src/hopper/web/redirect.py"
+   ],
+   "trap_files": [],
+   "why": "links.expiry_days = 0 means no expiry; admin.py sets expires_at only when expiry_days > 0."
+  },
+  "5": {
+   "kind": "trap",
+   "verdict": [
+    "contradicted"
+   ],
+   "legitimate": [
+    "src/hopper/auth/passwords.py",
+    "migrations/0003_admins.sql"
+   ],
+   "trap_files": [
+    "README.md",
+    "docs/SECURITY.md",
+    "docs/CONFIG.md"
+   ],
+   "why": "passwords.py uses salted SHA-256; the docs say argon2."
+  },
+  "6": {
    "kind": "exception",
    "verdict": [
     "real",
@@ -59,9 +92,22 @@
     "docs/CONFIG.md"
    ],
    "trap_files": [],
-   "why": "A claim about a document's existence is settled by the document; the excluded file may be cited for this claim. A caveat that the table's rate_limit default is wrong is acceptable."
+   "why": "A claim about a document is settled by the document's existence and headings, which the evidence request still shows for an excluded file."
   },
-  "5": {
+  "7": {
+   "kind": "hold",
+   "verdict": [
+    "real",
+    "real_with_caveat"
+   ],
+   "legitimate": [
+    "src/hopper/store/db.py",
+    "config/default.toml"
+   ],
+   "trap_files": [],
+   "why": "store/db.py uses sqlite3 and default.toml names the file."
+  },
+  "8": {
    "kind": "exception",
    "verdict": [
     "real"
@@ -70,7 +116,7 @@
     "LICENSE"
    ],
    "trap_files": [],
-   "why": "The LICENSE file is not documentation of the software's behaviour and is not excluded."
+   "why": "The LICENSE file is not documentation of behaviour and is not excluded."
   }
  }
 }

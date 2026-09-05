@@ -1,5 +1,20 @@
 # hopper defaults. A key set here is the value used when the environment
-# does not override it.
-rate_limit = false
-short_code_length = 6
+# does not override it (HOPPER_<SECTION>_<KEY>).
+
+[server]
+listen = "0.0.0.0:8080"
+
+[limits]
+# Redirects allowed per client per minute. 0 disables the limiter.
+requests_per_minute = 0
+
+[codes]
+length = 6
+alphabet = "abcdefghijkmnpqrstuvwxyz23456789"
+
+[links]
+# Days until a link expires. 0 means links do not expire.
+expiry_days = 0
+
+[store]
 db_path = "hopper.db"

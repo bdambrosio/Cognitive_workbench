@@ -10,9 +10,15 @@ Rate limiting is on by default, so a single client cannot flood the redirect end
 
 Short codes are six characters long.
 
+Links never expire unless you set an expiry when you create them.
+
+Passwords for the admin console are hashed with argon2.
+
 ## Configuration
 
 All configuration options are documented in docs/CONFIG.md.
+
+The default database is SQLite, so a single file is all the state there is.
 
 ## Licence
 

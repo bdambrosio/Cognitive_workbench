@@ -421,6 +421,24 @@ def _tool_list(repo_root: Path, path: Optional[str],
 # Tool: read
 # ---------------------------------------------------------------------------
 
+def _structure_only(path: Path, name: str) -> str:
+    """What `read` returns for an excluded document: that it exists, how
+    long it is, and its headings. Enough to settle a claim ABOUT the
+    document ("the options are documented in docs/CONFIG.md"), which the
+    first fixture run showed came back unsettled when the read was refused
+    outright; not enough to quote the body as evidence for a claim about
+    the software, which is what the exclusion is for."""
+    try:
+        lines = path.read_text(encoding='utf-8', errors='replace').splitlines()
+    except Exception as e:
+        return f"ERROR: read failed: {e}"
+    heads = [f"{i}|{ln}" for i, ln in enumerate(lines, 1) if ln.lstrip().startswith('#')][:40]
+    return (f"OK: {name} is documentation, excluded from evidence for this review: "
+            f"its body is not shown and cannot be cited for a claim about the "
+            f"software. It exists and has {len(lines)} lines"
+            + (". Its headings:\n" + "\n".join(heads) if heads else ".")
+            + "\nFor what the software does, read the code, configuration and build files.")
+
 def _tool_read(repo_root: Path, name: str,
                start_line: Optional[int], end_line: Optional[int],
                excludes: Optional[List[str]] = None) -> str:
@@ -430,10 +448,7 @@ def _tool_read(repo_root: Path, name: str,
     if path is None:
         return f"ERROR: read invalid or out-of-scope file: {name!r}"
     if _excluded(_rel_to_root(repo_root, path), excludes):
-        return (f"ERROR: read refused: {name} is documentation, excluded from "
-                f"evidence for this review. It restates claims and cannot be "
-                f"cited for one; its existence is visible in `list`. Read the "
-                f"code, configuration or build files the claim is about.")
+        return _structure_only(path, name)
     if _is_gitignored(repo_root, path):
         return (f"ERROR: read refused: {name} is gitignored "
                 f"(generated or runtime artifact, not source). list and "
@@ -586,9 +601,11 @@ class CodeSubagent(Subagent):
         if self.excludes:
             text += ("\n\n## Excluded from evidence\n\nThese paths are documentation "
                      "for this review: " + ", ".join(self.excludes) + ". They "
-                     "restate the claims and are not evidence for them. `read`, "
-                     "`cite` and `grep` do not open them; `list` shows them marked. "
-                     "Answer from the code, configuration and build files.")
+                     "restate the claims and are not evidence for them. `read` on one "
+                     "returns only that it exists, its length and its headings; `cite` "
+                     "refuses it; `grep` skips it; `list` shows it marked. That is enough "
+                     "for a claim about the document itself. For what the software does, "
+                     "answer from the code, configuration and build files.")
         return text
 
     def primitives(self):
@@ -626,6 +643,10 @@ class CodeSubagent(Subagent):
         if e - s + 1 > _MAX_CITE_LINES:
             return (f"ERROR: cite span of {e - s + 1} lines exceeds the cap of "
                     f"{_MAX_CITE_LINES}; cite the lines the caller will quote")
+        path = _safe_resolve(self.repo_root, name, must_be_file=True)
+        if path is not None and _excluded(_rel_to_root(self.repo_root, path), self.excludes):
+            return (f"ERROR: cite refused: {name} is documentation, excluded from "
+                    f"evidence for this review; its text cannot be carried as a quote.")
         out = _tool_read(self.repo_root, name, s, e, self.excludes)
         if not out.startswith('OK: '):
             return out

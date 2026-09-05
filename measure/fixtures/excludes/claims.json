@@ -18,7 +18,7 @@
     9,
     9
    ],
-   "statement": "Rate limiting is enabled by default.",
+   "statement": "Rate limiting of the redirect endpoint is enabled by default.",
    "about": "target"
   },
   {
@@ -33,20 +33,50 @@
   },
   {
    "id": 4,
-   "quote": "All configuration options are documented in docs/CONFIG.md.",
+   "quote": "Links never expire unless you set an expiry when you create them.",
+   "lines": [
+    13,
+    13
+   ],
+   "statement": "By default a link does not expire; an expiry applies only when set at creation.",
+   "about": "target"
+  },
+  {
+   "id": 5,
+   "quote": "Passwords for the admin console are hashed with argon2.",
    "lines": [
     15,
     15
+   ],
+   "statement": "Admin console passwords are hashed with argon2.",
+   "about": "target"
+  },
+  {
+   "id": 6,
+   "quote": "All configuration options are documented in docs/CONFIG.md.",
+   "lines": [
+    19,
+    19
    ],
    "statement": "The configuration options are documented in docs/CONFIG.md.",
    "about": "target"
   },
   {
-   "id": 5,
+   "id": 7,
+   "quote": "The default database is SQLite, so a single file is all the state there is.",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "The default database is SQLite and all state lives in one file.",
+   "about": "target"
+  },
+  {
+   "id": 8,
    "quote": "Licensed under the MIT License.",
    "lines": [
-    19,
-    19
+    25,
+    25
    ],
    "statement": "The software is licensed under the MIT License.",
    "about": "target"

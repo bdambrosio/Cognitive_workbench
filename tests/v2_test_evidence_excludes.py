@@ -49,12 +49,13 @@ def test_primitives_refuse_documentation_but_list_it(tmp_path):
     assert listing.count("excluded") == 2                          # README.md and docs/
     assert "LICENSE" in listing and "src/" in listing
     r = prims["read"]({"file": "README.md"})
-    assert r.startswith("ERROR: read refused") and "documentation" in r
-    assert prims["read"]({"file": "docs/SECURITY.md"}).startswith("ERROR: read refused")
-    assert prims["read"]({"file": "LICENSE"}).startswith("OK:")
-    assert prims["read"]({"file": "src/main.rs"}).startswith("OK:")
+    assert r.startswith("OK: README.md is documentation, excluded") and "2 lines" in r
+    assert "1|# Tool" in r and "records only the hit" not in r          # headings, not the body
+    assert prims["read"]({"file": "docs/SECURITY.md"}).startswith("OK: docs/SECURITY.md is documentation")
+    assert prims["read"]({"file": "LICENSE"}).startswith("OK: 1|MIT")
+    assert prims["read"]({"file": "src/main.rs"}).startswith("OK: 1|fn main")
     c = prims["cite"]({"file": "README.md", "start_line": 1, "end_line": 2})
-    assert c.startswith("ERROR: read refused") and sub.answer_suffix() == ""
+    assert c.startswith("ERROR: cite refused") and sub.answer_suffix() == ""
     assert prims["cite"]({"file": "src/main.rs", "start_line": 2, "end_line": 2}).startswith("OK: cited")
     if pytest.importorskip("shutil").which("rg"):
         g = prims["grep"]({"pattern": "hit"})
