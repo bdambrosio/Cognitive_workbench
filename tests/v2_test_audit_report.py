@@ -77,7 +77,7 @@ def test_assemble_without_prose_leaves_markers_and_orders_by_rating():
     assert ex.index("claim 5") < ex.index("claim 1")
     # order of sections
     order = ["## The transaction", "## Executive summary", "## Scope and approach",
-             "## How to read a finding", "## What the audit showed", "## Unsettled claims",
+             "## How to read a finding", "## What the review showed", "## Unsettled claims",
              "## Claims not examined", "## Claims that hold", "## Questions for the seller",
              "## Coverage", "## Limitations", "## Appendix"]
     idx = [doc.index(h) for h in order]
@@ -86,7 +86,7 @@ def test_assemble_without_prose_leaves_markers_and_orders_by_rating():
     assert "| README.md | 5 | 5 | yes | 12 | 3 | m |" in scope and "[[scope_note]]" in scope
     assert "| unsettled, or not examined |" in doc                    # the crosswalk
     # decisive before material within the shown section
-    shown = doc[doc.index("## What the audit showed"):doc.index("## Unsettled claims")]
+    shown = doc[doc.index("## What the review showed"):doc.index("## Unsettled claims")]
     assert shown.index("claim 5 — materiality: decisive") < shown.index("claim 1 — materiality: material")
     assert "**The gap:** g5" in shown and "`app/x.py`, lines 3–4" in shown
     unsettled = doc[doc.index("## Unsettled claims"):doc.index("## Claims not examined")]
@@ -99,7 +99,7 @@ def test_assemble_without_prose_leaves_markers_and_orders_by_rating():
     assert "| contradicted | shown | 1 |" in cov and "| unverifiable | unsettled | 2 |" in cov
     assert "Not examined: 1." in cov and "- `app/h.py`" in cov
     lim = doc[doc.index("## Limitations"):doc.index("## Appendix")]
-    assert "[[limitations]]" in lim and "has not confirmed the audit's interpretation" in lim
+    assert "[[limitations]]" in lim and "has not confirmed the review's interpretation" in lim
     assert "- (README.md) who?" in doc
 
 
@@ -196,7 +196,7 @@ def test_an_outside_claim_shows_the_links_the_claim_source_gives():
                 {"quote": "see https://docs.example.com/x, then", "lines": [12, 12]}])
     out = "\n".join(render._finding(linked, None, "exposure"))
     assert ("**Where the claim source points:** <https://apps.shopify.com/chattermate-chat>, "
-            "<https://docs.example.com/x>. The audit did not follow") in out
+            "<https://docs.example.com/x>. The practice did not follow") in out
     unlinked = f(2, "pip install chattermate-cli")
     assert "Where the claim source points" not in "\n".join(render._finding(unlinked, None, "exposure"))
     badge = f(4, "[![npm version](https://img.shields.io/npm/v/x.svg)]"
