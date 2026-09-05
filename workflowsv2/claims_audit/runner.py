@@ -184,8 +184,7 @@ def engagement_state(world: str, agent: str, leg: int, max_legs: int,
     # agreeing by coincidence: CONTRIBUTING.md is not a claim source and
     # llms.txt is not matched by the glob.
     traces = REPO / "scenarios" / world / agent / "inspect_traces"
-    opened = len(list(traces.glob("inspect_external_*.txt"))) \
-        if traces.is_dir() else 0
+    opened = len(evidence_traces(traces))
     head = (f"\n\n[engagement state, recorded by the client's process — "
             f"leg {leg} of {max_legs}, {elapsed_s / 60:.0f} min elapsed")
     # A COUNT THAT ONLY GROWS. A fraction saturates and reads as "finished";
@@ -252,6 +251,18 @@ def git_rev(path: Path) -> Optional[str]:
 
 _TRACE_CLAIMS = re.compile(r"^Query: \[claims ([\d, ]+)\]", re.M)
 
+#: Every evidence request in a traces directory, in time order. The subagent
+#: writes `inspect_external_*`; `extract_external_*` is the record of the
+#: 2026-09-04 top-level extract tool, withdrawn the same day (the auditor took
+#: the narrow path and missed the material finding), kept readable so that
+#: run's record still adjudicates.
+def evidence_traces(traces: Path) -> List[Path]:
+    if not traces.is_dir():
+        return []
+    return sorted(list(traces.glob("inspect_external_*.txt"))
+                  + list(traces.glob("extract_external_*.txt")),
+                  key=lambda t: t.name.split("_", 2)[-1])
+
 
 def trace_claims(text: str) -> List[int]:
     """The claim ids an evidence request was filed under, from the `[claims
@@ -264,7 +275,7 @@ def trace_index(traces: Path) -> Dict[Path, Dict[str, Any]]:
     """Every evidence request: the claims it named, its size in full and
     in the trimmed form the adjudication is normally handed."""
     out: Dict[Path, Dict[str, Any]] = {}
-    for t in sorted(traces.glob("inspect_external_*.txt")) if traces.is_dir() else []:
+    for t in evidence_traces(traces):
         text = t.read_text(encoding="utf-8", errors="replace")
         out[t] = {"claims": trace_claims(text), "chars": len(text),
                   "trimmed": len(trim_trace(text))}
@@ -1255,8 +1266,8 @@ def main() -> int:
                 # is a model going round in circles rather than reading.
                 if exit_reason == "max_iters":
                     max_iters_legs += 1
-                    traces_now = len(list((REPO / "scenarios" / args.world / name
-                                           / "inspect_traces").glob("inspect_external_*.txt")))
+                    traces_now = len(evidence_traces(REPO / "scenarios" / args.world / name
+                                                     / "inspect_traces"))
                     if traces_now <= traces_before:
                         error = (f"turn {i + 1} hit max_iters and made no new "
                                  f"evidence request — run is not valid")
