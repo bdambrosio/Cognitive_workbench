@@ -32,3 +32,6 @@ table.stages td { padding: 3px 8px; }
 .buttons { margin: 10px 0; display: flex; gap: 8px; flex-wrap: wrap; }
 .pages { margin: 6px 0 10px; font-size: 13px; }
 .pages a, .job a { color: #6ea0ff; }
+.settings label { display: block; margin: 8px 0; font-size: 13px; color: var(--muted); }
+.settings input, .settings textarea { display: block; width: 100%; margin-top: 3px; background: var(--bg); color: var(--text); border: 1px solid var(--rule); border-radius: 4px; padding: 6px 8px; font: inherit; font-size: 14px; }
+.settings textarea { font-family: var(--mono); font-size: 13px; }

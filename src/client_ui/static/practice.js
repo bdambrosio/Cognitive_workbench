@@ -86,6 +86,14 @@
     h += "</div>";
     const srcs = (e.surfaces || []).map((s) => esc(s.source) + " (" + s.claims + (s.frozen ? ", frozen" : "") + ")").join(", ");
     h += '<div class="muted">claim sources: ' + (srcs || "none in engagement.yaml") + "</div>";
+    const st = e.settings || {};
+    h += '<h3>Settings</h3><div class="settings">'
+      + '<label>claim sources, one per line, by path from the target root<textarea id="setSources" rows="3">' + esc((st.claim_sources || []).join("\n")) + "</textarea></label>"
+      + '<label>client emails, comma-separated (new ones are added to the Access policy and mailed the link)<input id="setEmails" value="' + esc((st.client_emails || []).join(", ")) + '"></label>'
+      + '<label>target (path; "target" is the engagement\'s own clone)<input id="setTarget" value="' + esc(st.target || "") + '"></label>'
+      + '<label>retention<input id="setRetention" value="' + esc(st.retention || "") + '"></label>'
+      + '<label>engagement letter' + (st.letter_is_template ? ' <span class="muted">(empty: the template is shown)</span>' : "") + '<textarea id="setLetter" rows="6" placeholder="Leave empty to show the practice\'s template letter.">' + esc(st.letter || "") + "</textarea></label>"
+      + '<button id="setSave">Save settings</button></div>';
     return h;
   }
   function renderDetail() {
@@ -120,6 +128,16 @@
         if (j) { data = j; render(); }
       });
     }
+    if ($("setSave")) $("setSave").addEventListener("click", async () => {
+      const body = {
+        claim_sources: $("setSources").value.split("\n").map((x) => x.trim()).filter(Boolean),
+        client_emails: $("setEmails").value.split(",").map((x) => x.trim()).filter(Boolean),
+        target: $("setTarget").value.trim(), retention: $("setRetention").value.trim(),
+        letter: $("setLetter").value,
+      };
+      const j = await api("api/engagements/" + encodeURIComponent(e.name) + "/settings", body);
+      if (j) { data = j.engagements; render(); say(j.policy ? ("saved · Access policy: " + j.policy.reason + (j.policy.added.length ? " " + j.policy.added.join(", ") : "")) : "saved"); }
+    });
     for (const b of document.querySelectorAll("#detail button[data-site]")) {
       b.addEventListener("click", async () => {
         const [what, a, val] = b.dataset.site.split(":");

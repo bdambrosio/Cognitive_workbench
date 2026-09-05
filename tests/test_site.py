@@ -237,3 +237,30 @@ def test_next_step_order(tmp_path, monkeypatch):
     seq.append(site.next_step(eng)["stage"])
     assert seq == ["letter", "intake", "materials", "enumeration", "enumeration", "surface",
                    "chain", "chain", "release", "report", "closed"]
+
+
+def test_settings_write_the_engagement_file_letter_and_policy(env, monkeypatch):
+    c, root = env
+    _new(c)
+    from client_ui import cf_access
+    synced = []
+    monkeypatch.setattr(cf_access, "ensure_emails", lambda emails: synced.append(list(emails)) or {"synced": True, "added": list(emails), "reason": "added"})
+    mail.sent.clear()
+    r = c.post("/p/api/engagements/e1/settings" + _as(PRACTICE), json={
+        "claim_sources": ["README.md", " docs/llms.txt ", ""], "client_emails": [CLIENT, "second@example.test"],
+        "target": "target", "letter": "# Our letter\n\nSigned.\n"})
+    assert r.status_code == 200, r.text
+    e = next(x for x in r.json()["engagements"] if x["name"] == "e1")
+    assert e["claim_sources"] == ["README.md", "docs/llms.txt"]
+    assert e["client_emails"] == [CLIENT, "second@example.test"]
+    assert e["settings"]["letter"].startswith("# Our letter") and e["settings"]["letter_is_template"] is False
+    assert r.json()["policy"]["added"] == ["second@example.test"]
+    assert synced == [["second@example.test"]]                  # only the new address
+    assert mail.sent[-1]["to"] == ["second@example.test"]
+    assert "Our letter" in c.get("/e/e1/api/status" + _as(CLIENT)).json()["letter"]
+    # an empty letter removes the engagement's own and shows the template again
+    r = c.post("/p/api/engagements/e1/settings" + _as(PRACTICE), json={"letter": ""})
+    assert r.json()["policy"] is None
+    assert "Terms **here**" in c.get("/e/e1/api/status" + _as(CLIENT)).json()["letter"]
+    assert st.claim_sources(root / "e1") == ["README.md", "docs/llms.txt"]     # untouched by a letter-only save
+    assert c.post("/p/api/engagements/e1/settings" + _as(CLIENT), json={"letter": "x"}).status_code == 403

@@ -51,7 +51,7 @@ from fastapi.staticfiles import StaticFiles                                     
 from pydantic import BaseModel                                                    # noqa: E402
 
 from workflowsv2 import engagement_state as state               # noqa: E402
-from client_ui import jobs, mail                                # noqa: E402
+from client_ui import cf_access, jobs, mail                     # noqa: E402
 from client_ui.access import Access, LOCAL_COOKIE               # noqa: E402
 from client_ui.app import _announce, _SAFE                      # noqa: E402
 from client_ui.registry import Registry                         # noqa: E402
@@ -221,6 +221,14 @@ class Source(BaseModel):
     source: str
 
 
+class Settings(BaseModel):
+    claim_sources: Optional[List[str]] = None
+    client_emails: Optional[List[str]] = None
+    target: Optional[str] = None
+    retention: Optional[str] = None
+    letter: Optional[str] = None            # "" removes the engagement's own letter
+
+
 # ---- the app ------------------------------------------------------------------
 
 def make_site_app(access: Access, model: Optional[Path] = None,
@@ -274,9 +282,9 @@ def make_site_app(access: Access, model: Optional[Path] = None,
             resp.set_cookie(LOCAL_COOKIE, request.query_params["as"], samesite="lax")
         return resp
 
-    def _act(fn, *args):
+    def _act(fn, *args, **kwargs):
         try:
-            return fn(*args)
+            return fn(*args, **kwargs)
         except SystemExit as e:
             raise HTTPException(status_code=400, detail=str(e))
         except jobs.JobRunning as e:
@@ -500,8 +508,18 @@ def make_site_app(access: Access, model: Optional[Path] = None,
                              for src in s["claim_sources"]]
             cur = state.current_run(d, s["current_intake"])
             s["report_exists"] = bool(cur and (cur / "report.md").is_file())
+            s["settings"] = _settings(d)
             out.append(s)
         return out
+
+    def _settings(eng_dir: Path) -> Dict[str, Any]:
+        cfg = state._engagement_yaml(eng_dir)
+        own = eng_dir / "letter.md"
+        return {"claim_sources": state.claim_sources(eng_dir),
+                "client_emails": state.client_emails(eng_dir),
+                "target": str(cfg.get("target") or ""), "retention": str(cfg.get("retention") or ""),
+                "letter": own.read_text(encoding="utf-8") if own.is_file() else "",
+                "letter_is_template": not own.is_file()}
 
     def _practice(request: Request) -> str:
         email, _, _ = _require(request, None, ("practice",))
@@ -526,11 +544,37 @@ def make_site_app(access: Access, model: Optional[Path] = None,
              body.client_emails, email)
         clients = state.client_emails(state.ENGAGEMENTS / body.name)
         if clients:
+            cf_access.ensure_emails(clients)
             mail.send(clients, "Tuuyi: your engagement page",
                       "Your engagement with Tuuyi is open. The page below shows where "
                       "it stands and what happens next. Start by reading the "
                       "engagement letter.", _link(body.name))
         return JSONResponse(_all())
+
+    @app.post("/p/api/engagements/{name}/settings")
+    async def change_settings(name: str, body: Settings, request: Request):
+        """The practice sets the engagement's claim sources, client emails,
+        target and retention, and its own letter. New client emails are added
+        to the Access policy."""
+        _practice(request)
+        eng_dir = _eng(name)
+        before = set(state.client_emails(eng_dir))
+        _act(state.update_engagement, eng_dir, claim_sources=body.claim_sources,
+             client_emails=body.client_emails, target=body.target, retention=body.retention)
+        if body.letter is not None:
+            own = eng_dir / "letter.md"
+            if body.letter.strip():
+                own.write_text(body.letter, encoding="utf-8")
+            elif own.is_file():
+                own.unlink()
+        sync = None
+        new = [e for e in state.client_emails(eng_dir) if e not in before]
+        if new:
+            sync = cf_access.ensure_emails(new)
+            mail.send(new, "Tuuyi: your engagement page",
+                      "Your engagement with Tuuyi is open. The page below shows where "
+                      "it stands and what happens next.", _link(name))
+        return JSONResponse({"engagements": _all(), "policy": sync})
 
     @app.post("/p/api/engagements/{name}/intake/current")
     async def intake_current(name: str, body: Choice, request: Request):

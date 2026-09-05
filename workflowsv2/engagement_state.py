@@ -199,6 +199,33 @@ def claim_sources(eng_dir: Path) -> List[str]:
     return [str(c) for c in (_engagement_yaml(eng_dir).get("claim_sources") or [])]
 
 
+#: The keys of engagement.yaml the practice page may set. Everything else
+#: in the file is kept as it is; the file's comments are not (yaml rewrites).
+SETTABLE = ("claim_sources", "client_emails", "target", "retention")
+
+
+@_locked
+def update_engagement(eng_dir: Path, **fields: Any) -> Dict[str, Any]:
+    """Set some of SETTABLE in engagement.yaml and return the whole file as
+    data. A key given as None is left alone; an empty list is written."""
+    import yaml
+    bad = [k for k in fields if k not in SETTABLE]
+    if bad:
+        raise SystemExit(f"not settable: {', '.join(bad)} (have: {', '.join(SETTABLE)})")
+    cfg = _engagement_yaml(eng_dir)
+    for k, v in fields.items():
+        if v is None:
+            continue
+        if k in ("claim_sources", "client_emails"):
+            v = [str(x).strip() for x in v if str(x).strip()]
+        else:
+            v = str(v).strip()
+        cfg[k] = v
+    atomic_write_text(eng_dir / "engagement.yaml",
+                      yaml.safe_dump(cfg, sort_keys=False, allow_unicode=True))
+    return cfg
+
+
 # ---- stages -----------------------------------------------------------------
 
 @_locked
