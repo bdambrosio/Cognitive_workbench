@@ -1,11 +1,11 @@
-// Theme: follows the system unless the visitor chose; the choice is remembered in this browser.
+// Theme: dark unless the visitor chose light; the choice is remembered in this browser.
 (function () {
   const root = document.documentElement, key = "theme";
   let saved = null; try { saved = localStorage.getItem(key); } catch (e) {}
-  if (saved) root.dataset.theme = saved;
+  if (saved === "light") root.dataset.theme = "light";
   const btn = document.getElementById("theme");
   if (!btn) return;
-  const isDark = () => root.dataset.theme === "dark" || (!root.dataset.theme && matchMedia("(prefers-color-scheme: dark)").matches);
+  const isDark = () => root.dataset.theme !== "light";
   const label = () => { btn.textContent = isDark() ? "light" : "dark"; };
   btn.addEventListener("click", () => {
     root.dataset.theme = isDark() ? "light" : "dark";
