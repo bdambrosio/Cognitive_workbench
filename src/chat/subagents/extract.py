@@ -95,8 +95,11 @@ def extract_external(repo_root: Path, trace_dir: Path, *,
         query = prefix + f"read {file} lines {s}-{e}"
         action = {"tool": "read", "file": file, "start_line": s, "end_line": e}
         # The reference line is what trim_trace keys on; the lines follow it
-        # exactly as read.
-        answer = f"{file}:{s}-{e}\n{obs}"
+        # exactly as read. The observation keeps the OK:/EMPTY:/ERROR:
+        # prefix convention (src/chat/CLAUDE.md), so the reference sits
+        # after the prefix.
+        answer = (f"OK: {file}:{s}-{e}\n{obs[4:]}" if obs.startswith("OK: ")
+                  else obs)
     else:
         return ("ERROR: extract_external needs `file` with `lines` [start, end], "
                 "or `pattern` (optionally with `file`)")

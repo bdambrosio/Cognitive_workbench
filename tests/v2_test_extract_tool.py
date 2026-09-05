@@ -32,7 +32,7 @@ def test_read_span_is_verbatim_and_traced():
         root = _repo(Path(d)); traces = Path(d) / "inspect_traces"
         out = extract_external(root, traces, file="backend/utils.rs",
                                lines=[2, 3], claims=[22, "9"])
-        assert out.startswith("backend/utils.rs:2-3\n"), out
+        assert out.startswith("OK: backend/utils.rs:2-3\n"), out
         assert "2|// Generate a random link" in out and "3|fn gen_link" in out
         assert "1|fn a()" not in out and "4|let hits" not in out
         t = evidence_traces(traces)
