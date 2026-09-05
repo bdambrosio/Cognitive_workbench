@@ -760,6 +760,10 @@ def make_site_app(access: Access, model: Optional[Path] = None,
         rows = decompose.append_subclaims(list(body.claims), parent, res["subclaims"], email)
         logger.info("decompose %s claim %s: %d proposed, %d declined, parse %s", name, body.claim_id,
                     len(rows), len(res["declined"]), res["parse"])
+        for d in res["declined"]:
+            logger.info("  declined: %s — %s", d.get("text"), d.get("why"))
+        for r in rows:
+            logger.info("  proposed: %s", r.get("statement"))
         return JSONResponse({"subclaims": rows, "declined": res["declined"], "parse": res["parse"]})
 
     _backend_cache: Dict[str, Any] = {}

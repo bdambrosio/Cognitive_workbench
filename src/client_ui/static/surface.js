@@ -45,10 +45,12 @@
       const cm = byClaim[String(c.id)] || [];
       h += '<tr data-src="' + esc(src.slug) + '" data-id="' + esc(c.id) + '">'
         + '<td class="id">' + esc(c.id) + (c.about === "seller" ? '<div class="muted">seller</div>' : c.about === "document" ? '<div class="muted">document</div>' : "")
-          + (c.implied_by != null ? '<div class="muted">implied by ' + esc(c.implied_by) + "</div>" : "") + "</td>"
+          + (c.implied_by != null ? '<div class="muted">implied by ' + esc(c.implied_by) + "</div>" : "")
+          + ((c.declined || []).length ? '<div class="declined">not decomposed: ' + c.declined.map((d) => esc(d.text) + " (" + esc(d.why) + ")").join("; ") + "</div>" : "") + "</td>"
         + '<td class="lines mono"' + (ed ? ' contenteditable="true"' : "") + ">" + esc((c.lines || []).join("–")) + "</td>"
         + '<td class="quote"' + (ed ? ' contenteditable="true"' : "") + ">" + esc(c.quote) + "</td>"
         + '<td class="statement"' + (ed ? ' contenteditable="true"' : "") + ">" + esc(c.statement) + "</td>"
+        // (the declined parts of a decomposed claim are shown under its id, below)
         + '<td class="comments">' + cm.map((x) => '<div class="c"><span class="by">' + esc(x.by) + "</span> " + esc(x.text) + "</div>").join("")
         + '<form class="comment" data-src="' + esc(src.source) + '" data-id="' + esc(c.id) + '"><input placeholder="comment"><button>add</button></form></td>'
         + (ed ? '<td><button class="quiet drop" title="leave this claim out">drop</button>'
@@ -91,6 +93,8 @@
         if (!j) { b.disabled = false; b.textContent = "decompose"; return; }
         // The proposals join the draft as rows the practice can edit or drop; save keeps them.
         const current = claimsOf(src);
+        const parent = current.find((c) => c.id === id);
+        if (parent) parent.declined = j.declined || [];        // the reasons stay with the claim, and are saved with the draft
         for (const row of j.subclaims) current.push(row);
         src.claims = current;
         render();
