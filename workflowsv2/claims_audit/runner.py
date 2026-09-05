@@ -184,8 +184,7 @@ def engagement_state(world: str, agent: str, leg: int, max_legs: int,
     # agreeing by coincidence: CONTRIBUTING.md is not a claim source and
     # llms.txt is not matched by the glob.
     traces = REPO / "scenarios" / world / agent / "inspect_traces"
-    opened = len(list(traces.glob("inspect_external_*.txt"))) \
-        if traces.is_dir() else 0
+    opened = len(evidence_traces(traces))
     head = (f"\n\n[engagement state, recorded by the client's process — "
             f"leg {leg} of {max_legs}, {elapsed_s / 60:.0f} min elapsed")
     # A COUNT THAT ONLY GROWS. A fraction saturates and reads as "finished";
@@ -252,6 +251,17 @@ def git_rev(path: Path) -> Optional[str]:
 
 _TRACE_CLAIMS = re.compile(r"^Query: \[claims ([\d, ]+)\]", re.M)
 
+#: Every evidence request in a traces directory, in time order. Two tools
+#: write them: `inspect_external` (the subagent) and, when the run enables
+#: it, `extract_external` (chat/subagents/extract.py, verbatim lines, no
+#: subagent). Same trace shape; the prefix says which.
+def evidence_traces(traces: Path) -> List[Path]:
+    if not traces.is_dir():
+        return []
+    return sorted(list(traces.glob("inspect_external_*.txt"))
+                  + list(traces.glob("extract_external_*.txt")),
+                  key=lambda t: t.name.split("_", 2)[-1])
+
 
 def trace_claims(text: str) -> List[int]:
     """The claim ids an evidence request was filed under, from the `[claims
@@ -264,7 +274,7 @@ def trace_index(traces: Path) -> Dict[Path, Dict[str, Any]]:
     """Every evidence request: the claims it named, its size in full and
     in the trimmed form the adjudication is normally handed."""
     out: Dict[Path, Dict[str, Any]] = {}
-    for t in sorted(traces.glob("inspect_external_*.txt")) if traces.is_dir() else []:
+    for t in evidence_traces(traces):
         text = t.read_text(encoding="utf-8", errors="replace")
         out[t] = {"claims": trace_claims(text), "chars": len(text),
                   "trimmed": len(trim_trace(text))}
@@ -375,7 +385,8 @@ def build_config(world: str, model_path: Optional[Path],
                  workflow_mode: Optional[bool] = None,
                  temperature: Optional[float] = None,
                  max_tokens: Optional[int] = None,
-                 external_repo: Optional[Path] = None
+                 external_repo: Optional[Path] = None,
+                 extract_tool: bool = False
                  ) -> Tuple[str, Dict[str, Any]]:
     from launcher import parse_characters                      # noqa: E402
 
@@ -424,6 +435,11 @@ def build_config(world: str, model_path: Optional[Path],
     # grader 2026-08-23, silently, three times in eleven.
     if max_tokens is not None:
         cfg.setdefault("chat", {})["react_max_tokens"] = max_tokens
+    # An experiment (2026-09-04): the verbatim extract tool beside the
+    # subagent. Off unless asked, so a run without the flag is the run
+    # main always made.
+    if extract_tool:
+        cfg.setdefault("chat", {})["extract_tool"] = True
     return name, cfg
 
 
@@ -1039,6 +1055,9 @@ def main() -> int:
                     help="characters of evidence traces handed to each "
                          "adjudication call (default %(default)s); over it, "
                          "every trace is handed over in compact form")
+    ap.add_argument("--extract-tool", action="store_true",
+                    help="offer `extract_external` (verbatim lines, no subagent) "
+                         "beside `inspect_external`; an experiment, off by default")
     ap.add_argument("--workflow-mode", choices=("on", "off"), default=None,
                     help="override the scenario's workflow_mode; omit to use "
                          "whatever audit.yaml declares")
@@ -1083,7 +1102,7 @@ def main() -> int:
                          f"{eng['target']} does not exist")
     name, cfg = build_config(args.world, args.model, wf_mode,
                              args.temperature, args.max_tokens,
-                             eng["target"])
+                             eng["target"], extract_tool=args.extract_tool)
     logger.info("world=%s model=%s model=%s", args.world, args.model,
                 (cfg.get("llm_config") or {}).get("model") or "(scenario default)")
 
@@ -1123,13 +1142,14 @@ def main() -> int:
         "  omitted tools     %d\n"
         "  max legs          %d\n"
         "  react_max_tokens  %s\n"
+        "  extract_tool      %s\n"
         "=== end configuration; everything after this is a chat message ===",
         args.world, name, cfg.get("external_repo"), cfg.get("inspect_repo"),
         cfg.get("workflow"), eng["brief"], ", ".join(eng["claim_sources"] or []),
         cfg.get("autonomy_enabled"), cfg.get("workflow_mode"),
         "; ".join(getattr(loop, "workflow_suppressed", []) or ["(none)"]),
         len(_chat.get("omitted_tools") or []), args.max_turns,
-        _chat.get("react_max_tokens"))
+        _chat.get("react_max_tokens"), bool(_chat.get("extract_tool")))
 
     t0 = time.time()
     legs, error = [], None
@@ -1255,8 +1275,8 @@ def main() -> int:
                 # is a model going round in circles rather than reading.
                 if exit_reason == "max_iters":
                     max_iters_legs += 1
-                    traces_now = len(list((REPO / "scenarios" / args.world / name
-                                           / "inspect_traces").glob("inspect_external_*.txt")))
+                    traces_now = len(evidence_traces(REPO / "scenarios" / args.world / name
+                                                     / "inspect_traces"))
                     if traces_now <= traces_before:
                         error = (f"turn {i + 1} hit max_iters and made no new "
                                  f"evidence request — run is not valid")
@@ -1658,6 +1678,7 @@ def main() -> int:
             "react_temperature", 0.7),
         "react_max_tokens": (cfg.get("chat") or {}).get(
             "react_max_tokens", 8192),
+        "extract_tool": bool((cfg.get("chat") or {}).get("extract_tool")),
         # THE SETTINGS THAT ACTUALLY APPLIED, resolved from the model rather
         # than copied from config. A row that cannot name its own sampling
         # settings is not evidence — the rule that already governs the served

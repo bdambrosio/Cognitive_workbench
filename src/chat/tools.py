@@ -304,6 +304,18 @@ class ToolsMixin:
                 "if the user names a file that is part of YOUR substrate, use `inspect` instead. Phrase as a "
                 "natural-language question (e.g. \"how does this project structure its modules?\", "
                 "\"what does the README say about installation?\", \"where is the main entry point?\")."))
+            if getattr(self, '_extract_tool', False):
+                tools.append(("extract_external",
+                    "`{\"thought\": \"<one terse sentence>\", \"tool\": \"extract_external\", \"file\": <path>, "
+                    "\"lines\": [<start>, <end>], \"claims\": [<int>, ...]}` or "
+                    "`{\"thought\": ..., \"tool\": \"extract_external\", \"pattern\": <string>, \"file\": <path, optional>, "
+                    "\"claims\": [<int>, ...]}` — "
+                    f"the exact lines of a file in `{external_repo}`, numbered, returned verbatim with no "
+                    "subagent in between; or the lines matching a pattern, as `path:line:text`. Use this for "
+                    "every span you intend to quote: what it returns is the text in the file, so a citation "
+                    "built from it resolves. Use `inspect_external` when you do not yet know which file holds "
+                    "the answer. At most 200 lines per call. `claims` files the request under those claims, as "
+                    "with `inspect_external`."))
         tools.append(("security",
             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"security\", \"query\": <string>}` — "
             "investigate LAN state or local host security state. A separate subagent (read-only typed "

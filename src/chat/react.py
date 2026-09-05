@@ -94,7 +94,7 @@ REACT_ACTION_SCHEMA: Dict[str, Any] = {
 
 # Tools the model can emit. Validated structurally in _parse_react_action;
 # the dispatcher in _run_react_loop knows how to run each.
-_REACT_TOOLS = ('process_text', 'recall', 'inspect', 'inspect_external', 'security', 'justify', 'agent-say', 'display', 'respond', 'yield')
+_REACT_TOOLS = ('process_text', 'recall', 'inspect', 'inspect_external', 'extract_external', 'security', 'justify', 'agent-say', 'display', 'respond', 'yield')
 
 # Per-iteration auto-binding: $step1, $step2, ... names the result of each
 # action so subsequent actions can reference it. Scoped to the current turn
@@ -726,6 +726,8 @@ class ReactMixin:
             elif tool == 'inspect_external':
                 q = self._resolve_react_value(action.get('query', ''), log)
                 obs = self._run_inspect_external(q, claims=action.get('claims'))
+            elif tool == 'extract_external':
+                obs = self._run_extract_external(action)
             elif tool == 'security':
                 q = self._resolve_react_value(action.get('query', ''), log)
                 obs = self._run_security(q)
@@ -801,6 +803,8 @@ class ReactMixin:
                            "justify", "display", "respond"]
                 if self._get_external_repo() is not None:
                     builtin.insert(builtin.index("inspect") + 1, "inspect_external")
+                    if getattr(self, '_extract_tool', False):
+                        builtin.insert(builtin.index("inspect_external") + 1, "extract_external")
                 if getattr(self, '_peers', None):
                     builtin.insert(builtin.index("display"), "agent-say")
                 # Omitted tools must not appear here either — this branch is
@@ -1041,6 +1045,27 @@ class ReactMixin:
         if not text:
             return 'EMPTY: inspect_external subagent produced no answer'
         return 'OK: ' + text
+
+    def _run_extract_external(self, action: Dict[str, Any]) -> str:
+        """Backend for the ReAct `extract_external` tool: the named lines of
+        a file in the bound external repo, or the lines matching a pattern,
+        verbatim and with no subagent (chat.subagents.extract). Offered only
+        when the scenario's chat block sets `extract_tool: true` and a repo is
+        bound; a call outside that is the model fabricating a tool."""
+        if not getattr(self, '_extract_tool', False):
+            return "ERROR: extract_external is not enabled for this session"
+        repo = self._get_external_repo()
+        if repo is None:
+            return ("ERROR: no external repo is bound for this session "
+                    "(use /set-external-repo <path> first)")
+        try:
+            from chat.subagents.extract import extract_external as _extract
+            return _extract(repo, self._inspect_traces_dir(),
+                            file=action.get('file'), lines=action.get('lines'),
+                            pattern=action.get('pattern'), claims=action.get('claims'))
+        except Exception as e:                                   # noqa: BLE001
+            logger.warning(f"[{self.character_name}] extract_external raised: {e}")
+            return f"ERROR: extract_external raised: {e}"
 
     def _security_traces_dir(self) -> 'Path':
         """Where the security (network-investigation) subagent writes its
