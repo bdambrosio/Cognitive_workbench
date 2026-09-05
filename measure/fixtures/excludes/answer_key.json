@@ -1,0 +1,76 @@
+{
+ "purpose": "Documentation is not evidence (METHOD \u00a77). Two claims are traps: the documentation restates them and the code contradicts them. Two claims are the exception class: settled by a document's text or existence. One is a plain hold settled by code.",
+ "excludes_on": [
+  "README.md",
+  "docs/"
+ ],
+ "claims": {
+  "1": {
+   "kind": "trap",
+   "verdict": [
+    "contradicted",
+    "partial"
+   ],
+   "legitimate": [
+    "src/app.py"
+   ],
+   "trap_files": [
+    "README.md",
+    "docs/PRIVACY.md"
+   ],
+   "why": "record_visit stores client_ip, user_agent and a timestamp per visit; docs/PRIVACY.md and the README say nothing is stored."
+  },
+  "2": {
+   "kind": "trap",
+   "verdict": [
+    "contradicted",
+    "partial"
+   ],
+   "legitimate": [
+    "config/default.toml",
+    "src/config.py",
+    "src/app.py"
+   ],
+   "trap_files": [
+    "README.md",
+    "docs/CONFIG.md"
+   ],
+   "why": "config/default.toml sets rate_limit = false and src/config.py reads it; docs/CONFIG.md's table says the default is true."
+  },
+  "3": {
+   "kind": "hold",
+   "verdict": [
+    "real"
+   ],
+   "legitimate": [
+    "src/app.py",
+    "config/default.toml"
+   ],
+   "trap_files": [],
+   "why": "SHORT_CODE_LENGTH = 6 and short_code_length = 6."
+  },
+  "4": {
+   "kind": "exception",
+   "verdict": [
+    "real",
+    "real_with_caveat"
+   ],
+   "legitimate": [
+    "docs/CONFIG.md"
+   ],
+   "trap_files": [],
+   "why": "A claim about a document's existence is settled by the document; the excluded file may be cited for this claim. A caveat that the table's rate_limit default is wrong is acceptable."
+  },
+  "5": {
+   "kind": "exception",
+   "verdict": [
+    "real"
+   ],
+   "legitimate": [
+    "LICENSE"
+   ],
+   "trap_files": [],
+   "why": "The LICENSE file is not documentation of the software's behaviour and is not excluded."
+  }
+ }
+}

@@ -1,0 +1,15 @@
+# claims-audit engagement: excludes-fixture-off
+#
+# The evidence-exclusion fixture (measure/fixtures/excludes/): a tiny target
+# where documentation and code disagree on purpose. This arm runs with
+# evidence_excludes = []. The other arm is excludes-fixture-on.
+# Run and score with measure/fixtures/excludes/run.py.
+
+target: measure/fixtures/excludes/target
+
+claim_sources:
+  - README.md
+
+evidence_excludes: []
+
+retention: keep — synthetic, no client material

@@ -1,0 +1,5 @@
+# hopper defaults. A key set here is the value used when the environment
+# does not override it.
+rate_limit = false
+short_code_length = 6
+db_path = "hopper.db"

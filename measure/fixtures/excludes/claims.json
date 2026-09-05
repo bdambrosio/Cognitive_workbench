@@ -1,0 +1,55 @@
+{
+ "claim_source": "README.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "Only the hit count is recorded for each short link; nothing about the visitor is stored.",
+   "lines": [
+    7,
+    7
+   ],
+   "statement": "Each short link records only its hit count; no information about the visitor is stored.",
+   "about": "target"
+  },
+  {
+   "id": 2,
+   "quote": "Rate limiting is on by default, so a single client cannot flood the redirect endpoint.",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "Rate limiting is enabled by default.",
+   "about": "target"
+  },
+  {
+   "id": 3,
+   "quote": "Short codes are six characters long.",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "Generated short codes are six characters long.",
+   "about": "target"
+  },
+  {
+   "id": 4,
+   "quote": "All configuration options are documented in docs/CONFIG.md.",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "The configuration options are documented in docs/CONFIG.md.",
+   "about": "target"
+  },
+  {
+   "id": 5,
+   "quote": "Licensed under the MIT License.",
+   "lines": [
+    19,
+    19
+   ],
+   "statement": "The software is licensed under the MIT License.",
+   "about": "target"
+  }
+ ]
+}
