@@ -109,3 +109,21 @@ def test_jobs_lock_and_finish(tmp_path):
     assert failed["state"] == "failed" and failed["error"] == "review exited 2"
     assert [x["kind"] for x in st.jobs(eng)] == ["enumerate", "chain"]
     assert st.summary(eng)["job"] is None
+
+
+def test_update_engagement_keeps_comments_and_other_keys(tmp_path):
+    eng = tmp_path / "e"; eng.mkdir()
+    (eng / "engagement.yaml").write_text(
+        "# the practice's note\n\ntarget: target\n\nclaim_sources:\n  - README.md\n\n\nretention: keep\n\n"
+        "# THE BUYER IS ILLUSTRATIVE.\ntransaction: |\n  Client: someone\n  Subject: code\n\nthresholds: |\n  Paying for: code\n")
+    cfg = st.update_engagement(eng, claim_sources=["README.md", "docs/a.md"], client_emails=["c@x.test"], target=None)
+    text = (eng / "engagement.yaml").read_text()
+    assert "# the practice's note" in text and "# THE BUYER IS ILLUSTRATIVE." in text
+    assert "transaction: |\n  Client: someone\n  Subject: code\n" in text
+    assert "claim_sources:\n  - README.md\n  - docs/a.md\n" in text
+    assert text.rstrip().endswith("client_emails:\n  - c@x.test")
+    assert cfg["claim_sources"] == ["README.md", "docs/a.md"] and cfg["client_emails"] == ["c@x.test"]
+    assert cfg["target"] == "target" and cfg["transaction"].startswith("Client: someone")
+    cfg = st.update_engagement(eng, claim_sources=[], target="targets/x")
+    text = (eng / "engagement.yaml").read_text()
+    assert "claim_sources: []\n" in text and "target: targets/x\n" in text and text.count("target:") == 1

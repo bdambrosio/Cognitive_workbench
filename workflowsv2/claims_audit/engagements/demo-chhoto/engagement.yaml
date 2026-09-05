@@ -30,3 +30,7 @@ thresholds: |
   Paying for: a small, private link shortener the buyer can run for its customers at low cost, as the README describes it
   Would change the price or the terms: any way visitors are logged or tracked beyond the hit count; footprint or resource figures materially worse than stated; a hardening step the README implies is on by default but is not
   Would end the deal: a licence or ownership problem with the code, or a dependency the buyer cannot run on its own hardware
+
+# Who may open this engagement on the client site, by email.
+client_emails:
+  - sales@tuuyi.com

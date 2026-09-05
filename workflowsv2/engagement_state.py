@@ -210,20 +210,60 @@ def claim_sources(eng_dir: Path) -> List[str]:
     return [str(c) for c in (_engagement_yaml(eng_dir).get("claim_sources") or [])]
 
 
-#: The keys of engagement.yaml the practice page may set. Everything else
-#: in the file is kept as it is; the file's comments are not (yaml rewrites).
+#: The keys of engagement.yaml the practice page may set. The file is edited
+#: in place, key by key, so its comments and the rest of its text survive:
+#: a yaml dump of demo-chhoto's file on 2026-09-05 dropped the practice's
+#: notes and reformatted the transaction block.
 SETTABLE = ("claim_sources", "client_emails", "target", "retention")
+
+
+def _render_key(key: str, value: Any) -> str:
+    if isinstance(value, list):
+        return f"{key}:" + ("".join(f"\n  - {v}" for v in value) if value else " []") + "\n"
+    return f"{key}: {value}\n"
+
+
+def _replace_key(text: str, key: str, rendered: str) -> str:
+    """Replace the top-level `key:` entry and the indented or list lines under
+    it; append at the end when the key is absent."""
+    lines = text.splitlines(keepends=True)
+    out, i, done = [], 0, False
+    while i < len(lines):
+        line = lines[i]
+        if not done and line.startswith(f"{key}:"):
+            out.append(rendered)
+            i += 1
+            while i < len(lines) and (lines[i].startswith((" ", "\t", "-")) or not lines[i].strip()):
+                # a blank line ends the block unless more of the block follows it
+                if not lines[i].strip():
+                    j = i
+                    while j < len(lines) and not lines[j].strip():
+                        j += 1
+                    if j < len(lines) and lines[j].startswith((" ", "\t", "-")):
+                        i = j
+                        continue
+                    break
+                i += 1
+            done = True
+            continue
+        out.append(line)
+        i += 1
+    if not done:
+        if out and not out[-1].endswith("\n"):
+            out.append("\n")
+        out.append("\n" + rendered)
+    return "".join(out)
 
 
 @_locked
 def update_engagement(eng_dir: Path, **fields: Any) -> Dict[str, Any]:
     """Set some of SETTABLE in engagement.yaml and return the whole file as
     data. A key given as None is left alone; an empty list is written."""
-    import yaml
     bad = [k for k in fields if k not in SETTABLE]
     if bad:
         raise SystemExit(f"not settable: {', '.join(bad)} (have: {', '.join(SETTABLE)})")
-    cfg = _engagement_yaml(eng_dir)
+    f = eng_dir / "engagement.yaml"
+    text = f.read_text(encoding="utf-8") if f.is_file() else ""
     for k, v in fields.items():
         if v is None:
             continue
@@ -231,10 +271,9 @@ def update_engagement(eng_dir: Path, **fields: Any) -> Dict[str, Any]:
             v = [str(x).strip() for x in v if str(x).strip()]
         else:
             v = str(v).strip()
-        cfg[k] = v
-    atomic_write_text(eng_dir / "engagement.yaml",
-                      yaml.safe_dump(cfg, sort_keys=False, allow_unicode=True))
-    return cfg
+        text = _replace_key(text, k, _render_key(k, v))
+    atomic_write_text(f, text)
+    return _engagement_yaml(eng_dir)
 
 
 # ---- stages -----------------------------------------------------------------
