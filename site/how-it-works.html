@@ -33,6 +33,9 @@
 <h2>Claims are enumerated, then frozen</h2>
 <p>The seller's documents are read one section at a time and every assertion is written down: features, numbers, guarantees, what a command does, what a default is. The list is frozen before anything is tested, so what counts as a claim is decided before the verdicts are in view. You see the frozen list; nothing is added to it later.</p>
 
+<h2>How a claim is read</h2>
+<p>Each assertion is read the way a reasonable buyer would read it in the context of the transaction: in its ordinary sense, as one statement, with the seller's own documentation as the specification of what the software is said to do. It is tested against the code, configuration and build files that determine what the software does. Documentation restates a claim and does not settle it, except where the claim is about the document itself, such as its licence. Vague general statements that a reasonable buyer would not rely on are not treated as claims. Where the ordinary sense of a claim implies properties the seller did not state, those are reported separately, marked as implied. The report states findings on each claim and expresses no opinion on the software, the seller or the transaction.</p>
+
 <h2>Every finding cites its evidence</h2>
 <p>Each claim gets one finding. A finding names the file and the lines that settle it, quotes them, and says what they show. A citation that does not resolve to the text it quotes is caught mechanically before anyone reads the report.</p>
 
