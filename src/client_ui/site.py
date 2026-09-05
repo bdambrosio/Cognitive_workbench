@@ -227,6 +227,7 @@ class Settings(BaseModel):
     target: Optional[str] = None
     retention: Optional[str] = None
     letter: Optional[str] = None            # "" removes the engagement's own letter
+    clone: Optional[str] = None             # a git URL or local path to fill target/ from
 
 
 # ---- the app ------------------------------------------------------------------
@@ -277,9 +278,26 @@ def make_site_app(access: Access, model: Optional[Path] = None,
         return email or "", role or "", eng_dir
 
     def _page(request: Request, path: Path):
-        resp = FileResponse(path)
+        # Static references carry the file's mtime, so a changed script is a
+        # new URL. Cloudflare caches .js/.css by extension whatever the
+        # origin says; on 2026-09-05 clients ran the morning's scripts all
+        # afternoon.
+        html = path.read_text(encoding="utf-8")
+        def stamp(m):
+            f = STATIC / m.group(2)
+            v = int(f.stat().st_mtime) if f.is_file() else 0
+            return f'{m.group(1)}="/static/{m.group(2)}?v={v}"'
+        html = re.sub(r'(src|href)="/static/([^"?]+)"', stamp, html)
+        resp = HTMLResponse(html, headers={"Cache-Control": "no-cache"})
         if access.no_access and request.query_params.get("as"):
             resp.set_cookie(LOCAL_COOKIE, request.query_params["as"], samesite="lax")
+        return resp
+
+    @app.middleware("http")
+    async def _no_cache_static(request: Request, call_next):
+        resp = await call_next(request)
+        if request.url.path.startswith("/static/"):
+            resp.headers["Cache-Control"] = "no-cache"
         return resp
 
     def _act(fn, *args, **kwargs):
@@ -548,6 +566,7 @@ def make_site_app(access: Access, model: Optional[Path] = None,
         own = eng_dir / "letter.md"
         return {"claim_sources": state.claim_sources(eng_dir),
                 "client_emails": state.client_emails(eng_dir),
+                "has_target": state.target_dir(eng_dir).is_dir() and any(state.target_dir(eng_dir).iterdir()),
                 "target": str(cfg.get("target") or ""), "retention": str(cfg.get("retention") or ""),
                 "letter": own.read_text(encoding="utf-8") if own.is_file() else "",
                 "letter_is_template": not own.is_file()}
@@ -590,6 +609,8 @@ def make_site_app(access: Access, model: Optional[Path] = None,
         _practice(request)
         eng_dir = _eng(name)
         before = set(state.client_emails(eng_dir))
+        if body.clone and body.clone.strip():
+            _act(state.clone_target, eng_dir, body.clone.strip())
         _act(state.update_engagement, eng_dir, claim_sources=body.claim_sources,
              client_emails=body.client_emails, target=body.target, retention=body.retention)
         if body.letter is not None:

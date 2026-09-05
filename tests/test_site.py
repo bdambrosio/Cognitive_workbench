@@ -290,3 +290,32 @@ def test_client_accepting_the_letter_notifies_the_practice(env):
     assert mail.sent == []
     c.post("/e/e1/api/letter/accept" + _as(CLIENT))
     assert mail.sent[-1]["to"] == [PRACTICE] and "accepted the letter" in mail.sent[-1]["subject"]
+
+
+def test_settings_clone_fills_the_target_once(env, tmp_path):
+    import shutil, subprocess
+    if not shutil.which("git"):
+        return
+    c, root = env
+    _new(c)
+    src = tmp_path / "src"; src.mkdir()
+    subprocess.run(["git", "-C", str(src), "init", "-q"], check=True)
+    (src / "README.md").write_text("claims\n")
+    subprocess.run(["git", "-C", str(src), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(src), "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "x"], check=True)
+    r = c.post("/p/api/engagements/e1/settings" + _as(PRACTICE), json={"clone": str(src), "claim_sources": ["README.md"]})
+    assert r.status_code == 200, r.text
+    assert (root / "e1" / "target" / "README.md").read_text() == "claims\n"
+    e = next(x for x in r.json()["engagements"] if x["name"] == "e1")
+    assert e["settings"]["has_target"] is True and e["claim_sources"] == ["README.md"]
+    # a second clone is refused; the materials are never replaced by accident
+    assert c.post("/p/api/engagements/e1/settings" + _as(PRACTICE), json={"clone": str(src)}).status_code == 400
+
+
+def test_pages_carry_versioned_static_urls_and_no_cache(env):
+    c, root = env
+    _new(c)
+    r = c.get("/e/e1/" + _as(CLIENT))
+    assert r.status_code == 200 and r.headers["cache-control"] == "no-cache"
+    assert 'src="/static/home.js?v=' in r.text and 'href="/static/site.css?v=' in r.text
+    assert c.get("/static/client.js").headers["cache-control"] == "no-cache"

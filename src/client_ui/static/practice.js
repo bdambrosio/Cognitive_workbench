@@ -93,7 +93,8 @@
     h += '<h3>Settings</h3><div class="settings">'
       + '<label>claim sources, one per line, by path from the target root<textarea id="setSources" rows="3">' + esc((st.claim_sources || []).join("\n")) + "</textarea></label>"
       + '<label>client emails, comma-separated (new ones are added to the Access policy and mailed the link)<input id="setEmails" value="' + esc((st.client_emails || []).join(", ")) + '"></label>'
-      + '<label>target (path; "target" is the engagement\'s own clone)<input id="setTarget" value="' + esc(st.target || "") + '"></label>'
+      + '<label>target (path; "target" is the engagement\'s own clone)' + (st.has_target ? ' <span class="muted">— materials present</span>' : ' <span class="warn">— no materials yet</span>') + '<input id="setTarget" value="' + esc(st.target || "") + '"></label>'
+      + (st.has_target ? "" : '<label>clone the target from (git URL or local path); fills target/ on save<input id="setClone" placeholder="https://github.com/org/repo"></label>')
       + '<label>retention<input id="setRetention" value="' + esc(st.retention || "") + '"></label>'
       + '<label>engagement letter' + (st.letter_is_template ? ' <span class="muted">(empty: the template is shown)</span>' : "") + '<textarea id="setLetter" rows="6" placeholder="Leave empty to show the practice\'s template letter.">' + esc(st.letter || "") + "</textarea></label>"
       + '<button id="setSave">Save settings</button></div>';
@@ -137,6 +138,7 @@
         client_emails: $("setEmails").value.split(",").map((x) => x.trim()).filter(Boolean),
         target: $("setTarget").value.trim(), retention: $("setRetention").value.trim(),
         letter: $("setLetter").value,
+        clone: $("setClone") ? $("setClone").value.trim() : null,
       };
       const j = await api("api/engagements/" + encodeURIComponent(e.name) + "/settings", body);
       if (j) { data = j.engagements; render(); say(j.policy ? ("saved · Access policy: " + j.policy.reason + (j.policy.added.length ? " " + j.policy.added.join(", ") : "")) : "saved"); }

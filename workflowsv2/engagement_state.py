@@ -175,12 +175,23 @@ def new_engagement(eng_dir: Path, clone: Optional[str] = None,
         encoding="utf-8")
     set_stage(eng_dir, "created", "done", by)
     if clone:
-        import subprocess
-        r = subprocess.run(["git", "clone", "--quiet", clone, str(eng_dir / TARGET)],
-                           capture_output=True, text=True)
-        if r.returncode != 0:
-            raise SystemExit(f"git clone failed: {r.stderr.strip()}")
+        clone_target(eng_dir, clone)
     return eng_dir
+
+
+def clone_target(eng_dir: Path, url: str) -> Path:
+    """Fill the engagement's target/ from a git URL or a local checkout.
+    Refuses when target/ already holds something: the practice removes it
+    by hand first, so a run's materials are never replaced by accident."""
+    import subprocess
+    dest = eng_dir / TARGET
+    if dest.exists() and any(dest.iterdir()):
+        raise SystemExit(f"{dest} already holds materials; remove it first to clone again")
+    r = subprocess.run(["git", "clone", "--quiet", url, str(dest)],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        raise SystemExit(f"git clone failed: {r.stderr.strip()}")
+    return dest
 
 
 def _engagement_yaml(eng_dir: Path) -> Dict[str, Any]:
