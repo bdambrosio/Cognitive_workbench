@@ -45,7 +45,7 @@
   // ---- the intake form ----
   function renderForm(d) {
     const form = d.form || {}, prev = lastForm;
-    let h = '<div class="form"><h2>Intake form</h2><div class="ledger">' + esc(d.ledger || "") + "</div>";
+    let h = '<div class="form"><h2>Intake form</h2><div class="ledger">' + esc(d.ledger || "") + '</div><div class="finish-hint" id="finishHint" hidden></div>';
     let firstChanged = null;
     for (const [group, fields] of Object.entries(d.slots || {})) {
       h += '<div class="group"><h3>' + esc(group) + "</h3>";
@@ -81,6 +81,18 @@
       fb.textContent = d.finish.done ? "Intake finished" : "Finish intake";
       fb.title = d.finish.allowed ? "" : "Answer at least one question first.";
       fb.dataset.empty = JSON.stringify(d.finish.empty || {});
+      const ready = d.finish.allowed && !d.finish.done;
+      const full = ready && !Object.keys(d.finish.empty || {}).length;
+      fb.classList.toggle("ready", full);
+      // The form says where the button is; a client asking the agent how to
+      // finish was the first live question (2026-09-05).
+      const hint = $("finishHint");
+      if (hint) {
+        hint.hidden = d.finish.done;
+        hint.textContent = d.finish.done ? "" : full
+          ? "Every field is filled. When you have nothing to add, press \u201cFinish intake\u201d below the conversation."
+          : "When you have said what you need to, press \u201cFinish intake\u201d below the conversation; empty fields are read as not stated.";
+      }
     }
   }
   async function finishIntake() {
