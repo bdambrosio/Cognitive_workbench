@@ -103,3 +103,8 @@ button.quiet:hover { background: var(--panel2); }
 .report a { color: #6ea0ff; }
 .banner { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: pre-wrap; margin-bottom: 18px; }
 @media (max-width: 800px) { main { grid-template-columns: 1fr; } #chat { border-right: 0; border-bottom: 1px solid var(--rule); } }
+/* the waiting bubble while the agent composes */
+.msg.waiting .dots i { display: inline-block; width: 7px; height: 7px; margin: 0 2px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite; }
+.msg.waiting .dots i:nth-child(2) { animation-delay: .2s; }
+.msg.waiting .dots i:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }

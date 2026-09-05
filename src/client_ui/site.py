@@ -382,8 +382,13 @@ def make_site_app(access: Access, model: Optional[Path] = None,
         if kind == "intake":
             eng_dir = state.ENGAGEMENTS / name
             check = d.get("check") or {}
-            d["finish"] = {"allowed": not check.get("empty"),
-                           "done": state.stage_value(eng_dir, "intake") == "done"}
+            # Finishing is allowed once anything is filled: a buyer who declined
+            # a question has answered it (INTAKE.md §3), and a form is never
+            # held hostage to one empty field. The page names the empties and
+            # asks before finishing.
+            d["finish"] = {"allowed": bool(check.get("filled")) or not check.get("empty"),
+                           "done": state.stage_value(eng_dir, "intake") == "done",
+                           "empty": check.get("empty") or {}}
         return d
 
     async def _turn(kind: str, name: str, text: str) -> None:

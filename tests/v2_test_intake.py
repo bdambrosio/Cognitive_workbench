@@ -16,9 +16,9 @@ def test_empty_form_matches_schema_and_checks_as_empty():
     req = sch.intake_schema()["required"]
     assert set(req) == set(f)
     c = sch.check_intake(f)
-    assert c["complete"] == [] and c["filled"] == 0 and c["total"] == 17
+    assert c["complete"] == [] and c["filled"] == 0 and c["total"] == 15
     assert c["emptiest"] == "identify"          # all equal: the first in §2 order
-    assert sch.ledger(c).startswith("[form: 0 of 17 fields filled; still empty — identify (")
+    assert sch.ledger(c).startswith("[form: 0 of 15 fields filled; still empty — identify (")
 
 
 def test_check_finds_the_emptiest_slot_and_completeness():

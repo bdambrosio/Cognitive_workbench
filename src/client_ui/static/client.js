@@ -32,6 +32,14 @@
     thinking = on;
     $("thinking").hidden = !on;
     send.disabled = on;
+    // A visible bubble in the conversation while the agent composes: the
+    // header word alone was missed (Bruce, 2026-09-05).
+    let w = document.getElementById("waiting");
+    if (on && !w) {
+      w = document.createElement("div"); w.id = "waiting"; w.className = "msg agent waiting";
+      w.innerHTML = '<span class="who">agent</span><span class="dots"><i></i><i></i><i></i></span>';
+      messages.appendChild(w); messages.scrollTop = messages.scrollHeight;
+    } else if (!on && w) { w.remove(); }
   }
 
   // ---- the intake form ----
@@ -62,7 +70,7 @@
     lastForm = JSON.parse(JSON.stringify(form));
     if (firstChanged) { const el = $(firstChanged); if (el) el.scrollIntoView({block: "center", behavior: "smooth"}); }
     $("uploadLabel").hidden = false;
-    if (d.uploads_dir) { $("uploadsHint").hidden = false; $("uploadsHint").textContent = "files for the seller go to: " + d.uploads_dir; }
+    $("uploadsHint").hidden = false; $("uploadsHint").textContent = "A file you upload is attached to this engagement and read by the review.";
     // On the site the client finishes the intake from the page; the button
     // is enabled once every slot is filled and stays until the practice
     // has what it needs.
@@ -71,11 +79,15 @@
       fb.hidden = false;
       fb.disabled = !d.finish.allowed || d.finish.done;
       fb.textContent = d.finish.done ? "Intake finished" : "Finish intake";
-      fb.title = d.finish.allowed ? "" : "Every slot of the form has to be filled first.";
+      fb.title = d.finish.allowed ? "" : "Answer at least one question first.";
+      fb.dataset.empty = JSON.stringify(d.finish.empty || {});
     }
   }
   async function finishIntake() {
     const fb = $("finishBtn");
+    const empty = JSON.parse(fb.dataset.empty || "{}");
+    const names = Object.entries(empty).flatMap(([slot, fs]) => fs.map((f) => slot + "." + f));
+    if (names.length && !confirm("Finish the intake with " + names.length + " field" + (names.length > 1 ? "s" : "") + " still empty?\n\n" + names.join("\n") + "\n\nEmpty fields are read as 'not stated'.")) return;
     fb.disabled = true;
     const r = await fetch(base + "/api/finish" + qs, {method: "POST"});
     const j = await r.json().catch(() => ({}));

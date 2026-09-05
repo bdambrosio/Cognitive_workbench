@@ -180,7 +180,6 @@ def finish(eng_dir: Path, intake_dir: Path, form: Dict[str, Any],
             + "\n\nClaim sources supplied: " + str(b.get("claim_sources") or "(not stated)").strip()
             + "\n\nWhat the buyer knows or suspects: " + str(b.get("known") or "(not stated)").strip()
             + "\n\nScope agreed: " + str(r.get("scope") or "(not stated)").strip()
-            + "\n\nDeliverable: " + str(r.get("deliverable") or "(not stated)").strip()
             + "\n", encoding="utf-8")
         written.append("brief.md")
     stamp = datetime.datetime.now(datetime.timezone.utc).isoformat()

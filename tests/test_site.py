@@ -107,7 +107,7 @@ def test_letter_then_intake_then_finish(env):
     # the intake page and its finish
     assert c.get("/e/e1/intake/" + _as(CLIENT)).status_code == 200
     d = c.get("/e/e1/intake/api/document" + _as(CLIENT)).json()
-    assert d["finish"] == {"allowed": True, "done": False}
+    assert d["finish"] == {"allowed": True, "done": False, "empty": {}}
     with c.websocket_connect("/e/e1/intake/ws" + _as(CLIENT)) as ws:
         assert [ws.receive_json()["type"] for _ in range(3)] == ["history", "document", "status"]
         assert ws.receive_json()["state"] == "thinking"                 # the opening, once

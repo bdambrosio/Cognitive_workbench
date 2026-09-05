@@ -17,7 +17,10 @@ SLOTS: Dict[str, Tuple[str, ...]] = {
     "situation": ("subject", "price", "structure", "timetable"),
     "background": ("target", "claim_sources", "known"),
     "assessment": ("paying_for", "price_movers", "walk_away"),
-    "recommendation": ("scope", "deliverable", "seller_questions"),
+    # `deliverable` and `seller_questions` were removed 2026-09-05 (Bruce):
+    # the deliverable is fixed by the tier, and questions to the seller are
+    # outside the offering. A form written before then may still carry them.
+    "recommendation": ("scope",),
 }
 
 
