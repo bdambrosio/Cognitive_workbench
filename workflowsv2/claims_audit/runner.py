@@ -251,10 +251,11 @@ def git_rev(path: Path) -> Optional[str]:
 
 _TRACE_CLAIMS = re.compile(r"^Query: \[claims ([\d, ]+)\]", re.M)
 
-#: Every evidence request in a traces directory, in time order. Two tools
-#: write them: `inspect_external` (the subagent) and, when the run enables
-#: it, `extract_external` (chat/subagents/extract.py, verbatim lines, no
-#: subagent). Same trace shape; the prefix says which.
+#: Every evidence request in a traces directory, in time order. The subagent
+#: writes `inspect_external_*`; `extract_external_*` is the record of the
+#: 2026-09-04 top-level extract tool, withdrawn the same day (the auditor took
+#: the narrow path and missed the material finding), kept readable so that
+#: run's record still adjudicates.
 def evidence_traces(traces: Path) -> List[Path]:
     if not traces.is_dir():
         return []
@@ -385,8 +386,7 @@ def build_config(world: str, model_path: Optional[Path],
                  workflow_mode: Optional[bool] = None,
                  temperature: Optional[float] = None,
                  max_tokens: Optional[int] = None,
-                 external_repo: Optional[Path] = None,
-                 extract_tool: bool = False
+                 external_repo: Optional[Path] = None
                  ) -> Tuple[str, Dict[str, Any]]:
     from launcher import parse_characters                      # noqa: E402
 
@@ -435,11 +435,6 @@ def build_config(world: str, model_path: Optional[Path],
     # grader 2026-08-23, silently, three times in eleven.
     if max_tokens is not None:
         cfg.setdefault("chat", {})["react_max_tokens"] = max_tokens
-    # An experiment (2026-09-04): the verbatim extract tool beside the
-    # subagent. Off unless asked, so a run without the flag is the run
-    # main always made.
-    if extract_tool:
-        cfg.setdefault("chat", {})["extract_tool"] = True
     return name, cfg
 
 
@@ -1055,9 +1050,6 @@ def main() -> int:
                     help="characters of evidence traces handed to each "
                          "adjudication call (default %(default)s); over it, "
                          "every trace is handed over in compact form")
-    ap.add_argument("--extract-tool", action="store_true",
-                    help="offer `extract_external` (verbatim lines, no subagent) "
-                         "beside `inspect_external`; an experiment, off by default")
     ap.add_argument("--workflow-mode", choices=("on", "off"), default=None,
                     help="override the scenario's workflow_mode; omit to use "
                          "whatever audit.yaml declares")
@@ -1102,7 +1094,7 @@ def main() -> int:
                          f"{eng['target']} does not exist")
     name, cfg = build_config(args.world, args.model, wf_mode,
                              args.temperature, args.max_tokens,
-                             eng["target"], extract_tool=args.extract_tool)
+                             eng["target"])
     logger.info("world=%s model=%s model=%s", args.world, args.model,
                 (cfg.get("llm_config") or {}).get("model") or "(scenario default)")
 
@@ -1142,14 +1134,13 @@ def main() -> int:
         "  omitted tools     %d\n"
         "  max legs          %d\n"
         "  react_max_tokens  %s\n"
-        "  extract_tool      %s\n"
         "=== end configuration; everything after this is a chat message ===",
         args.world, name, cfg.get("external_repo"), cfg.get("inspect_repo"),
         cfg.get("workflow"), eng["brief"], ", ".join(eng["claim_sources"] or []),
         cfg.get("autonomy_enabled"), cfg.get("workflow_mode"),
         "; ".join(getattr(loop, "workflow_suppressed", []) or ["(none)"]),
         len(_chat.get("omitted_tools") or []), args.max_turns,
-        _chat.get("react_max_tokens"), bool(_chat.get("extract_tool")))
+        _chat.get("react_max_tokens"))
 
     t0 = time.time()
     legs, error = [], None
@@ -1678,7 +1669,6 @@ def main() -> int:
             "react_temperature", 0.7),
         "react_max_tokens": (cfg.get("chat") or {}).get(
             "react_max_tokens", 8192),
-        "extract_tool": bool((cfg.get("chat") or {}).get("extract_tool")),
         # THE SETTINGS THAT ACTUALLY APPLIED, resolved from the model rather
         # than copied from config. A row that cannot name its own sampling
         # settings is not evidence — the rule that already governs the served

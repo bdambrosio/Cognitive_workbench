@@ -53,6 +53,9 @@ _MAX_ITERS = 12
 _MAX_READ_CHARS = 10_000
 _MAX_GREP_HITS = 50
 _MAX_LIST_ENTRIES = 200
+#: The most lines one `cite` carries. A span this long is a file, not a
+#: citation, and the auditor's context is what it would land in.
+_MAX_CITE_LINES = 200
 
 # Filesystem-fallback deny list (used when repo_root isn't a git checkout).
 # Inside git checkouts, .gitignore handles this and the deny list is
@@ -147,10 +150,18 @@ def _build_system_prompt(repo_root: Path, mode: str) -> str:
         "is a regex (rg's default syntax). Output format is "
         "`<relative_path>:<lineno>:<content>` per hit, capped at "
         f"{_MAX_GREP_HITS} hits.\n"
-        '4. {"thought": "...", "tool": "respond", "text": "<answer>"} — '
-        "final answer to the query, exits the loop. Cite specific paths "
-        "and line numbers (`src/chat/chat_loop.py:1860`) when grounding "
-        "claims in code — the caller wants to verify against the source.\n"
+        '4. {"thought": "...", "tool": "cite", "file": "<relative_path>", '
+        '"start_line": <int>, "end_line": <int>} — carry those lines into '
+        "your answer VERBATIM. The tool copies them from the file and appends "
+        "them under a CITED heading after your respond text; you never retype "
+        f"them. At most {_MAX_CITE_LINES} lines per call. Use it for every span "
+        "the caller will quote as evidence, once you have located it with "
+        "grep and read.\n"
+        '5. {"thought": "...", "tool": "respond", "text": "<answer>"} — '
+        "final answer to the query, exits the loop. Refer to what you cited "
+        "by path and line numbers (`src/chat/chat_loop.py:1860`) and say what "
+        "each span shows — the lines themselves follow your text, copied by "
+        "the tool.\n"
         "\n"
         "## Discipline\n"
         "\n"
@@ -172,6 +183,9 @@ def _build_system_prompt(repo_root: Path, mode: str) -> str:
         "- **Cite paths and line numbers in the final answer.** Format: "
         "  `<relative_path>:<lineno>` or `<relative_path>:<start>-<end>`. "
         "  The caller verifies against actual source.\n"
+        "- **Never retype file content as a quotation.** A span the caller "
+        "  needs word for word goes through `cite`; a retyped quote is a "
+        "  paraphrase the caller cannot resolve.\n"
         "- **If the codebase does not contain what's asked, say so "
         "  plainly** — do not speculate beyond evidence.\n"
         "- Output ONLY one JSON object per emission. No prose, no "
@@ -517,6 +531,8 @@ class CodeSubagent(Subagent):
         self.repo_root = Path(repo_root)
         self.mode = mode
         self.label = 'inspect_external' if mode == 'external' else 'inspect'
+        # Spans `cite` carried this run: (file, start, end, numbered text).
+        self._cited: List[Tuple[str, int, int, str]] = []
 
     def precheck(self, query: str) -> Optional[str]:
         if not query or not query.strip():
@@ -537,7 +553,50 @@ class CodeSubagent(Subagent):
                                          a.get('end_line')),
             'grep': lambda a: _tool_grep(self.repo_root,
                                          a.get('pattern', ''), a.get('path')),
+            'cite': self._tool_cite,
         }
+
+    def _tool_cite(self, a: Dict[str, Any]) -> str:
+        """Copy a span of a file into the answer, verbatim.
+
+        WHY (2026-09-04). Eight of the ten citation problems on the chhoto
+        engagement were spans this subagent had read and then retyped in
+        its answer a line or two off; the ninth was a paraphrase of a line
+        it had read. The auditor quotes from the answer, so the answer has
+        to carry the bytes. A top-level extract tool fixed that and cost the
+        exploration that finds what nobody asked for; this keeps the loop
+        and moves only the copying to the tool.
+        """
+        name = str(a.get('file') or '').strip()
+        try:
+            s, e = int(a.get('start_line')), int(a.get('end_line'))
+        except (TypeError, ValueError):
+            return "ERROR: cite needs `file`, `start_line` and `end_line` (integers)"
+        if not name:
+            return "ERROR: cite needs a `file`"
+        if s < 1 or e < s:
+            return f"ERROR: cite lines {s}-{e} is not a range"
+        if e - s + 1 > _MAX_CITE_LINES:
+            return (f"ERROR: cite span of {e - s + 1} lines exceeds the cap of "
+                    f"{_MAX_CITE_LINES}; cite the lines the caller will quote")
+        out = _tool_read(self.repo_root, name, s, e)
+        if not out.startswith('OK: '):
+            return out
+        text = out[4:].rstrip('\n')
+        key = (name, s, e)
+        if key not in {(f, a_, b_) for f, a_, b_, _ in self._cited}:
+            self._cited.append((name, s, e, text))
+        n = text.count('\n') + 1
+        return (f"OK: cited {name}:{s}-{e} ({n} line(s)); carried verbatim into "
+                f"your answer under CITED — refer to it, do not retype it.\n{text}")
+
+    def answer_suffix(self) -> str:
+        if not self._cited:
+            return ''
+        parts = ['', '', 'CITED (verbatim, copied by the tool):']
+        for name, s, e, text in self._cited:
+            parts += [f'{name}:{s}-{e}', text, '']
+        return '\n'.join(parts).rstrip('\n')
 
 
 def inspect(query: str, repo_root: Path, llm_backend,

@@ -403,13 +403,6 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         self._omitted_tools: List[str] = list(
             (character_config.get('chat') or {}).get('omitted_tools') or []
         )
-        # `extract_external` (chat.subagents.extract): verbatim lines from the
-        # bound external repo with no subagent. Off unless the scenario's chat
-        # block says `extract_tool: true`; the claims-audit runner sets it from
-        # --extract-tool. An experiment (2026-09-04), so main behaves as before
-        # until the flag is passed.
-        self._extract_tool: bool = bool(
-            (character_config.get('chat') or {}).get('extract_tool'))
         # Auto-discovered tools from src/tools/. Each entry exposes
         # `react_invoke`; the catalog and dispatch path read from this
         # registry rather than hardcoded if/elif chains. Adding a tool =

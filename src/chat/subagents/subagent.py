@@ -132,6 +132,13 @@ class Subagent:
         root), or None to run the loop."""
         return None
 
+    def answer_suffix(self) -> str:
+        """Text appended to the answer by the harness, not the model: what a
+        subclass's primitives carried verbatim during the run (code_subagent's
+        `cite`). Empty by default. Appended on every exit, because material
+        the tool copied is evidence whether or not the model got to respond."""
+        return ''
+
     def budget_exhausted_observation(self) -> str:
         """Observation substituted for a primitive once `deadline` passes.
         Only reached by subagents constructed with a deadline."""
@@ -312,6 +319,9 @@ class Subagent:
                       f"unparseable emissions; {cause}.)"
                       + self._salvage(iters))
 
+        suffix = self.answer_suffix()
+        if suffix:
+            answer = (answer or '') + suffix
         write_subagent_trace(self.trace_dir, self.label, query, iters, answer,
                              exit_reason)
         return answer
