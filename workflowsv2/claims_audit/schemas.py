@@ -87,7 +87,7 @@ EVIDENCE_FORMS: Tuple[str, ...] = ("citation", "derived", "search")
 #: METHOD §5: whom a claim concerns. `seller` marks an assertion the supplied
 #: materials are not expected to reach, so the reader knows why it went
 #: unsettled.
-ABOUT: Tuple[str, ...] = ("target", "seller")
+ABOUT: Tuple[str, ...] = ("target", "seller", "document")
 
 SEARCH_KINDS: Tuple[str, ...] = ("lexical", "structural")
 

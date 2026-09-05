@@ -198,6 +198,9 @@ def _finding(f: Dict[str, Any], rating: Optional[Dict[str, Any]],
         out.append(f"> also, at {_lines(loc.get('lines'))}: "
                    f"\"{_md_safe(loc.get('quote'))}\"")
     out += [""]
+    if f.get("about") == "document":
+        out += ["This assertion is about a document in the materials rather than "
+                "about what the software does; the document itself settles it."]
     if f.get("about") == "seller":
         out += ["This assertion is about the seller's own activity or "
                 "hosted service, which the supplied materials are not "

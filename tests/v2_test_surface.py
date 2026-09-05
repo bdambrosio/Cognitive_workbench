@@ -44,7 +44,7 @@ def test_split_sections_cuts_at_headings_outside_fences_and_merges_small():
 
 def test_assemble_surface_assigns_ids_and_folds_restatements():
     parts = [
-        {"claims": [{"quote": "fast", "lines": [4, 4], "statement": "s", "about": "target"}]},
+        {"claims": [{"quote": "fast", "lines": [4, 4], "statement": "s", "about": "document"}]},
         {"claims": [{"quote": "free | 0", "lines": [12, 12], "statement": "s", "about": "seller"},
                     {"quote": "Yes, fast.", "lines": [14, 14], "statement": "s",
                      "about": "target", "restates": 1},

@@ -44,7 +44,7 @@
     for (const c of src.claims) {
       const cm = byClaim[String(c.id)] || [];
       h += '<tr data-src="' + esc(src.slug) + '" data-id="' + esc(c.id) + '">'
-        + '<td class="id">' + esc(c.id) + (c.about === "seller" ? '<div class="muted">seller</div>' : "") + "</td>"
+        + '<td class="id">' + esc(c.id) + (c.about === "seller" ? '<div class="muted">seller</div>' : c.about === "document" ? '<div class="muted">document</div>' : "") + "</td>"
         + '<td class="lines mono"' + (ed ? ' contenteditable="true"' : "") + ">" + esc((c.lines || []).join("–")) + "</td>"
         + '<td class="quote"' + (ed ? ' contenteditable="true"' : "") + ">" + esc(c.quote) + "</td>"
         + '<td class="statement"' + (ed ? ' contenteditable="true"' : "") + ">" + esc(c.statement) + "</td>"

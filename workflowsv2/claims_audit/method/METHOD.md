@@ -23,11 +23,14 @@ Two things follow from being one stage of several:
 
 A claim is an assertion the seller makes to the buyer in the designated claim source — a listing, a technical description, a specification, a marketing document. The engagement names which document that is for this run.
 
-**Not every sentence of a claim source is a claim.** Three kinds are not, or not as written:
+**Not every sentence of a claim source is a claim.** Four kinds are not, or not as written:
 
 - **Navigation and courtesy.** A heading, a link, a badge, an image, a table of contents, "see LICENSE", "we welcome contributions", a sign-off. These point or greet and assert nothing about the target, even where the link points at the seller's own site, documentation or demo. A badge or link that states a fact — a licence badge, a version badge — is the fact it states, quoted as it appears.
 - **Instructions.** A command, an installation step, a prerequisite, a configuration example. Enumerate what the block asserts about the target: that a tool has the subcommands shown, that the stack runs on the named database, that a step has the stated effect. One claim per capability asserted, not one per line.
 - **Intent.** A roadmap item, a feature marked as coming, a plan. It concerns what the seller means to do, not the target's present state, and is enumerated as about the seller, per §5.
+- **Puffery.** A vague general statement of quality that a reasonable buyer would not rely on and that no evidence could settle: "blazing fast", "rock solid", "modern", "enterprise-grade". It is not enumerated. A statement that is specific and testable is a claim however it is dressed: "handles 10,000 requests a second" is a claim, "fast" is not.
+
+**Read each assertion as a reasonable buyer in this transaction would read it:** in its ordinary sense, as one statement, in the context of the whole document, with the seller's own documentation as the specification of what the software is said to do. A statement that the target belongs to a category, "a URL shortener", "a CRM", is one claim, that the core function of the category exists; it is not expanded into the properties a member of the category might have.
 
 **An assertion about the seller rather than the target is still a claim.** A sign-up page, a directory listing said to be in progress, a hosted plan and its price, a stated plan: the seller asserts them to the buyer, and the supplied materials are not expected to reach them. §5 marks such a claim so the reader knows why it went unsettled.
 
@@ -81,6 +84,7 @@ The claim source is given to you one section at a time, in document order, with 
 |---|---|
 | `target` | The product, code, infrastructure, business or terms the buyer would acquire |
 | `seller` | The seller's own activity, hosted service or stated intent, which the supplied materials are not expected to reach |
+| `document` | A document in the materials itself, rather than what the software does: its licence, its existence, what it contains. The document settles such a claim, and a citation into it is evidence for this claim alone, per §7 |
 
 - **`restates`** — present only when the assertion is one already enumerated, made again: the `id` of that claim.
 
@@ -244,7 +248,7 @@ Two kinds of JSON object, one per phase. Phase one is emitted once per section o
 | `claims[].quote` | The assertion verbatim, per §5 |
 | `claims[].lines` | Where that quote sits in the claim source |
 | `claims[].statement` | The claim in plain words |
-| `claims[].about` | `target` or `seller`, per §5 |
+| `claims[].about` | `target`, `seller` or `document`, per §5 |
 | `claims[].restates` | Present only for an assertion already enumerated: the `id` of that claim, per §5 |
 | `not_completed` | Present only when the section could not be read, per §4. When it is present, `claims` is empty |
 

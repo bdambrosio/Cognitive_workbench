@@ -963,7 +963,8 @@ def emit_findings(loop, method_text: str, claim_source: Path,
         f"A line of the claim source is the claim, not evidence for it: a "
         f"citation into `{claim_source.name}` restates the assertion and settles "
         f"nothing. Evidence is what the other supplied materials show, per "
-        f"METHOD \u00a72 and \u00a77.\n\n"
+        f"METHOD \u00a72 and \u00a77. The one exception is a claim marked as "
+        f"about a document: the document itself settles it.\n\n"
         f"THE FROZEN CLAIM SURFACE. These are the claims you enumerated, and "
         f"the surface does not change. Adjudicate every one of them, and refer "
         f"to each by its id:\n\n"
@@ -996,6 +997,8 @@ def _claim_line(c: Dict[str, Any]) -> str:
             f"      statement: {c.get('statement')}")
     if c.get("about") == "seller":
         line += "  (about the seller, per METHOD \u00a75)"
+    elif c.get("about") == "document":
+        line += "  (about a document itself, per METHOD \u00a75: the document settles it)"
     for loc in c.get("locations") or []:
         line += f"\n      also at [{loc.get('lines')}]: {loc.get('quote')}"
     return line
