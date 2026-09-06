@@ -184,7 +184,17 @@ def test_merge_emissions_carries_not_completed_from_any_batch():
     assert [f["claim_id"] for f in merged["findings"]] == [1]
     clean = _merge_emissions([first, part({"claim_source": "d.md",
                                            "findings": [{"claim_id": 2}]})])
-    assert "not_completed" not in clean["obj"]
+    assert "not_completed" not in clean["obj"] and clean["batch_defects"] == []
+    # A batch that sets the field beside its findings has misused it
+    # (METHOD §13): reported as a defect, its text not carried.
+    misused = part({"claim_source": "d.md", "findings": [{"claim_id": 2}],
+                    "not_completed": "All claims were attempted."})
+    m = _merge_emissions([first, misused])
+    assert "not_completed" not in m["obj"]
+    assert len(m["batch_defects"]) == 1 and m["batch_defects"][0].startswith("batch 2")
+    alone = _merge_emissions([misused])
+    assert "not_completed" not in alone["obj"] and len(alone["batch_defects"]) == 1
+    assert [f["claim_id"] for f in alone["obj"]["findings"]] == [2]
 
 
 def test_trace_claims_reads_the_prefix():

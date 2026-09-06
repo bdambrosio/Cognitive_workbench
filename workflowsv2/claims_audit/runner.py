@@ -711,8 +711,17 @@ def replace_findings(obj: Dict[str, Any], again: Dict[str, Any],
         if fresh_obj.get(key):
             obj[key] = list(obj.get(key) or []) + list(fresh_obj[key])
     if fresh_obj.get("not_completed"):
-        obj["not_completed"] = "; ".join(
-            s for s in (obj.get("not_completed"), fresh_obj["not_completed"]) if s)
+        if fresh_obj.get("findings"):
+            # METHOD §13: when `not_completed` is present, `findings` is
+            # empty. A response that sets it and delivers findings has
+            # misused the field, and its text is not run incompleteness.
+            logger.warning("re-adjudication set not_completed and delivered "
+                           "%d finding(s); the text is dropped: %s",
+                           len(fresh_obj["findings"]),
+                           str(fresh_obj["not_completed"])[:120])
+        else:
+            obj["not_completed"] = "; ".join(
+                s for s in (obj.get("not_completed"), fresh_obj["not_completed"]) if s)
     return n
 
 
@@ -892,21 +901,41 @@ def _merge_emissions(parts: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
 
     `parse` is the worst outcome across the batches, so one unparseable batch
     cannot read as a clean run, and `not_completed` is carried from every
-    batch that set it, so one batch that could not be attempted cannot
-    either: METHOD §4 makes the run incomplete when any claim was not
-    attempted.
+    batch that set it and delivered no findings, so one batch that could
+    not be attempted cannot either: METHOD §4 makes the run incomplete when
+    any claim was not attempted.
+
+    A BATCH THAT SETS `not_completed` AND DELIVERS FINDINGS HAS MISUSED THE
+    FIELD. METHOD §13: when it is present, `findings` is empty. On the
+    chhoto smoke test (2026-09-06) three batches delivered every finding and
+    still wrote paragraphs saying so in `not_completed`, and one wrote
+    "Absent"; carried as incompleteness, that reported a complete run as
+    incomplete. Such a batch is listed in `batch_defects` for the output
+    check instead, and its text is not carried.
     """
-    if len(parts) == 1:
-        return parts[0]
     rank = {"parsed": 0, "repaired": 1, "salvaged": 2, "unparseable": 3}
-    findings, unclaimed, questions, incomplete = [], [], [], []
-    for p in parts:
+    findings, unclaimed, questions, incomplete, defects = [], [], [], [], []
+    for i, p in enumerate(parts, 1):
         o = p.get("obj") or {}
         findings.extend(o.get("findings") or [])
         unclaimed.extend(o.get("unclaimed") or [])
         questions.extend(o.get("questions") or [])
         if o.get("not_completed"):
-            incomplete.append(str(o["not_completed"]))
+            if o.get("findings"):
+                defects.append(
+                    f"batch {i}: `not_completed` is set and "
+                    f"{len(o['findings'])} finding(s) were emitted; METHOD "
+                    f"§13 makes `findings` empty when it is present. The "
+                    f"text is not carried: {str(o['not_completed'])[:160]!r}")
+            else:
+                incomplete.append(str(o["not_completed"]))
+    if len(parts) == 1:
+        one = dict(parts[0])
+        one["obj"] = dict(parts[0].get("obj") or {})
+        if defects:
+            one["obj"].pop("not_completed", None)
+        one["batch_defects"] = defects
+        return one
     worst = max(parts, key=lambda p: rank.get(p.get("parse"), 3))
     head = dict(parts[0].get("obj") or {})
     head.pop("not_completed", None)
@@ -922,6 +951,7 @@ def _merge_emissions(parts: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
             "response_format_dropped": sorted(
                 {d for p in parts for d in (p.get("response_format_dropped") or [])}),
             "phase": "findings", "batches": len(parts),
+            "batch_defects": defects,
             "evidence": parts[0].get("evidence")}
 
 
@@ -1055,7 +1085,8 @@ TAG_INSTRUCTION = (
 def post_run_checks(obj: Optional[Dict[str, Any]], corpus: Path,
                     claim_source: str, frozen: Sequence[Dict[str, Any]],
                     out: Path, read: Optional[set] = None,
-                    excludes: Optional[List[str]] = None) -> Dict[str, Any]:
+                    excludes: Optional[List[str]] = None,
+                    also: Sequence[str] = ()) -> Dict[str, Any]:
     """METHOD's requirements, over the parsed output.
 
     REPLACES THREE PROSE PARSERS. v1 checked the ledger with a line regex, the
@@ -1072,6 +1103,11 @@ def post_run_checks(obj: Optional[Dict[str, Any]], corpus: Path,
     else:
         res = schemas.check_output(obj, corpus, claim_source, frozen, read,
                                    excludes=excludes)
+    # Defects the assembler saw and the merged object cannot show: a batch
+    # that set `not_completed` beside its findings (`_merge_emissions`).
+    if also:
+        res["problems"] = list(res["problems"]) + list(also)
+        res["ok"] = False
     for problem in res["problems"]:
         issues.note(out, stage="claims_audit", code="output_check",
                     text=problem, severity="blocking")
@@ -1662,7 +1698,8 @@ def main() -> int:
         checks = post_run_checks(obj, eng["target"], claim_source,
                                  frozen, out,
                                  read=set(files_read(traces_dir, eng["target"])),
-                                 excludes=eng["evidence_excludes"])
+                                 excludes=eng["evidence_excludes"],
+                                 also=(emission or {}).get("batch_defects") or ())
     if obj is not None and (out / "findings.partial.json").is_file():
         (out / "findings.partial.json").unlink()
     # A CHECK PROBLEM IS NOT A FAILED RUN (Bruce, 2026-09-03). The run

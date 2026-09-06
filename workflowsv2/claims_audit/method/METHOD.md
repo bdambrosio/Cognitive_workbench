@@ -284,7 +284,7 @@ Two kinds of JSON object, one per phase. Phase one is emitted once per section o
 | `findings[].correction` | Per §10, where a finding changed |
 | `unclaimed[]` | `note` and one §7 evidence item — per §9 |
 | `questions[]` | Questions only the seller can answer, each with the `claim_id` of the frozen claim that raised it and the `question` — per §12 |
-| `not_completed` | Present only when a claim you were given could not be attempted, per §4. When it is present, `findings` is empty. The client's process carries it into the assembled run, beside the findings of the batches that completed |
+| `not_completed` | Present only when a claim you were given could not be attempted, per §4. When it is present, `findings` is empty. The client's process carries it into the assembled run, beside the findings of the batches that completed. **When every claim was attempted, leave the field out.** Do not write "Absent", and do not use it to say that the claims were attempted — an absent field is how the output says that |
 
 An evidence item's `form` decides its fields, per §7:
 
