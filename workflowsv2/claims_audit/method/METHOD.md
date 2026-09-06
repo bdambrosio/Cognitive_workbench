@@ -243,7 +243,7 @@ The client's process may hand a claim back to you with the adjudication you gave
 
 3. **Gather evidence** across the materials §7 admits as evidence. The evidence that settles a claim usually sits far from the claim source. On every evidence request, name the claims it gathers evidence for: the record of the request is filed under those claims, and when you adjudicate a claim the client's process hands you the requests filed under it, and fetches nothing else for it. What is handed to you is admissible for any claim it bears on, whichever claim it was filed under. Material that bears on no claim, per §9, reaches the adjudication only through a request filed under some claim: file it under the claim whose evidence led you to it.
 
-4. **Adjudicate each frozen claim** and assign one verdict, per §6. Where a claim raises something only the seller can answer, record it in `questions`.
+4. **Adjudicate each frozen claim** and assign one verdict, per §6. Where a claim raises something only the seller can answer, record it in `questions`, with the `claim_id` of the claim that raised it.
 
    `questions` supplements the findings and never replaces one. A claim that needs seller information still gets its finding, and still gets `unverifiable` if the supplied materials cannot settle it.
 
@@ -283,7 +283,7 @@ Two kinds of JSON object, one per phase. Phase one is emitted once per section o
 | `findings[].evidence[]` | One list, each item declaring its `form` — per §7 |
 | `findings[].correction` | Per §10, where a finding changed |
 | `unclaimed[]` | `note` and one §7 evidence item — per §9 |
-| `questions[]` | Questions only the seller can answer, raised by a claim — per §12 |
+| `questions[]` | Questions only the seller can answer, each with the `claim_id` of the frozen claim that raised it and the `question` — per §12 |
 | `not_completed` | Present only when a claim you were given could not be attempted, per §4. When it is present, `findings` is empty. The client's process carries it into the assembled run, beside the findings of the batches that completed |
 
 An evidence item's `form` decides its fields, per §7:

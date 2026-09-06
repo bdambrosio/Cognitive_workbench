@@ -491,7 +491,9 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
     out.append("")
     if merged.get("questions"):
         out += ["## Questions for the seller", ""]
-        out += [f"- ({q.get('claim_source')}) {q.get('question')}"
+        out += [f"- ({q.get('claim_source')}"
+                + (f", claim {q['claim_id']}" if q.get("claim_id") is not None else "")
+                + f") {q.get('question')}"
                 for q in merged["questions"]] + [""]
     if merged.get("unclaimed"):
         out += ["## Observations the seller did not claim", ""]

@@ -242,7 +242,9 @@ def render(merged: Dict[str, Any], ratings: Dict[str, Any]) -> str:
     lines += _table(real, {}, "materiality", "real")
     if merged.get("questions"):
         lines += ["", "## Questions for the seller", ""]
-        lines += [f"- ({q['claim_source']}) {q['question']}"
+        lines += [f"- ({q['claim_source']}"
+                  + (f", claim {q['claim_id']}" if q.get("claim_id") is not None else "")
+                  + f") {q['question']}"
                   for q in merged["questions"]]
     if merged.get("unclaimed"):
         lines += ["", "## Unclaimed observations", ""]

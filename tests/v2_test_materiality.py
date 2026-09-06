@@ -23,7 +23,8 @@ def _run(tmp_path, name, source, claims, findings, meta_problems=(),
     (d / "findings.json").write_text(json.dumps(
         {"claim_source": source, "findings": findings,
          "unclaimed": [{"note": "seen", "evidence": {"form": "citation"}}],
-         "questions": ["who?"]}))
+         "questions": [{"claim_id": 1, "question": "who?"}]
+                      if source == "doc1.md" else ["who?"]}))
     (d / "run_meta.json").write_text(json.dumps(
         {"world": name, "resolved_model": "m", "harness_rev": "abc",
          "output_check": {"ok": not meta_problems,
@@ -79,7 +80,12 @@ def test_merge_carries_review_outcome_problems_and_restatements(tmp_path):
     assert [x["in"] for x in m["figures"]["restated_quotes"]] == [[
         {"claim_source": "doc1.md", "claim_id": 1, "verdict": "contradicted"},
         {"claim_source": "doc9.md", "claim_id": 1, "verdict": "partial"}]]
-    assert len(m["unclaimed"]) == 2 and m["questions"][0]["claim_source"] == "doc1.md"
+    assert len(m["unclaimed"]) == 2
+    # The object form since 2026-09-06 keeps its claim_id; a string from an
+    # older run merges without one.
+    by_src = {q["claim_source"]: q for q in m["questions"]}
+    assert by_src["doc1.md"] == {"claim_source": "doc1.md", "claim_id": 1, "question": "who?"}
+    assert by_src["doc9.md"] == {"claim_source": "doc9.md", "question": "who?"}
 
 
 def test_merge_refuses_an_unfinished_run(tmp_path):

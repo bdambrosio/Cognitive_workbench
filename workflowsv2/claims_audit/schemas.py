@@ -377,7 +377,9 @@ def audit_schema() -> Dict[str, Any]:
         "unclaimed": {"type": "array", "items": {"type": "object", "properties": {
             "note": {"type": "string"}, "evidence": evidence},
             "required": ["note", "evidence"]}},
-        "questions": {"type": "array", "items": {"type": "string"}},
+        "questions": {"type": "array", "items": {"type": "object", "properties": {
+            "claim_id": {"type": "integer"}, "question": {"type": "string"}},
+            "required": ["claim_id", "question"]}},
         "not_completed": {"type": "string"}},
         "required": ["claim_source", "findings"]}
 
@@ -907,6 +909,12 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
     for cid in sorted(ids - set(seen), key=lambda x: (x is None, x)):
         problems.append(f"claim {cid} in the frozen surface has no finding — "
                         f"METHOD §4 requires one for every claim")
+
+    for i, q in enumerate(obj.get("questions") or [], 1):
+        if not isinstance(q, dict) or q.get("claim_id") not in ids:
+            problems.append(f"question {i}: claim_id "
+                            f"{(q or {}).get('claim_id') if isinstance(q, dict) else q!r} "
+                            f"is not in the frozen surface (METHOD §12)")
 
     for i, u in enumerate(obj.get("unclaimed") or [], 1):
         e = (u or {}).get("evidence") or {}

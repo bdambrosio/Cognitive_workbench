@@ -295,3 +295,17 @@ def test_a_candidate_in_a_submodule_is_outside_not_unresolved(tmp_path):
     assert out[2]["outside"] == ["backend/app/enterprise/x.py"]
     # without the submodule list the same candidate is unresolved, as before
     assert sch.candidate_files(fs[:1], docs, read=set())[1]["unresolved"]
+
+
+def test_check_output_requires_a_question_to_name_a_frozen_claim(tmp_path):
+    corpus = _corpus(tmp_path)
+    real = {"claim_id": 4, "adjudication": {"verdict": "real"},
+            "evidence": [{"form": "citation", "document": "app/a.py",
+                          "lines": [1, 1], "quote": "x = 1", "shows": "s"}]}
+    obj = {"findings": [real],
+           "questions": [{"claim_id": 4, "question": "since when?"},
+                         {"claim_id": 9, "question": "orphan"},
+                         "a bare string"]}
+    res = sch.check_output(obj, corpus, "c.md", [{"id": 4}], read={"app/a.py"})
+    qs = [p for p in res["problems"] if p.startswith("question")]
+    assert len(qs) == 2 and qs[0].startswith("question 2") and qs[1].startswith("question 3")

@@ -148,7 +148,12 @@ def merge(run_dirs: Sequence[Path]) -> Dict[str, Any]:
         for u in r["findings"].get("unclaimed") or []:
             unclaimed.append({"claim_source": src, **(u or {})})
         for q in r["findings"].get("questions") or []:
-            questions.append({"claim_source": src, "question": q})
+            # A question is an object with its claim's id since 2026-09-06;
+            # runs recorded before that hold plain strings.
+            if isinstance(q, dict):
+                questions.append({"claim_source": src, **q})
+            else:
+                questions.append({"claim_source": src, "question": q})
 
     restated = []
     for key, recs in by_quote.items():
