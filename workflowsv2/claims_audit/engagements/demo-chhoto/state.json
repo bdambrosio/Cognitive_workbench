@@ -1,11 +1,185 @@
 {
- "current_intake": null,
- "current_run": {},
+ "current_intake": "2026-09-05T18-14-44Z",
+ "current_run": {
+  "2026-09-05T18-14-44Z": "2026-09-06T18-19-00Z_chain_2026-09-06T17-00-58Z"
+ },
  "cancelled": {
   "intakes": [],
   "runs": [
    "2026-09-04T17-35-44Z_chhoto_readme_1",
    "2026-09-04T23-34-02Z_chhoto_readme_3"
   ]
- }
+ },
+ "stages": {
+  "letter": {
+   "value": "accepted",
+   "at": "2026-09-05T18-14-17Z",
+   "by": "bruce.dambrosio@gmail.com"
+  },
+  "intake": {
+   "value": "done",
+   "at": "2026-09-05T20-29-14Z",
+   "by": "bruce.dambrosio@gmail.com"
+  },
+  "materials": {
+   "value": "ready",
+   "at": "2026-09-05T21-58-56Z",
+   "by": "bruce.dambrosio@gmail.com"
+  },
+  "enumeration": {
+   "value": "done",
+   "at": "2026-09-06T17-00-55Z",
+   "by": "job"
+  },
+  "surface": {
+   "value": "frozen",
+   "at": "2026-09-06T17-00-58Z",
+   "by": "smoke test 2026-09-06 (claude)"
+  },
+  "chain": {
+   "value": "done",
+   "at": "2026-09-06T18-22-14Z",
+   "by": "job"
+  }
+ },
+ "jobs": [
+  {
+   "id": "2026-09-05T21-59-01Z",
+   "kind": "enumerate",
+   "state": "done",
+   "by": "bruce.dambrosio@gmail.com",
+   "started": "2026-09-05T21-59-01Z",
+   "ended": "2026-09-05T22-02-07Z",
+   "exit": 0,
+   "error": null,
+   "log": "/home/bruce/Downloads/Cognitive_workbench/workflowsv2/claims_audit/engagements/demo-chhoto/jobs/2026-09-05T21-59-01Z.log",
+   "steps": [
+    {
+     "label": "enumerate README.md",
+     "pid": 1411997,
+     "exit": 0
+    }
+   ]
+  },
+  {
+   "id": "2026-09-05T22-35-20Z",
+   "kind": "enumerate",
+   "state": "done",
+   "by": "cli",
+   "started": "2026-09-05T22-35-20Z",
+   "ended": "2026-09-05T22-38-13Z",
+   "exit": 0,
+   "error": null,
+   "log": "workflowsv2/claims_audit/engagements/demo-chhoto/jobs/2026-09-05T22-35-20Z.log",
+   "steps": [
+    {
+     "label": "enumerate README.md",
+     "pid": 1548057,
+     "exit": 0
+    }
+   ]
+  },
+  {
+   "id": "2026-09-05T23-09-11Z",
+   "kind": "chain",
+   "state": "done",
+   "by": "bruce.dambrosio@gmail.com",
+   "started": "2026-09-05T23-09-11Z",
+   "ended": "2026-09-06T00-48-55Z",
+   "exit": 0,
+   "error": null,
+   "log": "/home/bruce/Downloads/Cognitive_workbench/workflowsv2/claims_audit/engagements/demo-chhoto/jobs/2026-09-05T23-09-11Z.log",
+   "steps": [
+    {
+     "label": "audit README.md",
+     "pid": 1676767,
+     "exit": 0
+    },
+    {
+     "label": "review README.md",
+     "pid": 1884105,
+     "exit": 0
+    },
+    {
+     "label": "materiality",
+     "pid": 2036479,
+     "exit": 0
+    },
+    {
+     "label": "report",
+     "pid": 2050263,
+     "exit": 0
+    }
+   ]
+  },
+  {
+   "id": "2026-09-06T01-15-22Z",
+   "kind": "enumerate",
+   "state": "done",
+   "by": "cli",
+   "started": "2026-09-06T01-15-22Z",
+   "ended": "2026-09-06T01-18-30Z",
+   "exit": 0,
+   "error": null,
+   "log": "workflowsv2/claims_audit/engagements/demo-chhoto/jobs/2026-09-06T01-15-22Z.log",
+   "steps": [
+    {
+     "label": "enumerate README.md",
+     "pid": 2151932,
+     "exit": 0
+    }
+   ]
+  },
+  {
+   "id": "2026-09-06T16-58-18Z",
+   "kind": "enumerate",
+   "state": "done",
+   "by": "smoke test 2026-09-06 (claude)",
+   "started": "2026-09-06T16-58-18Z",
+   "ended": "2026-09-06T17-00-55Z",
+   "exit": 0,
+   "error": null,
+   "log": "/home/bruce/Downloads/Cognitive_workbench/workflowsv2/claims_audit/engagements/demo-chhoto/jobs/2026-09-06T16-58-18Z.log",
+   "steps": [
+    {
+     "label": "enumerate README.md",
+     "pid": 95404,
+     "exit": 0
+    }
+   ]
+  },
+  {
+   "id": "2026-09-06T17-00-58Z",
+   "kind": "chain",
+   "state": "done",
+   "by": "smoke test 2026-09-06 (claude)",
+   "started": "2026-09-06T17-00-58Z",
+   "ended": "2026-09-06T18-22-14Z",
+   "exit": 0,
+   "error": null,
+   "log": "/home/bruce/Downloads/Cognitive_workbench/workflowsv2/claims_audit/engagements/demo-chhoto/jobs/2026-09-06T17-00-58Z.log",
+   "steps": [
+    {
+     "label": "audit README.md",
+     "pid": 98835,
+     "exit": 0
+    },
+    {
+     "label": "review README.md",
+     "pid": 152466,
+     "exit": 0
+    },
+    {
+     "label": "materiality",
+     "pid": 161243,
+     "exit": 0
+    },
+    {
+     "label": "report",
+     "pid": 162762,
+     "exit": 0
+    }
+   ]
+  }
+ ]
 }
