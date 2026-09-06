@@ -120,6 +120,84 @@
       h3.dataset.key = m[1] + "#" + m[2];
       h3.addEventListener("click", () => showFinding(h3.dataset.key, false));
     }
+    linkReferences();
+    buildOutline();
+  }
+  // Every "<source>, claim <id>" in the report's prose, lists and appendix
+  // rows becomes a link to that finding: the executive summary's list of
+  // material findings and the appendix table are the finding-level outline.
+  function linkReferences() {
+    const re = /([\w.\-]+\.\w+), claim (\d+)/g;
+    for (const el of doc.querySelectorAll(".report p, .report li, .report td")) {
+      if (el.closest("h3")) continue;
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      const nodes = [];
+      while (walker.nextNode()) nodes.push(walker.currentNode);
+      for (const node of nodes) {
+        const t = node.nodeValue;
+        if (!re.test(t)) { re.lastIndex = 0; continue; }
+        re.lastIndex = 0;
+        const frag = document.createDocumentFragment();
+        let last = 0, m;
+        while ((m = re.exec(t)) !== null) {
+          const key = m[1] + "#" + m[2];
+          if (!findings[key]) continue;
+          frag.appendChild(document.createTextNode(t.slice(last, m.index)));
+          const a = document.createElement("a");
+          a.className = "ref"; a.textContent = m[0]; a.href = "#";
+          a.addEventListener("click", (ev) => { ev.preventDefault(); showFinding(key, true); });
+          frag.appendChild(a);
+          last = m.index + m[0].length;
+        }
+        frag.appendChild(document.createTextNode(t.slice(last)));
+        node.parentNode.replaceChild(frag, node);
+      }
+    }
+    // The appendix table — the one whose second column is "id": the id
+    // cell of each row is the link. The scope table also has a numeric
+    // second column (the claim count) and is not a list of claims.
+    for (const tr of doc.querySelectorAll(".report table tbody tr")) {
+      const th = tr.closest("table").querySelectorAll("thead th");
+      if (th.length < 2 || th[1].textContent.trim() !== "id") continue;
+      const tds = tr.querySelectorAll("td");
+      if (tds.length < 2 || !/^\d+$/.test(tds[1].textContent.trim())) continue;
+      const key = tds[0].textContent.trim() + "#" + tds[1].textContent.trim();
+      if (!findings[key]) continue;
+      const a = document.createElement("a");
+      a.className = "ref"; a.textContent = tds[1].textContent.trim(); a.href = "#";
+      a.addEventListener("click", (ev) => { ev.preventDefault(); showFinding(key, true); });
+      tds[1].textContent = ""; tds[1].appendChild(a);
+    }
+  }
+  // A bar of the report's sections above the scrolling document, the
+  // current one marked as the reader scrolls. Built from the headings, so
+  // the renderer is unchanged; sits outside #doc so it never scrolls away.
+  function buildOutline() {
+    const old = $("toc"); if (old) old.remove();
+    const heads = Array.from(doc.querySelectorAll(".report h2"));
+    if (heads.length < 2) return;
+    const toc = document.createElement("nav");
+    toc.id = "toc";
+    const links = heads.map((h2) => {
+      const a = document.createElement("a");
+      a.textContent = h2.textContent.split(" — ")[0].trim(); a.href = "#";
+      a.title = h2.textContent.trim();
+      a.addEventListener("click", (ev) => { ev.preventDefault(); h2.scrollIntoView({block: "start", behavior: "smooth"}); });
+      toc.appendChild(a);
+      return a;
+    });
+    doc.parentNode.insertBefore(toc, doc);
+    const mark = () => {
+      const top = doc.getBoundingClientRect().top + 8;
+      let cur = 0;
+      heads.forEach((h2, i) => { if (h2.getBoundingClientRect().top <= top + 40) cur = i; });
+      links.forEach((a, i) => a.classList.toggle("current", i === cur));
+      const c = links[cur];
+      if (c && (c.offsetLeft < toc.scrollLeft || c.offsetLeft + c.offsetWidth > toc.scrollLeft + toc.clientWidth))
+        toc.scrollTo({left: c.offsetLeft - 20, behavior: "smooth"});
+    };
+    doc.addEventListener("scroll", mark, {passive: true});
+    mark();
   }
   function headingFor(key) {
     return Array.from(doc.querySelectorAll(".report h3")).find((h) => h.dataset.key === key);

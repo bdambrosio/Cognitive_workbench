@@ -62,6 +62,13 @@ button.quiet:hover { background: var(--panel2); }
 #evidence .where { font-family: var(--mono); font-size: 12px; color: var(--muted); }
 #evidence pre { margin: 6px 0; padding: 6px 8px; background: var(--bg); font-family: var(--mono); font-size: 12px; white-space: pre-wrap; overflow-x: auto; }
 #evidence .shows { font-size: 14px; }
+/* the outline: one bar of the report's sections above the document, the current one marked */
+#toc { position: relative; display: flex; gap: 16px; overflow-x: auto; white-space: nowrap; padding: 8px 28px; background: var(--panel); border-bottom: 1px solid var(--rule); font-size: 13px; scrollbar-width: thin; }
+#toc a { color: var(--muted); text-decoration: none; padding: 2px 0; border-bottom: 2px solid transparent; }
+#toc a:hover { color: var(--text); }
+#toc a.current { color: var(--text); border-bottom-color: var(--accent); }
+/* a "<source>, claim N" reference in the report: a link to that finding */
+.report a.ref { color: #6ea0ff; text-decoration: underline dotted; cursor: pointer; }
 .report h3 { cursor: pointer; }
 .report h3:hover { color: #6ea0ff; }
 .report .finding.named { border-color: var(--accent2); box-shadow: 0 0 0 1px var(--accent2); }
