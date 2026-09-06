@@ -163,6 +163,7 @@ SPACEMAP_ARCHITECTURE.md
 
 | Doc | Covers |
 |---|---|
+| [method-superseded-rules.md](method-superseded-rules.md) | METHOD's former §19: each rule the claims-review method once had and why it changed; moved out of the executable file 2026-09-05 |
 | [cohabitation-writeup.md](cohabitation-writeup.md) | DRAFT essay: five days living with the Factorio agent — records both v1 criteria passed, the perception-layer lessons, FLE upstream issues |
 | [cw-voice-sensor-plan.md](cw-voice-sensor-plan.md) | Historical build plan behind the shipped voice sensor (implemented 2026-06-19; retained for planning rationale) |
 | [design_note_agreements_rag.md](design_note_agreements_rag.md) | Discourse/agreements design; write-side (triage+CRUD + date-stamp aging) implemented 2026-06-11, read-side RAG-push deferred |

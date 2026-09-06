@@ -14,7 +14,7 @@ The audit's own method states the gap this review fills. METHOD §7: *"This chec
 
 **Review what the audit concluded, against what the materials show.**
 
-`claim` means what METHOD §2 defines: an assertion the seller made. The audit states *findings about* claims. It makes no claims of its own, and neither does this review.
+`claim` means what METHOD §2 and §5 define: an assertion the seller made, or one the practice read out of a seller's assertion and approved before the freeze. The audit states *findings about* claims. It makes no claims of its own, and neither does this review.
 
 **Do not audit the target.** A finding the audit never made is not your finding, however material it appears. If the audit missed something, that is a coverage question and §7 says where it goes.
 
