@@ -2,7 +2,7 @@
 
 ## 1. What this stage does
 
-One claim-source document is audited per run. The engagement names it. Every other supplied document is an **evidence source**, and all of them are available to you. *Evidence* means the material actually cited in a finding, per §7.
+One claim-source document is audited per run. The engagement names it. Every other supplied document is available to you; §7 says which of them count as evidence. *Evidence* means the material actually cited in a finding, per §7.
 
 > Compare what the seller asserts in this claim source against what the supplied materials show, and cite the material used.
 
@@ -27,14 +27,14 @@ A claim is an assertion the seller makes to the buyer in the designated claim so
 
 - **Navigation and courtesy.** A heading, a link, a badge, an image, a table of contents, "see LICENSE", "we welcome contributions", a sign-off. These point or greet and assert nothing about the target, even where the link points at the seller's own site, documentation or demo. A badge or link that states a fact — a licence badge, a version badge — is the fact it states, quoted as it appears.
 - **Instructions.** A command, an installation step, a prerequisite, a configuration example. Enumerate what the block asserts about the target: that a tool has the subcommands shown, that the stack runs on the named database, that a step has the stated effect. One claim per capability asserted, not one per line.
-- **Intent.** A roadmap item, a feature marked as coming, a plan. It concerns what the seller means to do, not the target's present state, and is enumerated as about the seller, per §5.
+- **Intent.** A roadmap item, a feature marked as coming, a plan. It concerns what the seller means to do, not the target's present state, and is enumerated as about the seller, per §5. Intent concerns a future state: a statement that the target does not have or do something is about its present state, and is a claim about the target whatever heading it sits under.
 - **Puffery.** A vague general statement of quality that a reasonable buyer would not rely on and that no evidence could settle: "blazing fast", "rock solid", "modern", "enterprise-grade". It is not enumerated. A statement that is specific and testable is a claim however it is dressed: "handles 10,000 requests a second" is a claim, "fast" is not.
 
-**Read each assertion as a reasonable buyer in this transaction would read it:** in its ordinary sense, as one statement, in the context of the whole document, with the seller's own documentation as the specification of what the software is said to do. A statement that the target belongs to a category, "a URL shortener", "a CRM", is one claim, that the core function of the category exists; it is not expanded into the properties a member of the category might have.
+**Read each assertion as a reasonable buyer in this transaction would read it:** in its ordinary sense, as one statement, using its heading only to resolve a referent, with the seller's own documentation as the specification of what the software is said to do. A statement that the target belongs to a category, "a URL shortener", "a CRM", is one claim, that the core function of the category exists; it is not expanded into the properties a member of the category might have.
 
 **An assertion about the seller rather than the target is still a claim.** A sign-up page, a directory listing said to be in progress, a hosted plan and its price, a stated plan: the seller asserts them to the buyer, and the supplied materials are not expected to reach them. §5 marks such a claim so the reader knows why it went unsettled.
 
-Other supplied documents, including source code and code comments, are evidence sources. They test claims. They are not themselves seller claims, even when they assert something.
+Other supplied documents are not claim sources for this run, even when they assert something; §7 says which of them are evidence.
 
 Business claims are in scope as well as technical ones. Revenue, customer counts, contracts and external dependencies are evaluated the same way as backups, uptime, architecture or test coverage.
 
@@ -116,7 +116,7 @@ Every finding carries exactly one.
 | `contradicted` | The claim is false — the claim source says one thing and the evidence shows another |
 | `unverifiable` | The claim was attempted and the supplied materials cannot settle it |
 
-**A gap must be citable, not merely unfound.** `partial` requires evidence you can point at showing the gap. Evidence you looked for and did not find is not a gap — that is `unverifiable`, and §8 governs it. The distinction is the same one that separates `unverifiable` from `contradicted`, and it is as easy to get wrong here.
+**A gap must be citable, not merely unfound.** `partial` requires evidence you can point at showing the gap. Evidence you looked for and did not find is not a gap — that is `unverifiable`, and §8 governs it.
 
 **Choosing between `partial` and `real_with_caveat`.** Ask whether you can cite a part of the assertion the evidence shows is not borne out. If you can, the verdict is `partial`. If every part holds and there is still something to say, it is `real_with_caveat`.
 
@@ -189,7 +189,7 @@ The adjudication also records what the searches established, as one of:
 | `outside_the_materials` | The kind of material needed to test the claim was not supplied at all — no customer records of any sort |
 | `not_examined` | The searches named one or more files where the material would appear, and at least one of them was not opened in this engagement |
 
-If the searches do not settle the question, the verdict is `unverifiable`, never `contradicted`.
+If the searches do not settle the question, the verdict is `unverifiable`, per §6.
 
 ## 9. Unclaimed observations
 
@@ -223,7 +223,7 @@ If evidence found later contradicts a finding you have already formed, revise th
 
 **Phase two — adjudicate.** You are given the frozen surface back.
 
-3. **Gather evidence** across all the supplied materials, not only the claim source. The evidence that settles a claim made in one document usually sits in another. On every evidence request, name the claims it gathers evidence for: the record of the request is filed under those claims, and a claim is adjudicated on the requests filed under it and nothing else.
+3. **Gather evidence** across the materials §7 admits as evidence. The evidence that settles a claim usually sits far from the claim source. On every evidence request, name the claims it gathers evidence for: the record of the request is filed under those claims, and a claim is adjudicated on the requests filed under it and nothing else.
 
 4. **Adjudicate each frozen claim** and assign one verdict, per §6. Where a claim raises something only the seller can answer, record it in `questions`.
 

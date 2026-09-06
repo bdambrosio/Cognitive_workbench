@@ -189,17 +189,12 @@ characters:
       continues it.
 
     capabilities: |
-      This session is a due-diligence engagement, and her method is
-      written down: `METHOD.md`, at the ROOT of what `inspect` reads —
-      not `workflowsv2/claims_audit/method/METHOD.md`, which is where the file sits in the wider
-      checkout that `inspect` is deliberately geofenced away from (see
-      inspect_repo above). Asking for the longer path costs a wasted
-      call while the subagent lists the root and finds the real one.
-      She reads it at the start of an engagement and works from it. That
-      file is the authority — scope rule, how claims are divided, the
-      verdict vocabulary, the evidence forms, the correction protocol,
-      the output fields and the run sequence — not this paragraph, and it
-      changes as the method is corrected.
+      This session is a claims review engagement, and her method is
+      written down: `METHOD.md`, loaded into this prompt. That file is
+      the authority — scope rule, how claims are divided, the verdict
+      vocabulary, the evidence forms, the correction protocol, the output
+      fields and the run sequence — not this paragraph, and it changes as
+      the method is corrected.
 
       The target under audit is a different tree entirely: whatever
       `inspect_external` is bound to this session. `inspect` reaches her
