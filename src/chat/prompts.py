@@ -266,7 +266,7 @@ class PromptsMixin:
         # (chat_loop._compute_substrate_line). Absent when git is
         # unavailable.
         substrate = getattr(self, '_substrate_line', '') or ''
-        if substrate:
+        if substrate and getattr(self, 'substrate_enabled', True):
             parts.append(
                 "## Substrate (harness provenance, session start)\n"
                 "What I am actually running — the working tree, not just "
@@ -281,7 +281,7 @@ class PromptsMixin:
         # "when X is up…"; this says which is up. Self-model is left alone —
         # an embodiment is environment, not substrate.
         embodiment = getattr(self, '_embodiment_line', '') or ''
-        if embodiment:
+        if embodiment and getattr(self, 'embodiment_enabled', True):
             parts.append(
                 "## Embodiment (probed at session start)\n"
                 "Which world I am actually in right now. Measured, not "

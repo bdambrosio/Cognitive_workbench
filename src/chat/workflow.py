@@ -125,6 +125,16 @@ _SUPPRESSED = [
     # failure was logged and swallowed, so nothing noticed.
     ('attribution_enabled',  'attribution',
      'the post-turn claim attribution call — claims.jsonl, verification concerns'),
+    # Two prompt blocks, not calls: computed once at session start and
+    # rendered under first-person headers written for a companion. The
+    # substrate block tells the agent to verify its own architecture "with
+    # inspect or exec-script", which in an audit points at the workbench
+    # repo instead of the target; the embodiment block tells an auditor it
+    # has no Factorio body this session. Neither has a use in a procedure.
+    ('substrate_enabled',    'substrate',
+     'the substrate block — harness commit and backend model'),
+    ('embodiment_enabled',   'embodiment',
+     'the embodiment block — which world surfaces are live'),
 ]
 
 

@@ -300,6 +300,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         self.orientation_enabled = bool((character_config.get('orientation') or {}).get('enabled', True))
         self.reflection_enabled = bool((character_config.get('reflection') or {}).get('enabled', True))
         self.attribution_enabled = bool((character_config.get('attribution') or {}).get('enabled', True))
+        self.substrate_enabled = bool((character_config.get('substrate') or {}).get('enabled', True))
+        self.embodiment_enabled = bool((character_config.get('embodiment') or {}).get('enabled', True))
         # WORKFLOW MODE. An agent executing a procedure is not maintaining a
         # relationship, and the machinery for the second is pure weight on
         # the first. Bundled rather than set one flag at a time because they
