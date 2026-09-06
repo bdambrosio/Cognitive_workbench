@@ -71,4 +71,4 @@ def banner(display_name: str, claims: int, findings: int, sources: int,
         f"  reviewed     {sources} claim document{'s' if sources != 1 else ''}, "
         f"{claims} claims, {findings} findings, reviewed and rated",
         f"  model        {model_label}, on a hosted inference service",
-        "  this page    your conversation is private to your browser and kept for a few days"])
+        "  this page    your conversation is tied to this browser, kept on our server for a few days, then deleted"])
