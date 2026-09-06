@@ -117,6 +117,14 @@ _SUPPRESSED = [
      'the per-turn orientation block'),
     ('reflection_enabled',   'reflection',
      'the post-turn reflection call — memories, user_concerns, agent_concerns'),
+    # Claim attribution is the provenance behind `justify`: one model call per
+    # turn that decomposes the reply into attributed claims and may spawn a
+    # verification concern. A workflow reply is a leg summary nobody will
+    # ask to justify. On the dataroom fixture (2026-09-06) the call ran at
+    # its 4,096-token cap, spent all of it on reasoning, and failed; the
+    # failure was logged and swallowed, so nothing noticed.
+    ('attribution_enabled',  'attribution',
+     'the post-turn claim attribution call — claims.jsonl, verification concerns'),
 ]
 
 

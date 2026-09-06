@@ -299,6 +299,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         self.discourse_enabled = bool((character_config.get('discourse') or {}).get('enabled', True))
         self.orientation_enabled = bool((character_config.get('orientation') or {}).get('enabled', True))
         self.reflection_enabled = bool((character_config.get('reflection') or {}).get('enabled', True))
+        self.attribution_enabled = bool((character_config.get('attribution') or {}).get('enabled', True))
         # WORKFLOW MODE. An agent executing a procedure is not maintaining a
         # relationship, and the machinery for the second is pure weight on
         # the first. Bundled rather than set one flag at a time because they
@@ -1945,7 +1946,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             # Reads the persisted trace record, so it audits exactly
             # what is durable. turn_seq is None when no trace was
             # written (pre-loop crash).
-            if turn_seq is not None:
+            if turn_seq is not None and self.attribution_enabled:
                 _stage('claims', self._extract_and_log_claims, turn_seq, True)
             # Discourse tracks shared premises and standing decisions —
             # things two parties agreed. A sensor pushed a report; it
