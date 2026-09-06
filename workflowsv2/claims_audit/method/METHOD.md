@@ -156,7 +156,7 @@ A finding's evidence is **one list**. Each item in it declares its `form`, and t
 - **`derivation`** — the arithmetic or reasoning, shown so a reader can reproduce it;
 - **`consequence`** — what follows, and why it bears on the claim.
 
-Derive only from facts supplied in the materials; do not import market forecasts or other outside conclusions. State the consequence and stop — do not turn it into advice about the transaction. Where the derivation depends on time, give the relevant date and what changes on it. A derivation that bears on no claim is not evidence about a claim; report it under §9.
+Derive only from facts supplied in the materials; do not import market forecasts or other outside conclusions. State the consequence and stop — do not turn it into advice about the transaction. Where the derivation depends on time, give the relevant date and what changes on it. The date of the engagement is not a supplied fact and has no line to cite: what follows from one cited fact and that date — how long since a recorded event, whether a stated window has passed — is said in that citation's `shows`, not as a `derived` item. A derivation that bears on no claim is not evidence about a claim; report it under §9.
 
 **`search`** — a record of a search performed to determine whether the supplied materials hold anything that could settle the claim. There is no line to cite for something that is absent, so searches are the evidence for a claim of absence, and the record of diligence behind an `unverifiable` verdict. §8 governs both.
 
@@ -211,7 +211,7 @@ For a claim that something exists, searches that find nothing settle nothing, an
 
 The materials may show something relevant that the seller never asserted. It is not a finding — there is no claim for it to adjudicate — and it is not discarded. Record it as an unclaimed observation with a short note saying what it shows.
 
-**This is the only thing an unclaimed observation is.** It is not a place for an assertion the frozen surface missed: §5 freezes the surface, and nothing adds to it afterwards by any route.
+**This is the only thing an unclaimed observation is.** It is not a place for an assertion the frozen surface missed: §5 freezes the surface, and nothing adds to it afterwards by any route. Nor is it a place to say again what a finding already says: material that bears on a frozen claim belongs in that claim's finding, as its evidence or its `gap`, and is not recorded here as well.
 
 What the observation rests on is written as one §7 evidence item: a `citation` where a single place shows it, or a `derived` item where it follows from two or more facts and no single quote holds it.
 
