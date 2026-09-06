@@ -658,7 +658,7 @@ def chase_message(todo: Dict[Any, List[str]],
                   frozen: Sequence[Dict[str, Any]]) -> str:
     """The gathering leg that opens the files the searches named. METHOD §8."""
     quotes = {c.get("id"): c.get("quote") for c in frozen}
-    lines = ["These claims are unsettled. Your searches named the files below "
+    lines = ["These claims rest on searches. Your searches named the files below "
              "as the places where the material that could settle each claim "
              "would appear, and you have not opened them. Open each one with "
              "inspect_external, naming the claim ids in the request's "
@@ -680,9 +680,9 @@ def untagged_message(ids: Sequence[int], frozen: Sequence[Dict[str, Any]]) -> st
     lines = ["No evidence request has been filed under the claims below, so "
              "nothing gathered so far can be used to adjudicate them. Gather "
              "the evidence that settles each one with inspect_external, "
-             "naming the claim ids in the request's `claims` field. Where the "
-             "materials cannot settle a claim, record the searches you made "
-             "under its id. Do not write findings; end the leg with `yield` "
+             "naming the claim ids in the request's `claims` field. Where a claim "
+             "asserts an absence, or the materials cannot settle it, record "
+             "the searches you made under its id (METHOD \u00a78). Do not write findings; end the leg with `yield` "
              "or `respond` when done.", ""]
     for cid in ids:
         lines.append(_claim_line(quotes.get(cid, {"id": cid})))
@@ -1484,9 +1484,10 @@ def main() -> int:
                     logger.info("reprompt recovered %d of %d",
                                 len(keep), len(missing))
 
-            # THE CHASE (METHOD §8). An `unverifiable` finding whose searches
-            # named a file the run never opened is not unsettled by the
-            # materials; it is unexamined. Nothing is adjudicated during the
+            # THE CHASE (METHOD §8). A finding whose searches named a file the
+            # run never opened — an `unverifiable` one, or a claim of absence
+            # resting on its searches — is not settled by the materials; it
+            # is unexamined. Nothing is adjudicated during the
             # gathering legs, so the runner had no grounds to disbelieve a
             # `respond` with those files still unread. Now it has: for each
             # such claim, one gathering leg names the claims and the files,
@@ -1532,9 +1533,8 @@ def main() -> int:
                         break
                     again = adjudicate(
                         sorted(todo, key=lambda x: (x is None, x)),
-                        note=("These claims were adjudicated `not_examined`: "
-                              "their searches named files that had not been "
-                              "opened. Those files have since been opened and "
+                        note=("These claims rest on searches that named "
+                              "files that had not been opened. Those files have since been opened and "
                               "their contents are in the evidence below. "
                               "Adjudicate these claims again."))
                     entry["parse"] = again["parse"]

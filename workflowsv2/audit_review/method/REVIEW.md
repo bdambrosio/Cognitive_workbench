@@ -67,9 +67,9 @@ A claim carrying `implied_by` is a subclaim the practice read out of a broader c
 
 **3. Evidence support.** Does the cited text show what the evidence item's `shows` says it shows?
 
-**4. Verdict calibration.** Given the claim, the evidence and the `gap`, is the verdict the right one from METHOD §6? A verdict is **overstated** when it credits the claim more than the cited evidence supports, and **understated** when it credits the claim less. A claim shown to be false but carrying `partial` is understated. A named part of the assertion failing, recorded as `real_with_caveat`, is overstated — METHOD §6 makes that boundary a test, and it is the one most often got wrong. Weak evidence recorded as a caveat rather than `unverifiable` is also overstated. A `partial` or `contradicted` whose `gap` rests on what a search did not find, with no cited line showing the part of the assertion that fails, is understated: METHOD §6 says that evidence looked for and not found is not a gap, and §8 that a search never settles a claim against the seller; the verdict such a finding supports is `unverifiable`.
+**4. Verdict calibration.** Given the claim, the evidence and the `gap`, is the verdict the right one from METHOD §6? A verdict is **overstated** when it credits the claim more than the cited evidence supports, and **understated** when it credits the claim less. A claim shown to be false but carrying `partial` is understated. A named part of the assertion failing, recorded as `real_with_caveat`, is overstated — METHOD §6 makes that boundary a test, and it is the one most often got wrong. Weak evidence recorded as a caveat rather than `unverifiable` is also overstated. A `partial` or `contradicted` whose `gap` rests on what a search did not find, with no cited line showing the part of the assertion that fails, is understated: METHOD §6 says that evidence looked for and not found is not a gap, and §8 that a search never settles a claim against the seller; the verdict such a finding supports is `unverifiable`. A `real` on a claim of absence — "no", "only", "never" — that rests on citations and records no search, or searches confined to the mechanism the seller names, is overstated: METHOD §8 makes searches over every place the thing could occur the evidence for such a claim.
 
-**5. Search adequacy** — for every finding whose evidence records a search: every `unverifiable` finding, where METHOD §8 requires a lexical and a structural search and the process has confirmed both are present, and any finding of another verdict that rests part of its `gap` on what a search did not find. The question is whether they were searches that would have found the thing: right terms, right places. A search recorded against the wrong terms, or confined to one directory of a tree that has several where the thing could live, is diligence on paper and none in fact.
+**5. Search adequacy** — for every finding whose evidence records a search: every `unverifiable` finding and every `real` on a claim of absence, where METHOD §8 requires a lexical and a structural search and the process has confirmed both are present, and any finding of another verdict that rests part of its `gap` on what a search did not find. The question is whether they were searches that would have found the thing: right terms, right places. A search recorded against the wrong terms, or confined to one directory of a tree that has several where the thing could live, is diligence on paper and none in fact.
 
 **Judge each finding on the evidence it cites, not on evidence you would have chosen.** If you would have cited something better, that is not an exception. The exception is what it did cite failing to do the work.
 
@@ -100,8 +100,9 @@ write it. The client's process derives it: a finding **holds** when every
 observation is clean, and **does not hold** when any is not.
 
 **Two observations can point at the same defect and mean different things
-together.** Irrelevant evidence with adequate searches says the materials do not
-settle this claim, and the audit should have returned `unverifiable`. Irrelevant
+together.** Irrelevant evidence with adequate searches says the citations do no work
+and the searches do it all: the audit should have returned `unverifiable`, or
+`real` on the searches alone where the claim is one of absence (METHOD §8). Irrelevant
 evidence with inadequate searches says the audit did not look properly, and
 nothing about the claim is established either way. The pair carries that; a
 single label cannot.

@@ -614,17 +614,18 @@ def candidate_files(findings: Sequence[Dict[str, Any]],
                     docs: Dict[str, List[str]], read: Optional[set],
                     submodules: Sequence[str] = ()
                     ) -> Dict[Any, Dict[str, List[str]]]:
-    """Per `unverifiable` finding: the files its searches named in
-    `candidates`, resolved against the corpus, and which of them were not
-    opened. METHOD §8.
+    """Per finding whose evidence records a search: the files its searches
+    named in `candidates`, resolved against the corpus, and which of them
+    were not opened. METHOD §8.
 
     `read` is the set of corpus keys the run opened (`runner.files_read`);
     None means the caller cannot say, and `unopened` is then left empty rather
     than guessed. `unresolved` holds the names that resolve to no single file,
     with the reason, so the caller can report them.
 
-    Keyed by `claim_id`. Only findings with the `unverifiable` verdict are
-    present: a candidate on a settled claim is a note, not an obligation.
+    Keyed by `claim_id`. Only findings with a `search` item are present. A
+    claim of absence rests on searches as an `unverifiable` one does (METHOD
+    §8, 2026-09-05), so its candidates are the same obligation.
 
     `outside` holds candidates that name a submodule — a place the materials
     do not reach — which is consistent with `outside_the_materials` and with
@@ -639,8 +640,8 @@ def candidate_files(findings: Sequence[Dict[str, Any]],
             if i == len(d) or d[i] == "/"} - {""}
     out: Dict[Any, Dict[str, List[str]]] = {}
     for f in findings:
-        adj = f.get("adjudication") or {}
-        if adj.get("verdict") != "unverifiable":
+        if not any(isinstance(e, dict) and e.get("form") == "search"
+                   for e in f.get("evidence") or []):
             continue
         named: List[str] = []
         unresolved: List[str] = []
@@ -851,6 +852,24 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
                         f"searches named was opened"
                         + (" (none were named)" if not cand.get("named")
                            else "") + " (METHOD §8)")
+        elif not any(isinstance(e, dict) and e.get("form") == "citation"
+                     for e in ev) and \
+                any(isinstance(e, dict) and e.get("form") == "search" for e in ev):
+            # A claim of absence holds on its searches: both kinds, and only
+            # once every candidate is opened (METHOD §8).
+            kinds = {e.get("kind") for e in ev
+                     if isinstance(e, dict) and e.get("form") == "search"}
+            missing = [k for k in SEARCH_KINDS if k not in kinds]
+            if missing:
+                problems.append(f"{w}: verdict {v!r} rests on searches and "
+                                f"needs a lexical and a structural one "
+                                f"(METHOD §8); missing {', '.join(missing)}")
+            if read is not None and (candidates.get(cid) or {}).get("unopened"):
+                problems.append(
+                    f"{w}: verdict {v!r} rests on searches that named "
+                    f"{', '.join(candidates[cid]['unopened'])} and the run "
+                    f"did not open it — until every candidate is opened the "
+                    f"verdict is `unverifiable`, `not_examined` (METHOD §8)")
 
         if not ev:
             problems.append(f"{w}: no evidence — METHOD §4 gives every finding "

@@ -144,8 +144,7 @@ def statistics(run: Path, corpus: Path, claim_source: str) -> Dict[str, Any]:
             name = key or e.get("document")
             cited_docs.add(name)
             cited_by.setdefault(name, []).append(f.get("claim_id"))
-        if not cites and (f.get("adjudication") or {}).get("verdict") \
-                != "unverifiable":
+        if not cites and not any(e.get("form") == "search" for e in ev):
             no_citation.append(f.get("claim_id"))
     ev_per.sort()
     corpus_docs = set(docs)
@@ -201,8 +200,8 @@ def statistics(run: Path, corpus: Path, claim_source: str) -> Dict[str, Any]:
             "min": ev_per[0] if ev_per else 0,
             "median": ev_per[len(ev_per) // 2] if ev_per else 0,
             "max": ev_per[-1] if ev_per else 0},
-        # A finding resting on no citation, whose verdict is not
-        # `unverifiable`, has asserted an outcome from nothing readable.
+        # A finding resting on neither a citation nor a search has asserted
+        # an outcome from nothing readable (METHOD §7, §8).
         "findings_without_a_citation": no_citation,
         "documents_cited": sorted(d for d in cited_docs if d),
         "documents_never_cited": sorted(corpus_docs - cited_docs),

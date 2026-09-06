@@ -46,6 +46,10 @@ def test_candidate_files_resolves_and_subtracts_what_was_read(tmp_path):
     assert out[1]["unresolved"] == ["document 'nope.py' is not in the materials"]
     # no read set: nothing is called unopened
     assert sch.candidate_files(fs, docs, read=None)[1]["unopened"] == []
+    # a claim of absence rests on its searches (METHOD §8, 2026-09-05): its
+    # candidates are the same obligation whatever the verdict
+    real = dict(_unv(3, None, ["app/b.py"]), adjudication={"verdict": "real"})
+    assert sch.candidate_files([real], docs, read={"app/a.py"})[3]["unopened"] == ["app/b.py"]
     # a directory of the corpus is recorded, not an obligation or a problem;
     # a dotfile resolves (lstrip once ate the dot)
     (tmp_path / "t" / ".gitmodules").write_text("[submodule]\n")
@@ -71,6 +75,16 @@ def test_check_output_enforces_the_disposition_against_the_read_set(tmp_path):
     assert "finding 3" not in text
     assert res["figures"]["not_examined"] == 2
     assert res["figures"]["unopened_candidates"] == ["app/a.py"]
+    # a `real` resting on searches alone: both kinds, every candidate opened
+    real = dict(_unv(4, None, ["app/a.py"]), adjudication={"verdict": "real"})
+    res = sch.check_output({"findings": [real]}, corpus, "c.md", [{"id": 4}], read={"app/b.py"})
+    assert "verdict 'real' rests on searches that named app/a.py" in "\n".join(res["problems"])
+    real["evidence"] = real["evidence"][:1]          # lexical only
+    res = sch.check_output({"findings": [real]}, corpus, "c.md", [{"id": 4}], read={"app/a.py"})
+    assert "missing structural" in "\n".join(res["problems"])
+    cited = dict(real, evidence=[{"form": "citation", "document": "app/a.py", "lines": [1, 1],
+                                  "quote": "x = 1", "shows": "s"}])
+    assert sch.check_output({"findings": [cited]}, corpus, "c.md", [{"id": 4}], read=set())["ok"]
     # without a read set the dispositions are taken as recorded
     res = sch.check_output(obj, corpus, "c.md", frozen)
     assert not [p for p in res["problems"] if "not_examined" in p or "did not open" in p]
