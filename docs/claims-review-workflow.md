@@ -57,9 +57,14 @@ engagement's `jobs/` and a lock so one engagement runs one job at a time.
 The chain job has four **steps**, one program each, in order:
 
 1. **Audit** (`workflowsv2/claims_audit/runner.py`). Takes the frozen
-   surface, so its own enumeration is skipped. The **auditor** is the agent
-   for this step: a model in a fresh **world**, the per-run directory under
-   `scenarios/` holding its memory and traces. Its work is in **legs**: a
+   surface, so its own enumeration is skipped. The step has two parts:
+   **gathering**, in which the auditor reads the target and files evidence
+   under the claims it serves, judging nothing; then **adjudication**, in
+   which it judges each claim on the evidence filed under it, using no
+   tools. Evidence is gathered; findings and their citations are produced
+   by adjudication. The **auditor** is the agent for this step: a model in
+   a fresh **world**, the per-run directory under `scenarios/` holding its
+   memory and traces. Gathering is done in **legs**: a
    leg is one turn of the agent, driven by the program, which says
    "continue" after each. Inside a leg the agent runs an **action loop**:
    up to sixteen **iterations**, each one JSON action, a tool call or a
@@ -70,9 +75,11 @@ The chain job has four **steps**, one program each, in order:
    answer with the cited lines copied verbatim. Every evidence request is
    tagged with the claims it serves. A leg ends when the agent **yields**,
    handing the remainder to the next leg, or responds, meaning it is done
-   gathering. After gathering come **chase** legs the program forces: one
-   for claims no request was filed under, one for files a search named
-   that nobody opened. Then **adjudication**: for each **batch** of about
+   gathering. Between gathering and adjudication, or after a first
+   adjudication, come **chase** legs the program forces: one for claims no
+   request was filed under, one for files a search named that nobody
+   opened; only the claims affected are then adjudicated again.
+   **Adjudication**: for each **batch** of about
    ten claims, one constrained model call reads the claims and the evidence
    filed under them and emits one **finding** per claim: a **verdict**
    from five (real, real with caveat, partial, contradicted, unverifiable)
