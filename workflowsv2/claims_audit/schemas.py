@@ -770,10 +770,14 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
         return {"ok": False, "problems": ["`findings` is not a list"],
                 "figures": {}}
 
+    # The object checked here is assembled from batches (runner
+    # `_merge_emissions`), so findings from the batches that completed sit
+    # beside the `not_completed` of any that did not, or of the claims the
+    # runner never put to adjudication. Either way METHOD §4 says the run is
+    # not an audit, and that is reported once, as the run's incompleteness.
     incomplete = obj.get("not_completed")
-    if incomplete and findings:
-        problems.append("`not_completed` is set and findings were emitted; "
-                        "METHOD §4 requires an empty findings list")
+    if incomplete:
+        problems.append(f"run not completed (METHOD §4): {incomplete}")
     if not incomplete and not findings:
         problems.append("no findings and no `not_completed` — METHOD §4 "
                         "requires one or the other")

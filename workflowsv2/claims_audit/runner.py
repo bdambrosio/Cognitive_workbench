@@ -693,16 +693,43 @@ def replace_findings(obj: Dict[str, Any], again: Dict[str, Any],
                      wanted: set) -> int:
     """Put the re-adjudicated findings for `wanted` in place of the old ones.
     A finding for a claim outside `wanted` is dropped: the surface is frozen
-    and METHOD §4 gives each claim one finding. Returns how many replaced."""
+    and METHOD §4 gives each claim one finding. The re-adjudication's
+    `unclaimed`, `questions` and `not_completed` are kept as well: a question
+    is a string with no claim on it, so nothing older can be told apart to
+    replace, and a batch that could not be attempted must not vanish into a
+    clean run. Returns how many findings were replaced."""
+    fresh_obj = again.get("obj") or {}
     fresh = {f.get("claim_id"): f
-             for f in ((again.get("obj") or {}).get("findings") or [])
+             for f in (fresh_obj.get("findings") or [])
              if f.get("claim_id") in wanted}
     n = 0
     for i, f in enumerate(obj.get("findings") or []):
         if f.get("claim_id") in fresh:
             obj["findings"][i] = fresh[f.get("claim_id")]
             n += 1
+    for key in ("unclaimed", "questions"):
+        if fresh_obj.get(key):
+            obj[key] = list(obj.get(key) or []) + list(fresh_obj[key])
+    if fresh_obj.get("not_completed"):
+        obj["not_completed"] = "; ".join(
+            s for s in (obj.get("not_completed"), fresh_obj["not_completed"]) if s)
     return n
+
+
+def previous_adjudications(obj: Dict[str, Any], ids: Sequence[int]) -> str:
+    """The adjudication each of `ids` carries now, for a re-adjudication:
+    METHOD §10 asks for one line on what changed and why, which needs the
+    earlier verdict in view."""
+    by_id = {f.get("claim_id"): f for f in (obj.get("findings") or [])}
+    lines = []
+    for cid in ids:
+        adj = (by_id.get(cid) or {}).get("adjudication") or {}
+        parts = [f"verdict {adj.get('verdict')}"]
+        for key in ("unresolved_because", "gap"):
+            if adj.get(key):
+                parts.append(f"{key}: {adj[key]}")
+        lines.append(f"  claim {cid}: " + "; ".join(parts))
+    return "\n".join(lines)
 
 
 def numbered(path: Path) -> str:
@@ -864,21 +891,29 @@ def _merge_emissions(parts: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     and collapsing it here would hide a batch boundary that went wrong.
 
     `parse` is the worst outcome across the batches, so one unparseable batch
-    cannot read as a clean run.
+    cannot read as a clean run, and `not_completed` is carried from every
+    batch that set it, so one batch that could not be attempted cannot
+    either: METHOD §4 makes the run incomplete when any claim was not
+    attempted.
     """
     if len(parts) == 1:
         return parts[0]
     rank = {"parsed": 0, "repaired": 1, "salvaged": 2, "unparseable": 3}
-    findings, unclaimed, questions = [], [], []
+    findings, unclaimed, questions, incomplete = [], [], [], []
     for p in parts:
         o = p.get("obj") or {}
         findings.extend(o.get("findings") or [])
         unclaimed.extend(o.get("unclaimed") or [])
         questions.extend(o.get("questions") or [])
+        if o.get("not_completed"):
+            incomplete.append(str(o["not_completed"]))
     worst = max(parts, key=lambda p: rank.get(p.get("parse"), 3))
     head = dict(parts[0].get("obj") or {})
+    head.pop("not_completed", None)
     head.update({"findings": findings, "unclaimed": unclaimed,
                  "questions": questions})
+    if incomplete:
+        head["not_completed"] = "; ".join(incomplete)
     return {"raw": "\n".join(p.get("raw") or "" for p in parts),
             "obj": head, "parse": worst.get("parse"),
             "parse_error": worst.get("parse_error"),
@@ -1343,32 +1378,41 @@ def main() -> int:
             traces fits them in full, so the quote comes from numbered lines.
             Each batch's findings are written to findings.partial.json as
             they land, so a run that dies keeps what it had.
+
+            A CLAIM WITH NO REQUEST FILED IS NOT ADJUDICATED. Until
+            2026-09-06 such a claim was handed to the call with a note to
+            return `unverifiable` "recording that no search was made" \u2014 a
+            finding no `unresolved_because` describes and that
+            `check_output` rejects for its missing searches, so the runner
+            was asking for a verdict it would then report as a defect. The
+            claims still untagged after the untagged chase are left out
+            here and named in the run's `not_completed` instead, which is
+            what METHOD \u00a74 says of a claim that was never attempted.
             """
+            skipped = [c for c in ids if c in chase["untagged_after"]]
+            if skipped:
+                logger.warning("not adjudicating %d claim(s) with no evidence "
+                               "request filed: %s", len(skipped),
+                               ", ".join(str(c) for c in skipped))
+            ids = [c for c in ids if c not in chase["untagged_after"]]
             index = trace_index(traces_dir)
             batches = evidence_batches(list(ids), index, args.batch,
                                        args.evidence_budget)
             emissions = []
             for bi, b in enumerate(batches, 1):
                 logger.info("adjudicating batch %d/%d: %d claim(s), %d "
-                            "trace(s), %d with no request filed", bi,
-                            len(batches), len(b["claims"]), len(b["traces"]),
-                            len(b["untagged"]))
-                bnote = note
+                            "trace(s)", bi, len(batches), len(b["claims"]),
+                            len(b["traces"]))
                 if b["untagged"]:
-                    bnote += (("\n\n" if note else "")
-                              + "No evidence request was filed under "
-                              + ("claim " if len(b["untagged"]) == 1 else "claims ")
-                              + ", ".join(str(c) for c in b["untagged"])
-                              + ". Every claim still gets exactly one finding "
-                                "(METHOD \u00a74). Adjudicate such a claim on "
-                                "what is below if it bears on the claim; "
-                                "otherwise its verdict is `unverifiable`, "
-                                "recording that no search was made.")
+                    logger.warning("batch %d: claim(s) %s have no request "
+                                   "filed and are adjudicated on the batch's "
+                                   "other evidence", bi,
+                                   ", ".join(str(c) for c in b["untagged"]))
                 e = emit_findings(
                     loop, method_text=method_text, claim_source=src_doc,
                     frozen=[by_id[c] for c in b["claims"] if c in by_id],
                     traces=b["traces"], max_tokens=emit_tokens,
-                    evidence_budget=args.evidence_budget, note=bnote)
+                    evidence_budget=args.evidence_budget, note=note)
                 emissions.append(e)
                 batch_log.append({"claims": b["claims"],
                                   "traces": len(b["traces"]),
@@ -1449,6 +1493,17 @@ def main() -> int:
                 error = (f"findings did not parse "
                          f"(finish={emission['finish']}): "
                          f"{emission['parse_error']}")
+            if not error and emission.get("obj") and chase["untagged_after"]:
+                # The claims adjudicate() left out. Recorded where METHOD §4
+                # says an unattempted claim is recorded, so the output check
+                # reports the run as incomplete rather than the findings as
+                # short.
+                left = ", ".join(str(c) for c in chase["untagged_after"])
+                reason = (f"claim(s) {left} not attempted: no evidence request "
+                          f"was filed under them in "
+                          f"{len(chase['untagged_passes'])} gathering leg(s)")
+                emission["obj"]["not_completed"] = "; ".join(
+                    s for s in (emission["obj"].get("not_completed"), reason) if s)
 
             # ONE REPROMPT FOR CLAIMS THAT GOT NO FINDING. Mechanical, and no
             # judgement is involved: the frozen surface says which claims
@@ -1460,7 +1515,8 @@ def main() -> int:
             if not error and emission and emission.get("obj"):
                 done = {f.get("claim_id")
                         for f in (emission["obj"].get("findings") or [])}
-                missing = [c for c in frozen if c.get("id") not in done]
+                missing = [c for c in frozen if c.get("id") not in done
+                           and c.get("id") not in chase["untagged_after"]]
                 if missing:
                     ids = ", ".join(str(c.get("id")) for c in missing)
                     logger.warning("%d frozen claim(s) with no finding: %s "
@@ -1531,12 +1587,18 @@ def main() -> int:
                     if not opened:
                         logger.warning("chase pass opened no new file — stopping")
                         break
+                    todo_ids = sorted(todo, key=lambda x: (x is None, x))
                     again = adjudicate(
-                        sorted(todo, key=lambda x: (x is None, x)),
+                        todo_ids,
                         note=("These claims rest on searches that named "
-                              "files that had not been opened. Those files have since been opened and "
-                              "their contents are in the evidence below. "
-                              "Adjudicate these claims again."))
+                              "files that had not been opened. Those files "
+                              "have since been opened and their contents are "
+                              "in the evidence below. Adjudicate these claims "
+                              "again. The adjudication each carries now:\n\n"
+                              + previous_adjudications(emission["obj"], todo_ids)
+                              + "\n\nWhere the verdict or the disposition "
+                                "changes, say in `correction` what changed "
+                                "and why, in one line (METHOD §10)."))
                     entry["parse"] = again["parse"]
                     entry["finish"] = again["finish"]
                     entry["readjudicated"] = replace_findings(

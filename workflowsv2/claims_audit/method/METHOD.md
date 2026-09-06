@@ -25,12 +25,12 @@ A claim is an assertion the seller makes to the buyer in the designated claim so
 
 **Not every sentence of a claim source is a claim.** Four kinds are not, or not as written:
 
-- **Navigation and courtesy.** A heading, a link, a badge, an image, a table of contents, "see LICENSE", "we welcome contributions", a sign-off. These point or greet and assert nothing about the target, even where the link points at the seller's own site, documentation or demo. A badge that states a fact about the target — a licence badge, a version badge — is the fact it states, quoted as it appears. A badge that reports a hosted count or measure — pulls, stars, downloads, image size, a build status — is navigation and is not enumerated.
-- **Instructions.** A command, an installation step, a prerequisite, a configuration example. Enumerate what the block asserts about the target: that a tool has the subcommands shown, that the stack runs on the named database, that a step has the stated effect. One claim per capability asserted, not one per line.
+- **Navigation and courtesy.** A heading, a link, a badge, an image, a table of contents, "see LICENSE", "we welcome contributions", a sign-off. These point or greet and assert nothing about the target, even where the link points at the seller's own site, documentation or demo. A badge that states a fact about the target — a licence badge, a version badge — is the fact it states, quoted as it appears. A badge that reports a hosted count or measure — pulls, stars, downloads, image size, a build status — is out of scope and is not enumerated: it reports a figure the host computes, which the supplied materials cannot reach.
+- **Instructions.** A command, an installation step, a prerequisite, a configuration example. Enumerate what the block asserts about the target: that a tool has the subcommands shown, that the stack runs on the named database, that a step has the stated effect. One claim per property asserted, per §5, not one per line.
 - **Intent.** A roadmap item, a feature marked as coming, a plan. It concerns what the seller means to do, not the target's present state, and is enumerated as about the seller, per §5. Intent concerns a future state: a statement that the target does not have or do something is about its present state, and is a claim about the target whatever heading it sits under.
 - **Puffery.** A vague general statement of quality that a reasonable buyer would not rely on and that no evidence could settle: "blazing fast", "rock solid", "modern", "enterprise-grade". It is not enumerated. A statement that is specific and testable is a claim however it is dressed: "handles 10,000 requests a second" is a claim, "fast" is not.
 
-**Read each assertion as a reasonable buyer in this transaction would read it:** in its ordinary sense, as one statement, using its heading only to resolve a referent, with the seller's own documentation as the specification of what the software is said to do. A statement that the target belongs to a category, "a URL shortener", "a CRM", is one claim, that the core function of the category exists; it is not expanded into the properties a member of the category might have.
+**Read each assertion as a reasonable buyer in this transaction would read it:** in its ordinary sense, as one statement, using its heading only to resolve a referent, with the claim source, and whatever other documentation of the seller's is in front of you, as the specification of what the software is said to do. A statement that the target belongs to a category, "a URL shortener", "a CRM", is one claim, that the core function of the category exists; it is not expanded into the properties a member of the category might have.
 
 **An assertion about the seller rather than the target is still a claim**, enumerated with `about` set to `seller`, per §5.
 
@@ -67,13 +67,13 @@ Where one piece of evidence settles several claims, write a finding for each and
 
 **Attempt every claim.** You may not skip one because it looks unimportant — the significance of a gap is not known until the claim is tested.
 
-If you cannot reach them all, the run does not produce an audit. Say so in `not_completed`, give the reason, and emit an empty list for the phase you are in. Do not mark the claims you did not reach as `unverifiable`: that verdict states that the materials cannot settle a claim, and what is true here is that the claim was never attempted.
+If you cannot attempt every claim you were given, say so in `not_completed`, give the reason, and emit an empty list for the phase you are in. The client's process carries that into the run, and a run with any claim not attempted does not produce an audit. Do not mark the claims you did not reach as `unverifiable`: that verdict states that the materials cannot settle a claim, and what is true here is that the claim was never attempted.
 
 A derived fact (§7) is evidence. It is not a finding of its own.
 
 ## 5. The claim surface
 
-The claim source is given to you one section at a time, in document order, with the claims already enumerated from the sections before it. Enumerate every assertion in the section you are given. Each one carries:
+The claim source is given to you one section at a time, in document order, with the claims already enumerated from the sections before it. Enumerate every claim in the section you are given: every assertion §2 admits, and none it excludes. Each one carries:
 
 - **`quote`** — the assertion as the claim source states it, **verbatim**. Copy it; do not paraphrase, tidy, or join text that is not contiguous.
 - **`lines`** — where that quote sits in the claim source, as a start and end line number.
@@ -94,11 +94,13 @@ The claim source is given to you one section at a time, in document order, with 
 
 **Divide by what is asserted.** One claim per property asserted about one subject. The properties are few: that something exists or is done; a default; a quantity or limit; a boundary — "only", "no", "all", "never"; a provenance fact — licence, author, origin. A sentence asserting two properties is two claims. The same property asserted in two places is one claim with two locations. The quote is the smallest contiguous span that carries the property and its subject; a lead-in that carries no property — a bullet marker, "i.e.", "and" — is left out of it.
 
-> "Backups run daily with 30-day retention" is **two** claims: a default (the schedule) and a quantity (the retention period). Sharing a sentence is not a reason to combine.
+> "Backups run daily with 30-day retention" is **two** claims: a quantity (how often backups run) and a quantity (how long they are kept). Sharing a sentence is not a reason to combine.
 >
-> "Platform-level redundancy and automatic failover" is **one** claim: one existence property, that replicas exist, stated twice over. Sharing a subject is not, by itself, a reason to combine — asserting one property is.
+> "Platform-level redundancy and automatic failover" is **two** claims: that replicas exist, and that failover happens without intervention. Sharing a subject is not a reason to combine.
+>
+> "Only the message count is stored, never the message" is **two** claims: that the count is stored, and a boundary, that nothing else is. A citation settles the first; the searches §8 requires settle the second.
 
-An instruction block is divided by what it asserts, not by its lines: six subcommands listed in one block assert one thing, that the tool has them, and are one claim.
+**One property that names several things is one claim.** Six subcommands listed in one block, three services the stack is said to run on, four export formats: the property is that the subject has the things listed, and it is one claim however many are listed. This is the only grouping the rule allows, and §6 says how such a claim fares when some of the things listed hold and some do not.
 
 **Enumerate before you adjudicate, and enumerate everything.** At this point you have not tested any claim, so you cannot know which will hold. A claim that looks obviously true, or obviously false, or impossible to check, is enumerated exactly like the rest.
 
@@ -112,17 +114,19 @@ Every finding carries exactly one.
 |---|---|
 | `real` | The evidence supports the whole claim and nothing in it needs a caveat. For a claim of absence, the evidence is the searches §8 requires |
 | `real_with_caveat` | Every part of the claim is borne out, and the evidence shows something a reader must know to read the claim correctly |
-| `partial` | The claim is substantially true and has a specific, citable gap |
-| `contradicted` | The claim is false — the claim source says one thing and the evidence shows another |
+| `partial` | The subject has the property the claim asserts, but not to the extent claimed: a quantity or limit differs, or some of the things the claim names are borne out and the others are shown not to be |
+| `contradicted` | The subject does not have the property the claim asserts, or has its opposite: the thing does not exist, the boundary is crossed, the default is otherwise, the provenance is different |
 | `unverifiable` | The claim was attempted and the supplied materials cannot settle it |
 
-**A gap must be citable, not merely unfound.** `partial` requires evidence you can point at showing the gap. Evidence you looked for and did not find is not a gap: for a claim that something exists, that is `unverifiable`, and §8 governs it.
+**`partial` is a difference of extent; `contradicted` is a difference of kind.** A claim asserts one property, per §5. Ask whether the subject has that property at all. Where it does, and the evidence shows a different measure or a missing member — retention claimed at 30 days and configured at 7; six subcommands claimed and five registered — the verdict is `partial`, and `gap` states the difference. Where it does not — no retention configured at all; a boundary the claim draws and the evidence crosses; a database other than the one named — the verdict is `contradicted`. A quantity that differs is `partial` whatever the size of the difference: `gap` records the size, and whether it matters is judged later, per the last rule of this section.
 
-**Choosing between `partial` and `real_with_caveat`.** Ask whether you can cite a part of the assertion the evidence shows is not borne out. If you can, the verdict is `partial`. If every part holds and there is still something to say, it is `real_with_caveat`.
+**A gap must be citable, not merely unfound.** `partial` and `contradicted` require evidence you can point at showing the gap. Evidence you looked for and did not find is not a gap: for a claim that something exists, that is `unverifiable`, and §8 governs it. For a claim that names several things, where some are found and the rest are neither found nor shown absent, the claim is `unverifiable`, and the citations record what was found.
 
-> "Blended MRR is $40,000", against $16,000 from the payment processor and three wire transfers of $8,000. Every part of the assertion holds; the total is $40,000. That 60% of it arrives by manual wire from three customers is not a failure of the claim, and a reader must know it. `real_with_caveat`.
+**Choosing between `partial` and `real_with_caveat`.** Ask whether you can cite a part of the claim — a measure, or one of the things it names — that the evidence shows is not as claimed. If you can, the verdict is `partial`. If every part holds and there is still something to say, it is `real_with_caveat`.
+
+> "Blended MRR is $40,000", against a processor export showing $16,000 of subscription charges in the month and three wire transfers of $8,000 in the same month from customers on annual invoices, with no customer appearing in both. Every part of the assertion holds; the month's recurring total is $40,000. That 60% of it arrives by manual wire from three customers is not a failure of the claim, and a reader must know it. `real_with_caveat`.
 >
-> "The technology stack is scalable", against a single dyno with the database co-located on it. The platform supports scaling; this deployment does not. A part of the assertion fails and can be named. `partial`.
+> "The CLI has `init`, `build`, `deploy`, `status`, `logs` and `rollback`", against a command table registering the first five and no `rollback` anywhere the two §8 searches looked. Five of the things named are borne out; the table that registers commands shows the sixth is not there, and can be cited. `partial`.
 
 **A caveat is not for weak evidence.** If what you have does not settle the claim, the verdict is `unverifiable` and §8 governs it. A framework version inferred from directory names, where no manifest or lockfile was supplied, is `unverifiable` — not a claim that holds with a caveat. The verdict says how the claim fared against the evidence; it does not say how confident you are.
 
@@ -130,9 +134,7 @@ Every finding carries exactly one.
 
 > "No telemetry", against a lexical search for analytics, telemetry, tracking and metrics terms and a structural search over the network calls and the dependency manifest, every candidate opened, nothing found. The searches are the evidence. `real`.
 >
-> "Only the message count is stored, never the message", against a counter column and a debug middleware that writes each message body to the log. The count is stored as said; the boundary fails, and the log line can be cited. `partial`.
-
-**Keep `partial` and `contradicted` apart.** `partial` means the claim is substantially true and a named part is not borne out. `contradicted` means the evidence says otherwise.
+> "Never the message", the boundary claim §5 splits from "only the message count is stored", against a debug middleware that writes each message body to the log. The thing excluded is found, and the log line can be cited. `contradicted`. The claim that the count is stored is a separate claim, settled by the counter column.
 
 **Do not judge whether a gap matters to the buyer.** That judgement depends on the transaction and on what every other claim source shows, and a later stage makes it. Record what the claim says, what the evidence shows, and the difference.
 
@@ -165,7 +167,13 @@ Derive only from facts supplied in the materials; do not import market forecasts
 
 **For numbers and dates, quote the source line.** A summary produced by a tool is useful for navigation and is not sufficient evidence for an exact quantitative claim.
 
-**Documentation is not evidence for a claim about the software.** A claim about what the software does is settled by files that take part in building or running it: source, configuration, build and deployment files, dependency manifests, database migrations, tests. A README, a page under a docs directory, a website export or any claim source, named for this run or not, restates a claim and does not settle it. The engagement lists such files as excluded; the evidence request will not quote their text, and shows only that they exist, their length and their headings, which is all a claim about a document needs: "MIT licensed" is settled by the LICENSE file, "the API is documented" by the presence and headings of the documentation. Inside a code file, cite the statement, not the comment above it.
+**Documentation is not evidence for a claim about the software.** A claim about what the software does is settled by files that take part in building or running it: source, configuration, build and deployment files, dependency manifests, database migrations, tests. A README, a page under a docs directory, a website export or any claim source, named for this run or not, restates a claim and does not settle it. The engagement lists such files as excluded; the evidence request will not quote their text, and shows only that they exist, their length and their headings. Inside a code file, cite the statement, not the comment above it.
+
+**A claim about a document, `about` set to `document` per §5, is settled by the document.** A file the engagement does not exclude is cited like any other: "MIT licensed" is settled by the text of the LICENSE file, and what it settles is that the file is the MIT licence, not that the software may lawfully be distributed under it, which is a legal question §11 leaves alone. For an excluded file, what the evidence request shows settles what it can: that the document exists, its length, and the topics its headings name. "The API is documented" is settled by a documentation file whose headings name the API. A claim about what such a document says beyond its headings — that it describes every endpoint, that a procedure in it is complete — is `unverifiable` with the disposition `present_but_not_readable`, per §8: the document is supplied and cannot be read as given.
+
+**A business claim is settled by business records.** Revenue, customer counts, contracts and dependencies on outside parties are settled by the records supplied for them: processor exports, invoices, ledgers, signed agreements, the manifest that names a dependency. A number the seller states in prose is the claim, not the record.
+
+**Evidence settles a claim only at the scope the claim states.** A claim names a subject, and often a condition, a version, a quantity or a period; the evidence must reach the same ones. A test file shows that a test is written, not that it passes. A deployment file shows what a deployment is configured to be, not what is running. A code path shows that a capability exists, not the throughput, uptime or usage claimed for it. Where the evidence reaches less than the claim states, it does not settle the claim, and §8 governs. Where two admissible sources disagree, cite both and say in `shows` which you relied on and why.
 
 **Every citation must resolve.** Before you emit, check that each document named exists, each line range is real, and each quoted span appears in the document as you have written it.
 
@@ -184,9 +192,9 @@ Two are required, and they are complementary:
 
 For each, state what you actually searched, what came back, and in `candidates` the files it found where the material would appear. A search shows what the materials hold where you looked and nothing about where you did not, which is why both kinds are required and every candidate is opened.
 
-**Every candidate is opened before a claim resting on searches gets its verdict.** A file the searches named and nobody read does not show that the thing is absent, or that the materials cannot settle the claim; it shows that the engagement has not looked. *Opened* means its contents were read and appear in the evidence requests. If a candidate of any search on the claim was not opened, and no citation settles the claim, the verdict is `unverifiable` with the disposition `not_examined`; the client's process then asks you to open those files and to adjudicate the claim again. The other three dispositions are recorded only when every candidate has been opened. `not_examined` requires a named file: where the searches named no file, one of the other three applies.
+**Every candidate is opened before a claim resting on searches gets its verdict.** A file the searches named and nobody read does not show that the thing is absent, or that the materials cannot settle the claim; it shows that the engagement has not looked. *Opened* means a read of the file was requested and what came back is in the evidence requests: its contents, or the failure to read them. A candidate that was opened and could not be read — a binary, a compiled archive, a truncated or encrypted file — settles nothing, and where no other evidence settles the claim, the disposition — the `unresolved_because` field, from the table below — is `present_but_not_readable`. If a candidate of any search on the claim was not opened, and no citation settles the claim, the verdict is `unverifiable` with the disposition `not_examined`; the client's process then asks you to open those files and to adjudicate the claim again, per §10. The other three dispositions are recorded only when every candidate has been opened. `not_examined` requires a named file: where the searches named no file, one of the other three applies.
 
-**A claim of absence.** "No telemetry", "only the count is stored", "never writes to disk". The two searches are its evidence, made over every place the excluded thing could occur: the code path the claim concerns, and the paths around it that could do the same thing another way — handlers, middleware, logging, configuration, dependencies. A citation showing the mechanism the seller names — a schema without the column, a handler that records only the count — shows what that mechanism does and by itself settles nothing about the rest. Where the searches find the thing, the verdict is `partial` or `contradicted`, per §6, citing what was found. Where both searches were made, every candidate opened and nothing found, the verdict is `real`, with the searches as its evidence. `unverifiable` is for the case where the places the thing could live were not supplied: the deployment that would show a logging sidecar, the configuration that would show an outbound endpoint.
+**A claim of absence.** "No telemetry", "only the count is stored", "never writes to disk". The two searches are its evidence, made over every place the excluded thing could occur: the code path the claim concerns, and the paths around it that could do the same thing another way — handlers, middleware, logging, configuration, dependencies. A citation showing the mechanism the seller names — a schema without the column, a handler that records only the count — shows what that mechanism does and by itself settles nothing about the rest. Where the searches find the thing, the verdict is `contradicted`, per §6, citing what was found. Where both searches were made, every candidate opened and nothing found, the verdict is `real`, with the searches as its evidence. `unverifiable` is for the case where the places the thing could live were not supplied: the deployment that would show a logging sidecar, the configuration that would show an outbound endpoint.
 
 When the verdict is `unverifiable`, the adjudication also records what the searches established, as one of:
 
@@ -197,7 +205,7 @@ When the verdict is `unverifiable`, the adjudication also records what the searc
 | `outside_the_materials` | The kind of material needed to test the claim was not supplied at all — no customer records of any sort |
 | `not_examined` | The searches named one or more files where the material would appear, and at least one of them was not opened in this engagement |
 
-For a claim that something exists, searches that find nothing settle nothing, and the verdict is `unverifiable`, per §6.
+For a claim that something exists, searches that find nothing settle nothing, and the verdict is `unverifiable`, per §6. The one exception is a place that registers every member of a kind — a command table, a route list, a dependency manifest, a migration directory. Opened, it shows which of the things a claim names are absent, and it is cited as the evidence for `partial` or `contradicted`.
 
 ## 9. Unclaimed observations
 
@@ -209,7 +217,9 @@ What the observation rests on is written as one §7 evidence item: a `citation` 
 
 ## 10. Correction protocol
 
-If evidence found later contradicts a finding you have already formed, revise the finding before emitting and record in one line what changed and why.
+If evidence found later contradicts a finding you have already formed, revise the finding before emitting and record in `correction`, in one line, what changed and why.
+
+The client's process may hand a claim back to you with the adjudication you gave it and further evidence, and ask you to adjudicate it again, per §8. Emit a whole finding. Where the verdict or the disposition changes, `correction` says what changed and why; where neither changes, leave it out.
 
 ## 11. What this stage does not do
 
@@ -231,13 +241,13 @@ If evidence found later contradicts a finding you have already formed, revise th
 
 **Phase two — adjudicate.** You are given the frozen surface back.
 
-3. **Gather evidence** across the materials §7 admits as evidence. The evidence that settles a claim usually sits far from the claim source. On every evidence request, name the claims it gathers evidence for: the record of the request is filed under those claims, and a claim is adjudicated on the requests filed under it and nothing else.
+3. **Gather evidence** across the materials §7 admits as evidence. The evidence that settles a claim usually sits far from the claim source. On every evidence request, name the claims it gathers evidence for: the record of the request is filed under those claims, and when you adjudicate a claim the client's process hands you the requests filed under it, and fetches nothing else for it. What is handed to you is admissible for any claim it bears on, whichever claim it was filed under. Material that bears on no claim, per §9, reaches the adjudication only through a request filed under some claim: file it under the claim whose evidence led you to it.
 
 4. **Adjudicate each frozen claim** and assign one verdict, per §6. Where a claim raises something only the seller can answer, record it in `questions`.
 
    `questions` supplements the findings and never replaces one. A claim that needs seller information still gets its finding, and still gets `unverifiable` if the supplied materials cannot settle it.
 
-   If it becomes clear that every frozen claim cannot be attempted, stop here: emit `not_completed` with the reason and an empty `findings`, per §4.
+   If a claim you were given cannot be attempted, stop here: emit `not_completed` with the reason and an empty `findings`, per §4.
 
 5. **Check every citation resolves**, per §7.
 
@@ -252,7 +262,7 @@ Two kinds of JSON object, one per phase. Phase one is emitted once per section o
 | Field | Contents |
 |---|---|
 | `claim_source` | The document named by the engagement |
-| `claims[]` | Every assertion the section you were given makes, per §5 |
+| `claims[]` | Every claim in the section you were given, per §2 and §5 |
 | `claims[].quote` | The assertion verbatim, per §5 |
 | `claims[].lines` | Where that quote sits in the claim source |
 | `claims[].statement` | The claim in plain words |
@@ -274,7 +284,7 @@ Two kinds of JSON object, one per phase. Phase one is emitted once per section o
 | `findings[].correction` | Per §10, where a finding changed |
 | `unclaimed[]` | `note` and one §7 evidence item — per §9 |
 | `questions[]` | Questions only the seller can answer, raised by a claim — per §12 |
-| `not_completed` | Present only when the run could not attempt every claim, per §4. When it is present, `findings` is empty |
+| `not_completed` | Present only when a claim you were given could not be attempted, per §4. When it is present, `findings` is empty. The client's process carries it into the assembled run, beside the findings of the batches that completed |
 
 An evidence item's `form` decides its fields, per §7:
 

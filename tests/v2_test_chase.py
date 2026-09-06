@@ -12,8 +12,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from workflowsv2.claims_audit import schemas as sch             # noqa: E402
 from workflowsv2.claims_audit.runner import (                     # noqa: E402
-    chase_message, compact_trace, evidence_batches, gathered_evidence,
-    replace_findings, trace_claims, untagged_message)
+    _merge_emissions, chase_message, compact_trace, evidence_batches,
+    gathered_evidence, previous_adjudications, replace_findings, trace_claims,
+    untagged_message)
 
 
 def _corpus(tmp_path):
@@ -146,6 +147,44 @@ def test_replace_findings_swaps_only_the_wanted_claims():
     assert [f["adjudication"]["verdict"] for f in obj["findings"]] == \
         ["contradicted", "real", "unverifiable"]
     assert len(obj["findings"]) == 3
+
+
+def test_replace_findings_keeps_the_readjudication_questions_and_incompletion():
+    obj = {"findings": [{"claim_id": 1, "adjudication": {"verdict": "unverifiable"}}],
+           "questions": ["q0"], "unclaimed": [{"note": "u0", "evidence": {}}]}
+    again = {"obj": {"findings": [], "questions": ["q1"],
+                     "unclaimed": [{"note": "u1", "evidence": {}}],
+                     "not_completed": "batch could not be read"}}
+    assert replace_findings(obj, again, wanted={1}) == 0
+    assert obj["questions"] == ["q0", "q1"]
+    assert [u["note"] for u in obj["unclaimed"]] == ["u0", "u1"]
+    assert obj["not_completed"] == "batch could not be read"
+
+
+def test_previous_adjudications_shows_verdict_and_disposition():
+    obj = {"findings": [
+        {"claim_id": 1, "adjudication": {"verdict": "unverifiable",
+                                         "unresolved_because": "not_examined"}},
+        {"claim_id": 2, "adjudication": {"verdict": "partial", "gap": "g"}}]}
+    text = previous_adjudications(obj, [1, 2, 3])
+    assert "claim 1: verdict unverifiable; unresolved_because: not_examined" in text
+    assert "claim 2: verdict partial; gap: g" in text
+    assert "claim 3: verdict None" in text
+
+
+def test_merge_emissions_carries_not_completed_from_any_batch():
+    def part(obj):
+        return {"obj": obj, "raw": "", "parse": "parsed", "finish": "stop",
+                "attempts": [], "response_format_dropped": [], "evidence": {}}
+    first = part({"claim_source": "d.md", "findings": [{"claim_id": 1}]})
+    second = part({"claim_source": "d.md", "findings": [],
+                   "not_completed": "batch 2 unreadable"})
+    merged = _merge_emissions([first, second])["obj"]
+    assert merged["not_completed"] == "batch 2 unreadable"
+    assert [f["claim_id"] for f in merged["findings"]] == [1]
+    clean = _merge_emissions([first, part({"claim_source": "d.md",
+                                           "findings": [{"claim_id": 2}]})])
+    assert "not_completed" not in clean["obj"]
 
 
 def test_trace_claims_reads_the_prefix():
