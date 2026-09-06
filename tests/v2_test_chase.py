@@ -334,3 +334,23 @@ def test_a_seller_claim_needs_no_searches_to_be_unverifiable(tmp_path):
     res = sch.check_output({"findings": [bare]}, corpus, "c.md",
                            [{"id": 5, "about": "target"}], read={"app/a.py"})
     assert any("needs a lexical" in p for p in res["problems"])
+
+
+def test_a_binary_candidate_is_present_but_not_readable(tmp_path):
+    corpus = _corpus(tmp_path)
+    (corpus / "wordpress").mkdir()
+    (corpus / "wordpress" / "plugin.zip").write_bytes(b"PK\x03\x04\x00\x00binary")
+    docs = sch.corpus_index(corpus)
+    view = sch.corpus_view(corpus)
+    assert "wordpress/plugin.zip" in view["binary_skipped"]
+    f = _unv(7, "outside_the_materials", ["wordpress/plugin.zip", "wordpress"])
+    cands = sch.candidate_files([f], docs, {"app/a.py"}, view["submodules"], view["binary_skipped"])
+    c = cands[7]
+    assert c["unreadable"] == ["wordpress/plugin.zip"] and c["unresolved"] == []
+    assert c["directories"] == ["wordpress"] and c["unopened"] == []
+    res = sch.check_output({"findings": [f]}, corpus, "c.md", [{"id": 7}], read={"app/a.py"})
+    assert any("present_but_not_readable" in p for p in res["problems"])
+    assert not any("not in the materials" in p for p in res["problems"])
+    ok = _unv(7, "present_but_not_readable", ["wordpress/plugin.zip"])
+    res = sch.check_output({"findings": [ok]}, corpus, "c.md", [{"id": 7}], read={"app/a.py"})
+    assert not any("candidate" in p for p in res["problems"])

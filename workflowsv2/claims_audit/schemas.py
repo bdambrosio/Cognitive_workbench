@@ -614,7 +614,8 @@ def resolve_document(docs: Dict[str, List[str]], name: Any
 
 def candidate_files(findings: Sequence[Dict[str, Any]],
                     docs: Dict[str, List[str]], read: Optional[set],
-                    submodules: Sequence[str] = ()
+                    submodules: Sequence[str] = (),
+                    binaries: Sequence[str] = ()
                     ) -> Dict[Any, Dict[str, List[str]]]:
     """Per finding whose evidence records a search: the files its searches
     named in `candidates`, resolved against the corpus, and which of them
@@ -636,8 +637,21 @@ def candidate_files(findings: Sequence[Dict[str, Any]],
     file to open, and a model naming the module where the material would sit
     is answering §8's question honestly. A name that resolves to nothing is
     a problem, as a cited document would be.
+
+    `unreadable` holds candidates that name a file the materials view skipped
+    as binary (`binaries`, corpus_view's `binary_skipped`): supplied, and
+    not readable as given, which is `present_but_not_readable` and nothing
+    else. Until 2026-09-06 such a candidate — a zip in the ChatterMate
+    repository — was reported as "not in the materials", which it is not.
+    A directory holding only such files counts as a directory.
     """
-    dirs = {k.rsplit("/", 1)[0] for k in docs if "/" in k}
+    bins = set()
+    for b in binaries:
+        b = str(b).strip().rstrip("/")
+        while b.startswith("./"):
+            b = b[2:]
+        bins.add(b.lstrip("/"))
+    dirs = {k.rsplit("/", 1)[0] for k in list(docs) + sorted(bins) if "/" in k}
     dirs = {d[:i] for d in dirs for i in range(len(d) + 1)
             if i == len(d) or d[i] == "/"} - {""}
     out: Dict[Any, Dict[str, List[str]]] = {}
@@ -649,6 +663,7 @@ def candidate_files(findings: Sequence[Dict[str, Any]],
         unresolved: List[str] = []
         directories: List[str] = []
         outside: List[str] = []
+        unreadable: List[str] = []
         subs = {m.rstrip("/") for m in submodules}
         for e in f.get("evidence") or []:
             if not isinstance(e, dict) or e.get("form") != "search":
@@ -663,6 +678,10 @@ def candidate_files(findings: Sequence[Dict[str, Any]],
                         if d not in outside:
                             outside.append(d)
                         continue
+                    if d in bins:
+                        if d not in unreadable:
+                            unreadable.append(d)
+                        continue
                     if d in dirs:
                         if d not in directories:
                             directories.append(d)
@@ -674,7 +693,8 @@ def candidate_files(findings: Sequence[Dict[str, Any]],
         out[f.get("claim_id")] = {"named": named, "unopened": unopened,
                                   "unresolved": unresolved,
                                   "directories": directories,
-                                  "outside": outside}
+                                  "outside": outside,
+                                  "unreadable": unreadable}
     return out
 
 
@@ -793,7 +813,8 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
     seen: Dict[Any, int] = {}
     verdicts: Dict[str, int] = {}
     forms: Dict[str, int] = {}
-    candidates = candidate_files(findings, docs, read, view["submodules"])
+    candidates = candidate_files(findings, docs, read, view["submodules"],
+                                 view.get("binary_skipped") or ())
     not_examined = 0
     unopened = sorted({k for c in candidates.values() for k in c["unopened"]})
     for i, f in enumerate(findings, 1):
@@ -850,6 +871,14 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
                     f"{w}: candidate {', '.join(cand['outside'])} is a "
                     f"submodule the materials do not include — the "
                     f"disposition is `outside_the_materials` (METHOD §8)")
+            # A candidate the materials view skipped as binary is supplied
+            # and cannot be read as given: `present_but_not_readable`.
+            if cand.get("unreadable") and because != "present_but_not_readable" \
+                    and not cand.get("unopened"):
+                problems.append(
+                    f"{w}: candidate {', '.join(cand['unreadable'])} is a "
+                    f"binary the materials view skipped — the disposition "
+                    f"is `present_but_not_readable` (METHOD §8)")
             if because == NOT_EXAMINED:
                 not_examined += 1
             if read is not None:

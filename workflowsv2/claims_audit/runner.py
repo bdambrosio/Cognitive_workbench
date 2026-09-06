@@ -1590,11 +1590,13 @@ def main() -> int:
             # and the findings keep `not_examined`.
             if not error and emission and emission.get("obj"):
                 docs = schemas.corpus_index(eng["target"])
-                submodules = schemas.corpus_view(eng["target"])["submodules"]
+                view = schemas.corpus_view(eng["target"])
+                submodules, binaries = view["submodules"], view.get("binary_skipped") or []
                 while len(legs) < args.max_turns:
                     read = set(files_read(traces_dir, eng["target"]))
                     cands = schemas.candidate_files(
-                        emission["obj"].get("findings") or [], docs, read, submodules)
+                        emission["obj"].get("findings") or [], docs, read, submodules,
+                        binaries)
                     todo = {cid: c["unopened"] for cid, c in cands.items()
                             if c["unopened"]}
                     if not todo:
@@ -1632,7 +1634,12 @@ def main() -> int:
                               "in the evidence below. Adjudicate these claims "
                               "again. The adjudication each carries now:\n\n"
                               + previous_adjudications(emission["obj"], todo_ids)
-                              + "\n\nWhere the verdict or the disposition "
+                              + "\n\nEvery file these searches named has now "
+                                "been opened, so `not_examined` no longer "
+                                "applies to any of them (METHOD §8): where "
+                                "the claim is still `unverifiable`, the "
+                                "disposition is one of the other three. "
+                                "Where the verdict or the disposition "
                                 "changes, say in `correction` what changed "
                                 "and why, in one line (METHOD §10)."))
                     entry["parse"] = again["parse"]
@@ -1645,7 +1652,8 @@ def main() -> int:
                         break
                 read = set(files_read(traces_dir, eng["target"]))
                 cands = schemas.candidate_files(
-                    emission["obj"].get("findings") or [], docs, read, submodules)
+                    emission["obj"].get("findings") or [], docs, read, submodules,
+                    binaries)
                 chase["unopened_after"] = sorted(
                     {f for c in cands.values() for f in c["unopened"]})
                 if chase["unopened_after"]:
