@@ -319,3 +319,18 @@ def test_check_output_requires_a_question_to_name_a_frozen_claim(tmp_path):
     res = sch.check_output(obj, corpus, "c.md", [{"id": 4}], read={"app/a.py"})
     qs = [p for p in res["problems"] if p.startswith("question")]
     assert len(qs) == 2 and qs[0].startswith("question 2") and qs[1].startswith("question 3")
+
+
+def test_a_seller_claim_needs_no_searches_to_be_unverifiable(tmp_path):
+    corpus = _corpus(tmp_path)
+    bare = {"claim_id": 5,
+            "adjudication": {"verdict": "unverifiable",
+                             "unresolved_because": "outside_the_materials"},
+            "evidence": [{"form": "citation", "document": "app/a.py",
+                          "lines": [1, 1], "quote": "x = 1", "shows": "s"}]}
+    res = sch.check_output({"findings": [bare]}, corpus, "c.md",
+                           [{"id": 5, "about": "seller"}], read={"app/a.py"})
+    assert not any("needs a lexical" in p for p in res["problems"])
+    res = sch.check_output({"findings": [bare]}, corpus, "c.md",
+                           [{"id": 5, "about": "target"}], read={"app/a.py"})
+    assert any("needs a lexical" in p for p in res["problems"])

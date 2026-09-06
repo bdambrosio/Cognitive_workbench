@@ -789,6 +789,7 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
     # happened in one pass, so a claim quietly dropped left no trace of ever
     # having been enumerated.
     ids = {c.get("id") for c in frozen}
+    about = {c.get("id"): c.get("about") for c in frozen}
     seen: Dict[Any, int] = {}
     verdicts: Dict[str, int] = {}
     forms: Dict[str, int] = {}
@@ -827,7 +828,14 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
             kinds = {e.get("kind") for e in ev
                      if isinstance(e, dict) and e.get("form") == "search"}
             missing = [k for k in SEARCH_KINDS if k not in kinds]
-            if missing:
+            # A claim about the seller — a stated intent, a hosted service —
+            # is one METHOD §5 says the materials usually cannot reach, and
+            # searching a repository for "I will fix every bug" records
+            # nothing. The searches are not required there (Bruce,
+            # 2026-09-06, on the chhoto smoke test: four of eleven flagged
+            # findings were of this kind). Required as before for a claim
+            # about the target or a document.
+            if missing and about.get(cid) != "seller":
                 problems.append(f"{w}: `unverifiable` needs a lexical and a "
                                 f"structural search (METHOD §8); missing "
                                 f"{', '.join(missing)}")
