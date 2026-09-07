@@ -21,6 +21,11 @@ list of commands, fixed before the audit and unable to change anything (§12).
 means of touching the system, which is a property of the harness rather than a
 rule it is asked to follow. Every finding cites the collection.
 
+**You do not write for a reader.** You deliver two blocks, the client's
+process turns each into a record under a schema, and a separate method
+writes the document from the record. The schema enforces the shape; this
+document says what makes a field correct.
+
 **A probe that did not complete is part of the record.** Probes run under a
 time budget and against a host doing other work; they time out, and they fail
 when an authorisation they need was never granted. Those outcomes are
@@ -89,8 +94,8 @@ because altering it is what an operator is for.
 
 The engagement may move this line, and the brief says so when it does; a
 boundary the brief does not state is this one. Where an element's side of it is
-genuinely unclear, enumerate the element and record the case in the LIMITATIONS
-block rather than deciding silently.
+genuinely unclear, enumerate the element and record the case among the
+limitations in your `EXAMINATION` block rather than deciding silently.
 
 That is the test, and it is deliberately mechanical. Enumerate an element for
 each of these the collection shows:
@@ -112,7 +117,8 @@ service listening on two ports is two elements. One port serving three virtual
 hosts is one element unless the collection shows them reaching different
 services. A single account is one element however many groups it belongs to and
 however many sudo rules it holds. Where the rule genuinely does not settle a
-case, record the case in the LIMITATIONS block rather than deciding silently.
+case, record the case among the limitations in your `EXAMINATION` block
+rather than deciding silently.
 
 **Privilege escalation is a path, not an element.** Sudo rules, group
 membership and setuid binaries are not ways in from outside the boundary; they
@@ -122,12 +128,15 @@ would put one account on the frozen surface more than once and inflate the
 denominator every coverage statement divides by — which would leave two audits
 of the same host with coverage figures that cannot be compared.
 
-**Label the elements, and keep the labels.** Give each a stable identifier as
-you enumerate — `S1`, `S2`, and so on, in the order the collection presents
-them. Every later reference uses that label. The label identifies an element
-inside this report and is not the system's name for anything; every finding
-therefore also carries a `collection/<artifact>:lines` citation, which a reader
-who has not seen your labels can open.
+**Labels are assigned by the client's process, and kept.** When the `ATTACK
+SURFACE` block is delivered it is recorded as data: one element per way in,
+each with its kind, an `identity` that names it the way the system does — an
+address and port, an account name, a unit name — its reach per §4, and its
+citation. The client's process assigns `S1`, `S2`, and so on in the order
+recorded and hands the frozen list back. Every later reference uses that
+label. The label identifies an element inside this review and is not the
+system's name for anything; the `identity` is, and it is what a later review
+compares against (§8).
 
 **From that point the surface is frozen.** It is the denominator every coverage
 statement in the report divides by. An element discovered later goes into an
@@ -181,21 +190,23 @@ Carrying an old observation forward is honest; presenting it as current is not.
 
 ## 6. Finding format
 
-```
-**Finding N: <short title> — [disposition] (from S<M>, collection/<artifact>:lines)**
+A finding is one record, and the fields are these:
 
-Exposure (S<M>, collection/<artifact>:lines): <what is reachable, verbatim>
+| Field | Contents |
+|---|---|
+| `title` | A short name for the finding |
+| `element` | The label of the frozen element it starts from |
+| `disposition` | One of §7's four |
+| `exposure` | What is reachable: a citation and one sentence, verbatim where the citation carries it |
+| `path` | What carries it, one step per citation, in order; empty when exposure and consequence are the same observation |
+| `consequence` | What the reached state permits: a citation and one sentence |
+| `assessment` | What this permits an attacker to do, in one or two sentences |
+| `remedy_locus` | The file, unit, rule or setting to change. Name it and stop: what to change it to is the owner's decision |
 
-Path (collection/<artifact>:lines, …): <what carries it, cited at each step>
-
-Consequence (collection/<artifact>:lines): <what the reached state permits, verbatim>
-
-Assessment: <what this permits an attacker to do, in one or two sentences>
-```
-
-The element label and the citation both appear in the first line on purpose:
-the label orders the finding against the frozen surface, and the citation is
-what a second reader can open without having seen the surface.
+A citation is `artifact` — a collection file name — `lines`, and `quote`, the
+text of those lines verbatim. The client's process checks that every citation
+resolves before the record is accepted; that confirms the text exists, not
+that it supports the finding, which remains your judgement.
 
 ## 7. Dispositions
 
@@ -237,11 +248,12 @@ Three classes, and each is reported even when the answer is "none":
   fact about the practice and it must be counted, not rediscovered each time.
 
 **What carries between audits of one system is a file, not a memory.** The
-engagement holds the previous audit's frozen surface, its findings, its probe
-outcomes, and its recognised patterns. The runner supplies them; the auditor
-reads them as evidence and cites them like any other. Nothing carries in the
-agent's own recollection — an audit that remembers rather than reads cannot
-show a reader what it was comparing against.
+engagement holds the previous audit's frozen surface, its findings and its
+probe outcomes. The client's process compares this audit's record against
+them by element `identity` and places the three classes above in the document;
+the auditor does not see the previous audit and does not need to. Nothing
+carries in the agent's own recollection — an audit that remembers rather than
+reads cannot show a reader what it was comparing against.
 
 **A recognised pattern is promoted by a person, never by the audit.** An audit
 may *propose* that a change is expected and recurring; only a human moves it
@@ -269,10 +281,11 @@ leaves.
 
 ## 9. The reader
 
-The report is read by whoever will change the system and by whoever decides
-what to change first. Write for the first: exact hosts, exact ports, exact
-files, no adjectives doing the work of citations. The second is served by §10's
-conclusion and by §4's order, not by adverbs.
+You do not write for one. A separate method, REPORT.md, writes the document
+for the person who will change the system and the person who decides what to
+change first, from the record you leave. What that reader needs from you is
+in the fields: exact artifacts, exact lines, a remedy locus that can be found,
+and nothing that a citation does not carry.
 
 ## 10. Report-level conclusion
 
@@ -288,13 +301,15 @@ One of these, and nothing else:
 
 **A grant that was never given cannot be read as a clean result.** Where a
 probe that the authentication, privilege or credential work depends on returned
-**unauthorised** (§12), `Hardened for what was examined` requires a LIMITATIONS
-sentence naming what the conclusion therefore does not cover. Without it the
-conclusion reads as strength that was never tested: §12's audit that reports
-"clean" while the walk that would have found dirt never finished.
+**unauthorised** (§12), `Hardened for what was examined` carries a sentence
+naming what the conclusion therefore does not cover. Without it the conclusion
+reads as strength that was never tested: §12's audit that reports "clean" while
+the walk that would have found dirt never finished.
 
-The conclusion is a statement about the examined subset, at the collection's
-timestamp. §1a governs how it must be written.
+The conclusion is computed by the client's process from the dispositions and
+the probe outcomes; you do not write it. It is a statement about the examined
+subset, at the collection's timestamp, and §1a governs how the document states
+it.
 
 ## 11. What this audit does not do
 
@@ -371,11 +386,20 @@ is reported as such — it is never worked around.
 
 1. Read the brief. It names the in-scope hosts and anything the client already
    knows about. It does not restate this method.
-2. Enumerate the attack surface per §3 and deliver the `ATTACK SURFACE` block.
-   The surface is frozen at that point.
-3. Work §4's order. Cite as you go; a finding assembled from memory at the end
-   is a finding whose citations were never checked.
-4. Deliver `REPORT`, then `LIMITATIONS`, then `GAP MAP`.
+2. Enumerate the attack surface per §3 and deliver the `ATTACK SURFACE`
+   block: one line per element, with its identity, its reach and its
+   citation. The client's process records it, assigns the labels, and hands
+   the frozen list back. The surface is frozen at that point.
+3. Work §4's order over the frozen labels. Cite as you go; a finding
+   assembled from memory at the end is a finding whose citations were never
+   checked.
+4. Deliver the `EXAMINATION` block: your working notes over the surface,
+   element by element in §4's order, each with the observations that carry
+   it and the disposition you reach, and after them what bounded the review
+   and what it could not settle. The client's process turns the block and
+   your evidence requests into the record: the findings in §6's fields, the
+   list of elements examined, the limitations, and the gap map. Nothing you
+   did not cite reaches the record.
 5. There is no channel to the client mid-engagement. A question the collection
    cannot answer becomes a §14 gap, not a pause.
 
@@ -388,18 +412,15 @@ report's silence.
 
 A gap names three things: what is unknown, why the collection cannot answer it,
 and **the exact command or source that would**. That third part is what makes
-the next collection better, and a gap without it is a complaint.
+the next collection better, and a gap without it is a complaint. In the record
+each gap carries `unknown`, `why` and `settles`, and the client's process
+refuses a gap whose `settles` is empty.
 
 ## 15. The deliverable
 
-Four blocks, each self-delimiting, each opened and closed by its own marker.
-
-- `ATTACK SURFACE` — the frozen enumeration, labelled, with citations.
-- `REPORT` — the findings in §6's format, in §4's order, and §10's conclusion.
-- `LIMITATIONS` — what bounded this audit: the collection's timestamp and
-  coverage, hosts named but not examined, any §3 case the trust boundary or the
-  element rule did not settle, and §10's sentence where a withheld grant leaves
-  part of the conclusion uncovered.
-- `GAP MAP` — §14.
-
-A turn boundary does not prove a document was written. The block markers do.
+Two blocks, each self-delimiting, each opened and closed by its own marker:
+`ATTACK SURFACE` (§3, §13 step 2) and `EXAMINATION` (§13 step 4). The record
+— the frozen surface, the findings, the examined list, the limitations and
+the gap map — is assembled from them by the client's process under a schema,
+and the document is written from the record under a separate method. A turn
+boundary does not prove a block was written. The block markers do.

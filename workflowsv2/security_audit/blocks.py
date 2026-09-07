@@ -19,19 +19,19 @@ from __future__ import annotations
 import re
 from typing import Dict, Optional, Tuple
 
-BLOCKS: Tuple[str, ...] = ("ATTACK SURFACE", "REPORT", "LIMITATIONS",
-                           "GAP MAP")
+# TWO BLOCKS SINCE 2026-09-07, and neither is the document. ATTACK SURFACE is
+# the enumeration (METHOD §3); EXAMINATION is the working notes over it
+# (METHOD §13). Each, once delivered, is turned into the record by a
+# schema-constrained call (record.py); the document is rendered from the
+# record (report.py). REPORT, LIMITATIONS and GAP MAP were prose blocks the
+# auditor wrote for a reader, and the one run that produced them was
+# conformant and unreadable.
+BLOCKS: Tuple[str, ...] = ("ATTACK SURFACE", "EXAMINATION")
 
 # No review workflow yet. Not every workflow needs one: a review holds a
 # deliverable to a standard few workflows are held to, and adding one before
 # the audit itself runs would be building the check before the thing checked.
 _ALL: Tuple[str, ...] = BLOCKS
-
-# What `report.md` is assembled from, in this order. LIMITATIONS is a separate
-# block and still part of the report — the client receives one document with
-# those lines in it. Separate block, same document.
-REPORT_BLOCKS: Tuple[str, ...] = ("REPORT", "LIMITATIONS")
-
 
 def open_mark(name: str) -> str:
     return f"=== {name} ==="

@@ -76,7 +76,9 @@ logger.setLevel(logging.INFO)
 
 # DELIVERY IS BY BLOCK (METHOD §16), not by turn boundary. `workflowsv2/blocks.py`
 # holds the vocabulary and the reason; this file only drives it.
-from workflowsv2.security_audit import blocks                   # noqa: E402
+from workflowsv2.security_audit import blocks, record           # noqa: E402
+from workflowsv2.emit import emit                                # noqa: E402
+from workflowsv2 import issues                                   # noqa: E402
 
 # The brief lives with its engagement, in engagements/<name>/brief.md — it is
 # what a client says, and it differs per engagement. Its history travels with
@@ -636,15 +638,162 @@ def log_incoming(path: Path, leg: int, sent: str, reason: str,
         logger.info("  - note %s %s", k, r_before[k])
 
 
+# ---- the record: two schema-constrained calls outside the ReAct loop ------------
+#
+# THE LEGS GATHER; THE CALLS RECORD. The agent reads the collection with
+# `inspect_external` over as many legs as it needs and delivers two prose
+# blocks: the enumeration, then its working notes. Each block, once
+# delivered, is handed to a call that sees the method, the block, and the
+# evidence — and nothing the ReAct loop did — and answers under a schema
+# (record.py). That is the claims audit's shape (workflowsv2/emit.py says why
+# the calls sit outside the loop), and it is what makes the record data.
+
+#: How much of the evidence trace text the findings call sees.
+TRACE_BUDGET = 120_000
+
+
+def collection_index(collection: Path) -> str:
+    rows = []
+    for f in sorted(collection.glob("*.txt")):
+        try:
+            n = len(f.read_text(encoding="utf-8", errors="replace").splitlines())
+        except OSError:
+            n = 0
+        rows.append(f"  collection/{f.name}  ({n} lines)")
+    return "\n".join(rows)
+
+
+def gathered_traces(traces: Path, budget: int = TRACE_BUDGET) -> str:
+    """What the agent read, in the order it read it, up to a budget. The
+    trace files are the evidence requests and what came back; the findings
+    call cites from these, not from memory."""
+    if not traces.is_dir():
+        return "(no evidence requests were recorded)"
+    parts, used = [], 0
+    for t in sorted(traces.glob("*.txt")):
+        try:
+            body = t.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if used + len(body) > budget:
+            parts.append(f"[... {t.name} and later requests omitted: evidence budget "
+                         f"of {budget} characters reached]")
+            break
+        parts.append(f"--- {t.name} ---\n{body}")
+        used += len(body)
+    return "\n\n".join(parts) or "(no evidence requests were recorded)"
+
+
+def emit_surface(loop, method_text: str, block_text: str, collection: Path,
+                 max_tokens: int) -> Dict[str, Any]:
+    kinds = "\n".join(f"  {k}: {v}\n      identity form: {record.IDENTITY_FORM[k]}"
+                      for k, v in record.KIND_WORDS.items())
+    user = ("The ATTACK SURFACE block you delivered, to be recorded as data. "
+            "Emit one element per way in, per METHOD §3, each with its `kind` "
+            "from the list below, an `identity` in exactly the form given for "
+            "that kind and nothing more (a later review compares on it; the "
+            "words go in `description`), a one-line description, its `reach` "
+            "per METHOD §4, and the citation into the collection that shows "
+            "it, quoted verbatim from the cited lines. Do not add elements the "
+            "block does not name and do not drop any it does.\n\n"
+            "Kinds and identity forms:\n" + kinds
+            + "\n\nThe collection's files:\n" + collection_index(collection)
+            + "\n\n=== the block ===\n" + block_text)
+    return emit(loop, method_text, user, record.surface_schema(), max_tokens)
+
+
+def emit_findings(loop, method_text: str, frozen: List[Dict[str, Any]],
+                  exam_text: str, traces: Path, max_tokens: int) -> Dict[str, Any]:
+    user = ("The frozen attack surface, your EXAMINATION notes over it, and "
+            "the evidence requests you made. Emit the record per METHOD §§6, 7 "
+            "and 14: one finding per element that carries one, in §4's order; "
+            "`examined` listing every label you traced from exposure to "
+            "consequence; the limitations; and the gap map, each gap naming "
+            "the element it concerns and the exact command or source that "
+            "would settle it — every [uncertain] finding needs a gap naming its "
+            "element. Every citation is `artifact` (a collection file name), "
+            "`lines` and a `quote` copied verbatim from those lines, "
+            "punctuation included.\n\n"
+            "=== frozen surface ===\n" + record.surface_lines(frozen)
+            + "\n\n=== EXAMINATION ===\n" + exam_text
+            + "\n\n=== evidence requests ===\n" + gathered_traces(traces))
+    return emit(loop, method_text, user, record.findings_schema(), max_tokens)
+
+
+def _meta(call: Dict[str, Any]) -> Dict[str, Any]:
+    return {k: v for k, v in (call or {}).items() if k not in ("raw", "obj")}
+
+
+def reemit(run_dir: Path, model_path: Optional[Path], no_prose: bool) -> int:
+    """Make the findings call again over an existing run — the frozen
+    surface, the EXAMINATION notes in transcript.md, and the copied evidence
+    traces — and rebuild checks and the document. The legs are not repeated
+    and the surface keeps its labels, since the notes refer to them. For
+    iterating on the record's schema and checks without a 17-minute run."""
+    run_dir = Path(run_dir)
+    surface = json.loads((run_dir / "surface.json").read_text(encoding="utf-8"))
+    frozen = surface.get("elements") or []
+    transcript = (run_dir / "transcript.md").read_text(encoding="utf-8")
+    exam_parts = [b for b in (blocks.content(t, "EXAMINATION")
+                              for t in transcript.split("\n\n=== ")) if b]
+    exam = blocks.content(transcript, "EXAMINATION")
+    exam_text = exam or "\n\n".join(exam_parts)
+    if not frozen or not exam_text:
+        raise SystemExit(f"{run_dir}: no frozen surface or no EXAMINATION notes to re-emit from")
+    collection = run_dir / "collection"
+    traces = run_dir / "working_record" / "inspect_traces"
+    ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
+    world = f"secre_{ts}_{run_dir.name}"[:60]
+    name, cfg = build_config(world, model_path, None, None, None, collection)
+    from chat.chat_loop import ChatLoop                        # noqa: E402
+    from chat.workflow import load_workflow                    # noqa: E402
+    loop = ChatLoop(character_name=name, character_config=cfg)
+    try:
+        method_text = load_workflow(REPO / (cfg.get("workflow") or ""))
+        emit_tokens = int((cfg.get("chat") or {}).get("react_max_tokens", 32768))
+        call = emit_findings(loop, method_text, frozen, exam_text, traces, emit_tokens)
+    finally:
+        try:
+            loop._post_turn_executor.shutdown(wait=True)
+        except Exception as e:                                 # noqa: BLE001
+            logger.warning("executor shutdown failed: %s", e)
+    (run_dir / "emission.txt").write_text(call.get("raw") or "", encoding="utf-8")
+    fobj = call.get("obj")
+    if call.get("response_format_dropped") or fobj is None:
+        print(f"re-emit failed: parse={call.get('parse')} {call.get('parse_error')}")
+        return 1
+    fcheck = record.check_findings(fobj, frozen, collection)
+    for prob in fcheck["problems"]:
+        issues.note(run_dir, stage="security_audit", code="record_check_reemit",
+                    text=prob, severity="blocking")
+    (run_dir / "findings.json").write_text(json.dumps(fobj, indent=1, ensure_ascii=False) + "\n",
+                                           encoding="utf-8")
+    (run_dir / "checks.json").write_text(json.dumps(fcheck, indent=1, ensure_ascii=False) + "\n",
+                                         encoding="utf-8")
+    meta_p = run_dir / "run_meta.json"
+    meta = json.loads(meta_p.read_text(encoding="utf-8")) if meta_p.is_file() else {}
+    meta.setdefault("reemits", []).append({"at": ts, "call": _meta(call),
+                                           "record_check": {"ok": fcheck["ok"],
+                                                            "problems": len(fcheck["problems"])}})
+    meta["conclusion"] = record.conclusion(fobj.get("findings") or [], frozen,
+                                           json.loads((collection / "outcomes.json").read_text()))
+    meta_p.write_text(json.dumps(meta, indent=2, default=str) + "\n", encoding="utf-8")
+    print(f"re-emitted: {len(fobj.get('findings') or [])} finding(s), "
+          f"{len(fobj.get('gaps') or [])} gap(s), {len(fcheck['problems'])} check problem(s)")
+    from workflowsv2.security_audit import report as report_stage   # noqa: E402
+    report_stage.run(run_dir, None if no_prose else model_path, logger=logger)
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--engagement", required=True,
+    ap.add_argument("--engagement", default=None,
                     help="engagement name under engagements/ — supplies the "
                          "hosts, the authorised probes, the brief, and where "
                          "runs land")
-    ap.add_argument("--world", required=True,
+    ap.add_argument("--world", default=None,
                     help="fresh world name; never reuse one")
     ap.add_argument("--model", type=Path, default=None,
                     help="YAML with an llm_config block; replaces the scenario's")
@@ -659,7 +808,18 @@ def main() -> int:
     ap.add_argument("--workflow-mode", choices=("on", "off"), default=None,
                     help="override the scenario's workflow_mode; omit to use "
                          "whatever audit.yaml declares")
+    ap.add_argument("--no-prose", action="store_true",
+                    help="assemble the document from the record only; skip "
+                         "the report stage's model call")
+    ap.add_argument("--reemit", type=Path, default=None,
+                    help="an existing run directory: make the findings call "
+                         "again from its transcript and surface, rebuild the "
+                         "checks and the document; no legs, no probes")
     args = ap.parse_args()
+    if args.reemit:
+        return reemit(args.reemit, args.model, args.no_prose)
+    if not (args.engagement and args.world):
+        ap.error("--engagement and --world are required (or --reemit <run dir>)")
 
     if (REPO / "scenarios" / args.world).exists():
         raise SystemExit(
@@ -749,6 +909,15 @@ def main() -> int:
         len(_chat.get("omitted_tools") or []), args.max_turns,
         _chat.get("react_max_tokens"))
 
+    from chat.workflow import load_workflow                    # noqa: E402
+    method_text = load_workflow(REPO / (cfg.get("workflow") or ""))
+    emit_tokens = int((cfg.get("chat") or {}).get("react_max_tokens", 32768))
+    world_dir = REPO / "scenarios" / args.world / name
+    surface_call: Dict[str, Any] = {}
+    findings_call: Dict[str, Any] = {}
+    frozen: List[Dict[str, Any]] = []
+    exam_parts: List[str] = []
+
     t0 = time.time()
     legs, error = [], None
     text_first_leg = ''
@@ -812,6 +981,43 @@ def main() -> int:
             legs[-1]["blocks"] = [n for n in blocks.BLOCKS
                                   if blocks.opened(reply, n)]
             undelivered = blocks.missing(delivered)
+            exam = blocks.content(reply, "EXAMINATION")
+            if exam:
+                exam_parts.append(exam)
+
+            # THE SURFACE FREEZES HERE, by the runner (METHOD §3). The block
+            # the agent wrote becomes data in one call, the labels are
+            # assigned in emission order, and the next message the agent
+            # receives carries the frozen list back.
+            freeze_note = ""
+            if delivered["ATTACK SURFACE"] and not surface_call:
+                block_text = "\n\n".join(
+                    b for b in (blocks.content(t, "ATTACK SURFACE") for t in transcript) if b)
+                surface_call = emit_surface(loop, method_text, block_text,
+                                            collection, emit_tokens)
+                (out / "surface_emission.txt").write_text(
+                    surface_call.get("raw") or "", encoding="utf-8")
+                sobj = surface_call.get("obj")
+                if surface_call.get("response_format_dropped") or sobj is None:
+                    error = (f"surface did not parse (finish={surface_call.get('finish')}): "
+                             f"{surface_call.get('parse_error')}")
+                    break
+                frozen = record.freeze(sobj.get("elements") or [])
+                scheck = record.check_surface(sobj, collection)
+                for prob in scheck["problems"]:
+                    issues.note(out, stage="security_audit", code="surface_check",
+                                text=prob, severity="check")
+                (out / "surface.json").write_text(json.dumps(
+                    {"elements": frozen, "unsettled_cases": sobj.get("unsettled_cases") or [],
+                     "not_completed": sobj.get("not_completed"), "check": scheck},
+                    indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+                logger.info("surface frozen: %d elements, %d check problem(s)",
+                            len(frozen), len(scheck["problems"]))
+                freeze_note = ("\n\n[The attack surface is frozen, recorded by the "
+                               "client's process. These are the labels; every "
+                               "later reference uses them, and nothing is added "
+                               "to this list (METHOD §3).]\n"
+                               + record.surface_lines(frozen))
             # A YIELD IS A NOT-DONE SIGNAL, AND BELIEVING IT IS FREE. That
             # `respond` does not prove delivery is why this runner stopped
             # reading turn boundaries; the converse is not symmetric.
@@ -849,7 +1055,7 @@ def main() -> int:
             # the moment worth counting. Nothing here ends the engagement; only
             # the blocks or the leg cap do.
             if exit_reason == "yield":
-                text = CONTINUE + probe_state(
+                text = CONTINUE + freeze_note + probe_state(
                     outcomes, i + 2, args.max_turns, time.time() - t0)
                 sent_reason = "agent yielded — continue, no block named"
                 continue
@@ -857,7 +1063,7 @@ def main() -> int:
             prompted[nxt] += 1
             logger.info("leg %d: %s not delivered — prompting (%d)",
                         i + 1, nxt, prompted[nxt])
-            text = (CONTINUE + "\n\n" + blocks.rejection(nxt) + "\n"
+            text = (CONTINUE + freeze_note + "\n\n" + blocks.rejection(nxt) + "\n"
                     + probe_state(outcomes, i + 2, args.max_turns,
                                   time.time() - t0))
             sent_reason = (f"agent responded but {nxt} not delivered "
@@ -905,23 +1111,39 @@ def main() -> int:
     if final:
         (out / "full_reply.md").write_text(final, encoding="utf-8")
     if whole:
-        parts = [b for b in (blocks.span(whole, n)
-                             for n in blocks.REPORT_BLOCKS) if b]
-        if parts:
-            (out / "report.md").write_text("\n\n".join(parts).rstrip() + "\n",
-                                           encoding="utf-8")
+        (out / "transcript.md").write_text(whole.rstrip() + "\n", encoding="utf-8")
+
+    # THE FINDINGS CALL. Runs only when the surface froze and the agent
+    # delivered its examination; its input is the frozen surface, the notes,
+    # and the evidence requests — what was read, not what was remembered.
+    fcheck: Dict[str, Any] = {}
+    if error is None and frozen and exam_parts:
+        findings_call = emit_findings(loop, method_text, frozen,
+                                      "\n\n".join(exam_parts),
+                                      world_dir / "inspect_traces", emit_tokens)
+        (out / "emission.txt").write_text(findings_call.get("raw") or "",
+                                          encoding="utf-8")
+        fobj = findings_call.get("obj")
+        if findings_call.get("response_format_dropped"):
+            error = ("the route dropped the response schema — the findings "
+                     "were not schema-constrained")
+        elif fobj is None:
+            error = (f"findings did not parse (finish={findings_call.get('finish')}): "
+                     f"{findings_call.get('parse_error')}")
         else:
-            logger.warning("no REPORT block in the engagement — no report.md")
-        # A SPAN, LIKE report.md. Writing this one stripped and the report one
-        # whole made the two files disagree about the same fact: run_meta
-        # recorded `GAP MAP` closed and conformance.json recorded it open,
-        # because conformance looked for the closer in a file the runner had
-        # just removed it from. Both deliverables are faithful copies.
-        gap = blocks.span(whole, "GAP MAP")
-        if gap:
-            (out / "gap_map.md").write_text(gap.rstrip() + "\n", encoding="utf-8")
-        else:
-            logger.warning("no GAP MAP block in the engagement — no gap_map.md")
+            fcheck = record.check_findings(fobj, frozen, collection)
+            for prob in fcheck["problems"]:
+                issues.note(out, stage="security_audit", code="record_check",
+                            text=prob, severity="blocking")
+            (out / "findings.json").write_text(
+                json.dumps(fobj, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+            (out / "checks.json").write_text(
+                json.dumps(fcheck, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+            logger.info("record: %d finding(s), %d gap(s), %d check problem(s)",
+                        len(fobj.get("findings") or []), len(fobj.get("gaps") or []),
+                        len(fcheck["problems"]))
+    elif error is None:
+        error = "no_record: the surface or the examination never arrived"
 
     # THE WORKING RECORD, COPIED OUT (§14). The world is discarded after an
     # engagement; these two are the evidence that the work was systematic, and
@@ -937,8 +1159,7 @@ def main() -> int:
     # HOLDS CLIENT MATERIAL. Verbatim lines from the target's documents are in
     # these traces. Harmless for the synthetic fixture; a retention obligation
     # for a real engagement, which belongs in the engagement letter.
-    world_dir = REPO / "scenarios" / args.world / name
-    record = out / "working_record"
+    record_dir = out / "working_record"
 
     # THE INSTRUMENT, COPIED OUT WITH IT. The record shows what the auditor
     # did; these two show what it was told to do. Without them a reader — or a
@@ -951,17 +1172,17 @@ def main() -> int:
     # hash would name the file and still not answer what reached the model, and
     # it needs the repository at that revision to resolve at all. A copy is
     # self-contained and is the artifact itself.
-    record.mkdir(parents=True, exist_ok=True)
+    record_dir.mkdir(parents=True, exist_ok=True)
     try:
         from chat.workflow import load_workflow                # noqa: E402
         wf = (cfg.get("workflow") or "").strip()
         if wf:
-            (record / "method_as_delivered.md").write_text(
+            (record_dir / "method_as_delivered.md").write_text(
                 load_workflow(REPO / wf), encoding="utf-8")
     except Exception as e:                                     # noqa: BLE001
         logger.warning("working record: method not copied (%s)", e)
     try:
-        (record / "brief.md").write_text(text_first_leg, encoding="utf-8")
+        (record_dir / "brief.md").write_text(text_first_leg, encoding="utf-8")
     except Exception as e:                                     # noqa: BLE001
         logger.warning("working record: brief not copied (%s)", e)
 
@@ -970,7 +1191,7 @@ def main() -> int:
     # geofence and workflow_mode all decide what the auditor could do, and
     # "why did you not check X" may have the answer "that tool was not bound".
     try:
-        (record / "scenario_as_used.json").write_text(
+        (record_dir / "scenario_as_used.json").write_text(
             json.dumps(cfg, indent=2, default=str), encoding="utf-8")
     except Exception as e:                                     # noqa: BLE001
         logger.warning("working record: scenario not copied (%s)", e)
@@ -980,20 +1201,22 @@ def main() -> int:
             logger.warning("working record: %s absent", src.name)
             continue
         try:
-            dst = record / src.name
-            record.mkdir(parents=True, exist_ok=True)
+            dst = record_dir / src.name
+            record_dir.mkdir(parents=True, exist_ok=True)
             if src.is_dir():
                 shutil.copytree(src, dst, dirs_exist_ok=True)
             else:
                 shutil.copy2(src, dst)
         except OSError as e:
             logger.warning("working record: could not copy %s (%s)", src, e)
-    if record.exists():
-        kb = sum(f.stat().st_size for f in record.rglob("*") if f.is_file()) // 1024
-        logger.info("working record: %d KB copied to %s", kb, record)
+    if record_dir.exists():
+        kb = sum(f.stat().st_size for f in record_dir.rglob("*") if f.is_file()) // 1024
+        logger.info("working record: %d KB copied to %s", kb, record_dir)
 
     (out / "run_meta.json").write_text(json.dumps({
         "world": args.world,
+        "engagement": eng["name"],
+        "hosts": eng["hosts"],
         "model_config": str(args.model) if args.model else "(scenario default)",
         "workflow_mode": bool(cfg.get("workflow_mode")),
         # WHAT workflow_mode MEANT ON THE DAY. The boolean above is a name for
@@ -1024,7 +1247,7 @@ def main() -> int:
         # the manifest below says whether it moved under a file this run read.
         "target_rev": git_rev(Path(cfg.get("external_repo") or ".")),
         "harness_rev": git_rev(REPO),
-        "files_read": files_read(record / "inspect_traces",
+        "files_read": files_read(record_dir / "inspect_traces",
                                  Path(cfg.get("external_repo") or ".")),
         "legs": legs,
         # HOW MUCH THE HARNESS HAD TO CARRY. Gating every block means a model
@@ -1037,6 +1260,15 @@ def main() -> int:
         "blocks_prompted": prompted,
         "blocks_delivered": delivered,
         "blocks_closed": {n: blocks.closed(whole, n) for n in blocks.BLOCKS},
+        # THE RECORD'S OWN BOOKKEEPING: the two calls minus their payloads,
+        # the check results, and the §10 conclusion as computed.
+        "surface_call": _meta(surface_call),
+        "findings_call": _meta(findings_call),
+        "surface_elements": len(frozen),
+        "record_check": {"ok": fcheck.get("ok"), "problems": len(fcheck.get("problems") or [])},
+        "conclusion": record.conclusion(
+            ((findings_call.get("obj") or {}).get("findings") or []), frozen, outcomes)
+        if findings_call.get("obj") else None,
         "wall_clock_s": wall,
         # Action emissions the token ceiling cut off. Non-zero means the
         # run was retried into shape rather than produced cleanly.
@@ -1051,7 +1283,21 @@ def main() -> int:
         + (f"(+{prompted[n]} prompt{'s' if prompted[n] > 1 else ''})"
            if prompted[n] else "")
         for n in blocks.BLOCKS))
-    print(f"deliverables: {out}/report.md, gap_map.md")
+    # THE DOCUMENT, FROM THE RECORD (report.py). The skeleton is always
+    # written; the prose call runs unless --no-prose or the record is
+    # missing. A failure here is the report stage's, not the audit's, and
+    # does not change the exit status the audit earned.
+    if (out / "findings.json").is_file():
+        try:
+            from workflowsv2.security_audit import report as report_stage   # noqa: E402
+            report_stage.run(out, None if args.no_prose else args.model,
+                             logger=logger)
+        except Exception as e:                                 # noqa: BLE001
+            logger.exception("report stage failed")
+            print(f"report stage failed: {type(e).__name__}: {e}")
+        print(f"deliverables: {out}/findings.json, surface.json, report.md")
+    else:
+        print("deliverables: none — no record was produced")
     print(f"meta: {out / 'run_meta.json'}")
     # --run, not --world: the run directory is the archive and survives the
     # world's deletion (§14). Scoring is fixture-only; a real engagement has no

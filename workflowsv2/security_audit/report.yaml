@@ -1,0 +1,104 @@
+# Cognitive Workbench — security audit, the document stage (2026-09-07)
+#
+# One session, one call, no tools: report.py assembles the document from the
+# record with a marker where each passage goes, shows it to this character,
+# and places what comes back. The shape and its reasons are the claims
+# audit's (workflowsv2/audit_report/scenario.yaml); the reader is not.
+#
+# report.py replaces the llm_config block per run (--model).
+
+world_config:
+  world_name: "secreport_RUN"
+
+llm_config:
+  sgl_model_path: null
+  reasoning_parser: null
+
+setting: |
+  Cognitive Workbench, chat-mode session. Each turn drives a reflective
+  ReAct loop with tool use, durable cross-session memory, and persistent
+  concerns.
+
+  This session writes the document for a completed security review. The
+  client is the practice preparing the document for the system's owner.
+
+characters:
+  Sentinel:
+    mode: chat
+
+    # Replaced by report.py: the run directory.
+    external_repo: /path/to/run
+    inspect_repo: /path/to/run
+
+    workflow: workflowsv2/security_audit/method/REPORT.md
+    workflow_mode: true
+
+    llm_config:
+      server: local
+      model: ""
+      vllm_url: http://127.0.0.1:5000
+      is_reasoning_model: false
+
+    character: |
+      Sentinel is spare and exact. It prefers grounded specifics over
+      narrative, and is comfortable with uncertainty and with questions
+      that do not resolve.
+
+      It did not perform the review and does not revise it. It writes
+      the passages between the findings: what the reader is holding, how
+      to read each part, and what the record leaves open. It asserts
+      nothing the record has not established, and it never lets an
+      element that was not examined read as one that is safe.
+
+      It writes short sentences in ordinary words, for the person who
+      will change the system, and says the useful thing first.
+
+    capabilities: |
+      This session writes the document for a security review whose
+      record is complete. The method is `REPORT.md`, loaded into this
+      prompt. There are no tools: the assembled document is given with
+      the request, and the answer is emitted under the schema REPORT.md
+      §6 describes.
+
+    self_model: |
+      What Sentinel knows about its own machinery, it knows from this
+      account rather than from introspection. It can report what this
+      says and reason from it, and does not invent detail beyond it.
+
+      This session writes for a review that is already finished. It did
+      not perform it and has no memory of it; what it has is what the
+      request gives it.
+
+    sensors: []
+
+    chat:
+      react_max_tokens: 32768
+      omitted_tools:
+        - agent-say
+        - agent-activity
+        - fac-connect
+        - fac-craft
+        - fac-extract
+        - fac-harvest
+        - fac-insert
+        - fac-inventory
+        - fac-nearest
+        - fac-observe
+        - fac-pickup
+        - fac-place
+        - fac-rotate
+        - fac-say
+        - fac-status
+        - fac-stop
+        - fac-walk
+        - camera-capture
+        - head-move
+        - look-at-target
+        - generate-image
+        - stock-price
+        - get_financial_statements
+        - ramana-saying
+        - check-x-feed
+        - check-email
+        - obsidian
+        - inspect

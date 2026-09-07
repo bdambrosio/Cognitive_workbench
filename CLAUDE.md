@@ -50,6 +50,20 @@ specification, and a specification that can be read two ways will be.
 Going forward, not backward: applies to new and edited text. Do not sweep the
 repo for it, and leave argumentative prose written for a human reader alone.
 
+## No mannered prose
+
+Mannered prose substitutes metaphor and flourish for direct statement. Instead
+of "a parameter worth varying," the mannered writer produces "a dial worth
+turning." Instead of "this point still matters," they write "this point earns
+its keep." The phrases exist to display the writer, not to convey the idea,
+and readers can tell. That is why mannered prose irritates: it makes the
+reader work harder so the writer can perform. It is also imprecise: metaphors
+drag in connotations the writer did not choose and cannot control.
+
+The fix is to say what you mean. When a literal phrase is available, use it.
+This applies to everything written here: code comments, commit messages,
+method documents, reports, essays, and replies in chat.
+
 ## Method documents are read whole
 
 `METHOD.md`, `REVIEW.md`, `DELIVERY.md` — any document a workflow LLM reads as
