@@ -1,0 +1,22 @@
+{
+ "intake_finished_at": "2026-09-05T20:29:14.364511+00:00",
+ "written": [
+  "transaction",
+  "thresholds"
+ ],
+ "check": {
+  "complete": [
+   "identify",
+   "situation",
+   "background",
+   "assessment",
+   "recommendation"
+  ],
+  "empty": {},
+  "emptiest": null,
+  "filled": 15,
+  "total": 15,
+  "open_questions": 0,
+  "notes": 3
+ }
+}

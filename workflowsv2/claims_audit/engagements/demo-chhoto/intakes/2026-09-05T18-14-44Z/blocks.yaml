@@ -1,0 +1,12 @@
+transaction: |
+  Client: test-client, an M&A firm
+  Acting for the client: the person conducting this conversation, for test-client
+  Counterparty: chhoto — the seller, and the company that owns the target
+  Subject: a url shortener
+  Price and basis: around $50k
+  Structure: an asset purchase — the buyer is buying the software itself, not the company that owns it; the buyer says the repo will be removed as a public repo
+  Timetable: 14 days
+thresholds: |
+  Paying for: the working code — it will run internal to the buyer's own system, so the buyer does not care about the user base
+  Would change the price or terms: unreliable code (the buyer's example: poor error handling), and obsolete implementation — especially if it generates shortened urls that break on some browsers or OSs
+  Would end the deal: the same grounds as would move the price — unreliable or obsolete code; the buyer says that if the audit finds the code is one of those things badly enough, that ends the deal rather than just moving the price

@@ -1,0 +1,175 @@
+{
+ "claim_source": "llms.txt",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "ChatterMate is an open-source AI customer-support chatbot platform",
+   "lines": [
+    3,
+    4
+   ],
+   "statement": "The platform is open-source: its source is available under an open-source licence.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "ChatterMate is an open-source AI customer-support chatbot platform",
+     "lines": [
+      3,
+      4
+     ]
+    }
+   ],
+   "statements": [
+    "ChatterMate is an AI customer-support chatbot platform: the core function of that category — an AI chatbot for customer support — exists."
+   ]
+  },
+  {
+   "id": 2,
+   "quote": "You can sign up, create AI agents, add knowledge sources, and embed a chat widget",
+   "lines": [
+    3,
+    4
+   ],
+   "statement": "The platform supports the listed capabilities: sign-up, creating AI agents, adding knowledge sources, and embedding a chat widget.",
+   "about": "target"
+  },
+  {
+   "id": 3,
+   "quote": "all from a browser, the terminal (CLI), or programmatically via an AI agent over MCP",
+   "lines": [
+    4,
+    5
+   ],
+   "statement": "The whole workflow can be done through each of three channels: a browser, a terminal CLI, and programmatically by an AI agent over MCP.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "embed the chat widget on any site",
+     "lines": [
+      35,
+      35
+     ]
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "quote": "the `chattermate` command, installed with `pip install chattermate-cli`",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "A CLI named `chattermate` exists and is installed by the PyPI package `chattermate-cli`.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "let an AI agent configure ChatterMate over the Model Context Protocol (`chattermate-mcp`)",
+     "lines": [
+      33,
+      33
+     ]
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "quote": "to sign up and manage everything from the terminal",
+   "lines": [
+    9,
+    10
+   ],
+   "statement": "The CLI supports signing up and managing the account and configuration from the terminal.",
+   "about": "target"
+  },
+  {
+   "id": 6,
+   "quote": "It is the account/config CLI",
+   "lines": [
+    10,
+    10
+   ],
+   "statement": "The `chattermate` CLI's role is account and configuration management.",
+   "about": "target"
+  },
+  {
+   "id": 7,
+   "quote": "distinct from the self-host Docker tool (`npm install -g chattermate-deploy`)",
+   "lines": [
+    10,
+    11
+   ],
+   "statement": "A separate self-host Docker tool exists, distributed as the npm package `chattermate-deploy`, and is distinct from the `chattermate` CLI.",
+   "about": "target"
+  },
+  {
+   "id": 8,
+   "quote": "chattermate signup --name \"Acme Inc\" --domain acme.com --admin-email you@acme.com --admin-name \"You\"\nchattermate agent create --name \"Support\" --type customer_support -i \"Be concise\" --json\n# Add knowledge from a URL or a local PDF:\nchattermate knowledge add-url --website https://docs.acme.com --agent-id <agent-id>\nchattermate knowledge add-file ./guide.pdf --agent-id <agent-id>\n# Create a widget to get the embed id:\nchattermate widget create --agent-id <agent-id> --name \"Website widget\"",
+   "lines": [
+    16,
+    23
+   ],
+   "statement": "The `chattermate` CLI supports the subcommands shown in the flow — `signup`, `agent create`, `knowledge add-url`, `knowledge add-file`, `widget create` — with the options shown, and they carry out the stated effects (signup, agent creation, adding knowledge from a URL or local PDF, widget creation returning an embed id).",
+   "about": "target"
+  },
+  {
+   "id": 9,
+   "quote": "# <script>window.chattermateId='YOUR_WIDGET_ID';</script>\n# <script src=\"https://app.chattermate.chat/webclient/chattermate.min.js\"></script>",
+   "lines": [
+    25,
+    26
+   ],
+   "statement": "The chat widget is embedded on a site by setting `window.chattermateId` and loading the script served at https://app.chattermate.chat/webclient/chattermate.min.js.",
+   "about": "target"
+  },
+  {
+   "id": 10,
+   "quote": "the account CLI — signup, login, tokens, agents, workflows, knowledge",
+   "lines": [
+    32,
+    32
+   ],
+   "statement": "The CLI's command areas include signup, login, tokens, agents, workflows and knowledge.",
+   "about": "target"
+  },
+  {
+   "id": 11,
+   "quote": "authenticated widgets and programmatic tokens",
+   "lines": [
+    36,
+    36
+   ],
+   "statement": "Widgets support authentication, and programmatic tokens can be issued (the Widget Apps feature).",
+   "about": "target"
+  },
+  {
+   "id": 12,
+   "quote": "Hosted API base: https://api.chattermate.chat (routes under `/api/v1`)",
+   "lines": [
+    41,
+    41
+   ],
+   "statement": "A hosted API is served at https://api.chattermate.chat with its routes under `/api/v1`.",
+   "about": "seller"
+  },
+  {
+   "id": 13,
+   "quote": "run the full stack on your own infrastructure with the self-host CLI",
+   "lines": [
+    48,
+    48
+   ],
+   "statement": "The self-host CLI runs the full ChatterMate stack on the user's own infrastructure.",
+   "about": "target"
+  },
+  {
+   "id": 14,
+   "quote": "command `chattermate-deploy init/start/stop`",
+   "lines": [
+    48,
+    48
+   ],
+   "statement": "The `chattermate-deploy` CLI has the subcommands `init`, `start` and `stop`.",
+   "about": "target"
+  }
+ ]
+}

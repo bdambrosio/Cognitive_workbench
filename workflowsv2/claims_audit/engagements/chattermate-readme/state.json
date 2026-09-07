@@ -1,0 +1,93 @@
+{
+ "current_intake": null,
+ "current_run": {},
+ "cancelled": {
+  "intakes": [],
+  "runs": []
+ },
+ "stages": {
+  "enumeration": {
+   "value": "done",
+   "at": "2026-09-06T20-06-07Z",
+   "by": "job"
+  },
+  "surface": {
+   "value": "frozen",
+   "at": "2026-09-06T20-06-34Z",
+   "by": "smoke test 2026-09-06 (claude)"
+  },
+  "chain": {
+   "value": "done",
+   "at": "2026-09-07T00-03-06Z",
+   "by": "job"
+  }
+ },
+ "jobs": [
+  {
+   "id": "2026-09-06T19-50-04Z",
+   "kind": "enumerate",
+   "state": "done",
+   "by": "smoke test 2026-09-06 (claude)",
+   "started": "2026-09-06T19-50-04Z",
+   "ended": "2026-09-06T20-06-07Z",
+   "exit": 0,
+   "error": null,
+   "log": "/home/bruce/Downloads/Cognitive_workbench/workflowsv2/claims_audit/engagements/chattermate-readme/jobs/2026-09-06T19-50-04Z.log",
+   "steps": [
+    {
+     "label": "enumerate README.md",
+     "pid": 179099,
+     "exit": 0
+    },
+    {
+     "label": "enumerate llms.txt",
+     "pid": 180976,
+     "exit": 0
+    }
+   ]
+  },
+  {
+   "id": "2026-09-06T20-06-34Z",
+   "kind": "chain",
+   "state": "done",
+   "by": "smoke test 2026-09-06 (claude)",
+   "started": "2026-09-06T20-06-34Z",
+   "ended": "2026-09-07T00-03-06Z",
+   "exit": 0,
+   "error": null,
+   "log": "/home/bruce/Downloads/Cognitive_workbench/workflowsv2/claims_audit/engagements/chattermate-readme/jobs/2026-09-06T20-06-34Z.log",
+   "steps": [
+    {
+     "label": "audit README.md",
+     "pid": 181178,
+     "exit": 0
+    },
+    {
+     "label": "review README.md",
+     "pid": 212876,
+     "exit": 0
+    },
+    {
+     "label": "audit llms.txt",
+     "pid": 240231,
+     "exit": 0
+    },
+    {
+     "label": "review llms.txt",
+     "pid": 243540,
+     "exit": 0
+    },
+    {
+     "label": "materiality",
+     "pid": 244188,
+     "exit": 0
+    },
+    {
+     "label": "report",
+     "pid": 249134,
+     "exit": 0
+    }
+   ]
+  }
+ ]
+}

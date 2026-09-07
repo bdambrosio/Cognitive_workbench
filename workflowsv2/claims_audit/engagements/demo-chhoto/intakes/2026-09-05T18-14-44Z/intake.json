@@ -1,0 +1,35 @@
+{
+ "identify": {
+  "client": "test-client, an M&A firm",
+  "acting": "the person conducting this conversation, for test-client",
+  "counterparty": "chhoto — the seller, and the company that owns the target",
+  "confidentiality": "normal confidentiality practices; this is an open source repo"
+ },
+ "situation": {
+  "subject": "a url shortener",
+  "price": "around $50k",
+  "structure": "an asset purchase — the buyer is buying the software itself, not the company that owns it; the buyer says the repo will be removed as a public repo",
+  "timetable": "14 days"
+ },
+ "background": {
+  "target": "a url shortener",
+  "claim_sources": "a url for the repo, and a readme file describing what chhoto says it does",
+  "known": "it seems functional, but the buyer is not sure how well it follows current standards and practices"
+ },
+ "assessment": {
+  "paying_for": "the working code — it will run internal to the buyer's own system, so the buyer does not care about the user base",
+  "price_movers": "unreliable code (the buyer's example: poor error handling), and obsolete implementation — especially if it generates shortened urls that break on some browsers or OSs",
+  "walk_away": "the same grounds as would move the price — unreliable or obsolete code; the buyer says that if the audit finds the code is one of those things badly enough, that ends the deal rather than just moving the price"
+ },
+ "recommendation": {
+  "scope": "Readme.md only as the claim source; the repo is the codebase against which the claims are checked — the readme is the seller's claim, the code is the evidence",
+  "deliverable": "a report of findings, read against the code inside the window before the repo goes private",
+  "seller_questions": "None — the buyer wants nothing put to the seller directly before closing"
+ },
+ "open_questions": [],
+ "notes": [
+  "the buyer initially declined to state the price, then volunteered around $50k when asked about deal structure",
+  "the buyer noted the repo will be removed as a public repo once the deal is done; the deliverable is to be checked against the code within the 14-day window before that happens",
+  "the buyer's first answer on the deliverable, 'usual report', was not accepted as field content; the recorded answer is their later words, 'a report of findings'"
+ ]
+}

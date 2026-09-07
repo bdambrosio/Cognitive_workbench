@@ -1,0 +1,2300 @@
+{
+ "claim_source": "README.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "ChatterMate - Open Source AI Customer Support Chatbot Platform",
+   "lines": [
+    1,
+    1
+   ],
+   "statement": "The target is an AI customer support chatbot platform, positioned as open source.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Open-source AI customer support platform",
+     "lines": [
+      9,
+      9
+     ]
+    },
+    {
+     "quote": "ChatterMate is an open-source AI customer support platform.",
+     "lines": [
+      540,
+      540
+     ]
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "quote": "License: Apache 2.0",
+   "lines": [
+    2,
+    2
+   ],
+   "statement": "A licence badge states the target is licensed under Apache 2.0.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Open source (Apache-2.0)",
+     "lines": [
+      206,
+      206
+     ]
+    },
+    {
+     "quote": "**Manage from your terminal, automate, or drive it with an AI agent** using the **ChatterMate CLI**",
+     "lines": [
+      242,
+      242
+     ]
+    },
+    {
+     "quote": "The core platform is Apache-2.0 licensed — free for personal and commercial use, including self-hosted production deployments.",
+     "lines": [
+      543,
+      543
+     ]
+    },
+    {
+     "quote": "**Open Source Core ([Apache-2.0](https://opensource.org/licenses/Apache-2.0))**",
+     "lines": [
+      604,
+      604
+     ]
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "quote": "[![npm version](https://img.shields.io/npm/v/chattermate-deploy.svg)](https://www.npmjs.com/package/chattermate-deploy)",
+   "lines": [
+    4,
+    4
+   ],
+   "statement": "A version badge states that an npm package named chattermate-deploy exists at a published version.",
+   "about": "target"
+  },
+  {
+   "id": 4,
+   "quote": "with human handoff",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The platform supports handing a conversation over from the AI to a human agent.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "escalates complex issues to human agents when needed",
+     "lines": [
+      34,
+      34
+     ]
+    },
+    {
+     "quote": "🤝 **Smart Human Handoff** | Intelligent AI-to-human transfer",
+     "lines": [
+      48,
+      48
+     ]
+    },
+    {
+     "quote": "Built-in human handoff + shared inbox",
+     "lines": [
+      209,
+      209
+     ]
+    },
+    {
+     "quote": "human handoff is a core feature, not an add-on.",
+     "lines": [
+      546,
+      546
+     ]
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "quote": "A no-code AI chatbot",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The chatbot can be set up and configured without writing code.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "intelligent AI-to-human handover",
+     "lines": [
+      9,
+      9
+     ]
+    },
+    {
+     "quote": "ChatterMate is a **no-code AI customer support platform**",
+     "lines": [
+      34,
+      34
+     ]
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "quote": "24/7 customer service automation",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The chatbot automates customer service continuously, around the clock.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "enables businesses to provide **24/7 customer service** through intelligent AI agents",
+     "lines": [
+      34,
+      34
+     ]
+    },
+    {
+     "quote": "AI handles routine questions 24/7 and hands off to your team when it matters",
+     "lines": [
+      540,
+      540
+     ]
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "quote": "multi-model AI (OpenAI, Anthropic Claude, Google Gemini, Mistral, xAI Grok, DeepSeek, Groq)",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The platform supports the seven named LLM providers: OpenAI, Anthropic Claude, Google Gemini, Mistral, xAI Grok, DeepSeek and Groq.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Choose your AI provider — **OpenAI**, **Anthropic (Claude)**, **Google Gemini**, **Mistral**, **xAI (Grok)**, **DeepSeek**, and **Groq**",
+     "lines": [
+      51,
+      51
+     ]
+    },
+    {
+     "quote": "OpenAI, Anthropic (Claude), Google Gemini, Mistral, xAI (Grok), DeepSeek, and Groq",
+     "lines": [
+      558,
+      558
+     ]
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "quote": "Shopify & e-commerce support",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The platform supports Shopify and e-commerce use cases.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Native **Shopify integration**",
+     "lines": [
+      49,
+      49
+     ]
+    }
+   ]
+  },
+  {
+   "id": 9,
+   "quote": "Slack and Jira integrations",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The platform has integrations with Slack and with Jira.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Connect your **Slack workspace** for internal product support.",
+     "lines": [
+      58,
+      58
+     ]
+    }
+   ]
+  },
+  {
+   "id": 10,
+   "quote": "visual workflow builder",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The platform includes a visual builder for workflows.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "🧩 **Visual Workflow Builder**",
+     "lines": [
+      59,
+      59
+     ]
+    },
+    {
+     "quote": "Build sophisticated conversation flows visually with our intuitive workflow builder",
+     "lines": [
+      63,
+      63
+     ]
+    },
+    {
+     "quote": "Visual no-code workflow builder",
+     "lines": [
+      211,
+      211
+     ]
+    }
+   ]
+  },
+  {
+   "id": 11,
+   "quote": "fully themeable chat widget",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The chat widget can be fully themed by the user.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Fully customizable chat widget to match your brand",
+     "lines": [
+      141,
+      141
+     ]
+    }
+   ]
+  },
+  {
+   "id": 12,
+   "quote": "Use the free hosted service",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The seller operates a hosted version of the product that is free to use.",
+   "about": "seller",
+   "locations": [
+    {
+     "quote": "Free tier",
+     "lines": [
+      212,
+      212
+     ]
+    },
+    {
+     "quote": "free",
+     "lines": [
+      241,
+      241
+     ]
+    },
+    {
+     "quote": "There's also a free hosted plan at [app.chattermate.chat](https://app.chattermate.chat).",
+     "lines": [
+      543,
+      543
+     ]
+    }
+   ]
+  },
+  {
+   "id": 13,
+   "quote": "self-host it",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The product can be self-hosted by the buyer.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "**Open Source & Self-Hosted**",
+     "lines": [
+      143,
+      143
+     ]
+    },
+    {
+     "quote": "Run the full stack (Postgres, Redis, backend, frontend) on your own infrastructure with `npm install -g chattermate-deploy`",
+     "lines": [
+      555,
+      555
+     ]
+    }
+   ]
+  },
+  {
+   "id": 14,
+   "quote": "open-source alternative to Intercom, Zendesk, and Chatbase",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The product serves as an open-source alternative to Intercom, Zendesk and Chatbase.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "**free, open-source alternative to Intercom, Zendesk AI, and Chatbase**",
+     "lines": [
+      202,
+      202
+     ]
+    }
+   ]
+  },
+  {
+   "id": 15,
+   "quote": "Your AI chatbot handles common queries",
+   "lines": [
+    34,
+    34
+   ],
+   "statement": "The AI chatbot answers common customer queries on its own",
+   "about": "target"
+  },
+  {
+   "id": 16,
+   "quote": "continuously learns from your knowledge base",
+   "lines": [
+    34,
+    34
+   ],
+   "statement": "The chatbot continuously learns from the customer's knowledge base",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "AI answers from your knowledge base",
+     "lines": [
+      208,
+      208
+     ]
+    }
+   ]
+  },
+  {
+   "id": 17,
+   "quote": "Integrate the chat widget on any website — or any **Shopify store** — with a single line of code.",
+   "lines": [
+    34,
+    34
+   ],
+   "statement": "The chat widget can be embedded on any website or Shopify store with a single line of code",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "🌐 **Web widget** | Nothing | The embeddable widget, plus **Shopify** and **WordPress** surfaces",
+     "lines": [
+      173,
+      173
+     ]
+    },
+    {
+     "quote": "The widget also embeds on any other e-commerce or website platform with one line of code.",
+     "lines": [
+      549,
+      549
+     ]
+    }
+   ]
+  },
+  {
+   "id": 18,
+   "quote": "with **business hours awareness**, real-time availability detection, and context-aware escalation messages",
+   "lines": [
+    48,
+    48
+   ],
+   "statement": "The human handoff includes business hours awareness, real-time agent availability detection, and context-aware escalation messages",
+   "about": "target"
+  },
+  {
+   "id": 19,
+   "quote": "answer order, shipping, and product questions from store data",
+   "lines": [
+    49,
+    49
+   ],
+   "statement": "The Shopify integration answers order, shipping, and product questions using store data",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "🛍️ **Shopify** | Your Shopify app | Order, shipping, and product answers from live store data",
+     "lines": [
+      189,
+      189
+     ]
+    },
+    {
+     "quote": "to answer order-status, shipping, and product questions directly from your store data.",
+     "lines": [
+      549,
+      549
+     ]
+    }
+   ]
+  },
+  {
+   "id": 20,
+   "quote": "Works for any online store.",
+   "lines": [
+    49,
+    49
+   ],
+   "statement": "The e-commerce support works for any online store, not only Shopify",
+   "about": "target"
+  },
+  {
+   "id": 21,
+   "quote": "Official **WordPress plugin**",
+   "lines": [
+    50,
+    50
+   ],
+   "statement": "An official WordPress plugin exists for the product",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Download the [WordPress plugin](https://github.com/chattermate/chattermate-wordpress-plugin/releases/latest/download/chattermate-chat.zip)",
+     "lines": [
+      552,
+      552
+     ]
+    }
+   ]
+  },
+  {
+   "id": 22,
+   "quote": "add the chat widget to any WordPress site by entering your Widget ID",
+   "lines": [
+    50,
+    50
+   ],
+   "statement": "The WordPress plugin adds the chat widget to any WordPress site given only a Widget ID",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "then enter your Widget ID under **Settings → ChatterMate Chat**.",
+     "lines": [
+      552,
+      552
+     ]
+    }
+   ]
+  },
+  {
+   "id": 23,
+   "quote": "No theme edits required.",
+   "lines": [
+    50,
+    50
+   ],
+   "statement": "Installing the WordPress plugin requires no theme edits",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "The chat launcher appears on your site with no theme edits.",
+     "lines": [
+      552,
+      552
+     ]
+    }
+   ]
+  },
+  {
+   "id": 24,
+   "quote": "with your own API key, or enter a custom model ID",
+   "lines": [
+    51,
+    51
+   ],
+   "statement": "Users can supply their own API key or enter a custom model ID",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Bring your own AI model (OpenAI, Claude, Gemini, Grok, +more)",
+     "lines": [
+      210,
+      210
+     ]
+    },
+    {
+     "quote": "bring your own API key, or enter a custom model ID for any model a provider supports.",
+     "lines": [
+      558,
+      558
+     ]
+    }
+   ]
+  },
+  {
+   "id": 25,
+   "quote": "Switch providers anytime without code changes.",
+   "lines": [
+    51,
+    51
+   ],
+   "statement": "AI providers can be switched at any time without code changes",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "You can switch providers at any time without code changes.",
+     "lines": [
+      558,
+      558
+     ]
+    }
+   ]
+  },
+  {
+   "id": 26,
+   "quote": "Let visitors start conversations instantly — no signup or email required.",
+   "lines": [
+    52,
+    52
+   ],
+   "statement": "Visitors can start chat conversations without signup or providing an email (Ask Anything Mode)",
+   "about": "target"
+  },
+  {
+   "id": 27,
+   "quote": "Customers can share **images, PDFs, Word docs, spreadsheets**, and more directly in chat.",
+   "lines": [
+    53,
+    53
+   ],
+   "statement": "Customers can attach images, PDFs, Word docs, spreadsheets, and other files directly in chat",
+   "about": "target"
+  },
+  {
+   "id": 28,
+   "quote": "Secure uploads with S3 storage",
+   "lines": [
+    53,
+    53
+   ],
+   "statement": "Chat file uploads are stored in S3",
+   "about": "target"
+  },
+  {
+   "id": 29,
+   "quote": "magic byte validation",
+   "lines": [
+    53,
+    53
+   ],
+   "statement": "Uploaded files are validated by magic byte inspection",
+   "about": "target"
+  },
+  {
+   "id": 30,
+   "quote": "Multilingual support",
+   "lines": [
+    54,
+    54
+   ],
+   "statement": "The product supports multiple languages",
+   "about": "target"
+  },
+  {
+   "id": 31,
+   "quote": "configurable **default language per workflow**",
+   "lines": [
+    54,
+    54
+   ],
+   "statement": "A default language can be configured per workflow",
+   "about": "target"
+  },
+  {
+   "id": 32,
+   "quote": "Native tickets raised straight from chat",
+   "lines": [
+    55,
+    55
+   ],
+   "statement": "Tickets can be raised natively from chat conversations",
+   "about": "target"
+  },
+  {
+   "id": 33,
+   "quote": "then **auto-triaged and investigated by AI**",
+   "lines": [
+    55,
+    55
+   ],
+   "statement": "Tickets are automatically triaged and investigated by AI",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Each one is triaged",
+     "lines": [
+      77,
+      77
+     ]
+    }
+   ]
+  },
+  {
+   "id": 34,
+   "quote": "it forms hypotheses, gathers evidence from your observability tools and databases, and writes a root-cause analysis you can read and audit",
+   "lines": [
+    55,
+    55
+   ],
+   "statement": "The AI ticketing forms hypotheses, gathers evidence from the customer's observability tools and databases, and writes an auditable root-cause analysis",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "the AI proposes hypotheses, tests each against your connected tools",
+     "lines": [
+      78,
+      79
+     ]
+    }
+   ]
+  },
+  {
+   "id": 35,
+   "quote": "Create and manage **Jira tickets directly from chat** conversations.",
+   "lines": [
+    56,
+    56
+   ],
+   "statement": "Jira tickets can be created and managed directly from chat conversations",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Create and track Jira issues from chat (OAuth 2.0)",
+     "lines": [
+      188,
+      188
+     ]
+    }
+   ]
+  },
+  {
+   "id": 36,
+   "quote": "OAuth 2.0 secure integration",
+   "lines": [
+    56,
+    56
+   ],
+   "statement": "The Jira integration uses OAuth 2.0",
+   "about": "target"
+  },
+  {
+   "id": 37,
+   "quote": "automatic ticket tracking",
+   "lines": [
+    56,
+    56
+   ],
+   "statement": "Jira tickets are tracked automatically",
+   "about": "target"
+  },
+  {
+   "id": 38,
+   "quote": "Native tickets can also escalate to Jira one-way.",
+   "lines": [
+    56,
+    56
+   ],
+   "statement": "Native tickets can escalate to Jira in one direction only",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "native tickets can escalate to Jira",
+     "lines": [
+      188,
+      188
+     ]
+    }
+   ]
+  },
+  {
+   "id": 39,
+   "quote": "**Token-based security** for embedded widgets.",
+   "lines": [
+    57,
+    57
+   ],
+   "statement": "Embedded widgets are secured with token-based authentication",
+   "about": "target"
+  },
+  {
+   "id": 40,
+   "quote": "Support both public Q&A and private authenticated conversations.",
+   "lines": [
+    57,
+    57
+   ],
+   "statement": "The widget supports both public Q&A conversations and private authenticated conversations",
+   "about": "target"
+  },
+  {
+   "id": 41,
+   "quote": "Teams get AI-powered assistance directly in Slack channels.",
+   "lines": [
+    58,
+    58
+   ],
+   "statement": "Teams receive AI-powered assistance directly in Slack channels",
+   "about": "target"
+  },
+  {
+   "id": 42,
+   "quote": "Design conversation flows with a **drag-and-drop interface**.",
+   "lines": [
+    59,
+    59
+   ],
+   "statement": "Conversation flows are designed through a drag-and-drop interface",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "**Drag-and-drop nodes**",
+     "lines": [
+      68,
+      68
+     ]
+    }
+   ]
+  },
+  {
+   "id": 43,
+   "quote": "Branching logic, conditional responses, and multi-step workflows without coding.",
+   "lines": [
+    59,
+    59
+   ],
+   "statement": "The workflow builder supports branching logic, conditional responses, and multi-step workflows without coding",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Branching logic - Create different paths based on user input",
+     "lines": [
+      69,
+      69
+     ]
+    }
+   ]
+  },
+  {
+   "id": 44,
+   "quote": "AI responses, human handoff, conditions, and more",
+   "lines": [
+    68,
+    68
+   ],
+   "statement": "The workflow builder provides node types including AI response, human handoff, and condition nodes.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Node types - Start, AI Response, Human Transfer, Condition, End nodes",
+     "lines": [
+      70,
+      70
+     ]
+    }
+   ]
+  },
+  {
+   "id": 45,
+   "quote": "Real-time preview - Test workflows before deploying",
+   "lines": [
+    71,
+    71
+   ],
+   "statement": "Workflows can be tested in a real-time preview before deployment.",
+   "about": "target"
+  },
+  {
+   "id": 46,
+   "quote": "Version control - Save and restore workflow versions",
+   "lines": [
+    72,
+    72
+   ],
+   "statement": "Workflow versions can be saved and restored.",
+   "about": "target"
+  },
+  {
+   "id": 47,
+   "quote": "Tickets are raised from a conversation (by the AI or an agent), or from an alert webhook",
+   "lines": [
+    76,
+    77
+   ],
+   "statement": "Tickets can be created from a conversation (by the AI or an agent) and from an alert webhook.",
+   "about": "target"
+  },
+  {
+   "id": 48,
+   "quote": "deduplicated against open tickets",
+   "lines": [
+    77,
+    77
+   ],
+   "statement": "Tickets are deduplicated against open tickets.",
+   "about": "target"
+  },
+  {
+   "id": 49,
+   "quote": "records every query it ran as evidence you can inspect",
+   "lines": [
+    79,
+    79
+   ],
+   "statement": "Every query the AI ran during investigation is recorded as evidence the customer can inspect.",
+   "about": "target"
+  },
+  {
+   "id": 50,
+   "quote": "a versioned root-cause analysis with citations back to that evidence",
+   "lines": [
+    80,
+    80
+   ],
+   "statement": "The investigation output is a versioned root-cause analysis with citations back to the recorded evidence.",
+   "about": "target"
+  },
+  {
+   "id": 51,
+   "quote": "Connect read-only investigation sources under **Settings → Ticketing**",
+   "lines": [
+    82,
+    82
+   ],
+   "statement": "Investigation sources can be connected under Settings → Ticketing, and they are read-only.",
+   "about": "target"
+  },
+  {
+   "id": 52,
+   "quote": "observability platforms via MCP (Grafana, Elasticsearch, Sentry, CloudWatch, or any MCP server)",
+   "lines": [
+    83,
+    84
+   ],
+   "statement": "Observability platforms can be connected as investigation sources via MCP, including Grafana, Elasticsearch, Sentry, CloudWatch, or any MCP server.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "🧰 **MCP servers** | Paste a token | Any MCP server as an agent tool — Grafana, Elasticsearch, Sentry, CloudWatch, and others",
+     "lines": [
+      190,
+      190
+     ]
+    }
+   ]
+  },
+  {
+   "id": 53,
+   "quote": "a **guardrailed SQL connector**",
+   "lines": [
+    84,
+    84
+   ],
+   "statement": "An optionally enabled SQL connector with guardrails is available as an investigation source.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "🗄️ **SQL connectors** | Paste a token | Read-only, guardrailed **PostgreSQL** and **MySQL** access for AI ticket investigation",
+     "lines": [
+      191,
+      191
+     ]
+    }
+   ]
+  },
+  {
+   "id": 54,
+   "quote": "(Postgres/MySQL,\ndirect or over an SSH tunnel)",
+   "lines": [
+    84,
+    85
+   ],
+   "statement": "The SQL connector supports Postgres and MySQL, connected directly or over an SSH tunnel.",
+   "about": "target"
+  },
+  {
+   "id": 55,
+   "quote": "Autonomy is staged, and you choose the level:",
+   "lines": [
+    87,
+    87
+   ],
+   "statement": "Ticketing AI autonomy is organised into levels, and the customer chooses the level.",
+   "about": "target"
+  },
+  {
+   "id": 56,
+   "quote": "| **L1** | Investigate and document only |\n| **L2** | Also propose a resolution — a human approves or rejects it |\n| **L3** | Also message the customer and close the ticket, behind confidence guards |",
+   "lines": [
+    91,
+    93
+   ],
+   "statement": "Three autonomy levels exist as described: L1 investigates and documents only; L2 additionally proposes a resolution for human approval or rejection; L3 additionally messages the customer and closes the ticket behind confidence guards.",
+   "about": "target"
+  },
+  {
+   "id": 57,
+   "quote": "The investigation agent reads untrusted customer text and holds live tool access",
+   "lines": [
+    97,
+    98
+   ],
+   "statement": "The investigation agent processes untrusted customer-supplied text while holding live access to tools such as databases and observability sources.",
+   "about": "target"
+  },
+  {
+   "id": 58,
+   "quote": "the limits are enforced in code, not by prompting",
+   "lines": [
+    98,
+    98
+   ],
+   "statement": "The agent's guardrail limits are enforced in code rather than by prompt instructions to the model.",
+   "about": "target"
+  },
+  {
+   "id": 59,
+   "quote": "The SQL connector is read-only, structurally. Queries are parsed to an AST and rejected unless they are a single plain `SELECT`.",
+   "lines": [
+    100,
+    101
+   ],
+   "statement": "The SQL connector is structurally read-only: queries are parsed to an AST and rejected unless they are a single plain SELECT statement.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Writes, DDL, multiple statements, and a denylist of dangerous functions cannot pass",
+     "lines": [
+      101,
+      102
+     ]
+    }
+   ]
+  },
+  {
+   "id": 60,
+   "quote": "Table access is restricted to an allowlist you pick, enforced through CTEs, joins and subqueries",
+   "lines": [
+    102,
+    104
+   ],
+   "statement": "Table access is limited to a user-configured allowlist, and the restriction holds even when tables are referenced through CTEs, joins and subqueries.",
+   "about": "target"
+  },
+  {
+   "id": 61,
+   "quote": "A `LIMIT` is forced.",
+   "lines": [
+    104,
+    104
+   ],
+   "statement": "Every query executed through the connector has a LIMIT applied to it.",
+   "about": "target"
+  },
+  {
+   "id": 62,
+   "quote": "Comments are stripped before execution, since MySQL executes `/*! */`",
+   "lines": [
+    104,
+    105
+   ],
+   "statement": "SQL comments are stripped from queries before execution, because MySQL can execute code inside /*! */ comment syntax.",
+   "about": "target"
+  },
+  {
+   "id": 63,
+   "quote": "The connection itself is a read-only transaction",
+   "lines": [
+    105,
+    105
+   ],
+   "statement": "The database connection used by the connector runs as a read-only transaction.",
+   "about": "target"
+  },
+  {
+   "id": 64,
+   "quote": "a statement timeout — a second, independent barrier",
+   "lines": [
+    106,
+    106
+   ],
+   "statement": "The connection enforces a statement timeout, forming a second barrier independent of the query-level guardrails.",
+   "about": "target"
+  },
+  {
+   "id": 65,
+   "quote": "Columns you mask are never readable. Masked columns are blocked from being referenced anywhere, including in a `WHERE` clause",
+   "lines": [
+    107,
+    108
+   ],
+   "statement": "Masked columns cannot be referenced in any part of a query, including WHERE clauses, so their values cannot be probed.",
+   "about": "target"
+  },
+  {
+   "id": 66,
+   "quote": "whole-row tricks that would smuggle them out (`to_jsonb(t)`, `t::text`, `to_json(t.*)`) are blocked too",
+   "lines": [
+    109,
+    110
+   ],
+   "statement": "Whole-row constructs that would expose masked column values — to_jsonb(t), t::text, to_json(t.*) — are blocked as well.",
+   "about": "target",
+   "restates": 66
+  },
+  {
+   "id": 67,
+   "quote": "results are masked again on the way back",
+   "lines": [
+    110,
+    110
+   ],
+   "statement": "Query results are re-masked before being returned, as a second masking pass on the way out.",
+   "about": "target"
+  },
+  {
+   "id": 68,
+   "quote": "Nothing is written to your database, ever.",
+   "lines": [
+    111,
+    111
+   ],
+   "statement": "The system never writes anything to the customer's database.",
+   "about": "target"
+  },
+  {
+   "id": 69,
+   "quote": "Approving an AI proposal records the decision",
+   "lines": [
+    111,
+    112
+   ],
+   "statement": "Approving an AI-proposed resolution only records the approval decision; it does not itself apply any change.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "any change to your systems is made by your team",
+     "lines": [
+      112,
+      112
+     ]
+    }
+   ]
+  },
+  {
+   "id": 70,
+   "quote": "Row-level scoping keeps one customer's data out of another's ticket.",
+   "lines": [
+    113,
+    113
+   ],
+   "statement": "Row-level scoping prevents the agent investigating one ticket from reading another customer's rows.",
+   "about": "target"
+  },
+  {
+   "id": 71,
+   "quote": "Queries against it are rewritten to read only the ticket customer's own rows",
+   "lines": [
+    115,
+    116
+   ],
+   "statement": "Queries against a row-scoped table are rewritten so they return only the rows belonging to the ticket's customer.",
+   "about": "target",
+   "restates": 72
+  },
+  {
+   "id": 72,
+   "quote": "the AI cannot widen that, because the filter is\n  applied to the table it selects *from*, not to a condition it could write\n  around",
+   "lines": [
+    116,
+    118
+   ],
+   "statement": "The row-scope filter cannot be bypassed by the AI, because it is applied at the table being selected from rather than as a query condition the AI could write around.",
+   "about": "target"
+  },
+  {
+   "id": 73,
+   "quote": "A ticket with no known customer cannot query a scoped table at all,\n  rather than falling back to reading everything.",
+   "lines": [
+    118,
+    119
+   ],
+   "statement": "When a ticket has no identified customer, queries against scoped tables fail entirely rather than falling back to unrestricted access.",
+   "about": "target"
+  },
+  {
+   "id": 74,
+   "quote": "Tables you leave unscoped\n  (products, error codes) stay fully readable.",
+   "lines": [
+    119,
+    120
+   ],
+   "statement": "Tables the operator does not mark as scoped, such as products and error codes, remain fully readable by the agent.",
+   "about": "target"
+  },
+  {
+   "id": 75,
+   "quote": "Identifiers belonging to\n  anyone other than the recipient are stripped from every message sent to a\n  customer",
+   "lines": [
+    121,
+    123
+   ],
+   "statement": "Outbound messages to a customer have identifiers belonging to anyone other than that recipient stripped from them.",
+   "about": "target"
+  },
+  {
+   "id": 76,
+   "quote": "other customers' tickets are redacted before they reach the\n  model",
+   "lines": [
+    123,
+    124
+   ],
+   "statement": "Tickets belonging to other customers are redacted before their content is sent to the model.",
+   "about": "target"
+  },
+  {
+   "id": 77,
+   "quote": "Every query is audited. Each attempt is logged with the SQL and outcome",
+   "lines": [
+    125,
+    125
+   ],
+   "statement": "Every query attempt is logged, recording both the SQL and the outcome of the attempt.",
+   "about": "target"
+  },
+  {
+   "id": 78,
+   "quote": "returned rows are deliberately never stored",
+   "lines": [
+    126,
+    126
+   ],
+   "statement": "The rows returned by queries are never stored by the audit logging.",
+   "about": "target"
+  },
+  {
+   "id": 79,
+   "quote": "it's the control that stops the agent reading across\n  customers, and it's off until you set it",
+   "lines": [
+    129,
+    130
+   ],
+   "statement": "Row-level scoping is disabled by default and only takes effect once the operator sets a row-scope column for a table.",
+   "about": "target"
+  },
+  {
+   "id": 80,
+   "quote": "Context-aware AI",
+   "lines": [
+    138,
+    138
+   ],
+   "statement": "The AI-powered responses feature produces context-aware answers, using conversation context.",
+   "about": "target"
+  },
+  {
+   "id": 81,
+   "quote": "conversation memory across sessions",
+   "lines": [
+    138,
+    138
+   ],
+   "statement": "The AI retains conversation memory across sessions.",
+   "about": "target"
+  },
+  {
+   "id": 82,
+   "quote": "Real-time monitoring, conversation insights, and performance metrics",
+   "lines": [
+    139,
+    139
+   ],
+   "statement": "An analytics dashboard provides real-time monitoring, conversation insights, and performance metrics.",
+   "about": "target"
+  },
+  {
+   "id": 83,
+   "quote": "Train your AI with domain-specific knowledge and FAQs",
+   "lines": [
+    140,
+    140
+   ],
+   "statement": "The AI can be trained with domain-specific knowledge and FAQs provided by the user.",
+   "about": "target"
+  },
+  {
+   "id": 84,
+   "quote": "Granular permissions for team members",
+   "lines": [
+    142,
+    142
+   ],
+   "statement": "The platform provides role-based access control with granular permissions for team members.",
+   "about": "target"
+  },
+  {
+   "id": 85,
+   "quote": "Full control over your data with self-hosting option",
+   "lines": [
+    143,
+    143
+   ],
+   "statement": "Self-hosting gives the buyer full control over their data.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Self-hosting / data ownership",
+     "lines": [
+      207,
+      207
+     ]
+    },
+    {
+     "quote": "Self-hosting gives you complete data ownership.",
+     "lines": [
+      555,
+      555
+     ]
+    }
+   ]
+  },
+  {
+   "id": 86,
+   "quote": "**All of these are free and included**",
+   "lines": [
+    147,
+    147
+   ],
+   "statement": "All the integrations listed in this section are free and included.",
+   "about": "target"
+  },
+  {
+   "id": 87,
+   "quote": "every adapter ships in the\nopen-source codebase",
+   "lines": [
+    147,
+    148
+   ],
+   "statement": "Every integration adapter ships in the open-source codebase.",
+   "about": "target"
+  },
+  {
+   "id": 88,
+   "quote": "self-hosting unlocks the lot",
+   "lines": [
+    148,
+    148
+   ],
+   "statement": "Self-hosting provides all of the listed integrations.",
+   "about": "target"
+  },
+  {
+   "id": 89,
+   "quote": "What some of them need is **your own credentials**, because the integration\ntalks to your account on someone else's platform",
+   "lines": [
+    150,
+    151
+   ],
+   "statement": "Some integrations require the buyer's own credentials or app registration with the third-party provider, in one of two modes: creating a developer app whose keys go in the backend .env, or pasting a provider token in the ChatterMate UI.",
+   "about": "target"
+  },
+  {
+   "id": 90,
+   "quote": "one shared inbox for all of them",
+   "lines": [
+    160,
+    160
+   ],
+   "statement": "All messaging channels feed a single shared inbox.",
+   "about": "target"
+  },
+  {
+   "id": 91,
+   "quote": "with the same AI\nanswers, human handoff, and workflows as the web widget",
+   "lines": [
+    160,
+    161
+   ],
+   "statement": "The messaging channels have the same AI answers, human handoff, and workflows as the web widget.",
+   "about": "target"
+  },
+  {
+   "id": 92,
+   "quote": "💬 **WhatsApp** | Your Meta app | WhatsApp Business Cloud API — templates, media, and 24-hour session handling",
+   "lines": [
+    165,
+    165
+   ],
+   "statement": "A WhatsApp channel exists over the WhatsApp Business Cloud API, supporting templates, media, and 24-hour session handling.",
+   "about": "target"
+  },
+  {
+   "id": 93,
+   "quote": "💬 **Facebook Messenger** | Your Meta app | Meta Messenger Platform, connected per Page",
+   "lines": [
+    166,
+    166
+   ],
+   "statement": "A Facebook Messenger channel exists via the Meta Messenger Platform, connected per Page.",
+   "about": "target"
+  },
+  {
+   "id": 94,
+   "quote": "📷 **Instagram** | Your Meta app | Instagram Direct Messages via the Meta Graph API",
+   "lines": [
+    167,
+    167
+   ],
+   "statement": "An Instagram channel exists, handling Instagram Direct Messages via the Meta Graph API.",
+   "about": "target"
+  },
+  {
+   "id": 95,
+   "quote": "🔷 **Slack** | Your Slack app | Your Slack workspace as an internal support channel",
+   "lines": [
+    168,
+    168
+   ],
+   "statement": "A Slack channel exists, connecting the buyer's Slack workspace as an internal support channel.",
+   "about": "target"
+  },
+  {
+   "id": 96,
+   "quote": "✈️ **Telegram** | Paste a token | Bot token from BotFather — no app registration",
+   "lines": [
+    169,
+    169
+   ],
+   "statement": "A Telegram channel exists, set up by pasting a BotFather bot token with no app registration.",
+   "about": "target"
+  },
+  {
+   "id": 97,
+   "quote": "🟢 **LINE** | Paste a token | LINE Messaging API channel credentials",
+   "lines": [
+    170,
+    170
+   ],
+   "statement": "A LINE channel exists via LINE Messaging API channel credentials.",
+   "about": "target"
+  },
+  {
+   "id": 98,
+   "quote": "📱 **SMS** | Paste a token | Your **Twilio**, **Vonage**, **Plivo**, or **MessageBird** account keys",
+   "lines": [
+    171,
+    171
+   ],
+   "statement": "An SMS channel exists, working with a Twilio, Vonage, Plivo, or MessageBird account.",
+   "about": "target"
+  },
+  {
+   "id": 99,
+   "quote": "inbound email becomes a conversation",
+   "lines": [
+    172,
+    172
+   ],
+   "statement": "The email channel turns inbound email into a conversation.",
+   "about": "target"
+  },
+  {
+   "id": 100,
+   "quote": "replies go back over email",
+   "lines": [
+    172,
+    172
+   ],
+   "statement": "Replies to email-channel conversations are sent back over email.",
+   "about": "target"
+  },
+  {
+   "id": 101,
+   "quote": "🟠 **HubSpot** | Your HubSpot app | Contacts and leads pushed from chat, OAuth connected",
+   "lines": [
+    179,
+    179
+   ],
+   "statement": "A HubSpot integration exists, pushing contacts and leads captured from chat to HubSpot over OAuth.",
+   "about": "target"
+  },
+  {
+   "id": 102,
+   "quote": "🟩 **Pipedrive** | Your Pipedrive app | Persons and leads pushed from chat, OAuth connected",
+   "lines": [
+    180,
+    180
+   ],
+   "statement": "A Pipedrive integration exists, pushing persons and leads captured from chat to Pipedrive over OAuth.",
+   "about": "target"
+  },
+  {
+   "id": 103,
+   "quote": "Synced by the `crm_sync` worker",
+   "lines": [
+    182,
+    182
+   ],
+   "statement": "CRM data is synced by a background worker named crm_sync.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "| CRM sync | `python -m app.workers.crm_sync` | Lead push to HubSpot / Pipedrive |",
+     "lines": [
+      399,
+      399
+     ]
+    }
+   ]
+  },
+  {
+   "id": 104,
+   "quote": "🪝 **Webhooks** | Nothing | Outbound ticket webhooks to drive your own automations",
+   "lines": [
+    192,
+    192
+   ],
+   "statement": "The platform sends outbound ticket webhooks that the buyer can use to drive their own automations.",
+   "about": "target"
+  },
+  {
+   "id": 105,
+   "quote": "Adding a channel means implementing one adapter in `backend/app/channels/`\nagainst the shared `ChannelAdapter` base",
+   "lines": [
+    194,
+    195
+   ],
+   "statement": "Adding a new messaging channel requires implementing one adapter in backend/app/channels/ against a shared ChannelAdapter base class.",
+   "about": "target"
+  },
+  {
+   "id": 106,
+   "quote": "the inbox, AI, and handoff come for\nfree",
+   "lines": [
+    195,
+    196
+   ],
+   "statement": "The shared adapter base provides the inbox, AI, and human handoff to every channel without per-channel work.",
+   "about": "target"
+  },
+  {
+   "id": 107,
+   "quote": "CRM adapters follow the same shape in `backend/app/crm/`",
+   "lines": [
+    196,
+    196
+   ],
+   "statement": "CRM adapters are implemented in backend/app/crm/ following the same one-adapter pattern as channels.",
+   "about": "target"
+  },
+  {
+   "id": 108,
+   "quote": "with AI answers *and* human handoff in one inbox",
+   "lines": [
+    202,
+    202
+   ],
+   "statement": "ChatterMate provides AI answers and human handoff together in a single inbox.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "It combines an AI chatbot (trained on your knowledge base) with human agents in a shared inbox",
+     "lines": [
+      540,
+      540
+     ]
+    }
+   ]
+  },
+  {
+   "id": 109,
+   "quote": "Per-AI-resolution fees | ❌ none",
+   "lines": [
+    213,
+    213
+   ],
+   "statement": "ChatterMate charges no per-AI-resolution fees, as the comparison table's ChatterMate column asserts.",
+   "about": "target"
+  },
+  {
+   "id": 110,
+   "quote": "There are two ways to run ChatterMate.",
+   "lines": [
+    235,
+    235
+   ],
+   "statement": "ChatterMate can be run in exactly two ways: the hosted service and self-hosting.",
+   "about": "target"
+  },
+  {
+   "id": 111,
+   "quote": "manage everything from the dashboard, the CLI, or an AI agent",
+   "lines": [
+    235,
+    236
+   ],
+   "statement": "The hosted service can be managed entirely from the dashboard, the CLI, or an AI agent.",
+   "about": "target"
+  },
+  {
+   "id": 112,
+   "quote": "**Self-host with Docker**",
+   "lines": [
+    236,
+    236
+   ],
+   "statement": "Self-hosting ChatterMate is done with Docker.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Run the full ChatterMate stack on your own infrastructure with the **self-host CLI** (Docker-based):",
+     "lines": [
+      262,
+      262
+     ]
+    },
+    {
+     "quote": "The **self-host CLI** (`npm install -g chattermate-deploy`) scaffolds and runs\nthe Docker stack.",
+     "lines": [
+      289,
+      290
+     ]
+    },
+    {
+     "quote": "# Build and start all services\ndocker compose up --build",
+     "lines": [
+      329,
+      330
+     ]
+    }
+   ]
+  },
+  {
+   "id": 113,
+   "quote": "no card required",
+   "lines": [
+    241,
+    241
+   ],
+   "statement": "Signing up for the hosted service requires no payment card.",
+   "about": "seller"
+  },
+  {
+   "id": 114,
+   "quote": "The ChatterMate CLI — sign up, mint tokens, and manage agents, workflows & knowledge",
+   "lines": [
+    245,
+    245
+   ],
+   "statement": "The ChatterMate CLI supports signing up, minting tokens, and managing agents, workflows, and knowledge.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "The **hosted CLI**\n(`pip install chattermate-cli`) signs you up and manages agents/knowledge against the\nChatterMate API.",
+     "lines": [
+      287,
+      289
+     ]
+    }
+   ]
+  },
+  {
+   "id": 115,
+   "quote": "pip install chattermate-cli          # installs the `chattermate` command",
+   "lines": [
+    246,
+    246
+   ],
+   "statement": "The CLI is installable from pip as the `chattermate-cli` package, and installing it provides a `chattermate` command.",
+   "about": "target"
+  },
+  {
+   "id": 116,
+   "quote": "chattermate signup --name \"Acme Inc\" --domain acme.com --admin-email you@acme.com\nchattermate agent create --name \"Support\" --type customer_support -i \"Be concise and friendly\"\nchattermate knowledge add-url --website https://docs.acme.com --agent-id <agent-id>",
+   "lines": [
+    248,
+    250
+   ],
+   "statement": "The `chattermate` command provides the `signup`, `agent create`, and `knowledge add-url` subcommands with the options shown.",
+   "about": "target"
+  },
+  {
+   "id": 117,
+   "quote": "connect the\n[MCP server](https://docs.chattermate.chat/features/mcp-server) to configure ChatterMate over MCP",
+   "lines": [
+    257,
+    258
+   ],
+   "statement": "ChatterMate provides an MCP server through which ChatterMate can be configured over MCP.",
+   "about": "target"
+  },
+  {
+   "id": 118,
+   "quote": "npm install -g chattermate-deploy",
+   "lines": [
+    266,
+    266
+   ],
+   "statement": "The self-host CLI is distributed as the npm package `chattermate-deploy` and installs a global `chattermate-deploy` command.",
+   "about": "seller",
+   "locations": [
+    {
+     "quote": "npm install -g chattermate-deploy",
+     "lines": [
+      320,
+      320
+     ]
+    }
+   ]
+  },
+  {
+   "id": 119,
+   "quote": "# Scaffold a project, then start the full stack (Postgres, Redis, backend, frontend, worker)",
+   "lines": [
+    268,
+    268
+   ],
+   "statement": "`chattermate-deploy init` scaffolds a project and `chattermate-deploy start` starts a full stack comprising Postgres, Redis, a backend, a frontend and a worker.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "The self-host CLI (`chattermate-deploy`, installed via npm) scaffolds and runs the Docker stack.",
+     "lines": [
+      315,
+      315
+     ]
+    }
+   ]
+  },
+  {
+   "id": 120,
+   "quote": "chattermate-deploy start                  # then open http://localhost/",
+   "lines": [
+    271,
+    271
+   ],
+   "statement": "After `chattermate-deploy start`, the application is served at http://localhost/.",
+   "about": "target"
+  },
+  {
+   "id": 121,
+   "quote": "chattermate-deploy init <project-name>    # Scaffold a new self-hosted project\nchattermate-deploy start                  # Start all services (Docker)\nchattermate-deploy stop                   # Stop all services\nchattermate-deploy status                 # Check service status\nchattermate-deploy logs                   # View service logs\nchattermate-deploy reset                  # Reset and remove all data",
+   "lines": [
+    278,
+    283
+   ],
+   "statement": "The `chattermate-deploy` CLI provides the subcommands init, start, stop, status, logs and reset, with the effects described alongside each.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "chattermate-deploy init my-project\ncd my-project\nchattermate-deploy start",
+     "lines": [
+      321,
+      323
+     ]
+    }
+   ]
+  },
+  {
+   "id": 122,
+   "quote": "They are separate tools that happen to share the `chattermate` name.",
+   "lines": [
+    290,
+    290
+   ],
+   "statement": "The hosted CLI and the self-host CLI are two distinct tools, not one command.",
+   "about": "seller",
+   "locations": [
+    {
+     "quote": "This is **not** the account CLI",
+     "lines": [
+      316,
+      316
+     ]
+    }
+   ]
+  },
+  {
+   "id": 123,
+   "quote": "**For Self-Host CLI (Recommended)**\n- Node.js 16+\n- Docker & Docker Compose\n- npm or yarn",
+   "lines": [
+    302,
+    305
+   ],
+   "statement": "Running the self-host CLI requires Node.js 16+, Docker and Docker Compose, and npm or yarn.",
+   "about": "target"
+  },
+  {
+   "id": 124,
+   "quote": "**For Manual Installation**\n- Python 3.12+\n- PostgreSQL 14+ (with Vector extension)",
+   "lines": [
+    307,
+    309
+   ],
+   "statement": "Manual installation requires Python 3.12+ and PostgreSQL 14+ with the Vector extension.",
+   "about": "target"
+  },
+  {
+   "id": 125,
+   "quote": "Firebase Project (for push notifications)",
+   "lines": [
+    310,
+    310
+   ],
+   "statement": "A Firebase project is required for push notifications.",
+   "about": "target"
+  },
+  {
+   "id": 126,
+   "quote": "Redis (optional, for rate limiting and multi-server socket deployment)",
+   "lines": [
+    311,
+    311
+   ],
+   "statement": "Redis is an optional dependency, used for rate limiting and for multi-server socket deployment.",
+   "about": "target"
+  },
+  {
+   "id": 127,
+   "quote": "cd backend\npython -m venv venv\nsource venv/bin/activate  # Windows: venv\\Scripts\\activate\npip install -r requirements.txt\n\n# Set up environment variables\ncp .env.example .env\n# Configure .env with your credentials",
+   "lines": [
+    349,
+    356
+   ],
+   "statement": "The backend is a Python application installed with pip from a requirements.txt, and configured by copying a provided `.env.example` file.",
+   "about": "target"
+  },
+  {
+   "id": 128,
+   "quote": "# Database setup\nalembic upgrade head\n\n# To generate revisions if any model changes\nalembic revision --autogenerate -m \"Changes description\"",
+   "lines": [
+    358,
+    362
+   ],
+   "statement": "The database schema is managed with Alembic migrations: `alembic upgrade head` applies them and `alembic revision --autogenerate` generates revisions from model changes.",
+   "about": "target"
+  },
+  {
+   "id": 129,
+   "quote": "cd frontend\nnpm install\ncp .env.example .env",
+   "lines": [
+    367,
+    369
+   ],
+   "statement": "The frontend is a Node application installed with npm and configured by copying a provided `.env.example` file.",
+   "about": "target"
+  },
+  {
+   "id": 130,
+   "quote": "For Web Push notification, generate a firebase config and place it in `backend/app/config/firebase-config.json`",
+   "lines": [
+    372,
+    372
+   ],
+   "statement": "Web Push notifications are configured via a Firebase config file placed at `backend/app/config/firebase-config.json` in the backend.",
+   "about": "target"
+  },
+  {
+   "id": 131,
+   "quote": "uvicorn app.main:app --reload --port 8000",
+   "lines": [
+    383,
+    383
+   ],
+   "statement": "The backend runs as a uvicorn-served ASGI application at the entrypoint `app.main:app`, with a development mode on port 8000.",
+   "about": "target"
+  },
+  {
+   "id": 132,
+   "quote": "python -m app.workers.run_knowledge_processor",
+   "lines": [
+    386,
+    386
+   ],
+   "statement": "A knowledge processor worker exists and is run with `python -m app.workers.run_knowledge_processor`.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "ExecStart=/path/to/chattermate/backend/venv/bin/python -m app.workers.run_knowledge_processor",
+     "lines": [
+      515,
+      515
+     ]
+    }
+   ]
+  },
+  {
+   "id": 133,
+   "quote": "The API server only enqueues long-running jobs",
+   "lines": [
+    391,
+    391
+   ],
+   "statement": "Boundary claim: the API server's role in long-running jobs is limited to enqueuing them; it does not execute them.",
+   "about": "target"
+  },
+  {
+   "id": 134,
+   "quote": "a separate worker process\nexecutes them",
+   "lines": [
+    391,
+    392
+   ],
+   "statement": "A separate worker process exists that executes the long-running jobs the API server enqueues.",
+   "about": "target"
+  },
+  {
+   "id": 135,
+   "quote": "jobs sit at `pending` forever",
+   "lines": [
+    392,
+    392
+   ],
+   "statement": "If no worker process is running, enqueued jobs remain in `pending` status indefinitely.",
+   "about": "target"
+  },
+  {
+   "id": 136,
+   "quote": "the\nUI shows a progress bar that never advances",
+   "lines": [
+    392,
+    393
+   ],
+   "statement": "Without a running worker, the UI displays a progress bar that never advances.",
+   "about": "target"
+  },
+  {
+   "id": 137,
+   "quote": "| Knowledge + FAQ | `python -m app.workers.run_knowledge_processor` | Knowledge ingestion (crawl, PDF, sitemap) **and** FAQ jobs |",
+   "lines": [
+    397,
+    397
+   ],
+   "statement": "A Knowledge + FAQ worker exists, is run by `python -m app.workers.run_knowledge_processor`, and handles both knowledge ingestion (crawl, PDF, sitemap) and FAQ jobs.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "# Recommended for local dev — knowledge and FAQ in one loop\npython -m app.workers.run_knowledge_processor",
+     "lines": [
+      409,
+      410
+     ]
+    }
+   ]
+  },
+  {
+   "id": 138,
+   "quote": "| Ticket investigator | `python -m app.workers.ticket_investigator` | AI ticket investigation + ticket lifecycle |",
+   "lines": [
+    398,
+    398
+   ],
+   "statement": "A ticket investigator worker exists, is run by `python -m app.workers.ticket_investigator`, and handles AI ticket investigation and ticket lifecycle.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "python -m app.workers.ticket_investigator",
+     "lines": [
+      427,
+      427
+     ]
+    }
+   ]
+  },
+  {
+   "id": 139,
+   "quote": "FAQ generation and import jobs (Generate FAQs,\n\"Migrate an existing help center\", PDF import) are drained by the *knowledge\nworker*",
+   "lines": [
+    403,
+    405
+   ],
+   "statement": "FAQ generation and import jobs — Generate FAQs, migrating an existing help center, and PDF import — are drained by the knowledge worker.",
+   "about": "target"
+  },
+  {
+   "id": 140,
+   "quote": "there is no separate FAQ container",
+   "lines": [
+    405,
+    405
+   ],
+   "statement": "Claim of absence: no separate FAQ container exists in the deployment.",
+   "about": "target"
+  },
+  {
+   "id": 141,
+   "quote": "Both knowledge entrypoints pick\nup the FAQ queue, so either one is enough",
+   "lines": [
+    405,
+    406
+   ],
+   "statement": "Both knowledge worker entrypoints pick up the FAQ queue, so running either one alone is sufficient.",
+   "about": "target"
+  },
+  {
+   "id": 142,
+   "quote": "# What Docker runs: knowledge and FAQ as independent asyncio tasks, so a long\n# FAQ generation never blocks knowledge ingestion\npython -m app.workers.knowledge_processor",
+   "lines": [
+    412,
+    414
+   ],
+   "statement": "A `knowledge_processor` module exists, and the Docker deployment runs it with knowledge and FAQ as independent asyncio tasks.",
+   "about": "target"
+  },
+  {
+   "id": 143,
+   "quote": "so a long\n# FAQ generation never blocks knowledge ingestion",
+   "lines": [
+    412,
+    413
+   ],
+   "statement": "Boundary claim: in the Docker deployment, a long-running FAQ generation never blocks knowledge ingestion.",
+   "about": "target"
+  },
+  {
+   "id": 144,
+   "quote": "# FAQ queue only — useful when debugging generation/import in isolation\npython -m app.workers.faq_processor",
+   "lines": [
+    416,
+    417
+   ],
+   "statement": "A `faq_processor` module exists that drains only the FAQ queue, for running FAQ generation/import in isolation.",
+   "about": "target"
+  },
+  {
+   "id": 145,
+   "quote": "Polls every 60s.",
+   "lines": [
+    420,
+    420
+   ],
+   "statement": "The knowledge/FAQ worker polls its queue every 60 seconds.",
+   "about": "target"
+  },
+  {
+   "id": 146,
+   "quote": "On startup it fails any job left stuck in `processing` by a\nprevious crash, so a killed worker doesn't strand a job forever.",
+   "lines": [
+    420,
+    421
+   ],
+   "statement": "On startup, the worker fails any job left in `processing` by a previous crash, so a killed worker cannot strand a job indefinitely.",
+   "about": "target"
+  },
+  {
+   "id": 147,
+   "quote": "Runs two loops in one process — investigation runs\n(polled every 15s) and ticket lifecycle/SLA sweeps (every 5 min)",
+   "lines": [
+    423,
+    424
+   ],
+   "statement": "The ticket investigator runs two loops in a single process: an investigation loop and a ticket lifecycle/SLA sweep loop.",
+   "about": "target"
+  },
+  {
+   "id": 148,
+   "quote": "(polled every 15s)",
+   "lines": [
+    424,
+    424
+   ],
+   "statement": "The investigation loop polls every 15 seconds.",
+   "about": "target"
+  },
+  {
+   "id": 149,
+   "quote": "ticket lifecycle/SLA sweeps (every 5 min)",
+   "lines": [
+    424,
+    424
+   ],
+   "statement": "The ticket lifecycle/SLA sweep loop runs every 5 minutes.",
+   "about": "target"
+  },
+  {
+   "id": 150,
+   "quote": "Needs Redis (`REDIS_URL`) to push live `ticket_update` frames to dashboard\nclients",
+   "lines": [
+    430,
+    431
+   ],
+   "statement": "The ticket investigator requires Redis (configured via `REDIS_URL`) in order to push live `ticket_update` frames to dashboard clients.",
+   "about": "target"
+  },
+  {
+   "id": 151,
+   "quote": "without it the frontend falls back to polling",
+   "lines": [
+    431,
+    431
+   ],
+   "statement": "Without Redis, the frontend falls back to polling instead of receiving live `ticket_update` frames.",
+   "about": "target"
+  },
+  {
+   "id": 152,
+   "quote": "Orphaned runs are\nreaped on startup",
+   "lines": [
+    431,
+    432
+   ],
+   "statement": "Orphaned investigation runs are reaped when the ticket investigator starts up.",
+   "about": "target"
+  },
+  {
+   "id": 153,
+   "quote": "**Under Docker**, these already run as services — `docker compose up` starts\nthem alongside the API",
+   "lines": [
+    434,
+    435
+   ],
+   "statement": "Under Docker, the workers already run as services: `docker compose up` starts them alongside the API (as the `knowledge_processor` and `ticket_investigator` services named in the log commands).",
+   "about": "target"
+  },
+  {
+   "id": 154,
+   "quote": "# Development\nnpm run dev\n\n# Build Widget for chat integration\nnpm run build:widget\n\n# Build Web Client\nnpm run build:webclient",
+   "lines": [
+    444,
+    451
+   ],
+   "statement": "The frontend defines npm scripts `dev`, `build:widget` (building a chat-integration widget), and `build:webclient` (building a web client).",
+   "about": "target"
+  },
+  {
+   "id": 155,
+   "quote": "pytest tests/",
+   "lines": [
+    460,
+    460
+   ],
+   "statement": "The backend has a test suite located at tests/ that runs with pytest.",
+   "about": "target"
+  },
+  {
+   "id": 156,
+   "quote": "npm run test:unit    # Unit tests\nnpm run test:e2e     # E2E tests",
+   "lines": [
+    465,
+    466
+   ],
+   "statement": "The frontend defines an npm script `test:unit` for unit tests and an npm script `test:e2e` for end-to-end tests.",
+   "about": "target"
+  },
+  {
+   "id": 157,
+   "quote": "docker pull chattermate/frontend:latest\ndocker pull chattermate/backend:latest",
+   "lines": [
+    479,
+    480
+   ],
+   "statement": "Pre-built Docker images for the frontend and backend are available for pull under the names chattermate/frontend and chattermate/backend.",
+   "about": "target"
+  },
+  {
+   "id": 158,
+   "quote": "docker compose -f docker-compose.prod.yml up -d",
+   "lines": [
+    483,
+    483
+   ],
+   "statement": "The repository provides a docker-compose.prod.yml file for running the stack in production with docker compose.",
+   "about": "target"
+  },
+  {
+   "id": 159,
+   "quote": "gunicorn app.main:app \\\n    --workers 4 \\\n    --worker-class uvicorn.workers.UvicornWorker \\\n    --bind 0.0.0.0:8000",
+   "lines": [
+    493,
+    496
+   ],
+   "statement": "The backend ASGI application is at app.main:app and can be served in production by gunicorn using the uvicorn.workers.UvicornWorker worker class.",
+   "about": "target"
+  },
+  {
+   "id": 160,
+   "quote": "npm run build",
+   "lines": [
+    529,
+    529
+   ],
+   "statement": "The frontend has a production build runnable with npm run build, producing an artifact servable by a web server such as nginx.",
+   "about": "target"
+  },
+  {
+   "id": 161,
+   "quote": "ChatterMate detects frustration or explicit requests for a human and transfers the conversation with full context, respecting business hours and agent availability.",
+   "lines": [
+    546,
+    546
+   ],
+   "statement": "The AI detects visitor frustration or explicit requests for a human and transfers the conversation with full context, respecting business hours and agent availability.",
+   "about": "target"
+  },
+  {
+   "id": 162,
+   "quote": "Install it from the [Shopify App Store](https://apps.shopify.com/chattermate-chat)",
+   "lines": [
+    549,
+    549
+   ],
+   "statement": "ChatterMate is installable from the Shopify App Store.",
+   "about": "seller"
+  },
+  {
+   "id": 163,
+   "quote": "A WordPress.org directory listing is in progress.",
+   "lines": [
+    552,
+    552
+   ],
+   "statement": "A listing in the WordPress.org plugin directory is in progress (not yet available).",
+   "about": "seller"
+  },
+  {
+   "id": 164,
+   "quote": "**Auto Follow-up System** - Automated follow-ups for idle customers",
+   "lines": [
+    566,
+    566
+   ],
+   "statement": "Intent: an automated follow-up system for idle customers is coming (roadmap item, not a present feature).",
+   "about": "seller"
+  },
+  {
+   "id": 165,
+   "quote": "**Customer Contact Management** - CRM-like contact organization",
+   "lines": [
+    567,
+    567
+   ],
+   "statement": "Intent: CRM-like customer contact management is coming (roadmap item, not a present feature).",
+   "about": "seller"
+  },
+  {
+   "id": 166,
+   "quote": "**Human Agent AI Suggestions** - AI-powered response suggestions for agents",
+   "lines": [
+    568,
+    568
+   ],
+   "statement": "Intent: AI-powered response suggestions for human agents are coming (roadmap item, not a present feature).",
+   "about": "seller"
+  },
+  {
+   "id": 167,
+   "quote": "**AI Voice Chat** - Voice-enabled AI conversations",
+   "lines": [
+    569,
+    569
+   ],
+   "statement": "Intent: voice-enabled AI conversations are coming (roadmap item, not a present feature).",
+   "about": "seller"
+  },
+  {
+   "id": 168,
+   "quote": "**More Integrations** - Zendesk, Intercom, and more",
+   "lines": [
+    570,
+    570
+   ],
+   "statement": "Intent: additional integrations, naming Zendesk and Intercom, are coming (roadmap item, not a present feature).",
+   "about": "seller"
+  },
+  {
+   "id": 169,
+   "quote": "ChatterMate follows an **open-core** model:",
+   "lines": [
+    602,
+    602
+   ],
+   "statement": "The target is distributed under an open-core model: an open-source core plus separately provided enterprise features.",
+   "about": "target"
+  },
+  {
+   "id": 170,
+   "quote": "Free for personal and commercial use — including proprietary and SaaS deployments",
+   "lines": [
+    605,
+    605
+   ],
+   "statement": "The Apache-2.0 licence permits free personal and commercial use, including proprietary and SaaS deployments.",
+   "about": "document"
+  },
+  {
+   "id": 171,
+   "quote": "No source-disclosure or copyleft obligations",
+   "lines": [
+    606,
+    606
+   ],
+   "statement": "The licence imposes no source-disclosure or copyleft obligations.",
+   "about": "document"
+  },
+  {
+   "id": 172,
+   "quote": "Includes an explicit patent grant",
+   "lines": [
+    607,
+    607
+   ],
+   "statement": "The licence contains an explicit patent grant.",
+   "about": "document"
+  },
+  {
+   "id": 173,
+   "quote": "Advanced/enterprise capabilities are provided separately under a commercial arrangement",
+   "lines": [
+    610,
+    611
+   ],
+   "statement": "Enterprise capabilities are sold separately under a commercial arrangement by the seller.",
+   "about": "seller"
+  },
+  {
+   "id": 174,
+   "quote": "Priority support, warranties, and indemnification available",
+   "lines": [
+    612,
+    612
+   ],
+   "statement": "The seller offers priority support, warranties and indemnification (under the commercial arrangement).",
+   "about": "seller"
+  },
+  {
+   "id": 175,
+   "quote": "Contributions are accepted under Apache-2.0 with a [Developer Certificate of Origin](DCO) sign-off — see [CONTRIBUTING.md](CONTRIBUTING.md).",
+   "lines": [
+    615,
+    615
+   ],
+   "statement": "The seller accepts contributions under Apache-2.0 with a DCO sign-off.",
+   "about": "seller"
+  }
+ ]
+}

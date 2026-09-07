@@ -1,0 +1,507 @@
+{
+ "claim_source": "README.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "SPDX-License-Identifier: MIT",
+   "lines": [
+    2,
+    2
+   ],
+   "statement": "The source code is licensed under the MIT license.",
+   "about": "document",
+   "locations": [
+    {
+     "quote": "[![license-badge](https://img.shields.io/badge/License-MIT-green?logo=googledocs&label=license)](https://spdx.org/licenses/MIT.html)",
+     "lines": [
+      12,
+      12
+     ]
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "quote": "[![github-tests-badge](https://img.shields.io/github/actions/workflow/status/SinTan1729/chhoto-url/.github%2Fworkflows%2Frust-tests.yml?logo=github&label=tests)](https://github.com/SinTan1729/chhoto-url/actions/workflows/rust-tests.yml)",
+   "lines": [
+    4,
+    4
+   ],
+   "statement": "The project has an automated test workflow (rust-tests.yml) that runs on GitHub Actions.",
+   "about": "target"
+  },
+  {
+   "id": 3,
+   "quote": "[![latest-release-badge](https://img.shields.io/github/v/release/SinTan1729/chhoto-url?logo=github)](https://github.com/SinTan1729/chhoto-url/releases/latest)",
+   "lines": [
+    10,
+    10
+   ],
+   "statement": "A latest release version of chhoto-url is published on GitHub.",
+   "about": "target"
+  },
+  {
+   "id": 4,
+   "quote": "A simple selfhosted URL shortener with no unnecessary features",
+   "lines": [
+    20,
+    20
+   ],
+   "statement": "The target is a self-hosted URL shortener whose core function works, with a deliberately minimal feature set.",
+   "about": "target"
+  },
+  {
+   "id": 5,
+   "quote": "Simplicity and speed are the main foci of this project.",
+   "lines": [
+    20,
+    21
+   ],
+   "statement": "The project's stated design priorities are simplicity and speed — a statement of focus rather than a testable performance figure on its own.",
+   "about": "seller"
+  },
+  {
+   "id": 6,
+   "quote": "The scratch docker image is <4.5 MB (compressed)",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "The scratch-variant Docker image, compressed, is smaller than 4.5 MB.",
+   "about": "target"
+  },
+  {
+   "id": 7,
+   "quote": "the alpine one is <8.5 MB (compressed)",
+   "lines": [
+    21,
+    22
+   ],
+   "statement": "The alpine-variant Docker image, compressed, is smaller than 8.5 MB.",
+   "about": "target"
+  },
+  {
+   "id": 8,
+   "quote": "it uses <10 MB of RAM under regular use",
+   "lines": [
+    22,
+    22
+   ],
+   "statement": "The application consumes less than 10 MB of RAM under normal operation.",
+   "about": "target"
+  },
+  {
+   "id": 9,
+   "quote": "I consider this project\nto be complete, not dead. I'm unlikely to add any new features, but I will try\nand fix every bug you report. I will also try to keep it updated in terms of\nsecurity vulnerabilities.",
+   "lines": [
+    24,
+    27
+   ],
+   "statement": "The seller states the project is in maintenance mode: no new features planned, with reported bugs fixed and security updates applied — a statement about the seller's ongoing activity and intent, which the supplied materials are not expected to reach.",
+   "about": "seller"
+  },
+  {
+   "id": 10,
+   "quote": "So, I decided\nto rewrite it in Rust and add some features to it that I thought were essential (e.g. hit counting).",
+   "lines": [
+    38,
+    39
+   ],
+   "statement": "The target is implemented in Rust (a rewrite of simply-shorten) and includes features such as hit counting.",
+   "about": "target"
+  },
+  {
+   "id": 11,
+   "quote": "The database is cleared every 15 minutes, so don't use it for anything other than testing.",
+   "lines": [
+    53,
+    53
+   ],
+   "statement": "The seller's hosted demo instance wipes its database every 15 minutes.",
+   "about": "seller"
+  },
+  {
+   "id": 12,
+   "quote": "Shortens URLs of any length to a randomly generated link.",
+   "lines": [
+    58,
+    58
+   ],
+   "statement": "The tool shortens URLs of any length, generating a random short link.",
+   "about": "target"
+  },
+  {
+   "id": 13,
+   "quote": "Automatic expiry of links after a chosen time.",
+   "lines": [
+    59,
+    59
+   ],
+   "statement": "Links can be given a chosen expiry time after which they expire automatically.",
+   "about": "target"
+  },
+  {
+   "id": 14,
+   "quote": "(Optional) Allows you to specify the shortened URL instead of the generated\n  one.",
+   "lines": [
+    60,
+    61
+   ],
+   "statement": "Optionally, the user can choose a custom short URL instead of the randomly generated one.",
+   "about": "target"
+  },
+  {
+   "id": 15,
+   "quote": "Opening the shortened URL in your browser will instantly redirect you\n  to the correct long URL.",
+   "lines": [
+    62,
+    63
+   ],
+   "statement": "Visiting a short URL redirects immediately to the original long URL, with no intermediate redirection page.",
+   "about": "target"
+  },
+  {
+   "id": 16,
+   "quote": "The docker image is only ~6MB",
+   "lines": [
+    64,
+    64
+   ],
+   "statement": "The Docker image is approximately 6MB in size.",
+   "about": "target"
+  },
+  {
+   "id": 17,
+   "quote": "RAM uasge\n  stays under 5MB under normal use.",
+   "lines": [
+    64,
+    65
+   ],
+   "statement": "RAM usage stays under 5MB under normal use.",
+   "about": "target"
+  },
+  {
+   "id": 18,
+   "quote": "Counts number of hits for each short link",
+   "lines": [
+    66,
+    66
+   ],
+   "statement": "The tool counts the number of hits for each short link.",
+   "about": "target"
+  },
+  {
+   "id": 19,
+   "quote": "in a privacy respecting way\n  i.e. only the hit is recorded, and nothing else.",
+   "lines": [
+    66,
+    67
+   ],
+   "statement": "Hit counting is privacy respecting: only the fact of the hit is recorded, and no other data (e.g. IPs, user agents) is stored.",
+   "about": "target"
+  },
+  {
+   "id": 20,
+   "quote": "Short links can be edited after creation.",
+   "lines": [
+    68,
+    68
+   ],
+   "statement": "Existing short links can be edited after they are created.",
+   "about": "target"
+  },
+  {
+   "id": 21,
+   "quote": "Each short link may have custom notes attached to it.",
+   "lines": [
+    69,
+    69
+   ],
+   "statement": "Custom notes can be attached to each short link.",
+   "about": "target"
+  },
+  {
+   "id": 22,
+   "quote": "The UI features filtering for links,\n  based on short link, long link, and notes.",
+   "lines": [
+    69,
+    70
+   ],
+   "statement": "The user interface supports filtering links by short link, long link, and notes.",
+   "about": "target"
+  },
+  {
+   "id": 23,
+   "quote": "QR codes can be generated for easy sharing.",
+   "lines": [
+    71,
+    71
+   ],
+   "statement": "The tool can generate QR codes for short links.",
+   "about": "target"
+  },
+  {
+   "id": 24,
+   "quote": "Supports operation using API key, and lets the user provide hashed password and API key.",
+   "lines": [
+    72,
+    72
+   ],
+   "statement": "The tool supports operation via an API key, and the user can supply the password and API key in hashed form.",
+   "about": "target"
+  },
+  {
+   "id": 25,
+   "quote": "Has a robust JSON-RPC adjacent API.",
+   "lines": [
+    73,
+    73
+   ],
+   "statement": "The tool exposes a programmatic API described as JSON-RPC adjacent.",
+   "about": "target"
+  },
+  {
+   "id": 26,
+   "quote": "Has a mobile friendly UI",
+   "lines": [
+    74,
+    74
+   ],
+   "statement": "The user interface is mobile friendly.",
+   "about": "target"
+  },
+  {
+   "id": 27,
+   "quote": "automatic dark mode",
+   "lines": [
+    74,
+    74
+   ],
+   "statement": "The UI switches to dark mode automatically.",
+   "about": "target"
+  },
+  {
+   "id": 28,
+   "quote": "Can serve a custom landing page, if needed.",
+   "lines": [
+    75,
+    75
+   ],
+   "statement": "The tool can serve a custom landing page when configured to do so.",
+   "about": "target"
+  },
+  {
+   "id": 29,
+   "quote": "Has a public mode, where anyone can add links without authentication. Deleting\n  or listing available links will need admin access using the password.",
+   "lines": [
+    76,
+    77
+   ],
+   "statement": "A public mode exists in which anyone can add links without authenticating, while deleting or listing links requires admin access with the password.",
+   "about": "target"
+  },
+  {
+   "id": 30,
+   "quote": "It's also possible to completely disable the frontend.",
+   "lines": [
+    78,
+    78
+   ],
+   "statement": "The frontend can be completely disabled by configuration.",
+   "about": "target"
+  },
+  {
+   "id": 31,
+   "quote": "It's also possible to force an expiry\n  time for public instances, which might be useful.",
+   "lines": [
+    78,
+    79
+   ],
+   "statement": "An expiry time can be forced for links added on public instances.",
+   "about": "target"
+  },
+  {
+   "id": 32,
+   "quote": "Allows setting the URL of your website, in case you want to conveniently\n  generate short links locally.",
+   "lines": [
+    80,
+    81
+   ],
+   "statement": "The site URL is configurable, so short links can be generated against the user's own domain.",
+   "about": "target"
+  },
+  {
+   "id": 33,
+   "quote": "Links are stored in an SQLite database, which is configured to be ACID by default.",
+   "lines": [
+    82,
+    82
+   ],
+   "statement": "Links are persisted in an SQLite database, and that database is configured for ACID behaviour by default.",
+   "about": "target"
+  },
+  {
+   "id": 34,
+   "quote": "Options are available for tuning the database to the user's liking.",
+   "lines": [
+    83,
+    83
+   ],
+   "statement": "Configuration options exist for tuning the database.",
+   "about": "target"
+  },
+  {
+   "id": 35,
+   "quote": "Available as a Docker container with a provided compose file.",
+   "lines": [
+    84,
+    84
+   ],
+   "statement": "The tool is distributed as a Docker container, and a compose file is provided in the materials.",
+   "about": "target"
+  },
+  {
+   "id": 36,
+   "quote": "Backend written in Rust using [Actix Web](https://actix.rs/), and frontend\n  written in plain HTML and vanilla JS, using [Pure CSS](https://purecss.io/)\n  for styling.",
+   "lines": [
+    85,
+    87
+   ],
+   "statement": "The backend is written in Rust using Actix Web, and the frontend is plain HTML and vanilla JavaScript styled with Pure CSS.",
+   "about": "target"
+  },
+  {
+   "id": 37,
+   "quote": "Uses very basic authentication using a provided password. It's not encrypted in transport.",
+   "lines": [
+    88,
+    88
+   ],
+   "statement": "Authentication uses a provided password in a very basic form, and that authentication is not encrypted in transport.",
+   "about": "target"
+  },
+  {
+   "id": 38,
+   "quote": "**Tracking or spying of any kind.**",
+   "lines": [
+    94,
+    94
+   ],
+   "statement": "The seller states that tracking or spying functionality will not be implemented in the project.",
+   "about": "seller"
+  },
+  {
+   "id": 39,
+   "quote": "The only logs that still exist are\n  some very simple ones, mostly meant for debugging.",
+   "lines": [
+    94,
+    95
+   ],
+   "statement": "The only logging the software performs is a small set of simple logs intended mostly for debugging.",
+   "about": "target"
+  },
+  {
+   "id": 40,
+   "quote": "**User management.**",
+   "lines": [
+    96,
+    96
+   ],
+   "statement": "The seller states that user management will not be implemented, and that organizations needing one should run separate containers or use other software.",
+   "about": "seller"
+  },
+  {
+   "id": 41,
+   "quote": "**Cookies, newsletters**, \"we value your privacy\" popups or any of the multiple\n  other ways modern web shows how anti-user it is.",
+   "lines": [
+    98,
+    100
+   ],
+   "statement": "The seller states that cookies, newsletters and consent popups will not be implemented in the project.",
+   "about": "seller"
+  },
+  {
+   "id": 42,
+   "quote": "**Paywalls** or messages begging for donations.",
+   "lines": [
+    101,
+    101
+   ],
+   "statement": "The seller states that paywalls or donation-request messages will not be implemented in the project.",
+   "about": "seller"
+  },
+  {
+   "id": 43,
+   "quote": "The list of adjectives and names used for random short url generation is a modified\n  version of [this list used by docker](https://github.com/moby/moby/blob/master/internal/namesgenerator/names-generator.go).",
+   "lines": [
+    124,
+    125
+   ],
+   "statement": "The word list used for random short URL generation is a modified version of the Docker/moby names-generator list.",
+   "about": "target"
+  },
+  {
+   "id": 44,
+   "quote": "It is highly recommended that you [enable WAL mode](./docs/INSTALLATION.md#chhoto_sqlite_use_wal_mode).",
+   "lines": [
+    126,
+    126
+   ],
+   "statement": "The software supports enabling SQLite WAL mode through a documented configuration option.",
+   "about": "target"
+  },
+  {
+   "id": 45,
+   "quote": "Although it's unlikely, it's possible that your database is mangled after some update.",
+   "lines": [
+    127,
+    127
+   ],
+   "statement": "The seller discloses that applying some update may, in rare cases, corrupt or mangle the database.",
+   "about": "target"
+  },
+  {
+   "id": 46,
+   "quote": "If you intend to have more than a few thousand short links, it's strongly recommended that you use the UID\n  [`CHHOTO_SLUG_STYLE`](./docs/INSTALLATION.md#chhoto_slug_style) with a [`CHHOTO_SLUG_LENGTH`](./docs/INSTALLATION.md#chhoto_slug_length)\n  of 16 or more.",
+   "lines": [
+    129,
+    131
+   ],
+   "statement": "The software provides the configuration options CHHOTO_SLUG_STYLE and CHHOTO_SLUG_LENGTH.",
+   "about": "target"
+  },
+  {
+   "id": 47,
+   "quote": "Otherwise, generating new links will start to fail after a while.",
+   "lines": [
+    131,
+    131
+   ],
+   "statement": "With the default slug generation, creating new links will begin to fail once the number of links exceeds a few thousand.",
+   "about": "target"
+  },
+  {
+   "id": 48,
+   "quote": "For safety, only `https`,`http`,`ftp`, and `magnet` links are allowed for long links by default. Please take a look at\n  [`CHHOTO_EXTRA_PROTOCOLS`](./docs/INSTALLATION.md#chhoto_extra_protocols) to use more protocols.",
+   "lines": [
+    132,
+    133
+   ],
+   "statement": "By default only https, http, ftp and magnet protocols are accepted for long links, and the CHHOTO_EXTRA_PROTOCOLS option can extend this allowlist.",
+   "about": "target"
+  },
+  {
+   "id": 49,
+   "quote": "A simple selfhosted URL shortener with no unnecessary features",
+   "lines": [
+    20,
+    20
+   ],
+   "statement": "The target can be self-hosted: it runs entirely on infrastructure the user controls, without requiring the seller's hosted service.",
+   "about": "target",
+   "implied_by": 4,
+   "property": "self-hostable",
+   "approved_by": "bruce.dambrosio@gmail.com"
+  }
+ ]
+}
