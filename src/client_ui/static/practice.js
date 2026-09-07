@@ -27,15 +27,17 @@
     h += '<div class="new"><div class="muted">New engagement</div>'
       + '<input id="newName" placeholder="name (letters, digits, . _ -)">'
       + '<input id="newClone" placeholder="clone from (git URL or local path), optional">'
-      + '<input id="newEmails" placeholder="client emails, comma-separated">'
+      + '<input id="newEmails" placeholder="client (buyer) emails, comma-separated">'
+      + '<input id="newSellers" placeholder="seller emails, comma-separated">'
       + '<button id="newBtn">Create</button></div>';
     $("list").innerHTML = h;
     for (const el of document.querySelectorAll(".eng")) el.addEventListener("click", () => { selected = el.dataset.name; render(); });
     $("newBtn").addEventListener("click", async () => {
       const name = $("newName").value.trim(), clone = $("newClone").value.trim();
       const client_emails = $("newEmails").value.split(",").map((x) => x.trim()).filter(Boolean);
+      const seller_emails = $("newSellers").value.split(",").map((x) => x.trim()).filter(Boolean);
       if (!name) return;
-      const j = await api("api/engagements", {name, clone: clone || null, client_emails});
+      const j = await api("api/engagements", {name, clone: clone || null, client_emails, seller_emails});
       if (j) { data = j; selected = name; render(); }
     });
   }
@@ -54,14 +56,16 @@
       + (r.cancelled ? "" : '<button class="quiet" data-act="run/cancel" data-id="' + esc(r.name) + '">cancel</button>')
       + "</td></tr>").join("");
   }
-  const STAGE_LABELS = {created: "opened", letter: "letter accepted", intake: "intake finished", materials: "materials ready",
+  const STAGE_LABELS = {created: "opened", letter: "letter accepted", intake: "intake finished", materials: "materials",
     enumeration: "claims enumerated", surface: "surface frozen", chain: "review run", release: "report released", closed: "closed"};
   function stagePanel(e) {
     const v = (st) => (e.stages[st] || {}).value;
     const job = e.job;
     const n = e.next || {};
     const noClient = !(e.client_emails || []).length;
+    const noSeller = !(e.seller_emails || []).length;
     const who = n.who === "client" ? (noClient ? "no client on this engagement: the practice takes the client's step, from the client home link below" : "waiting on the client")
+      : n.who === "seller" ? (noSeller ? "no seller on this engagement: the practice supplies the materials, from the materials link below" : "waiting on the seller")
       : n.who === "practice" ? "the practice's move" : "finished";
     let h = "<h3>Stages</h3><div class=\"next\"><span class=\"muted\">" + esc(who) + "</span> · " + esc(n.text) + "</div>";
     h += "<table class=\"stages\">";
@@ -84,6 +88,7 @@
     h += '<div class="pages">';
     h += '<a href="' + q("/e/" + encodeURIComponent(e.name) + "/") + '">client home</a>';
     h += ' · <a href="' + q("/e/" + encodeURIComponent(e.name) + "/intake/") + '">intake</a>';
+    h += ' · <a href="' + q("/e/" + encodeURIComponent(e.name) + "/materials/") + '">materials</a>';
     h += ' · <a href="' + q("/p/surface/" + encodeURIComponent(e.name) + "/") + '">surface editor</a>';
     if (e.report_exists) h += ' · <a href="' + q("/e/" + encodeURIComponent(e.name) + "/report/") + '">report</a>';
     h += "</div>";
@@ -91,12 +96,13 @@
     h += '<div class="muted">claim sources: ' + (srcs || "none in engagement.yaml") + "</div>";
     const st = e.settings || {};
     h += '<h3>Settings</h3><div class="settings">'
-      + '<label>claim sources, one per line, by path from the target root<textarea id="setSources" rows="3">' + esc((st.claim_sources || []).join("\n")) + "</textarea></label>"
-      + '<label>client emails, comma-separated (new ones are added to the Access policy and mailed the link)<input id="setEmails" value="' + esc((st.client_emails || []).join(", ")) + '"></label>'
+      + '<label>claim sources, one per line, by path from the target root (or tick them on the materials page)<textarea id="setSources" rows="3">' + esc((st.claim_sources || []).join("\n")) + "</textarea></label>"
+      + '<label>client (buyer) emails, comma-separated (new ones are added to the Access policy and mailed the link)<input id="setEmails" value="' + esc((st.client_emails || []).join(", ")) + '"></label>'
+      + '<label>seller emails, comma-separated: they see only the materials page (new ones are added to the Access policy and mailed the link)<input id="setSellers" value="' + esc((st.seller_emails || []).join(", ")) + '"></label>'
       + '<label>target (path; "target" is the engagement\'s own clone)' + (st.has_target ? ' <span class="muted">— materials present</span>' : ' <span class="warn">— no materials yet</span>') + '<input id="setTarget" value="' + esc(st.target || "") + '"></label>'
       + (st.has_target ? "" : '<label>clone the target from (git URL or local path); fills target/ on save<input id="setClone" placeholder="https://github.com/org/repo"></label>')
       + '<label>retention<input id="setRetention" value="' + esc(st.retention || "") + '"></label>'
-      + '<label>excluded from evidence, one per line: documentation the review may list but not read or cite (claim sources, a docs/ directory)' + (st.evidence_excludes_explicit ? "" : ' <span class="muted">— defaulting to the claim sources</span>') + '<textarea id="setExcludes" rows="3">' + esc((st.evidence_excludes || []).join("\n")) + "</textarea></label>"
+      + '<label>excluded from evidence, one per line: documentation the review may list but not read or cite (claim sources, a docs/ directory; or tick them on the materials page)' + (st.evidence_excludes_explicit ? "" : ' <span class="muted">— defaulting to the claim sources</span>') + '<textarea id="setExcludes" rows="3">' + esc((st.evidence_excludes || []).join("\n")) + "</textarea></label>"
       + '<label>engagement letter' + (st.letter_is_template ? ' <span class="muted">(empty: the template is shown)</span>' : "") + '<textarea id="setLetter" rows="6" placeholder="Leave empty to show the practice\'s template letter.">' + esc(st.letter || "") + "</textarea></label>"
       + '<button id="setSave">Save settings</button></div>';
     return h;
@@ -137,6 +143,7 @@
       const body = {
         claim_sources: $("setSources").value.split("\n").map((x) => x.trim()).filter(Boolean),
         client_emails: $("setEmails").value.split(",").map((x) => x.trim()).filter(Boolean),
+        seller_emails: $("setSellers").value.split(",").map((x) => x.trim()).filter(Boolean),
         target: $("setTarget").value.trim(), retention: $("setRetention").value.trim(),
         evidence_excludes: $("setExcludes").value.split("\n").map((x) => x.trim()).filter(Boolean),
         letter: $("setLetter").value,

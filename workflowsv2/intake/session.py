@@ -28,10 +28,13 @@ from workflowsv2.turns import latest_reply
 
 logger = logging.getLogger("intake.session")
 
-#: Where a client's uploads land, relative to the engagement directory. The
-#: intake agent has no repository tools (scenario.yaml omits them), so the
-#: page tells it the file's text in the turn that announces the upload.
-UPLOADS = "uploads"
+#: Where a client's uploads land, relative to the engagement directory: the
+#: engagement's materials (engagement_state.TARGET), beside what the seller
+#: supplies, so a document uploaded at intake can be named as a claim source
+#: by its path from the target root. The intake agent has no repository
+#: tools (scenario.yaml omits them), so the page tells it the file's text in
+#: the turn that announces the upload.
+UPLOADS = "target"
 
 
 def route_logging(log_path: Path) -> None:

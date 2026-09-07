@@ -19,6 +19,7 @@ from client_ui.access import Access                             # noqa: E402
 
 PRACTICE = "bruce@example.test"
 CLIENT = "client@example.test"
+SELLER = "seller@example.test"
 OTHER = "other@example.test"
 
 
@@ -229,13 +230,13 @@ def test_next_step_order(tmp_path, monkeypatch):
     monkeypatch.setattr(st, "ENGAGEMENTS", tmp_path)
     eng = st.new_engagement(tmp_path / "e")
     seq = []
-    for stage, value in [("letter", "accepted"), ("intake", "done"), ("materials", "ready"),
+    for stage, value in [("letter", "accepted"), ("intake", "done"), ("materials", "supplied"), ("materials", "ready"),
                          ("enumeration", "running"), ("enumeration", "done"), ("surface", "frozen"),
                          ("chain", "running"), ("chain", "done"), ("release", "released"), ("closed", "closed")]:
         seq.append(site.next_step(eng)["stage"])
         st.set_stage(eng, stage, value)
     seq.append(site.next_step(eng)["stage"])
-    assert seq == ["letter", "intake", "materials", "enumeration", "enumeration", "surface",
+    assert seq == ["letter", "intake", "materials", "materials", "enumeration", "enumeration", "surface",
                    "chain", "chain", "release", "report", "closed"]
 
 
@@ -319,3 +320,195 @@ def test_pages_carry_versioned_static_urls_and_no_cache(env):
     assert r.status_code == 200 and r.headers["cache-control"] == "no-cache"
     assert 'src="/static/home.js?v=' in r.text and 'href="/static/site.css?v=' in r.text
     assert c.get("/static/client.js").headers["cache-control"] == "no-cache"
+
+
+# ---- the materials page -----------------------------------------------------------
+
+def _new_with_seller(c, name="e1"):
+    r = c.post("/p/api/engagements" + _as(PRACTICE),
+               json={"name": name, "client_emails": [CLIENT], "seller_emails": [SELLER]})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def _up(c, who, path, data, into="", name="e1"):
+    return c.post(f"/e/{name}/materials/api/upload" + _as(who),
+                  data={"into": into, "path": path}, files={"file": (path.split("/")[-1], data)})
+
+
+def test_seller_sees_only_the_materials(env):
+    c, root = env
+    _new_with_seller(c)
+    # the seller was mailed the materials link, the client the home link
+    assert any(m["to"] == [SELLER] and "/e/e1/materials/" in m["body"] for m in mail.sent)
+    assert any(m["to"] == [CLIENT] and m["body"].rstrip().endswith("/e/e1/") for m in mail.sent)
+    assert c.get("/" + _as(SELLER), follow_redirects=False).headers["location"] == "/e/e1/"
+    s = c.get("/e/e1/api/status" + _as(SELLER)).json()
+    assert s["role"] == "seller" and s["roles"] == ["seller"]
+    assert c.get("/e/e1/materials/" + _as(SELLER)).status_code == 200
+    assert c.get("/e/e1/materials/api" + _as(SELLER)).status_code == 200
+    for page in ("intake/", "intake/api/document", "surface/", "surface/api", "report/"):
+        assert c.get(f"/e/e1/{page}" + _as(SELLER)).status_code == 403, page
+    assert c.post("/e/e1/api/letter/accept" + _as(SELLER), json={}).status_code == 403
+    # the buyer never sees the materials
+    assert c.get("/e/e1/materials/" + _as(CLIENT)).status_code == 403
+    assert c.get("/e/e1/materials/api" + _as(CLIENT)).status_code == 403
+    assert c.get("/e/e1/materials/api" + _as(OTHER)).status_code == 403
+    assert c.get("/e/e1/materials/api" + _as(PRACTICE)).json()["roles"] == ["practice"]
+    # an address in both lists has both
+    c.post("/p/api/engagements/e1/settings" + _as(PRACTICE), json={"seller_emails": [SELLER, CLIENT]})
+    s = c.get("/e/e1/api/status" + _as(CLIENT)).json()
+    assert s["role"] == "client" and s["roles"] == ["client", "seller"]
+    assert c.get("/e/e1/materials/api" + _as(CLIENT)).status_code == 200
+
+
+def test_materials_upload_arrange_delete_and_paths(env):
+    c, root = env
+    _new_with_seller(c)
+    eng = root / "e1"
+    r = _up(c, SELLER, "README.md", b"# Hi\n")
+    assert r.status_code == 200 and r.json()["saved"] == "README.md"
+    assert (eng / "target" / "README.md").read_bytes() == b"# Hi\n"
+    # a folder upload carries its folders; a name is sanitized, not refused
+    assert _up(c, SELLER, "repo/src/main.py", b"x = 1\n").json()["saved"] == "repo/src/main.py"
+    assert _up(c, SELLER, "r\u00e9sum\u00e9 (final).pdf", b"%PDF").json()["saved"] == "r_sum_ (final).pdf"
+    # replacing a file replaces it
+    assert _up(c, SELLER, "README.md", b"# Hi again\n").status_code == 200
+    assert (eng / "target" / "README.md").read_text() == "# Hi again\n"
+    # into a shown folder
+    assert _up(c, SELLER, "notes.txt", b"n", into="repo").json()["saved"] == "repo/notes.txt"
+    # mkdir, listing, download
+    assert c.post("/e/e1/materials/api/mkdir" + _as(SELLER), json={"path": "docs/api"}).json()["created"] == "docs/api"
+    j = c.get("/e/e1/materials/api" + _as(SELLER)).json()
+    assert [e["name"] for e in j["entries"]] == ["docs", "repo", "r_sum_ (final).pdf", "README.md"]
+    assert j["writable"] is True and j["count"] == 4 and j["own_target"] is True
+    j = c.get("/e/e1/materials/api" + _as(SELLER) + "&path=repo/src").json()
+    assert j["path"] == "repo/src" and [e["name"] for e in j["entries"]] == ["main.py"]
+    assert c.get("/e/e1/materials/api/file" + _as(SELLER) + "&path=repo/src/main.py").content == b"x = 1\n"
+    # paths that leave the root, or name what is not there
+    for bad in ("../x", "repo/../../x", "repo/./src"):
+        assert c.get("/e/e1/materials/api" + _as(SELLER) + "&path=" + bad).status_code == 400, bad
+        assert c.post("/e/e1/materials/api/mkdir" + _as(SELLER), json={"path": bad}).status_code == 400, bad
+        assert _up(c, SELLER, "x", b"", into=bad).status_code == 400, bad
+    # an absolute path is read as relative to the root
+    assert c.post("/e/e1/materials/api/mkdir" + _as(SELLER), json={"path": "/etc/passwd"}).json()["created"] == "etc/passwd"
+    assert (eng / "target" / "etc" / "passwd").is_dir()
+    c.post("/e/e1/materials/api/delete" + _as(SELLER), json={"path": "etc"})
+    assert c.get("/e/e1/materials/api/file" + _as(SELLER) + "&path=repo").status_code == 400
+    assert c.get("/e/e1/materials/api/file" + _as(SELLER) + "&path=nope").status_code == 400
+    # a symlink out of the root is refused
+    (eng / "target" / "out").symlink_to(root)
+    assert c.get("/e/e1/materials/api" + _as(SELLER) + "&path=out").status_code == 400
+    # delete: a file, a folder and everything under it; the root never
+    assert c.post("/e/e1/materials/api/delete" + _as(SELLER), json={"path": "README.md"}).json()["deleted"] == "README.md"
+    assert c.post("/e/e1/materials/api/delete" + _as(SELLER), json={"path": "repo"}).status_code == 200
+    assert not (eng / "target" / "repo").exists()
+    assert c.post("/e/e1/materials/api/delete" + _as(SELLER), json={"path": ""}).status_code == 400
+    assert c.post("/e/e1/materials/api/delete" + _as(SELLER), json={"path": "gone"}).status_code == 400
+
+
+def test_materials_marks_are_the_practice_s(env):
+    c, root = env
+    _new_with_seller(c)
+    eng = root / "e1"
+    for path in ("README.md", "docs/a.md", "docs/b.md", "docs/deep/c.md", "src/x.py"):
+        assert _up(c, PRACTICE, path, b"t").status_code == 200
+    mark = lambda who, body: c.post("/e/e1/materials/api/mark" + _as(who), json=body)   # noqa: E731
+    assert mark(SELLER, {"path": "README.md", "claim_source": True}).status_code == 403
+    assert mark(PRACTICE, {"path": "README.md", "claim_source": True}).json()["claim_sources"] == ["README.md"]
+    # a folder as claim source marks the files directly in it
+    j = mark(PRACTICE, {"path": "docs", "claim_source": True}).json()
+    assert j["claim_sources"] == ["README.md", "docs/a.md", "docs/b.md"]
+    assert j["evidence_excludes"] == j["claim_sources"]              # still the default
+    # an exclusion names the folder itself
+    j = mark(PRACTICE, {"path": "docs", "excluded": True}).json()
+    assert j["evidence_excludes"] == ["README.md", "docs/a.md", "docs/b.md", "docs"]
+    lst = c.get("/e/e1/materials/api" + _as(PRACTICE) + "&path=docs").json()
+    assert all(e["under_excluded"] for e in lst["entries"] if e["name"] == "deep")
+    assert lst["excludes_explicit"] is True
+    j = mark(PRACTICE, {"path": "docs", "claim_source": False, "excluded": False}).json()
+    assert j["claim_sources"] == ["README.md"]
+    # the exclusions became explicit when first marked, so the old default stays written
+    assert j["evidence_excludes"] == ["README.md", "docs/a.md", "docs/b.md"]
+    # the settings form and the page write the same file
+    assert st.claim_sources(eng) == ["README.md"]
+    # deleting a marked file removes its marks
+    c.post("/e/e1/materials/api/delete" + _as(PRACTICE), json={"path": "README.md"})
+    assert st.claim_sources(eng) == [] and st.evidence_excludes(eng) == ["docs/a.md", "docs/b.md"]
+    c.post("/e/e1/materials/api/delete" + _as(PRACTICE), json={"path": "docs"})
+    assert st.evidence_excludes(eng) == []
+    assert mark(PRACTICE, {"path": "nope", "claim_source": True}).status_code == 400
+
+
+def test_materials_supplied_then_ready_then_locked(env, tmp_path):
+    c, root = env
+    _new_with_seller(c)
+    eng = root / "e1"
+    assert _up(c, SELLER, "README.md", b"t").status_code == 200
+    assert site.next_step(eng)["who"] == "letter" or site.next_step(eng)["stage"] == "letter"
+    mail.sent.clear()
+    r = c.post("/e/e1/materials/api/supplied" + _as(SELLER), json={})
+    assert r.status_code == 200 and st.stage_value(eng, "materials") == "supplied"
+    assert mail.sent[-1]["to"] == [PRACTICE] and "supplied" in mail.sent[-1]["subject"]
+    assert c.post("/e/e1/materials/api/supplied" + _as(CLIENT), json={}).status_code == 403
+    st.set_stage(eng, "letter", "accepted"); st.set_stage(eng, "intake", "done")
+    assert site.next_step(eng) == {"stage": "materials", "who": "practice",
+                                   "text": "The seller has supplied the materials. The practice is checking "
+                                           "them before marking them ready."}
+    # the practice marks them ready: the seller is read only, the practice is not
+    c.post("/p/api/engagements/e1/stage" + _as(PRACTICE), json={"stage": "materials", "value": "ready"})
+    j = c.get("/e/e1/materials/api" + _as(SELLER)).json()
+    assert j["writable"] is False and "marked the materials ready" in j["why_not_writable"]
+    assert _up(c, SELLER, "late.md", b"t").status_code == 400
+    assert c.post("/e/e1/materials/api/delete" + _as(SELLER), json={"path": "README.md"}).status_code == 400
+    assert c.post("/e/e1/materials/api/supplied" + _as(SELLER), json={}).status_code == 400
+    assert _up(c, PRACTICE, "late.md", b"t").status_code == 200
+    # a running job locks everyone
+    release = tmp_path / "go"
+    def steps(eng_dir, kind, model, ts):
+        yield ("wait", ["sh", "-c", f"while [ ! -f {release} ]; do sleep 0.05; done"])
+    jobs._steps_for = steps
+    (eng / "engagement.yaml").write_text(f"target: target\nclaim_sources: [README.md]\nclient_emails: ['{CLIENT}']\nseller_emails: ['{SELLER}']\n")
+    assert c.post("/p/api/engagements/e1/jobs/enumerate" + _as(PRACTICE)).status_code == 200
+    j = c.get("/e/e1/materials/api" + _as(PRACTICE)).json()
+    assert j["writable"] is False and "job is running" in j["why_not_writable"]
+    assert _up(c, PRACTICE, "mid.md", b"t").status_code == 400
+    release.write_text("")
+    import time
+    for _ in range(100):
+        if st.running_job(eng) is None:
+            break
+        time.sleep(0.05)
+    assert c.get("/e/e1/materials/api" + _as(PRACTICE)).json()["writable"] is True
+    # a target outside the engagement is shown, never written
+    outside = tmp_path / "corpus"; outside.mkdir(); (outside / "a.txt").write_text("a")
+    c.post("/p/api/engagements/e1/settings" + _as(PRACTICE), json={"target": str(outside)})
+    j = c.get("/e/e1/materials/api" + _as(PRACTICE)).json()
+    assert [e["name"] for e in j["entries"]] == ["a.txt"] and j["own_target"] is False
+    assert j["writable"] is False and "outside" in j["why_not_writable"]
+    assert _up(c, PRACTICE, "b.txt", b"b").status_code == 400
+    assert c.get("/e/e1/materials/api/file" + _as(PRACTICE) + "&path=a.txt").content == b"a"
+
+
+def test_intake_uploads_land_in_the_materials_and_a_clone_joins_them(env, tmp_path):
+    c, root = env
+    _new(c)
+    eng = root / "e1"
+    from workflowsv2.intake import session as intake_session
+    assert intake_session.UPLOADS == st.TARGET
+    # a clone into a target that already holds a document keeps the document
+    (eng / "target").mkdir(); (eng / "target" / "deck.pdf").write_bytes(b"%PDF")
+    import subprocess
+    src = tmp_path / "src"; src.mkdir()
+    subprocess.run(["git", "init", "-q", str(src)], check=True)
+    (src / "README.md").write_text("# r\n")
+    subprocess.run(["git", "-C", str(src), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(src), "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "i"], check=True)
+    st.clone_target(eng, str(src))
+    assert (eng / "target" / "deck.pdf").is_file() and (eng / "target" / "README.md").is_file()
+    assert (eng / "target" / ".git").is_dir()
+    assert not any(p.name.startswith(".clone_") for p in eng.iterdir())
+    # a second clone would replace README.md: refused, nothing changed
+    with pytest.raises(SystemExit, match="README.md"):
+        st.clone_target(eng, str(src))
+    assert (eng / "target" / "README.md").read_text() == "# r\n"

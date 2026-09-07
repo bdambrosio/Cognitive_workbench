@@ -8,7 +8,8 @@ practice through a whole engagement.
 WHO SEES WHAT. Identity comes from Cloudflare Access (src/client_ui/access.py):
 a practice email opens every engagement and the practice pages under /p/;
 a client email opens the engagements whose `client_emails` name it, under
-/e/<engagement>/. Nothing else answers.
+/e/<engagement>/; a seller email opens only the materials page of the
+engagements whose `seller_emails` name it. Nothing else answers.
 
 THE STAGES. A client's engagement home lists the ten stages of the
 engagement (workflowsv2/engagement_state.STAGES) with the current one
@@ -26,6 +27,12 @@ is mounted twice, under /e/<e>/intake/ and /e/<e>/report/.
 THE SURFACE. After enumeration the client reads the claim surface and
 comments on any claim; the practice edits and freezes it. The frozen file
 is in claims.json shape, which is what the audit runner's --surface reads.
+
+THE MATERIALS. The seller (or the practice) uploads, arranges and deletes
+the files under the engagement's target/ on /e/<e>/materials/
+(src/client_ui/materials.py) and marks the stage `materials` as "supplied";
+the practice marks it "ready". The practice marks files there as claim
+sources or as excluded from evidence. The client never sees the materials.
 """
 from __future__ import annotations
 
@@ -51,7 +58,7 @@ from fastapi.staticfiles import StaticFiles                                     
 from pydantic import BaseModel                                                    # noqa: E402
 
 from workflowsv2 import engagement_state as state               # noqa: E402
-from client_ui import cf_access, jobs, mail                     # noqa: E402
+from client_ui import cf_access, jobs, mail, materials          # noqa: E402
 from client_ui.access import Access, LOCAL_COOKIE               # noqa: E402
 from client_ui.app import _announce, _SAFE                      # noqa: E402
 from client_ui.registry import Registry                         # noqa: E402
@@ -61,12 +68,20 @@ STATIC = HERE / "static"
 LETTER_TEMPLATE = state.ENGAGEMENTS / "LETTER_TEMPLATE.md"
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
+#: The mail a seller gets when named on an engagement.
+SELLER_SUBJECT = "Tuuyi: the materials page for your engagement"
+SELLER_BODY = ("A claims review has been opened in which you are the seller. The page "
+               "below is where you upload the repository and the documents to be "
+               "examined, arrange them, and say when they are complete. The buyer "
+               "does not see this page or the files on it; the report names files "
+               "by path and quotes the lines each finding rests on.")
+
 
 # ---- the stages, as the pages describe them ----------------------------------
 
 def next_step(eng_dir: Path) -> Dict[str, str]:
     """The stage the engagement is at, whose move it is, and one line
-    saying so. `who` is "client", "practice" or "done"."""
+    saying so. `who` is "client", "seller", "practice" or "done"."""
     v = lambda s: state.stage_value(eng_dir, s)                # noqa: E731
     if v("closed") == "closed":
         return {"stage": "closed", "who": "done", "text": "The engagement is closed."}
@@ -79,9 +94,14 @@ def next_step(eng_dir: Path) -> Dict[str, str]:
     if v("intake") != "done":
         return {"stage": "intake", "who": "client",
                 "text": "Complete the intake conversation, then finish it."}
-    if v("materials") != "ready":
+    if v("materials") == "supplied":
         return {"stage": "materials", "who": "practice",
-                "text": "The practice is obtaining the materials named at intake."}
+                "text": "The seller has supplied the materials. The practice is checking "
+                        "them before marking them ready."}
+    if v("materials") != "ready":
+        return {"stage": "materials", "who": "seller",
+                "text": "The seller is supplying the materials on the materials page, "
+                        "or the practice is obtaining them."}
     if v("enumeration") == "running":
         return {"stage": "enumeration", "who": "practice",
                 "text": "The claims are being enumerated from the documents you named."}
@@ -108,10 +128,11 @@ def letter_text(eng_dir: Path) -> str:
     return p.read_text(encoding="utf-8") if p.is_file() else "(no engagement letter on file)"
 
 
-def status_for(eng_dir: Path, role: str) -> Dict[str, Any]:
+def status_for(eng_dir: Path, role: str, roles: Optional[Set[str]] = None) -> Dict[str, Any]:
     s = state.summary(eng_dir)
     cur = state.current_run(eng_dir, s["current_intake"])
-    return {"name": eng_dir.name, "role": role, "stages": s["stages"],
+    return {"name": eng_dir.name, "role": role, "roles": sorted(roles or {role}),
+            "stages": s["stages"],
             "stage_order": list(state.STAGES), "next": next_step(eng_dir),
             "job": s["job"], "letter": letter_text(eng_dir),
             "released": state.stage_value(eng_dir, "release") == "released",
@@ -195,6 +216,7 @@ class NewEngagement(BaseModel):
     name: str
     clone: Optional[str] = None
     client_emails: List[str] = []
+    seller_emails: List[str] = []
 
 
 class Choice(BaseModel):
@@ -227,9 +249,20 @@ class Decompose(BaseModel):
     claims: List[Dict[str, Any]]        # the draft as the page holds it, so the proposal sees unsaved edits
 
 
+class MaterialsPath(BaseModel):
+    path: str
+
+
+class Mark(BaseModel):
+    path: str
+    claim_source: Optional[bool] = None
+    excluded: Optional[bool] = None
+
+
 class Settings(BaseModel):
     claim_sources: Optional[List[str]] = None
     client_emails: Optional[List[str]] = None
+    seller_emails: Optional[List[str]] = None
     target: Optional[str] = None
     retention: Optional[str] = None
     evidence_excludes: Optional[List[str]] = None
@@ -277,12 +310,15 @@ def make_site_app(access: Access, model: Optional[Path] = None,
         return d
 
     def _require(request: Request, name: Optional[str], roles: Tuple[str, ...]) -> Tuple[str, str, Optional[Path]]:
+        """The email, the role the page is rendered for (the first of
+        `roles` the email holds) and the engagement; 403 when it holds none."""
         email = _email(request)
         eng_dir = _eng(name) if name else None
-        role = access.role(email, eng_dir)
-        if role not in roles:
+        mine = access.roles(email, eng_dir)
+        role = next((r for r in roles if r in mine), None)
+        if role is None:
             raise HTTPException(status_code=403, detail="not yours to see")
-        return email or "", role or "", eng_dir
+        return email or "", role, eng_dir
 
     def _page(request: Request, path: Path):
         # Static references carry the file's mtime, so a changed script is a
@@ -314,6 +350,8 @@ def make_site_app(access: Access, model: Optional[Path] = None,
             raise HTTPException(status_code=400, detail=str(e))
         except jobs.JobRunning as e:
             raise HTTPException(status_code=409, detail=f"a job is already running: {e}")
+        except materials.Refused as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
     def _link(name: str, tail: str = "") -> str:
         return f"{mail.site_url()}/e/{name}/{tail}"
@@ -334,20 +372,25 @@ def make_site_app(access: Access, model: Optional[Path] = None,
         if not mine:
             return HTMLResponse("<p>No engagement names this address. Write to the practice.</p>",
                                 status_code=403)
-        items = "".join(f'<li><a href="/e/{n}/">{n}</a></li>' for n in mine)
-        return HTMLResponse(f"<h1>Your engagements</h1><ul>{items}</ul>")
+        items = "".join(f'<li><a class="btn" href="/e/{n}/">{n}</a></li>' for n in mine)
+        return HTMLResponse(f'<!doctype html><html lang="en"><head><meta charset="utf-8">'
+                            f'<title>Your engagements</title><link rel="stylesheet" href="/static/client.css">'
+                            f'<link rel="stylesheet" href="/static/site.css"></head><body>'
+                            f'<header><div class="title">Your engagements <span class="mode">with Tuuyi</span></div></header>'
+                            f'<main class="site one"><section><ul class="links">{items}</ul></section></main>'
+                            f'</body></html>')
 
-    # ---- the client's engagement home ----------------------------------------
+    # ---- the engagement home: the client's, and the seller's ----------------------
 
     @app.get("/e/{name}/")
     async def home(name: str, request: Request):
-        _require(request, name, ("client", "practice"))
+        _require(request, name, ("client", "practice", "seller"))
         return _page(request, STATIC / "home.html")
 
     @app.get("/e/{name}/api/status")
     async def status(name: str, request: Request):
-        _, role, eng_dir = _require(request, name, ("client", "practice"))
-        return JSONResponse(status_for(eng_dir, role))
+        email, role, eng_dir = _require(request, name, ("client", "practice", "seller"))
+        return JSONResponse(status_for(eng_dir, role, access.roles(email, eng_dir)))
 
     @app.post("/e/{name}/api/letter/accept")
     async def accept_letter(name: str, request: Request):
@@ -381,6 +424,77 @@ def make_site_app(access: Access, model: Optional[Path] = None,
             raise HTTPException(status_code=400, detail="an empty comment")
         add_comment(eng_dir, body.source, body.claim_id, body.text.strip(), email)
         return JSONResponse(surface_for(eng_dir, body.source))
+
+    # ---- the materials: the seller's page, and the practice's ---------------------
+
+    def _materials(request: Request, name: str) -> Tuple[str, Set[str], Path]:
+        email, _, eng_dir = _require(request, name, ("practice", "seller"))
+        return email, access.roles(email, eng_dir), eng_dir
+
+    @app.get("/e/{name}/materials/")
+    async def materials_page(name: str, request: Request):
+        _materials(request, name)
+        return _page(request, STATIC / "materials.html")
+
+    @app.get("/e/{name}/materials/api")
+    async def materials_list(name: str, request: Request, path: str = ""):
+        _, roles, eng_dir = _materials(request, name)
+        out = _act(materials.listing, eng_dir, path, roles)
+        out.update({"name": name, "roles": sorted(roles), "next": next_step(eng_dir)})
+        return JSONResponse(out)
+
+    @app.get("/e/{name}/materials/api/file")
+    async def materials_file(name: str, request: Request, path: str):
+        _, _, eng_dir = _materials(request, name)
+        p = _act(materials.file_path, eng_dir, path)
+        return FileResponse(str(p), filename=p.name)
+
+    @app.post("/e/{name}/materials/api/upload")
+    async def materials_upload(name: str, request: Request):
+        """One file per request, so a folder of many files is many requests
+        and the request-size cap in front of the site applies per file.
+        Form fields: `into` (the folder shown), `path` (the file's name, or
+        its path within the folder being uploaded), `file`."""
+        _, roles, eng_dir = _materials(request, name)
+        form = await request.form()
+        file = form.get("file")
+        if file is None or isinstance(file, str):        # a plain field, or none: not a file
+            raise HTTPException(status_code=400, detail="no file")
+        data = await file.read()
+        rel = _act(materials.save, eng_dir, roles, str(form.get("into") or ""),
+                   str(form.get("path") or file.filename or ""), data)
+        return JSONResponse({"saved": rel, "bytes": len(data)})
+
+    @app.post("/e/{name}/materials/api/mkdir")
+    async def materials_mkdir(name: str, body: MaterialsPath, request: Request):
+        _, roles, eng_dir = _materials(request, name)
+        return JSONResponse({"created": _act(materials.mkdir, eng_dir, roles, body.path)})
+
+    @app.post("/e/{name}/materials/api/delete")
+    async def materials_delete(name: str, body: MaterialsPath, request: Request):
+        _, roles, eng_dir = _materials(request, name)
+        return JSONResponse({"deleted": _act(materials.delete, eng_dir, roles, body.path)})
+
+    @app.post("/e/{name}/materials/api/mark")
+    async def materials_mark(name: str, body: Mark, request: Request):
+        """The practice marks a path as a claim source or as excluded from
+        evidence; the runner reads the marks when a job starts."""
+        _require(request, name, ("practice",))
+        return JSONResponse(_act(materials.mark, _eng(name), body.path,
+                                 body.claim_source, body.excluded))
+
+    @app.post("/e/{name}/materials/api/supplied")
+    async def materials_supplied(name: str, request: Request):
+        """The seller says the materials are complete; the practice is
+        mailed and marks them ready after looking."""
+        email, roles, eng_dir = _materials(request, name)
+        if state.stage_value(eng_dir, "materials") == "ready":
+            raise HTTPException(status_code=400, detail="the materials are already marked ready")
+        state.set_stage(eng_dir, "materials", "supplied", email)
+        mail.send(mail.practice_emails(), f"Tuuyi: materials supplied for {name}",
+                  f"{email} marked the materials for {name} as supplied. Look them over "
+                  f"and mark them ready.", f"{mail.site_url()}/p/#{name}")
+        return JSONResponse({"materials": "supplied", "next": next_step(eng_dir)})
 
     # ---- the two conversations ------------------------------------------------
 
@@ -436,10 +550,10 @@ def make_site_app(access: Access, model: Optional[Path] = None,
             email = access.email(request_like.headers, request_like.cookies,
                                  request_like.query_params)
             eng_dir = _eng(name)
-            role = access.role(email, eng_dir)
-            if role not in ("client", "practice"):
+            roles = access.roles(email, eng_dir)
+            if not roles & {"client", "practice"}:
                 raise HTTPException(status_code=403, detail="not yours to see")
-            if kind == "post" and role == "client" and \
+            if kind == "post" and "practice" not in roles and \
                     state.stage_value(eng_dir, "release") != "released":
                 raise HTTPException(status_code=404, detail="the report is not released yet")
             return eng_dir
@@ -573,6 +687,7 @@ def make_site_app(access: Access, model: Optional[Path] = None,
         own = eng_dir / "letter.md"
         return {"claim_sources": state.claim_sources(eng_dir),
                 "client_emails": state.client_emails(eng_dir),
+                "seller_emails": state.seller_emails(eng_dir),
                 "has_target": state.target_dir(eng_dir).is_dir() and any(state.target_dir(eng_dir).iterdir()),
                 "target": str(cfg.get("target") or ""), "retention": str(cfg.get("retention") or ""),
                 "evidence_excludes": state.evidence_excludes(eng_dir),
@@ -600,28 +715,34 @@ def make_site_app(access: Access, model: Optional[Path] = None,
         if not _NAME.match(body.name or ""):
             raise HTTPException(status_code=400, detail="bad engagement name")
         _act(state.new_engagement, state.ENGAGEMENTS / body.name, body.clone or None,
-             body.client_emails, email)
+             body.client_emails, email, body.seller_emails)
         clients = state.client_emails(state.ENGAGEMENTS / body.name)
+        sellers = state.seller_emails(state.ENGAGEMENTS / body.name)
+        if clients or sellers:
+            cf_access.ensure_emails(clients + sellers)
         if clients:
-            cf_access.ensure_emails(clients)
             mail.send(clients, "Tuuyi: your engagement page",
                       "Your engagement with Tuuyi is open. The page below shows where "
                       "it stands and what happens next. Start by reading the "
                       "engagement letter.", _link(body.name))
+        if sellers:
+            mail.send(sellers, SELLER_SUBJECT, SELLER_BODY, _link(body.name, "materials/"))
         return JSONResponse(_all())
 
     @app.post("/p/api/engagements/{name}/settings")
     async def change_settings(name: str, body: Settings, request: Request):
-        """The practice sets the engagement's claim sources, client emails,
-        target and retention, and its own letter. New client emails are added
-        to the Access policy."""
+        """The practice sets the engagement's claim sources, client and
+        seller emails, target and retention, and its own letter. New emails
+        are added to the Access policy and mailed their page."""
         _practice(request)
         eng_dir = _eng(name)
         before = set(state.client_emails(eng_dir))
+        sellers_before = set(state.seller_emails(eng_dir))
         if body.clone and body.clone.strip():
             _act(state.clone_target, eng_dir, body.clone.strip())
         _act(state.update_engagement, eng_dir, claim_sources=body.claim_sources,
-             client_emails=body.client_emails, target=body.target, retention=body.retention,
+             client_emails=body.client_emails, seller_emails=body.seller_emails,
+             target=body.target, retention=body.retention,
              evidence_excludes=body.evidence_excludes)
         if body.letter is not None:
             own = eng_dir / "letter.md"
@@ -631,11 +752,15 @@ def make_site_app(access: Access, model: Optional[Path] = None,
                 own.unlink()
         sync = None
         new = [e for e in state.client_emails(eng_dir) if e not in before]
+        new_sellers = [e for e in state.seller_emails(eng_dir) if e not in sellers_before]
+        if new or new_sellers:
+            sync = cf_access.ensure_emails(new + new_sellers)
         if new:
-            sync = cf_access.ensure_emails(new)
             mail.send(new, "Tuuyi: your engagement page",
                       "Your engagement with Tuuyi is open. The page below shows where "
                       "it stands and what happens next.", _link(name))
+        if new_sellers:
+            mail.send(new_sellers, SELLER_SUBJECT, SELLER_BODY, _link(name, "materials/"))
         return JSONResponse({"engagements": _all(), "policy": sync})
 
     @app.post("/p/api/engagements/{name}/intake/current")

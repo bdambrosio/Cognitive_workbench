@@ -48,6 +48,12 @@ below, each `{"value", "at", "by"}`), and `jobs`, the record of every
 enumeration or chain job the site started: when, which steps, the exit. A
 job in state "running" is the engagement's lock: a second job is refused
 until it ends. Marks again, never deletion.
+
+THE SELLER (2026-09-07). `seller_emails` in engagement.yaml names who supplies
+the materials: those addresses open only the materials page of the client
+site, where they upload into target/ and mark the stage `materials` as
+"supplied"; the practice then marks it "ready". The client (the buyer) never
+sees the materials, only the claim surface and the report.
 """
 from __future__ import annotations
 
@@ -139,8 +145,12 @@ target: target
 
 claim_sources: []
 
-# Who may open this engagement's pages on the client site, by email.
+# Who may open this engagement's pages on the client site, by email. The
+# client is the buyer: letter, intake, claim surface, report. The seller
+# supplies and maintains the materials under target/ on the materials page
+# and sees nothing of the client's pages. An address in both lists has both.
 client_emails: {client_emails}
+seller_emails: {seller_emails}
 
 retention: keep
 """
@@ -162,16 +172,19 @@ def target_dir(eng_dir: Path) -> Path:
 
 def new_engagement(eng_dir: Path, clone: Optional[str] = None,
                    client_emails: Optional[List[str]] = None,
-                   by: Optional[str] = None) -> Path:
+                   by: Optional[str] = None,
+                   seller_emails: Optional[List[str]] = None) -> Path:
     """Create the engagement: its directory, a stub engagement.yaml (with
-    the client's emails when given), and — with `clone` — its target/ from
-    a git URL or a local checkout. Marks the `created` stage."""
+    the client's and the seller's emails when given), and — with `clone` —
+    its target/ from a git URL or a local checkout. Marks the `created` stage."""
     if eng_dir.exists():
         raise SystemExit(f"engagement '{eng_dir.name}' already exists")
     eng_dir.mkdir(parents=True)
     emails = json.dumps([e.strip() for e in (client_emails or []) if e.strip()])
+    sellers = json.dumps([e.strip() for e in (seller_emails or []) if e.strip()])
     (eng_dir / "engagement.yaml").write_text(
-        STUB.format(name=eng_dir.name, stamp=stamp(), client_emails=emails),
+        STUB.format(name=eng_dir.name, stamp=stamp(), client_emails=emails,
+                    seller_emails=sellers),
         encoding="utf-8")
     set_stage(eng_dir, "created", "done", by)
     if clone:
@@ -181,16 +194,29 @@ def new_engagement(eng_dir: Path, clone: Optional[str] = None,
 
 def clone_target(eng_dir: Path, url: str) -> Path:
     """Fill the engagement's target/ from a git URL or a local checkout.
-    Refuses when target/ already holds something: the practice removes it
-    by hand first, so a run's materials are never replaced by accident."""
+    Files already under target/ (an intake upload, the seller's documents)
+    are kept; the clone's top-level entries are moved in beside them, and
+    the clone is refused if any entry would replace one already there, so
+    a run's materials are never replaced by accident."""
+    import shutil
     import subprocess
+    import tempfile
     dest = eng_dir / TARGET
-    if dest.exists() and any(dest.iterdir()):
-        raise SystemExit(f"{dest} already holds materials; remove it first to clone again")
-    r = subprocess.run(["git", "clone", "--quiet", url, str(dest)],
-                       capture_output=True, text=True)
-    if r.returncode != 0:
-        raise SystemExit(f"git clone failed: {r.stderr.strip()}")
+    dest.mkdir(exist_ok=True)
+    tmp = Path(tempfile.mkdtemp(prefix=".clone_", dir=eng_dir))
+    try:
+        r = subprocess.run(["git", "clone", "--quiet", url, str(tmp / "repo")],
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            raise SystemExit(f"git clone failed: {r.stderr.strip()}")
+        entries = sorted(p.name for p in (tmp / "repo").iterdir())
+        clash = [n for n in entries if (dest / n).exists()]
+        if clash:
+            raise SystemExit(f"{dest} already holds {', '.join(clash)}; remove them first to clone")
+        for n in entries:
+            shutil.move(str(tmp / "repo" / n), str(dest / n))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
     return dest
 
 
@@ -203,6 +229,13 @@ def _engagement_yaml(eng_dir: Path) -> Dict[str, Any]:
 def client_emails(eng_dir: Path) -> List[str]:
     """The emails allowed to open this engagement on the client site."""
     return [str(e).strip().lower() for e in (_engagement_yaml(eng_dir).get("client_emails") or [])
+            if str(e).strip()]
+
+
+def seller_emails(eng_dir: Path) -> List[str]:
+    """The emails allowed to supply and maintain this engagement's materials
+    on the client site."""
+    return [str(e).strip().lower() for e in (_engagement_yaml(eng_dir).get("seller_emails") or [])
             if str(e).strip()]
 
 
@@ -224,7 +257,8 @@ def evidence_excludes(eng_dir: Path) -> List[str]:
 #: in place, key by key, so its comments and the rest of its text survive:
 #: a yaml dump of demo-chhoto's file on 2026-09-05 dropped the practice's
 #: notes and reformatted the transaction block.
-SETTABLE = ("claim_sources", "client_emails", "target", "retention", "evidence_excludes")
+SETTABLE = ("claim_sources", "client_emails", "seller_emails", "target", "retention",
+            "evidence_excludes")
 
 
 def _render_key(key: str, value: Any) -> str:
@@ -277,7 +311,7 @@ def update_engagement(eng_dir: Path, **fields: Any) -> Dict[str, Any]:
     for k, v in fields.items():
         if v is None:
             continue
-        if k in ("claim_sources", "client_emails", "evidence_excludes"):
+        if k in ("claim_sources", "client_emails", "seller_emails", "evidence_excludes"):
             v = [str(x).strip() for x in v if str(x).strip()]
         else:
             v = str(v).strip()
@@ -495,6 +529,7 @@ def summary(eng_dir: Path) -> Dict[str, Any]:
                            "has_engagement_yaml": (eng_dir / "engagement.yaml").is_file(),
                            "has_target": target_dir(eng_dir).is_dir(),
                            "client_emails": client_emails(eng_dir),
+                           "seller_emails": seller_emails(eng_dir),
                            "claim_sources": claim_sources(eng_dir),
                            "stages": st.get("stages") or {},
                            "job": running_job(eng_dir),

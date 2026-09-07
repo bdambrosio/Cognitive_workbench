@@ -45,3 +45,19 @@ form.comment button { padding: 3px 9px; font-size: 12px; }
 .actions { margin-top: 12px; display: flex; gap: 8px; }
 table.claims td button { display: block; margin: 2px 0; }
 table.claims .declined { font-size: 12px; color: var(--muted); max-width: 220px; white-space: normal; margin-top: 4px; }
+/* the materials page */
+.next .who.seller { color: var(--accent2); }
+.toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 14px 0 8px; flex-wrap: wrap; }
+.toolbar .crumbs { font-family: var(--mono); font-size: 13px; }
+.toolbar .tools { display: flex; gap: 8px; }
+.toolbar .btn { display: inline-block; padding: 5px 10px; border: 1px solid var(--rule); border-radius: 6px; cursor: pointer; background: var(--panel); color: var(--text); font-size: 13px; }
+.toolbar .btn:hover { border-color: var(--accent2); }
+table.files { border-collapse: collapse; width: 100%; font-size: 14px; }
+table.files th, table.files td { border-bottom: 1px solid var(--rule); padding: 5px 8px; text-align: left; vertical-align: middle; }
+table.files th { color: var(--muted); font-weight: 500; font-size: 12px; }
+table.files td.num { font-family: var(--mono); font-size: 13px; text-align: right; white-space: nowrap; }
+table.files td.mono { white-space: nowrap; }
+table.files tr.excluded td:first-child { color: var(--muted); }
+table.files td button { padding: 2px 8px; font-size: 12px; }
+#actions { align-items: center; gap: 16px; }
+#marks { margin-top: 28px; }

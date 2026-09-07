@@ -62,6 +62,16 @@ def test_access_email_from_header_or_cookie_and_roles(keys, tmp_path, monkeypatc
     assert a.engagements_for("bruce@example.test") == ["e1", "e2"]
     assert a.engagements_for("client@example.test") == ["e1"]
     assert a.engagements_for("nobody@example.test") == []
+    # the seller: only the materials page, and both roles when named twice
+    st.new_engagement(tmp_path / "e3", client_emails=["client@example.test"],
+                      seller_emails=["seller@example.test", "client@example.test"])
+    e3 = tmp_path / "e3"
+    assert a.roles("seller@example.test", e3) == {"seller"}
+    assert a.roles("client@example.test", e3) == {"client", "seller"}
+    assert a.role("client@example.test", e3) == "client"
+    assert a.role("seller@example.test", e3) == "seller"
+    assert a.roles("bruce@example.test", e3) == {"practice"}
+    assert a.engagements_for("seller@example.test") == ["e3"]
 
 
 def test_no_access_mode_and_missing_config():

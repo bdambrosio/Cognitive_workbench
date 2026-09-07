@@ -10,7 +10,7 @@ Tuuyi will carry out a claims review for the client named at intake.
 
 **What it is not.** Not a penetration test, not a review of code quality or architecture, not legal or financial advice, and not a judgement on claims the materials cannot settle, which are reported as unsettled.
 
-**Materials.** The client arranges read access to the repository and names the documents that carry the seller's claims. The practice examines them on hardware it controls, in an environment created for this engagement and deleted afterwards. For this pilot engagement, model calls run on a hosted inference service; the materials are public or the client has agreed to that.
+**Materials.** The seller supplies the repository and the documents to be examined on a page of this site that only the seller and the practice can open, arranges them there, and says when they are complete. Where the client holds the materials, the client supplies them the same way. The client names the documents that carry the seller's claims. The client does not receive the materials: the report names files by their path and quotes the lines each finding rests on, and nothing more of them leaves the engagement. The practice examines the materials on hardware it controls, in an environment created for this engagement and deleted afterwards. For this pilot engagement, model calls run on a hosted inference service; the materials are public or the client has agreed to that.
 
 **Retention.** The engagement file, the record and the report are kept for the period stated at intake and then deleted.
 

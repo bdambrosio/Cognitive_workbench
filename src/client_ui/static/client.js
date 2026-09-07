@@ -70,7 +70,7 @@
     lastForm = JSON.parse(JSON.stringify(form));
     if (firstChanged) { const el = $(firstChanged); if (el) el.scrollIntoView({block: "center", behavior: "smooth"}); }
     $("uploadLabel").hidden = false;
-    $("uploadsHint").hidden = false; $("uploadsHint").textContent = "A file you upload is attached to this engagement and read by the review.";
+    $("uploadsHint").hidden = false; $("uploadsHint").textContent = "A file you upload is placed with the engagement's materials, where the review reads it.";
     // On the site the client finishes the intake from the page; the button
     // is enabled once every slot is filled and stays until the practice
     // has what it needs.

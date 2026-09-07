@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Materials</title>
+<link rel="stylesheet" href="/static/client.css">
+<link rel="stylesheet" href="/static/site.css">
+</head>
+<body>
+<header>
+  <div class="title"><span id="engagement">engagement</span> <span class="mode">materials</span></div>
+  <div class="state"><span id="msg"></span> <a id="back" href="">back</a></div>
+</header>
+<main class="site one">
+  <section id="materials">
+    <p class="next" id="next"></p>
+    <p class="muted" id="intro"></p>
+    <div class="toolbar" id="toolbar">
+      <span class="crumbs" id="crumbs"></span>
+      <span class="tools" id="tools"></span>
+    </div>
+    <p class="muted" id="locked" hidden></p>
+    <table class="files" id="files"></table>
+    <div class="actions" id="actions"></div>
+    <div id="marks" hidden>
+      <h2>What the review reads</h2>
+      <p class="muted">Claim sources are the documents whose assertions are listed and tested; they are not evidence. Excluded paths may be listed by the review but not read or cited. Both can be changed at any time; a job reads them when it starts.</p>
+      <div class="mono" id="markLists"></div>
+    </div>
+  </section>
+</main>
+<script src="/static/md.js"></script>
+<script src="/static/materials.js"></script>
+</body>
+</html>

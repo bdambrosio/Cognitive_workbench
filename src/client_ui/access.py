@@ -12,8 +12,9 @@ a request that reached this process some other way carries no identity.
     PRACTICE_EMAILS    comma-separated; these emails are the practice
 
 Roles: `practice` for an email in PRACTICE_EMAILS; `client` for an email in
-the engagement's `client_emails`; None otherwise. A practice email may open
-every engagement.
+the engagement's `client_emails`; `seller` for one in its `seller_emails`.
+An email may hold both client and seller on one engagement and then has the
+pages of both. A practice email may open every engagement.
 
 NO ACCESS, FOR LOCAL WORK. With `no_access=True` the identity is the `as`
 query parameter or the `site_as` cookie, and the site must be bound to the
@@ -24,7 +25,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional
+from typing import Any, Callable, Dict, List, Mapping, Optional, Set
 
 logger = logging.getLogger("client_ui.access")
 
@@ -96,24 +97,35 @@ class Access:
         e = claims.get("email")
         return e.strip().lower() if isinstance(e, str) and e.strip() else None
 
-    def role(self, email: Optional[str], eng_dir: Optional[Path]) -> Optional[str]:
+    def roles(self, email: Optional[str], eng_dir: Optional[Path]) -> Set[str]:
+        """Every role this email holds on the engagement: {"practice"}, or
+        any of {"client", "seller"}, or empty."""
         if not email:
-            return None
+            return set()
         if email in self.practice:
-            return "practice"
+            return {"practice"}
+        out: Set[str] = set()
         if eng_dir is not None:
             from workflowsv2 import engagement_state as state
             if email in state.client_emails(eng_dir):
-                return "client"
-        return None
+                out.add("client")
+            if email in state.seller_emails(eng_dir):
+                out.add("seller")
+        return out
+
+    def role(self, email: Optional[str], eng_dir: Optional[Path]) -> Optional[str]:
+        """The one role a page is rendered for: practice over client over
+        seller. None when the email holds none."""
+        mine = self.roles(email, eng_dir)
+        return next((r for r in ("practice", "client", "seller") if r in mine), None)
 
     def engagements_for(self, email: Optional[str]) -> List[str]:
         """The engagements this email may open: all of them for the
-        practice, those naming it for a client."""
+        practice, those naming it as client or seller otherwise."""
         from workflowsv2 import engagement_state as state
         if not email:
             return []
         names = state.engagements()
         if email in self.practice:
             return names
-        return [n for n in names if email in state.client_emails(state.ENGAGEMENTS / n)]
+        return [n for n in names if self.roles(email, state.ENGAGEMENTS / n)]
