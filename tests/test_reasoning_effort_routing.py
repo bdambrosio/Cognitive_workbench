@@ -171,3 +171,43 @@ def test_declining_asserts_thinking_off_rather_than_omitting():
     import inspect
     src = inspect.getsource(_ChatBackend.chat)
     assert "enable_thinking is False or reasoning_effort == 'none'" in src
+
+
+def test_the_reflection_passes_and_attribution_decline_a_baseline():
+    """On a local server whose template default left thinking on (Jill's
+    Qwen3.8 Flash Next container, 2026-09-07) the companion update spent
+    228 s and its whole 16,384-token budget in a repetition loop and
+    returned nothing, and claim attribution deliberated every claim for
+    199 s and truncated its JSON. Both are synthesis or extraction over a
+    fixed prompt and never run in workflow mode. They decline positively:
+    the request carries enable_thinking=false and no reasoning_effort."""
+    import inspect
+    from chat import claims
+    src = inspect.getsource(ChatLoop)
+    seg = src[src.index("tracker.llm_generate = self._make_llm_callable"):]
+    calls = [l.strip() for l in seg.splitlines() if "tracker.llm_generate = self._make_llm_callable" in l]
+    assert len(calls) == 2 and all("reasoning_effort='none'" in c for c in calls), calls
+    attribution = inspect.getsource(claims)
+    i = attribution.index("def llm_chat(messages):")
+    assert "reasoning_effort='none'" in attribution[i:i + 900]
+    from chat import reflection, concerns
+    r = inspect.getsource(reflection.ReflectionMixin._reflect_and_remember)
+    assert "reasoning_effort='none'" in r
+    # The concern passes run inside workflows, on cloud routes where 'none'
+    # would mean the provider default: they inherit the model file's baseline.
+    w = inspect.getsource(concerns)
+    j = w.index("def _update_concern_wip(")
+    assert "reasoning_effort" not in w[j:w.index("new_wip = (new_wip or '').strip()", j)]
+
+    # and the callable forwards it: the body asserts thinking off
+    inst = object.__new__(ChatLoop)
+    inst.character_name = "Jill"
+    inst._reasoning_effort = 'medium'
+    inst.backend = KwargRecorder('ok')
+    inst.backend.is_cloud = False
+    inst._record_empty_response = lambda *a, **k: None
+    gen = inst._make_llm_callable('none', reasoning_effort='none')
+    res = gen(["system", "user"], max_tokens=100)
+    assert res.success and inst.backend.kwargs['reasoning_effort'] == 'none'
+    rec = Recorder(baseline='medium')
+    assert rec._effective('none') is None

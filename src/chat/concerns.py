@@ -2618,6 +2618,13 @@ class ConcernsMixin:
                 f"Working log (last entries):\n{summary}\n\n"
                 f"Final output of this fire:\n{(reply or '').strip()[:1000]}"
             )
+            # Inherits the model file's baseline, deliberately: concerns run
+            # inside workflows too, and on a cloud route a per-call 'none'
+            # cannot mean off — it omits the field, which is the provider's
+            # default (more reasoning than `medium` on GLM at Fireworks).
+            # The local case is handled at the server: the container must
+            # default enable_thinking to false (2026-09-07, when it did not,
+            # this call spent its 1,024 tokens on reasoning and returned "").
             new_wip = self.backend.chat(
                 [{'role': 'system', 'content': sys_msg},
                  {'role': 'user', 'content': user_msg}],

@@ -1082,8 +1082,16 @@ class ClaimsMixin:
             # that function stays pure and offline-runnable.
             attempts['n'] += 1
             cap = budget * 2 if attempts['n'] > 1 else budget
+            # Thinking off, positively: attribution is extraction over a
+            # fixed record. On a local server whose default left thinking on
+            # (Qwen3.8 Flash Next container, 2026-09-07) it deliberated the
+            # grounding of every claim for 199 s, spent 14,985 reasoning
+            # tokens of the 16,384 budget, truncated the JSON and retried at
+            # double budget. reasoning_effort='none' sends
+            # enable_thinking=false locally; never runs in workflow mode.
             return self.backend.chat(messages, max_tokens=cap,
-                                     cot_profile='none')
+                                     cot_profile='none',
+                                     reasoning_effort='none')
 
         status: Dict[str, Any] = {}
         claims = attribute_claims(record, llm_chat,

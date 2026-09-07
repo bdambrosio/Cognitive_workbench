@@ -512,11 +512,16 @@ class ReflectionMixin:
             user_parts.append(
                 f"Return the JSON object now (keys: {return_keys}). All "
                 "lists empty if frame≠none or nothing qualifies.")
+            # Thinking off, positively: reflection is synthesis over a fixed
+            # prompt. Omission means the server's default, which on Jill's
+            # Qwen3.8 Flash Next container was thinking on (2026-09-07:
+            # 2,726 reasoning tokens and 48 s for one memory pass). Never
+            # runs in workflow mode, so cloud routes are unaffected.
             result = self._llm_generate(
                 [{'role': 'system', 'content': sys_msg},
                  {'role': 'user', 'content': "\n\n".join(user_parts)}],
                 max_tokens=8192, is_json=True,
-                cot_profile='none')
+                cot_profile='none', reasoning_effort='none')
             if not result.success:
                 return ([], [], [])
             payload = result.text

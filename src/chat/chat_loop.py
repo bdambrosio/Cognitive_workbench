@@ -1472,27 +1472,23 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             # then contaminates state notes and re-injects into chat_reply's
             # system prompt on subsequent turns.
             #
-            # No reasoning_effort here. These passes are synthesis from a
-            # long prompt, not novel reasoning, and the original intent of
-            # pinning them to 'low' was to spend FEWER analysis tokens.
+            # THINKING OFF, POSITIVELY. These passes are synthesis from a
+            # long prompt, not novel reasoning. reasoning_effort='none' makes
+            # the backend omit the effort field and, on a local server, send
+            # chat_template_kwargs enable_thinking=false. The --reasoning
+            # launcher flag never reaches these calls: it is passed only at
+            # the ReAct action and orientation/triage sites.
             #
-            # That literal was inert for months — _ChatBackend only
-            # forwarded reasoning_effort when a scenario declared a
-            # baseline, and jill-chat.yaml declares none. Commit a0cb09e3
-            # let a call site opt in without a baseline (so --reasoning
-            # could reach the ReAct loop) and un-suppressed it here as a
-            # side effect. On Gemma-4 the effect inverts: its chat template
-            # has no reasoning_effort variable at all, so vLLM falls back to
-            # enable_thinking = (effort != "none") — the request that asked
-            # for LESS thinking switches thinking ON, from a default of off.
-            #
-            # Measured 2026-08-15: 12,049 characters of reasoning to emit
-            # the 15-character answer "NONE END_TRIAGE", and a 6-minute
-            # post-turn tail for three visible turns.
-            #
-            # Reflection reasoning belongs behind the launcher flag if it is
-            # ever wanted, not behind a literal in the reflection path.
-            tracker.llm_generate = self._make_llm_callable('none')
+            # Why positive rather than omitted: omission means the server's
+            # default. On 2026-09-07 Jill's Qwen3.8 Flash Next container was
+            # launched without a default of enable_thinking=false, so every
+            # call that sent nothing thought; the companion update spent
+            # 228 s and its whole 16,384-token budget in a repetition loop
+            # and returned nothing. The server default is the primary fix;
+            # this line is insurance against the next container drift.
+            # (Earlier history: a 'low' literal here switched thinking ON
+            # for Gemma-4, 2026-08-15, and was removed.)
+            tracker.llm_generate = self._make_llm_callable('none', reasoning_effort='none')
             new_disc = tracker.analyze_segment(
                 dialog, start=0, end=len(dialog) - 1,
                 previous_discourse_state=prev_disc, tom='',
@@ -1514,8 +1510,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             # executive_node) because chat-mode sessions rarely emit `close`,
             # and the template is built to self-prune slow-moving fields.
             prev_comp = self._companion_state.get(entity, '')
-            # No reasoning_effort — see the note on the discourse call above.
-            tracker.llm_generate = self._make_llm_callable('none')
+            # Thinking off — see the note on the discourse call above.
+            tracker.llm_generate = self._make_llm_callable('none', reasoning_effort='none')
             new_comp = tracker.update_companion_from_discourse_segment(
                 dialog, character_name=entity, start=0, end=len(dialog) - 1,
                 discourse_state=self._discourse_state.get(entity, ''),
