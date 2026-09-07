@@ -10,8 +10,11 @@ THREE CLASSES, AND ONLY ONE IS A MARK AGAINST THE SELLER. Findings with a
 verdict about the claim are what the review showed, ordered by materiality.
 `unverifiable` findings are unsettled, ordered by exposure, and among them
 those the searches named files for that nobody opened are set apart as not
-examined. Nothing here re-judges: every verdict, gap, rating and basis is the
-record's, copied.
+examined. Unsettled claims tagged `about: seller` at enumeration — promises
+about the seller's conduct or services, which code is not expected to settle
+— are listed under their own heading within the unsettled class, each with
+the question the review puts to the seller (2026-09-07). Nothing here
+re-judges: every verdict, gap, rating and basis is the record's, copied.
 """
 from __future__ import annotations
 
@@ -63,9 +66,13 @@ def _key(f: Dict[str, Any]) -> str:
 
 
 def classify(merged: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
-    """shown / unsettled / not_examined / holds, from the verdicts."""
+    """shown / unsettled / seller_unsettled / not_examined / holds, from the
+    verdicts. `seller_unsettled` is the unsettled claims tagged `about:
+    seller`; a seller-tagged claim the materials did settle stays with its
+    verdict, and one not examined stays with that class."""
     out: Dict[str, List[Dict[str, Any]]] = {
-        "shown": [], "unsettled": [], "not_examined": [], "holds": []}
+        "shown": [], "unsettled": [], "seller_unsettled": [], "not_examined": [],
+        "holds": []}
     for f in merged.get("findings") or []:
         adj = f.get("adjudication") or {}
         if ms.rateable(f):
@@ -73,6 +80,8 @@ def classify(merged: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
         elif ms.exposable(f):
             if adj.get("unresolved_because") == NOT_EXAMINED:
                 out["not_examined"].append(f)
+            elif f.get("about") == "seller":
+                out["seller_unsettled"].append(f)
             else:
                 out["unsettled"].append(f)
         else:
@@ -80,10 +89,31 @@ def classify(merged: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
     return out
 
 
+#: The line before the seller's promises. Fixed text, not a prose slot.
+SELLER_LINE = ("These claims are promises about what the seller does or offers — "
+               "maintenance, a hosted service, commercial terms, what is planned — "
+               "not about what the software does. The supplied materials are not "
+               "expected to settle them, and nothing in the materials was found "
+               "against them. Each carries its exposure rating, what would change "
+               "if the promise were not kept, and the question the review puts to "
+               "the seller. Ordered by exposure.")
+
+
 def _ratings_by_key(ratings: Dict[str, Any], array: str
                     ) -> Dict[str, Dict[str, Any]]:
     return {f"{r.get('claim_source')}#{r.get('claim_id')}": r
             for r in ratings.get(array) or []}
+
+
+def _questions_by_key(merged: Dict[str, Any]) -> Dict[str, List[str]]:
+    """The questions for the seller that name a claim, by that claim's key,
+    in record order."""
+    out: Dict[str, List[str]] = {}
+    for q in merged.get("questions") or []:
+        if q.get("claim_id") is None or not q.get("question"):
+            continue
+        out.setdefault(f"{q.get('claim_source')}#{q.get('claim_id')}", []).append(q["question"])
+    return out
 
 
 def _ordered(findings: Sequence[Dict[str, Any]], rated: Dict[str, Dict[str, Any]],
@@ -185,7 +215,7 @@ def _links(f: Dict[str, Any]) -> List[str]:
 
 
 def _finding(f: Dict[str, Any], rating: Optional[Dict[str, Any]],
-             field: str) -> List[str]:
+             field: str, questions: Optional[List[str]] = None) -> List[str]:
     adj = f.get("adjudication") or {}
     v = adj.get("verdict")
     head = f"### {f.get('claim_source')}, claim {f.get('claim_id')}"
@@ -238,6 +268,8 @@ def _finding(f: Dict[str, Any], rating: Optional[Dict[str, Any]],
                     if sm.get(field) != rating.get(field)] + [""]
     if f.get("correction"):
         out += [f"**Correction:** {_md_safe(f['correction'])}", ""]
+    for q in questions or []:
+        out += [f"**Question for the seller:** {_md_safe(q)}", ""]
     out += ["", "Evidence:", ""] + (_evidence(f.get("evidence")) or ["- (none)"])
     out += ["", f"Check: {_review_line(f)}.", ""]
     return out
@@ -265,7 +297,7 @@ def coverage(merged: Dict[str, Any], ratings: Dict[str, Any],
                or "none") + ".",
             f"Unsettled and not examined, by exposure: "
             + (", ".join(f"{k} {n}" for k, n in sorted((rf.get('exposure') or {}).items()))
-               or "none") + ".",
+               or "none") + f"; of which {len(classes['seller_unsettled'])} about the seller.",
             f"Not examined: {len(classes['not_examined'])} claim(s)."]
     unopened = sorted({f for r in merged.get("runs") or []
                        for f in (r.get("unopened_candidates") or [])})
@@ -368,8 +400,12 @@ def _how_to_read() -> List[str]:
         "nothing was found against them, and each carries an *exposure* "
         "rating. *Not examined* claims are unsettled claims whose searches "
         "named files the engagement did not open; they are listed apart and "
-        "are the first thing a further pass would settle. Claims that hold "
-        "are listed after the three classes.", "",
+        "are the first thing a further pass would settle. Unsettled claims "
+        "about the seller's own conduct or services — a promise to maintain, "
+        "a hosted service, commercial terms — are listed under their own "
+        "heading within the unsettled class, each with the question the "
+        "review puts to the seller. Claims that hold are listed after the "
+        "three classes.", "",
         "**Where the claim source points.** An unsettled claim whose "
         "materials were not supplied — a listing, a published package, a "
         "hosted service — shows any link the claim source itself gives for "
@@ -405,6 +441,7 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
     classes = classify(merged)
     by_m = _ratings_by_key(ratings, "ratings")
     by_e = _ratings_by_key(ratings, "exposures")
+    by_q = _questions_by_key(merged)
     runs = merged.get("runs") or []
     dates = sorted({(r.get("captured_at_utc") or "")[:10] for r in runs} - {""})
     revs = sorted({r.get("target_rev") or "" for r in runs} - {""})
@@ -464,18 +501,22 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
 
     out += ["## What the review showed", ""] + _slot("shown_note", prose)
     for f in _ordered(classes["shown"], by_m, "materiality"):
-        out += _finding(f, by_m.get(_key(f)), "materiality")
+        out += _finding(f, by_m.get(_key(f)), "materiality", by_q.get(_key(f)))
     if not classes["shown"]:
         out += ["No finding showed a gap.", ""]
     out += ["## Unsettled claims", ""] + _slot("unsettled_note", prose)
     for f in _ordered(classes["unsettled"], by_e, "exposure"):
-        out += _finding(f, by_e.get(_key(f)), "exposure")
+        out += _finding(f, by_e.get(_key(f)), "exposure", by_q.get(_key(f)))
     if not classes["unsettled"]:
         out += ["None.", ""]
+    if classes["seller_unsettled"]:
+        out += ["## Unsettled claims about the seller", "", SELLER_LINE, ""]
+        for f in _ordered(classes["seller_unsettled"], by_e, "exposure"):
+            out += _finding(f, by_e.get(_key(f)), "exposure", by_q.get(_key(f)))
     if classes["not_examined"]:
         out += ["## Claims not examined", ""] + _slot("not_examined_note", prose)
         for f in _ordered(classes["not_examined"], by_e, "exposure"):
-            out += _finding(f, by_e.get(_key(f)), "exposure")
+            out += _finding(f, by_e.get(_key(f)), "exposure", by_q.get(_key(f)))
     out += ["## Claims that hold", "",
             "| claim source | id | claim | evidence |", "|---|---|---|---|"]
     for f in sorted(classes["holds"], key=lambda x: (x.get("claim_source") or "",
@@ -519,7 +560,8 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
             + (", ".join(f"{k} {n}" for k, n in sorted((rf.get('materiality') or {}).items()))
                or "none") + ". Unsettled claims by exposure: "
             + (", ".join(f"{k} {n}" for k, n in sorted((rf.get('exposure') or {}).items()))
-               or "none") + f". Not examined: {len(classes['not_examined'])}.", ""]
+               or "none") + f", of which {len(classes['seller_unsettled'])} about the seller. "
+            f"Not examined: {len(classes['not_examined'])}.", ""]
     unopened = sorted({f for r in runs for f in (r.get("unopened_candidates") or [])})
     if unopened:
         out += [f"Files the searches named that were not opened ({len(unopened)}):", ""]

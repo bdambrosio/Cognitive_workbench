@@ -166,8 +166,9 @@ def main() -> int:
     (out / "worklist.md").write_text(render.worklist(record["merged"], out),
                                      encoding="utf-8")
     classes = render.classify(record["merged"])
-    logger.info("assembled: shown %d, unsettled %d, not examined %d, hold %d",
-                *(len(classes[k]) for k in ("shown", "unsettled",
+    logger.info("assembled: shown %d, unsettled %d (about the seller %d), "
+                "not examined %d, hold %d",
+                *(len(classes[k]) for k in ("shown", "unsettled", "seller_unsettled",
                                            "not_examined", "holds")))
     if args.no_prose:
         (out / "report.md").write_text(skeleton, encoding="utf-8")

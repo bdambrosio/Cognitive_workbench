@@ -17,9 +17,9 @@ def _record():
               {"form": "search", "kind": "structural", "performed": "p", "result": "r",
                "candidates": ["app/h.py"]}]
 
-    def f(src, cid, verdict, **adj):
+    def f(src, cid, verdict, about="target", **adj):
         return {"claim_source": src, "claim_id": cid, "quote": f"claim {cid} text",
-                "lines": [cid, cid], "statement": "s",
+                "lines": [cid, cid], "statement": "s", "about": about,
                 "adjudication": {"verdict": verdict, **adj},
                 "evidence": search if verdict == "unverifiable" else cite,
                 "review": {"outcome": "holds", "adverse_observations": []},
@@ -34,8 +34,13 @@ def _record():
             f("README.md", 2, "real"),
             f("README.md", 3, "unverifiable", unresolved_because="not_in_the_materials"),
             f("README.md", 4, "unverifiable", unresolved_because="not_examined"),
-            f("README.md", 5, "real_with_caveat", gap="g5")],
-        "questions": [{"claim_source": "README.md", "question": "who?"}],
+            f("README.md", 5, "real_with_caveat", gap="g5"),
+            # the seller's promises: one the materials cannot reach, one they settle
+            f("README.md", 6, "unverifiable", about="seller", unresolved_because="outside_the_materials"),
+            f("README.md", 7, "real", about="seller")],
+        "questions": [{"claim_source": "README.md", "question": "who?"},
+                      {"claim_source": "README.md", "claim_id": 6, "question": "for how long?"},
+                      {"claim_source": "README.md", "claim_id": 3, "question": "where?"}],
         "unclaimed": [],
         "figures": {"runs": 1, "claims": 5, "findings": 5, "reviewed": 5,
                     "unreviewed": 0,
@@ -46,9 +51,10 @@ def _record():
         {"claim_source": "README.md", "claim_id": 5, "materiality": "decisive", "basis": "b5"}],
         "exposures": [
         {"claim_source": "README.md", "claim_id": 3, "exposure": "not_material", "basis": "e3"},
-        {"claim_source": "README.md", "claim_id": 4, "exposure": "decisive", "basis": "e4"}],
+        {"claim_source": "README.md", "claim_id": 4, "exposure": "decisive", "basis": "e4"},
+        {"claim_source": "README.md", "claim_id": 6, "exposure": "material", "basis": "e6"}],
         "figures": {"materiality": {"material": 1, "decisive": 1},
-                    "exposure": {"not_material": 1, "decisive": 1}}}
+                    "exposure": {"not_material": 1, "decisive": 1, "material": 1}}}
     return {"merged": merged, "ratings": ratings, "dir": Path(".")}
 
 
@@ -57,7 +63,8 @@ def test_classify_sorts_by_verdict_and_disposition():
     assert [f["claim_id"] for f in c["shown"]] == [1, 5]
     assert [f["claim_id"] for f in c["unsettled"]] == [3]
     assert [f["claim_id"] for f in c["not_examined"]] == [4]
-    assert [f["claim_id"] for f in c["holds"]] == [2]
+    assert [f["claim_id"] for f in c["seller_unsettled"]] == [6]
+    assert [f["claim_id"] for f in c["holds"]] == [2, 7]          # settled seller claim stays with its verdict
 
 
 def test_assemble_without_prose_leaves_markers_and_orders_by_rating():
@@ -78,6 +85,7 @@ def test_assemble_without_prose_leaves_markers_and_orders_by_rating():
     # order of sections
     order = ["## The transaction", "## Executive summary", "## Scope and approach",
              "## How to read a finding", "## What the review showed", "## Unsettled claims",
+             "## Unsettled claims about the seller",
              "## Claims not examined", "## Claims that hold", "## Questions for the seller",
              "## Coverage", "## Limitations", "## Appendix"]
     idx = [doc.index(h) for h in order]
@@ -89,15 +97,24 @@ def test_assemble_without_prose_leaves_markers_and_orders_by_rating():
     shown = doc[doc.index("## What the review showed"):doc.index("## Unsettled claims")]
     assert shown.index("claim 5 — materiality: decisive") < shown.index("claim 1 — materiality: material")
     assert "**The gap:** g5" in shown and "`app/x.py`, lines 3–4" in shown
-    unsettled = doc[doc.index("## Unsettled claims"):doc.index("## Claims not examined")]
+    unsettled = doc[doc.index("## Unsettled claims"):doc.index("## Unsettled claims about the seller")]
     assert "claim 3 — exposure: not_material" in unsettled
     assert "material of the right kind was supplied" in unsettled
+    assert "**Question for the seller:** where?" in unsettled           # a question rides with its finding
+    assert "claim 6" not in unsettled
+    seller = doc[doc.index("## Unsettled claims about the seller"):doc.index("## Claims not examined")]
+    assert seller.startswith("## Unsettled claims about the seller\n\n" + render.SELLER_LINE)
+    assert "claim 6 — exposure: material" in seller
+    assert "**Question for the seller:** for how long?" in seller
+    assert "claim 7" not in seller and "claim 3" not in seller
     ne = doc[doc.index("## Claims not examined"):doc.index("## Claims that hold")]
     assert "claim 4 — exposure: decisive" in ne and "Files named: `app/h.py`" in ne
     assert "| README.md | 2 | claim 2 text | `app/x.py` lines 3–4 |" in doc
+    assert "| README.md | 7 | claim 7 text | `app/x.py` lines 3–4 |" in doc
     cov = doc[doc.index("## Coverage"):doc.index("## Limitations")]
-    assert "| contradicted | shown | 1 |" in cov and "| unverifiable | unsettled | 2 |" in cov
-    assert "Not examined: 1." in cov and "- `app/h.py`" in cov
+    assert "| contradicted | shown | 1 |" in cov and "| unverifiable | unsettled | 3 |" in cov
+    assert "of which 1 about the seller. Not examined: 1." in cov and "- `app/h.py`" in cov
+    assert "- (README.md, claim 6) for how long?" in doc                # the checklist stays complete
     lim = doc[doc.index("## Limitations"):doc.index("## Appendix")]
     assert "[[limitations]]" in lim and "has not confirmed the review's interpretation" in lim
     assert "- (README.md) who?" in doc
@@ -111,9 +128,10 @@ def test_assemble_places_prose_and_drops_the_not_examined_section_when_empty():
     assert "The engagement states nothing about the transaction" in doc
     assert "**The buyer's thresholds.**  \nNone recorded." in doc
     assert "## Claims not examined" in doc
-    rec["merged"]["findings"] = [f for f in rec["merged"]["findings"] if f["claim_id"] != 4]
+    rec["merged"]["findings"] = [f for f in rec["merged"]["findings"] if f["claim_id"] not in (4, 6)]
     doc = render.assemble(rec, None, None, "eng")
     assert "## Claims not examined" not in doc and "[[not_examined_note]]" not in doc
+    assert "## Unsettled claims about the seller" not in doc and render.SELLER_LINE not in doc
 
 
 def test_check_prose():
@@ -156,7 +174,7 @@ def test_header_index_and_worklist(tmp_path):
     assert doc.splitlines()[2].startswith("Materials as of 2026-09-02 at commit abcdef012345.")
     apx = doc[doc.index("## Appendix — every claim and its verdict"):]
     rows = [l for l in apx.splitlines() if l.startswith("| README.md")]
-    assert len(rows) == 5
+    assert len(rows) == 7
     assert "| README.md | 1 | 1 | claim 1 text | contradicted | material |" in rows[0]
     assert "| README.md | 4 | 4 | claim 4 text | unverifiable | decisive |" in rows[3]
     # worklist gathers every stage's issues, blocking first

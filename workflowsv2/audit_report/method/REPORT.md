@@ -26,6 +26,8 @@ The document sorts every claim the review did not find to hold into one of three
 | **unsettled** | The practice looked and the supplied materials cannot settle the claim. Nothing was found against it. Each carries an `exposure` rating: what it would change if the claim were false |
 | **not examined** | The practice's searches named files where the answer would be, and the engagement did not open them. Nothing was found against the claim, and nothing was looked at. Each carries an `exposure` rating |
 
+Within the unsettled class, claims about the seller's own conduct or services — a promise to maintain, a hosted service, commercial terms — are listed under their own heading, with the question the review puts to the seller beneath each. The materials are not expected to reach them.
+
 Claims the review found to hold are listed after the three classes.
 
 ## 4. What you must not do
@@ -62,7 +64,7 @@ Seven, each one field of the output. The document is assembled in this order, an
 4. **Scope and approach.** The table of what was examined, computed, followed by **`scope_note`** — two or three short paragraphs on what the table does not say: which claim sources were reviewed and which were not, what kind of material was not supplied or sits outside the materials, and what parts of the target the findings did not reach.
 5. How to read a finding, with every term defined. Written by the client's process.
 6. **`shown_note`** — one paragraph before the shown findings: what kind of gaps they are, what pattern they make taken together, and that they are ordered by materiality.
-7. **`unsettled_note`** — one paragraph before the unsettled claims: that nothing was found against them, what they have in common and why the materials cannot settle them, and that they are ordered by exposure.
+7. **`unsettled_note`** — one paragraph before the unsettled claims: that nothing was found against them, what they have in common and why the materials cannot settle them, and that they are ordered by exposure. The document lists unsettled claims about the seller's own conduct or services under a second heading after this passage; the passage introduces both, and the document's own line before the second heading says what sets them apart.
 8. **`not_examined_note`** — one to three sentences before the unexamined claims: that the searches named files nobody opened, that these claims are the first thing a further pass would settle, and that they are ordered by exposure. Empty when the document has no such claims.
 9. The claims that hold, the questions for the seller, the unclaimed observations, and the coverage figures, copied or computed.
 10. **`limitations`** — one paragraph. What this document is not: not a penetration test, not a code-quality review, not legal advice, not a judgement on claims it did not resolve. The facts about scope come from the document itself; add nothing it does not state. The client's process adds the inherent limitations it states in every report.
