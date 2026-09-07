@@ -486,6 +486,105 @@ def emit_parts(loop, method_text: str, stats: Dict[str, Any],
 
 
 # ---------------------------------------------------------------------------
+# The adverse-evidence recall check
+# ---------------------------------------------------------------------------
+
+#: Findings the recall check reads: the verdict where a missed adverse fact
+#: changes the report, since nothing in the finding says anything is wrong.
+RECALL_VERDICTS = ("real",)
+
+
+def adverse_recall(loop, method_text: str, run: Path,
+                   frozen: Sequence[Dict[str, Any]],
+                   findings: Sequence[Dict[str, Any]],
+                   max_tokens: int, batch: int = 10,
+                   budget: int = 400_000) -> Dict[str, Any]:
+    """For each finding rated `real`: does the material the audit read and
+    filed under the claim hold anything adverse to the claim that the finding
+    does not cite?
+
+    WHY. Two GLM audits of chhoto on one frozen surface (2026-09-06) rated
+    claim 29 `real_with_caveat` and `real`. Both had read frontend/index.html,
+    where the QR library is loaded from a CDN; one cited the line and one did
+    not, and the report's only material finding came and went with it. The
+    review's five checks read the finding as written and cannot see what it
+    left out; the materiality stage rates what it is handed. This check reads
+    the audit's own working record — the evidence requests filed under the
+    claim — which is where an uncited adverse line sits.
+
+    NOT AN OBSERVATION AND NOT AN OUTCOME. REVIEW.md defines the review; this
+    is a check the client's process runs beside it, recorded in
+    `adverse_recall.json` and as issues for the practice. It does not touch
+    `holds`, so the materiality stage's input is unchanged.
+
+    Batched the way adjudication batches: claims that share traces, the full
+    traces within the budget (`claims_audit.runner.evidence_batches`,
+    `gathered_evidence`). The trimmed form would defeat the purpose — the
+    uncited lines are exactly the ones trimming drops.
+    """
+    from workflowsv2.claims_audit.runner import (evidence_batches,
+                                                  gathered_evidence, trace_index)
+    traces = run / "working_record" / "inspect_traces"
+    claims_by_id = {c.get("id"): c for c in frozen}
+    subjects = {f.get("claim_id"): f for f in findings
+                if (f.get("adjudication") or {}).get("verdict") in RECALL_VERDICTS}
+    out: Dict[str, Any] = {"verdicts": list(RECALL_VERDICTS),
+                           "subjects": sorted(k for k in subjects if k is not None),
+                           "rows": [], "calls": [], "untagged": []}
+    if not subjects or not traces.is_dir():
+        out["note"] = "no subjects" if not subjects else "no evidence traces in the run"
+        return out
+    index = trace_index(traces)
+    batches = evidence_batches(sorted(k for k in subjects if k is not None),
+                               index, batch, budget)
+    for b in batches:
+        out["untagged"].extend(b["untagged"])
+        ids = [c for c in b["claims"] if c not in b["untagged"]]
+        if not ids:
+            continue
+        ev = gathered_evidence(b["traces"], budget)
+        lines = []
+        for cid in ids:
+            c, f = claims_by_id.get(cid) or {}, subjects[cid]
+            cited = [f"{e.get('document')}:{e.get('lines')}"
+                     for e in f.get("evidence") or []
+                     if isinstance(e, dict) and e.get("form") == "citation"]
+            lines.append(f"--- claim {cid}\n    quote     : {c.get('quote')}\n"
+                         f"    statement : {c.get('statement')}\n"
+                         f"    verdict   : real\n"
+                         f"    cites     : {', '.join(cited) or '(nothing)'}")
+        body = ("A recall check on findings rated `real`, beside the review. "
+                "For each claim below, the audit read the material that "
+                "follows and filed it under the claim, then rated the claim "
+                "`real` citing only the lines listed under `cites`. Read the "
+                "material and answer, per claim: does it hold anything that "
+                "contradicts, limits or qualifies the claim as stated — a "
+                "condition, a dependency, a narrower scope, a failure path — "
+                "that the finding does not cite? Set `uncited_adverse` true "
+                "only where you can name the document and lines in `where` "
+                "and say in `what`, in one sentence, what they show against "
+                "the claim. Material that merely restates the claim, or that "
+                "the finding already cites, is not adverse. Where nothing "
+                "adverse is present, `uncited_adverse` is false and `where` "
+                "and `what` are empty.\n\n"
+                + "\n\n".join(lines)
+                + "\n\nThe material the audit read, filed under these claims:\n\n"
+                + ev["text"]
+                + "\n\nEmit `adverse_recall` with one row for exactly these claims.")
+        got = emit(loop, method_text, body, schemas.adverse_recall_schema(),
+                   max_tokens)
+        out["calls"].append({"claims": ids, "traces": len(b["traces"]),
+                             "evidence": {k: v for k, v in ev.items() if k != "text"},
+                             **{k: v for k, v in got.items() if k not in ("raw", "obj")}})
+        rows = ((got.get("obj") or {}).get("adverse_recall") or [])
+        for r in rows:
+            if r.get("claim_id") in ids:
+                out["rows"].append(r)
+    out["hits"] = [r for r in out["rows"] if r.get("uncited_adverse")]
+    return out
+
+
+# ---------------------------------------------------------------------------
 # The retest
 # ---------------------------------------------------------------------------
 
@@ -624,6 +723,54 @@ under the schema in REVIEW §8.
 """
 
 
+def _write_recall(out: Path, recall: Dict[str, Any]) -> None:
+    """adverse_recall.json beside the review, and one issue per hit."""
+    (out / "adverse_recall.json").write_text(
+        json.dumps(recall, indent=1, ensure_ascii=False, default=str) + "\n",
+        encoding="utf-8")
+    for r in recall.get("hits") or []:
+        issues.note(out, stage="audit_review", code="adverse_recall",
+                    severity="check",
+                    text=(f"claim {r.get('claim_id')}: rated `real`, and the "
+                          f"material the audit read holds something adverse it "
+                          f"does not cite — {r.get('where')}: {r.get('what')}"))
+    logger.info("adverse recall: %d subject(s), %d call(s), %d hit(s), %d "
+                "with no request filed", len(recall.get("subjects") or []),
+                len(recall.get("calls") or []), len(recall.get("hits") or []),
+                len(recall.get("untagged") or []))
+
+
+def run_adverse_recall_only(run: Path, out: Path, args) -> int:
+    """`--adverse-recall-only`: the check on its own, for a run already
+    reviewed or one reviewed before the check existed."""
+    meta = json.loads((run / "run_meta.json").read_text())
+    target = Path(meta.get("external_repo") or ".")
+    frozen = json.loads((run / "claims.json").read_text()).get("claims") or []
+    findings = json.loads((run / "findings.json").read_text()).get("findings") or []
+    out.mkdir(exist_ok=True)
+    world = args.world or f"recall_{run.name[-40:]}"
+    from chat.chat_loop import ChatLoop                        # noqa: E402
+    name, cfg = build_config(run, world, Path(args.model) if args.model else None,
+                             target)
+    loop = ChatLoop(character_name=name, character_config=cfg)
+    method_text = load_workflow(REPO / REVIEW_PATH)
+    max_tokens = int((cfg.get("chat") or {}).get("react_max_tokens", 32768))
+    try:
+        recall = adverse_recall(loop, method_text, run, frozen, findings,
+                                max_tokens, batch=args.batch)
+    finally:
+        try:
+            loop._post_turn_executor.shutdown(wait=True)
+        except Exception as e:                                 # noqa: BLE001
+            logger.warning("executor shutdown failed: %s", e)
+    recall["model"] = loop.backend.resolved_model()
+    _write_recall(out, recall)
+    print(f"adverse recall: {len(recall.get('hits') or [])} hit(s) on "
+          f"{len(recall.get('subjects') or [])} `real` finding(s) -> "
+          f"{out / 'adverse_recall.json'}")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -638,6 +785,11 @@ def main() -> int:
     ap.add_argument("--held-sample", type=int, default=3,
                     help="findings that hold, retested as a control (REVIEW §9)")
     ap.add_argument("--seed", type=int, default=0, help="for the held sample")
+    ap.add_argument("--no-adverse-recall", action="store_true",
+                    help="skip the adverse-evidence recall check on `real` findings")
+    ap.add_argument("--adverse-recall-only", action="store_true",
+                    help="run only that check, against a run that already "
+                         "holds a review; writes review/adverse_recall.json")
     args = ap.parse_args()
 
     run = Path(args.run).resolve()
@@ -645,6 +797,10 @@ def main() -> int:
         if not (run / needed).is_file():
             raise SystemExit(f"{run}: no {needed} — not a finished audit run")
     out = run / "review"
+    if args.adverse_recall_only:
+        # The check reads the audit's record and the findings, never the
+        # review, so it may run beside an existing review and on past runs.
+        return run_adverse_recall_only(run, out, args)
     if (out / "review.json").is_file():
         raise SystemExit(f"{out}: already reviewed. A reviewer whose `inspect` "
                          f"can see a previous review is not independent of it.")
@@ -721,6 +877,16 @@ def main() -> int:
     obj = (emission or {}).get("obj") or {"claim_checks": [],
                                           "finding_reviews": [],
                                           "record_check": ""}
+    # ---- the adverse-evidence recall check, beside the review ------------
+    recall = None
+    if not error and not args.no_adverse_recall:
+        try:
+            recall = adverse_recall(loop, method_text, run, frozen, findings,
+                                    max_tokens, batch=args.batch)
+            _write_recall(out, recall)
+        except Exception as e:                                 # noqa: BLE001
+            logger.exception("adverse recall check failed")
+            recall = {"error": f"{type(e).__name__}: {e}"}
     check = schemas.check_review(obj, frozen, findings)
     for problem in check["problems"]:
         issues.note(out, stage="audit_review", code="review_check",
@@ -758,6 +924,11 @@ def main() -> int:
         "reviewed_run": run.name, "world": world,
         "model_config": args.model, "resolved_model": loop.backend.resolved_model(),
         "batch": args.batch, "held_sample": len(sampled),
+        "adverse_recall": (None if recall is None else
+                           {k: v for k, v in recall.items() if k in ("subjects", "untagged", "error")}
+                           | ({"hits": [r.get("claim_id") for r in recall.get("hits", [])],
+                               "calls": len(recall.get("calls", []))}
+                              if "error" not in recall else {})),
         "legs": legs, "wall_clock_s": wall,
         "transient_events": getattr(loop, "transient_events", None),
         "emission": [{k: v for k, v in c.items() if k != "raw"}

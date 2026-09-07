@@ -118,6 +118,22 @@ def record_check_schema() -> Dict[str, Any]:
         "required": ["record_check"]}
 
 
+def adverse_recall_schema() -> Dict[str, Any]:
+    """The adverse-evidence recall check, one row per finding rated `real`:
+    whether the material the audit read and filed under the claim holds
+    anything adverse to the claim that the finding does not cite. Not a
+    REVIEW.md observation and not part of the outcome; recorded beside the
+    review for the practice (runner.adverse_recall)."""
+    return {"type": "object", "properties": {
+        "adverse_recall": {"type": "array", "items": {"type": "object", "properties": {
+            "claim_id": {"type": "integer"},
+            "uncited_adverse": {"type": "boolean"},
+            "where": {"type": "string"},
+            "what": {"type": "string"}},
+            "required": ["claim_id", "uncited_adverse", "where", "what"]}}},
+        "required": ["adverse_recall"]}
+
+
 def review_schema() -> Dict[str, Any]:
     """All three parts in one response, for a review small enough to ask at once."""
     return {"type": "object", "properties": {
