@@ -65,7 +65,8 @@ characters:
     workflow: workflowsv2/claims_audit/method/CONTINUATION.md
 
     # OFF, unlike an engagement: a consultation is a conversation with the
-    # client, so orientation stays on. The post-turn passes do not (below).
+    # client, so discourse and orientation both stay on. Reflection and
+    # attribution do not (below).
     #
     # ORIENTATION IS NOT THE PROBLEM, and suppressing it was the wrong first
     # instinct. Measured 2026-08-26: asked for the most serious finding, the
@@ -81,15 +82,12 @@ characters:
     # unaware of the same thing more quietly.
     workflow_mode: false
 
-    # THE POST-TURN PASSES ARE OFF (Bruce, 2026-09-07). Discourse (which
-    # carries the companion update), reflection and claim attribution run
-    # after every reply and each is a model call; the session answers from
-    # the record, not from a memory of the client, so they buy nothing here
-    # and cost a tail of calls behind each answer. On a cloud route those
-    # calls also ran at the provider's default reasoning, which the model
-    # file does not describe. Orientation stays on, for the reason above.
-    discourse:
-      enabled: false
+    # REFLECTION AND ATTRIBUTION ARE OFF (Bruce, 2026-09-07). Both run after
+    # every reply as model calls; the session answers from the record, not
+    # from a memory of the client, so neither buys anything here. Discourse
+    # stays on: it is the running record of what was agreed in this
+    # conversation, and the next turn's prompt reads it. The companion
+    # update rides inside the discourse pass and has no switch of its own.
     reflection:
       enabled: false
     attribution:
