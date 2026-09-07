@@ -141,12 +141,20 @@ def findings_schema() -> Dict[str, Any]:
 # ---- the frozen surface --------------------------------------------------------
 
 def freeze(elements: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Label the elements S1..Sn in the order emitted. The label is the
-    report's name for an element and nothing else (METHOD §3)."""
-    out = []
-    for i, e in enumerate(elements, 1):
+    """Label the elements S1..Sn in the order emitted, one per identity.
+    The label is the report's name for an element and nothing else
+    (METHOD §3). A second element with the same kind and identity is the
+    same way in and is dropped, first one kept: sec_5 (2026-09-07) emitted
+    thirty elements of which fifteen were repeats, and every coverage
+    figure would have divided by the wrong denominator."""
+    out, seen = [], set()
+    for e in elements:
+        k = identity_key(e)
+        if k in seen:
+            continue
+        seen.add(k)
         row = dict(e)
-        row["label"] = f"S{i}"
+        row["label"] = f"S{len(out) + 1}"
         out.append(row)
     return out
 

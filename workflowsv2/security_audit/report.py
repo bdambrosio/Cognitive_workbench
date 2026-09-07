@@ -203,10 +203,13 @@ def assemble(run: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
     if delta:
         out += ["## Change since the previous review", "",
                 f"Compared with run `{delta['previous']}`, by element identity.", ""]
-        out += ["**New elements:** " + (", ".join(
+        out += ["**Elements enumerated this time and not last time:** " + (", ".join(
             f"`{e.get('identity')}`" for e in delta["new_elements"]) or "none") + "."]
-        out += ["**Elements no longer present:** " + (", ".join(
-            f"`{e.get('identity')}`" for e in delta["gone_elements"]) or "none") + "."]
+        out += ["**Elements enumerated last time and not this time:** " + (", ".join(
+            f"`{e.get('identity')}`" for e in delta["gone_elements"]) or "none")
+            + (". An element missing from this enumeration may still be on the host; "
+               "two enumerations of one collection differ, and this list is the "
+               "difference, not a change on the host." if delta["gone_elements"] else ".")]
         rc = delta["resolved_candidates"]
         out += ["**Findings the previous review carried that this collection does not "
                 "support:** " + (", ".join(f"`{i}` ({_md(f.get('title'))})" for i, f in rc)

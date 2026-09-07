@@ -46,7 +46,7 @@ Five, each one field of the output. The document is assembled in this order, and
 
 1. Title, host, collection date, the probe outcomes table, and the conclusion. Computed.
 2. **`summary`** — two or three short paragraphs after the conclusion: what this document is and what was examined; that every finding cites the collection by file and line, so any finding can be checked; and in one or two sentences what most changes what the owner assumed, named by element label. Where the conclusion carries a withheld grant, say in one sentence what the conclusion therefore does not cover.
-3. **`change_note`** — one paragraph after the computed change since the previous review, present only when the document has that section: what the new elements and the persistent gaps amount to. An empty string on a first review.
+3. **`change_note`** — one paragraph after the computed change since the previous review, present only when the document has that section: what the elements newly enumerated and the persistent gaps amount to. An element enumerated last time and not this time may still be on the host, because two enumerations differ; say that it was not enumerated, never that it is gone. An empty string on a first review.
 4. **`findings_note`** — one paragraph before the findings: what kind of paths they are, what pattern they make taken together, and that they are ordered by disposition and then by what an attacker reaches first.
 5. The findings, the attack surface table and the gap map. Computed.
 6. **`gaps_note`** — one to three sentences before the gap map: that these are what the collection could not settle, and that each names the observation that would.

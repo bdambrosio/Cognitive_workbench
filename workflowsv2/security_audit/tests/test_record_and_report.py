@@ -94,6 +94,9 @@ def test_surface_and_findings_checks(tmp_path):
     frozen = record.freeze(_surface())
     assert [e["label"] for e in frozen] == ["S1", "S2"]
     assert record.check_surface({"elements": _surface()}, c)["ok"]
+    # a repeat is the same way in: dropped at the freeze, labels stay dense
+    twice = record.freeze(_surface() + [dict(_surface()[0], description="again")])
+    assert [e["label"] for e in twice] == ["S1", "S2"] and twice[0]["description"] == "ssh on every interface"
     dup = {"elements": _surface() + [dict(_surface()[0])]}
     assert any("repeats" in p for p in record.check_surface(dup, c)["problems"])
     ok = record.check_findings(_findings(), frozen, c)
@@ -166,7 +169,7 @@ def test_change_since_compares_by_identity_not_label(tmp_path):
     assert [i for i, _ in delta["resolved_candidates"]] == ["socket tcp 0.0.0.0:22"]   # label moved S1->S2, identity matched
     doc = report.assemble(record.load_run(later), None, record.load_run(first))
     assert "## Change since the previous review" in doc and "[[change_note]]" in doc
-    assert "not resolved" in doc
+    assert "not resolved" in doc and "enumerated this time and not last time" in doc
 
 
 def test_prose_check(tmp_path):

@@ -1003,6 +1003,9 @@ def main() -> int:
                              f"{surface_call.get('parse_error')}")
                     break
                 frozen = record.freeze(sobj.get("elements") or [])
+                if len(frozen) < len(sobj.get("elements") or []):
+                    logger.info("surface: %d repeated element(s) dropped at the freeze",
+                                len(sobj.get("elements") or []) - len(frozen))
                 scheck = record.check_surface(sobj, collection)
                 for prob in scheck["problems"]:
                     issues.note(out, stage="security_audit", code="surface_check",
