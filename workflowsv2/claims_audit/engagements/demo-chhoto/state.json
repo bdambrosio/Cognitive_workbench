@@ -38,7 +38,7 @@
   },
   "chain": {
    "value": "done",
-   "at": "2026-09-06T18-22-14Z",
+   "at": "2026-09-07T01-41-39Z",
    "by": "job"
   }
  },
@@ -177,6 +177,39 @@
     {
      "label": "report",
      "pid": 162762,
+     "exit": 0
+    }
+   ]
+  },
+  {
+   "id": "2026-09-07T00-29-34Z",
+   "kind": "chain",
+   "state": "done",
+   "by": "spread run 2026-09-06 (claude)",
+   "started": "2026-09-07T00-29-34Z",
+   "ended": "2026-09-07T01-41-39Z",
+   "exit": 0,
+   "error": null,
+   "log": "/home/bruce/Downloads/Cognitive_workbench/workflowsv2/claims_audit/engagements/demo-chhoto/jobs/2026-09-07T00-29-34Z.log",
+   "steps": [
+    {
+     "label": "audit README.md",
+     "pid": 251348,
+     "exit": 0
+    },
+    {
+     "label": "review README.md",
+     "pid": 253694,
+     "exit": 0
+    },
+    {
+     "label": "materiality",
+     "pid": 258647,
+     "exit": 0
+    },
+    {
+     "label": "report",
+     "pid": 258846,
      "exit": 0
     }
    ]
