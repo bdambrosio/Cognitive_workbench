@@ -646,8 +646,19 @@ class _ChatBackend:
         # individual calls opt into, so omitting the field IS off. Sending
         # the literal would also risk a 400 from engines whose schema only
         # knows low|medium|high.
+        #
+        # ON A CLOUD ROUTE, OFF IS NOT AVAILABLE. chat_template_kwargs is
+        # local-only, and omitting the field there means the provider's
+        # default — on GLM at Fireworks that is MORE reasoning than
+        # `medium` (measure/models/fw_glm53flash.yaml, 2026-09-02). So a
+        # call that declines on a cloud route whose model file declares a
+        # baseline sends `low`, the smallest value the route accepts. A
+        # cloud model with no baseline is left alone: it may not accept
+        # the field at all. (Bruce, 2026-09-07.)
         if effective is not None and effective != 'none':
             body['reasoning_effort'] = effective
+        elif effective == 'none' and self.is_cloud and self.reasoning_effort:
+            body['reasoning_effort'] = 'low'
 
         # Skip grammar / chat_template_kwargs when going to a cloud endpoint
         # (signaled by api_key being set). Cloud providers reject those

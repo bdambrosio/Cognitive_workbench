@@ -127,3 +127,32 @@ def test_the_schema_would_be_rejected_by_strict_mode():
     # `text`, `query`, `to`, … are none of them required, which is why the
     # non-strict schema route saw them dropped.
     assert 'text' not in REACT_ACTION_SCHEMA['properties']
+
+
+def _effort_sent(captured, backend, **kw):
+    try:
+        backend.chat([{'role': 'user', 'content': 'x'}], **kw)
+    except Exception:
+        pass
+    body = captured.get('body') or {}
+    return body.get('reasoning_effort'), body.get('chat_template_kwargs')
+
+
+def test_declining_on_a_cloud_route_with_a_baseline_sends_low(captured):
+    """Off is not available on a cloud route: chat_template_kwargs is
+    local-only and an omitted field is the provider's default, which on GLM
+    at Fireworks reasons more than `medium`. So `none` becomes `low` there,
+    and only where the model file declares a baseline (a route known to
+    accept the field)."""
+    cloud = _ChatBackend(server='local', model='gpt-5.6-luna',
+                         base_url='https://api.openai.com/v1',
+                         api_key='OPENAI_API_KEY', reasoning_effort='medium')
+    assert _effort_sent(captured, cloud, reasoning_effort='none') == ('low', None)
+    assert _effort_sent(captured, cloud) == ('medium', None)
+    # no baseline: the field is not sent at all
+    bare = _cloud()
+    assert _effort_sent(captured, bare, reasoning_effort='none') == (None, None)
+    # local: positive off, no effort field, whatever the baseline
+    local = _ChatBackend(server='local', model='Qwen3.8-27B',
+                         base_url='http://127.0.0.1:5000', reasoning_effort='medium')
+    assert _effort_sent(captured, local, reasoning_effort='none') == (None, {'enable_thinking': False})
