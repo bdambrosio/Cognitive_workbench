@@ -194,6 +194,35 @@ def test_expectation_checks_log_in_shadow_and_bump_live(loop, tmp_path, monkeypa
     loop._log_expectation_checks(checks + checks, shown, 8)               # duplicates: one bump each
     assert get(a)["properties"]["activation"] == pytest.approx(0.4 + C._AGENT_CONCERN_BUMP_AMOUNT)
     assert get(u)["properties"]["strength"] == pytest.approx(0.5 + C._USER_CONCERN_BUMP_AMOUNT)
+    # the repeat wrote no rows: same expectation, verdict and direction as each concern's last row
+    assert len(_rows(tmp_path / "memory" / C._EXPECTATIONS_FILE)) == 2
+
+
+def test_expectation_rows_are_written_on_change_only(loop, tmp_path, monkeypatch):
+    now = datetime.now(timezone.utc).isoformat()
+    a = _note(loop, "Collection_ac", {"kind": "agent_concern", "status": "active", "activation": 0.4,
+                                      "instruction": "x", "rhythm_hours": 24,
+                                      "wip": "w\nEXPECT: quiet", "wip_updated_at": now}, "agent one")
+    shown = {"agent one": (a, "agent", {}, "quiet", 0.1)}
+    unclear = [{"concern": "agent one", "verdict": "unclear", "direction": "neutral", "evidence": "e1"}]
+    assert loop._log_expectation_checks(unclear, shown, 1) == 1
+    assert loop._log_expectation_checks(unclear, shown, 2) == 0            # same answer, different evidence: skipped
+    held = [{"concern": "agent one", "verdict": "held", "direction": "neutral", "evidence": "e3"}]
+    assert loop._log_expectation_checks(held, shown, 3) == 1               # verdict changed
+    assert loop._log_expectation_checks(held, shown, 4) == 0
+    shown2 = {"agent one": (a, "agent", {}, "louder", 0.1)}               # expectation rewritten
+    assert loop._log_expectation_checks(held, shown2, 5) == 1
+    rows = _rows(tmp_path / "memory" / C._EXPECTATIONS_FILE)
+    assert [(r["turn_seq"], r["verdict"], r["expect"]) for r in rows] == \
+        [(1, "unclear", "quiet"), (3, "held", "quiet"), (5, "held", "louder")]
+    # the live bump does not depend on a row being written
+    monkeypatch.setattr(C, "_EXPECTATIONS_LIVE", True)
+    bad = [{"concern": "agent one", "verdict": "violated", "direction": "aversive", "evidence": "e6"}]
+    loop._log_expectation_checks(bad, shown2, 6)
+    loop._log_expectation_checks(bad, shown2, 7)
+    assert loop.resource_manager.get_resource(a)["properties"]["activation"] == \
+        pytest.approx(0.4 + 2 * C._AGENT_CONCERN_BUMP_AMOUNT)
+    assert len(_rows(tmp_path / "memory" / C._EXPECTATIONS_FILE)) == 4
 
 
 def test_wip_prompt_asks_for_the_expect_line(loop):

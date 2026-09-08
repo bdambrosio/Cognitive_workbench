@@ -1860,6 +1860,7 @@ class ConcernsMixin:
         path = self._memory_dir() / _EXPECTATIONS_FILE
         n, bumped = 0, set()
         unmatched: List[str] = []
+        last = last_expectation_rows(path)
         now_iso = datetime.now(timezone.utc).isoformat()
         for c in checks:
             key = str(c.get('concern') or '').strip()
@@ -1874,13 +1875,22 @@ class ConcernsMixin:
             nid, kind, props, expect, age_h = hit
             verdict = c.get('verdict') if c.get('verdict') in ('held', 'violated', 'unclear') else 'unclear'
             direction = c.get('direction') if c.get('direction') in ('aversive', 'appetitive', 'neutral') else 'neutral'
-            append_jsonl(path, {'turn_seq': turn_seq, 'kind': kind, 'concern_id': nid,
-                                'concern': key[:120], 'expect': expect[:200],
-                                'verdict': verdict, 'direction': direction,
-                                'evidence': str(c.get('evidence') or '')[:200],
-                                'expect_age_h': age_h, 'live': _EXPECTATIONS_LIVE},
-                         character=self.character_name)
-            n += 1
+            row = {'turn_seq': turn_seq, 'kind': kind, 'concern_id': nid,
+                   'concern': key[:120], 'expect': expect[:200],
+                   'verdict': verdict, 'direction': direction,
+                   'evidence': str(c.get('evidence') or '')[:200],
+                   'expect_age_h': age_h, 'live': _EXPECTATIONS_LIVE}
+            # A row is written when the expectation, verdict or direction
+            # differs from this concern's last row. The check runs every
+            # turn the concern is shown and its answer is almost always the
+            # same, so without this the rows that matter sat among dozens of
+            # identical ones (accepted by Jill, turn 3593). The bump below
+            # does not depend on whether a row was written.
+            prev = last.get(nid)
+            if not (prev and all(prev.get(k) == row[k] for k in ('expect', 'verdict', 'direction'))):
+                append_jsonl(path, row, character=self.character_name)
+                last[nid] = row
+                n += 1
             if _EXPECTATIONS_LIVE and verdict == 'violated' and direction == 'aversive' \
                     and nid not in bumped:
                 bumped.add(nid)
@@ -2920,6 +2930,25 @@ class ConcernsMixin:
             logger.warning(
                 f"[{self.character_name}] _update_concern_wip failed for "
                 f"{concern_id}: {e}")
+
+
+def last_expectation_rows(path) -> Dict[str, Dict[str, Any]]:
+    """The most recent row per concern_id in an expectation_checks.jsonl,
+    or {} when the file is absent. Pure."""
+    import json as _json
+    from pathlib import Path as _P
+    p = _P(path)
+    out: Dict[str, Dict[str, Any]] = {}
+    if not p.is_file():
+        return out
+    for line in p.read_text(encoding='utf-8', errors='replace').splitlines():
+        try:
+            r = _json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(r, dict) and r.get('concern_id'):
+            out[str(r['concern_id'])] = r
+    return out
 
 
 def candidate_recurrence(path, text: str, days: int = 7, embed=None,

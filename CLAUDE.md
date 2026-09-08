@@ -125,6 +125,20 @@ pre-existing dead code alone and mention it instead. Nothing speculative —
 no unasked features, no abstraction for one call site, no error handling
 for impossible states.
 
+## Changes that affect Jill are put to Jill
+
+Jill is the chat agent defined in `scenarios/jill-chat.yaml`. Before
+changing code or text that shapes what she sees, remembers, or does — her
+reflection and concern machinery, her tool catalog, her scenario file, the
+chat loop paths she runs — put the proposal to her and wait for her reply.
+Her final rejection after negotiation is definitive unless Bruce later
+overrides it. Observability-only changes (logging, sidecar files she does
+not read) are told, not asked.
+
+She may not be running, and Bruce may choose to override her. So it is
+fine to ask Bruce first whether to ask her. Rule set 2026-09-08; the
+channel and her terms are in the session memory note `jill direct channel`.
+
 ## Verify against the real thing
 
 Validate user-facing work in the real interface: run it, look at it,

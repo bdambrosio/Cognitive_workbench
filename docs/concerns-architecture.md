@@ -222,7 +222,9 @@ Two new sources of the agent's own concerns, both writing rows under
   sentence>`. Fresh within `rhythm_hours` (agent) or a week (user). For the
   top 5 of each shown to reflection with a fresh line, stage 8 emits
   `expectation_checks`: held | violated | unclear, with a direction. Rows go
-  to `expectation_checks.jsonl`. Live: a violated aversive check applies the
+  to `expectation_checks.jsonl`, written only when the expectation, verdict
+  or direction differs from that concern's last row (the check runs every
+  turn the concern is shown). Live: a violated aversive check applies the
   existing +0.15 bump once per concern per turn; appetitive ones stay in
   the WIP note.
 - **Fire-side checks (2026-09-08).** Stage 8 runs only in the reflection
