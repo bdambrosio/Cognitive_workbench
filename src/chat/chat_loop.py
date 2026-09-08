@@ -2157,7 +2157,11 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # Auto-RAG: pull top-k durable memories that match this turn's input.
         # Injected next to the Companion block in the system prompt; no ReAct
         # tool call required. Cheap miss (one embedding query).
-        recall = self._recall(text, k=3, record_near_misses=True)
+        # Near misses are recorded on human turns only. An autonomous fire
+        # recalls against the same instruction every rhythm, so the same
+        # losers would recur by clockwork and trip the three-in-a-week rule
+        # for nothing (seen in the first hour of rows, 2026-09-07).
+        recall = self._recall(text, k=3, record_near_misses=not autonomous)
         # Concerns surface: user_concerns (top by strength) + agent_concerns
         # (top by activation). Two separate lists — the prompt builder
         # renders each in its own section. No firing on user turns;
