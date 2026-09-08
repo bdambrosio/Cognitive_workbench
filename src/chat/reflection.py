@@ -70,6 +70,50 @@ _REFLECT_STAGE6_RULE = (
     "\"evidence\": \"<quote or paraphrase of the user evidence, <=200 chars>\"}, ...]"
 )
 
+# STAGE 7 — candidates (2026-09-07). Kept OUT of the base prompt like stage
+# 6: appended only when the turn has thoughts or recurring near-misses to
+# show, so a turn without them keeps a byte-identical prompt. Candidates are
+# written to a shadow log (concerns.py) and create nothing.
+_REFLECT_STAGE7_RULE = (
+    "This turn also has STAGE 7 — candidates. Under \"## What {character} "
+    "thought while reasoning this turn\" are {character}'s own thoughts from "
+    "the action loop, and under \"## Memories that came close this week and "
+    "were not used\" are memories that keep ranking just below the recall "
+    "cutoff. From these ONLY, emit as `candidates` the things {character} "
+    "noticed that the reply did not use and that press — a connection made "
+    "and set aside, a wrongness on a dimension {character} cares about, a "
+    "memory that keeps almost surfacing. A candidate is NOT a concern and "
+    "creates nothing; it is a record of noticing. Never a candidate for "
+    "something {entity} asked for — that is stage 4. Usually this list is "
+    "empty.\n"
+    "  [{{\"text\": \"<=120 chars\", \"why\": \"<what was noticed and where, "
+    "<=200 chars>\", \"source\": \"trace|near_miss|both\", "
+    "\"sign\": \"aversive|appetitive|neutral\", \"affectable\": true|false}}, ...]\n"
+    "`sign`: aversive when the noticing points at something wrong on a "
+    "dimension {character} cares about, appetitive when at something worth "
+    "pursuing. `affectable`: whether {character} could do something about it."
+)
+
+# STAGE 8 — expectation checks (2026-09-07). Appended only when at least one
+# shown concern carries a fresh `EXPECT:` line. Checks are written to a
+# shadow log and bump nothing until _EXPECTATIONS_LIVE.
+_REFLECT_STAGE8_RULE = (
+    "This turn also has STAGE 8 — expectation checks. Some concerns listed "
+    "above carry a line `EXPECT: ...`: what {character} expected to find on "
+    "that concern's dimension. For each such concern, and only those, say "
+    "whether THIS exchange bore on the expectation: `held` if the exchange "
+    "showed it holding, `violated` if it showed otherwise, `unclear` if the "
+    "exchange did not touch it. `direction` is aversive when a violation is "
+    "something wrong on that dimension, appetitive when it is something "
+    "better than expected. Evidence must be from this exchange.\n"
+    "Emit `expectation_checks` (one entry per EXPECT line shown; `unclear` "
+    "is the usual verdict):\n"
+    "  [{{\"concern\": \"<its text exactly as listed>\", "
+    "\"verdict\": \"held|violated|unclear\", "
+    "\"direction\": \"aversive|appetitive|neutral\", "
+    "\"evidence\": \"<=200 chars\"}}, ...]"
+)
+
 
 class ReflectionMixin:
     """Mixin for ChatLoop — moved verbatim from chat_loop.py."""
@@ -162,8 +206,12 @@ class ReflectionMixin:
         "{entity} appears to want from {character} about it — to be "
         "witnessed, to have it tracked, to get hands-on help, to have it "
         "researched, to discuss it. State that stance in plain language "
-        "grounded in the evidence; don't guess beyond it. Strength is "
-        "set to 1.0 by the runtime — don't include strength in your output.\n"
+        "grounded in the evidence; don't guess beyond it. End `context` "
+        "with one line starting exactly 'EXPECT: ' — one sentence saying "
+        "what {character} expects {entity}'s state on this concern to be "
+        "the next time it comes up, so a later exchange can be read against "
+        "it. Strength is set to 1.0 by the runtime — don't include strength "
+        "in your output.\n"
         "UPDATE user_concerns: if this exchange materially DEVELOPS a "
         "concern listed under \"## Existing user_concerns\" — new "
         "evidence, a shift in what {entity} wants, real progress — emit "
@@ -385,6 +433,40 @@ class ReflectionMixin:
         "lists empty and capability_gap null."
     )
 
+    #: How much of the turn's own thinking the reflection sees.
+    _THOUGHTS_CAP = 4000
+
+    def _turn_thoughts(self, source: str) -> str:
+        """The `thought` fields of this turn's ACTION lines, in order, from
+        the reasoning record the turn just wrote; the tail is kept when the
+        cap is hit. Observations are left out on purpose: they are tool
+        output, not the agent's noticing. '' when nothing is found."""
+        try:
+            records = self._load_reasoning_records()
+        except Exception as e:                                     # noqa: BLE001
+            logger.warning(f"[{self.character_name}] reasoning records unreadable: {e}")
+            return ''
+        rec = None
+        for r in reversed(records or []):
+            if r.get('source') == source and not r.get('autonomous'):
+                rec = r
+                break
+        if not rec:
+            return ''
+        self._last_turn_seq = rec.get('turn_seq')
+        out: List[str] = []
+        for line in str(rec.get('working_log') or '').splitlines():
+            if not line.startswith('ACTION: '):
+                continue
+            obj = repair_json_string(line[len('ACTION: '):])
+            th = (obj or {}).get('thought') if isinstance(obj, dict) else None
+            if isinstance(th, str) and th.strip():
+                out.append(th.strip())
+        text = "\n".join(f"- {t}" for t in out)
+        if len(text) > self._THOUGHTS_CAP:
+            text = "[earlier thoughts omitted]\n" + text[-self._THOUGHTS_CAP:]
+        return text
+
     def _reflect_and_remember(self, source: str, entity: Optional[str] = None
                               ) -> Tuple[List[str], List[str], List[str]]:
         """Run a single reflection LLM call over the latest exchange; persist
@@ -440,9 +522,35 @@ class ReflectionMixin:
             # this list so the empty-registry prompt stays byte-identical
             # to pre-capture behavior. Load failure → [] (stays pending).
             pending_fires = self._load_pending_fire_outcomes()
+            # STAGE 7 inputs: the agent's own thoughts from this turn's
+            # action loop (never the observations — those are tool output)
+            # and memories that came close this week without being used.
+            thoughts = self._turn_thoughts(source)
+            near = []
+            try:
+                near = self._near_miss_recurrent()
+            except Exception as e:                                 # noqa: BLE001
+                logger.warning(f"[{self.character_name}] near-miss read failed: {e}")
+            # STAGE 8 inputs: the fresh EXPECT line of each shown concern,
+            # keyed by the text the model sees so a check resolves back.
+            shown_expect: Dict[str, Tuple[str, str, Dict[str, Any], str, float]] = {}
+            for nid, text, _a, p in existing_agent[:5]:
+                ex = self.expect_line(p, 'agent')
+                if ex:
+                    shown_expect[text] = (nid, 'agent', p, ex[0], ex[1])
+            for nid, text, _s, p in existing_user[:5]:
+                ex = self.expect_line(p, 'user')
+                if ex:
+                    shown_expect[text] = (nid, 'user', p, ex[0], ex[1])
             sys_msg = self._REFLECT_SYS.format(
                 character=self.character_name, entity=entity,
                 narrowness_rule=_CONCERN_INSTRUCTION_NARROWNESS_RULE)
+            if thoughts or near:
+                sys_msg += "\n\n" + _REFLECT_STAGE7_RULE.format(
+                    character=self.character_name, entity=entity)
+            if shown_expect:
+                sys_msg += "\n\n" + _REFLECT_STAGE8_RULE.format(
+                    character=self.character_name, entity=entity)
             if pending_fires:
                 sys_msg += "\n\n" + _REFLECT_STAGE6_RULE
             user_parts = []
@@ -467,6 +575,8 @@ class ReflectionMixin:
                 for _nid, text, _s, p in existing_user:
                     ctx = str((p or {}).get('context', '') or '').strip()
                     lines.append(f"- {text} — {ctx[:100]}" if ctx else f"- {text}")
+                    if text in shown_expect and shown_expect[text][1] == 'user':
+                        lines.append(f"    EXPECT: {shown_expect[text][3]}")
                 user_parts.append(
                     "## Existing user_concerns (do NOT re-emit; emit only "
                     "NEW user_concerns this exchange surfaced)\n" + "\n".join(lines))
@@ -481,13 +591,30 @@ class ReflectionMixin:
                     if p.get('seed'):
                         return " [seed]"
                     return " [system]" if p.get('system_spawned') else ""
-                lines = [
-                    f"- {text}{_tag(p)}"
-                    for _nid, text, _a, p in existing_agent]
+                lines = []
+                for _nid, text, _a, p in existing_agent:
+                    lines.append(f"- {text}{_tag(p)}")
+                    if text in shown_expect and shown_expect[text][1] == 'agent':
+                        lines.append(f"    EXPECT: {shown_expect[text][3]}")
+                from chat.concerns import _AGENT_CONCERN_POPULATION_CAP as _cap
+                n_active = self._active_nonseed_agent_count()
+                cap_line = (f"{n_active} of {_cap} active. "
+                            + ("At the cap: close one under agent_concerns_closed "
+                               "before creating one; a new one at the cap is refused."
+                               if n_active >= _cap else ""))
                 user_parts.append(
                     "## Existing agent_concerns (do NOT re-emit; emit only "
                     "NEW agent_concerns this exchange surfaced; candidates "
-                    "for agent_concerns_closed)\n" + "\n".join(lines))
+                    "for agent_concerns_closed)\n" + cap_line.strip() + "\n"
+                    + "\n".join(lines))
+            if thoughts:
+                user_parts.append(
+                    f"## What {self.character_name} thought while reasoning this turn\n"
+                    + thoughts)
+            if near:
+                user_parts.append(
+                    "## Memories that came close this week and were not used\n"
+                    + "\n".join(f"- ({count}×) {t[:120]}" for _nid, count, t in near))
             if pending_fires:
                 # Identity + reach-back beyond the 4-turn dialog window;
                 # the reaction evidence itself is usually already in the
@@ -509,6 +636,10 @@ class ReflectionMixin:
                            "agent_concerns, agent_concerns_closed")
             if pending_fires:
                 return_keys += ", fire_outcomes"
+            if thoughts or near:
+                return_keys += ", candidates"
+            if shown_expect:
+                return_keys += ", expectation_checks"
             user_parts.append(
                 f"Return the JSON object now (keys: {return_keys}). All "
                 "lists empty if frame≠none or nothing qualifies.")
@@ -517,9 +648,13 @@ class ReflectionMixin:
             # Qwen3.8 Flash Next container was thinking on (2026-09-07:
             # 2,726 reasoning tokens and 48 s for one memory pass). Never
             # runs in workflow mode, so cloud routes are unaffected.
+            user_text = "\n\n".join(user_parts)
+            logger.info(f"[{self.character_name}] reflection input: {len(user_text)} chars; "
+                        f"thoughts {len(thoughts)} chars, near-misses {len(near)}, "
+                        f"expectations shown {len(shown_expect)}")
             result = self._llm_generate(
                 [{'role': 'system', 'content': sys_msg},
-                 {'role': 'user', 'content': "\n\n".join(user_parts)}],
+                 {'role': 'user', 'content': user_text}],
                 max_tokens=8192, is_json=True,
                 cot_profile='none', reasoning_effort='none')
             if not result.success:
@@ -562,6 +697,30 @@ class ReflectionMixin:
             if isinstance(payload, dict) and pending_fires:
                 self._apply_fire_outcome_judgments(
                     payload.get('fire_outcomes'), pending_fires)
+
+            # STAGE 7 / 8 (shadow): rows to <memory>/, nothing created or
+            # bumped unless the flags in concerns.py say so. Gated on the
+            # sections having been shown, like fire_outcomes.
+            if isinstance(payload, dict):
+                turn_seq = getattr(self, '_last_turn_seq', None)
+                if thoughts or near:
+                    cands = payload.get('candidates')
+                    if isinstance(cands, list) and cands:
+                        try:
+                            n = self._log_concern_candidates(
+                                [c for c in cands if isinstance(c, dict)], turn_seq, entity)
+                            logger.info(f"[{self.character_name}] reflection: {n} candidate(s) logged")
+                        except Exception as e:                     # noqa: BLE001
+                            logger.warning(f"[{self.character_name}] candidate log failed: {e}")
+                if shown_expect:
+                    checks = payload.get('expectation_checks')
+                    if isinstance(checks, list) and checks:
+                        try:
+                            n = self._log_expectation_checks(
+                                [c for c in checks if isinstance(c, dict)], shown_expect, turn_seq)
+                            logger.info(f"[{self.character_name}] reflection: {n} expectation check(s) logged")
+                        except Exception as e:                     # noqa: BLE001
+                            logger.warning(f"[{self.character_name}] expectation log failed: {e}")
 
             mems_written: List[str] = []
             for text, category, polarity in raw_memories:

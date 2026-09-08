@@ -1,0 +1,266 @@
+"""The agent's own concerns, in shadow (2026-09-07): the population cap,
+near-miss rows and their recurrence, candidate rows and would-promote,
+expectation lines and their checks, and the two companion headings.
+
+Same construction as test_concern_dynamics.py: object.__new__(ChatLoop)
+over a scratch world, a stubbed backend, nothing live.
+"""
+import json
+import os
+import shutil
+import sys
+import threading
+import uuid
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
+from chat import concerns as C                                   # noqa: E402
+from chat.chat_loop import ChatLoop                              # noqa: E402
+from chat.memories import near_miss_recurrent                    # noqa: E402
+from infospace_resource_manager import InfospaceResourceManager   # noqa: E402
+
+
+class StubBackend:
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.calls = 0
+
+    def chat(self, messages, **kwargs):
+        self.calls += 1
+        return self.responses.pop(0) if len(self.responses) > 1 else self.responses[0]
+
+
+@pytest.fixture
+def loop(tmp_path):
+    world = f"pytest_scratch_{uuid.uuid4().hex[:8]}"
+    mgr = InfospaceResourceManager(world, world_config={"world_name": world})
+    inst = object.__new__(ChatLoop)
+    inst.character_name = "Tester"
+    inst.resource_manager = mgr
+    inst._faiss_lock = threading.Lock()
+    for cid, kind in (("Collection_ac", "agent_concerns"), ("Collection_uc", "user_concerns")):
+        mgr.resource_registry[cid] = {
+            "name": cid, "type": mgr.resource_types.Collection, "location": (0, 0),
+            "description": kind, "remove_on_take": False,
+            "properties": {"content": [], "format": "list", "collection_name": kind, "kind": kind}}
+    inst._agent_concerns_collection_id = "Collection_ac"
+    inst._user_concerns_collection_id = "Collection_uc"
+    inst.backend = StubBackend(['{"verdict": "fire"}'])
+    inst._autonomy_log_path = lambda: tmp_path / "autonomy.jsonl"
+    inst._memory_dir = lambda: tmp_path / "memory"
+    # no embedder: recurrence search finds nothing
+    inst._find_similar_concern = lambda text, cid: None
+    yield inst
+    shutil.rmtree(Path(__file__).parent.parent / "scenarios" / world, ignore_errors=True)
+
+
+def _note(loop, cid, props, text="concern text"):
+    props = {"exclude_from_index": True, **props}
+    ok, nid, err, _ = loop.resource_manager.create_note("Tester", text, "text", "pytest", "", "", props)
+    assert ok, err
+    loop.resource_manager.resource_registry[cid]["properties"]["content"].append(nid)
+    return nid
+
+
+def _rows(path):
+    return [json.loads(l) for l in Path(path).read_text().splitlines() if l.strip()]
+
+
+# ── the cap ───────────────────────────────────────────────────────────
+
+def test_cap_refuses_chosen_concerns_and_passes_debts(loop, tmp_path):
+    for i in range(C._AGENT_CONCERN_POPULATION_CAP):
+        _note(loop, "Collection_ac", {"kind": "agent_concern", "status": "active",
+                                      "activation": 0.1, "instruction": None, "rhythm_hours": 24},
+              text=f"c{i}")
+    _note(loop, "Collection_ac", {"kind": "agent_concern", "status": "active", "seed": True,
+                                  "activation": 0.1, "instruction": None, "rhythm_hours": 24}, text="seed")
+    assert loop._active_nonseed_agent_count() == C._AGENT_CONCERN_POPULATION_CAP
+    # reflection's kind of create: refused, logged
+    assert loop._add_agent_concern("one more", entity="User") is None
+    ev = _rows(tmp_path / "autonomy.jsonl")
+    assert ev[-1]["event"] == "concern_refused_cap" and ev[-1]["cap"] == C._AGENT_CONCERN_POPULATION_CAP
+    # a yield's remainder and system-spawned work pass
+    assert loop._add_agent_concern("remainder", entity="User", skip_recurrence=True) is not None
+    assert loop._add_agent_concern("verify", entity="User",
+                                   extra_properties={"system_spawned": True}) is not None
+
+
+# ── near misses ────────────────────────────────────────────────────────
+
+def test_near_miss_rows_and_recurrence(tmp_path):
+    from utils.file_utils import append_jsonl
+    p = tmp_path / "near_misses.jsonl"
+    old = (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
+    for _ in range(3):
+        append_jsonl(p, {"note_id": "Note_1", "final": 0.61, "rank": 4, "of": 5}, character="T")
+    append_jsonl(p, {"note_id": "Note_2", "final": 0.7, "rank": 4, "of": 5}, character="T")
+    append_jsonl(p, {"note_id": "Note_3", "final": 0.9, "rank": 4, "of": 5, "ts": old}, character="T")
+    append_jsonl(p, {"note_id": "Note_3", "final": 0.9, "rank": 4, "of": 5, "ts": old}, character="T")
+    append_jsonl(p, {"note_id": "Note_3", "final": 0.9, "rank": 4, "of": 5, "ts": old}, character="T")
+    assert near_miss_recurrent(p, days=7, min_count=3) == [("Note_1", 3, 0.61)]
+    assert near_miss_recurrent(p, days=30, min_count=3)[0][0] == "Note_3"      # older rows count in a wider window
+    assert near_miss_recurrent(tmp_path / "absent.jsonl") == []
+
+
+def test_recall_records_losers_only_when_asked(loop, tmp_path):
+    loop._memories_collection_id = "Collection_mem"
+    hits = [{"document": f"m{i}", "score": 0.9 - i * 0.05, "metadata": {"source_note_id": f"Note_{i}"}}
+            for i in range(6)]
+    loop.resource_manager.search_collection = lambda *a, **k: (True, hits, None)
+    loop.resource_manager.get_resource = lambda nid: {"properties": {}, "content": nid}
+    loop._recency_adjust = lambda s, ca: s
+    out = loop._recall("q", k=3)
+    assert len(out) == 3 and not (tmp_path / "memory" / "near_misses.jsonl").exists()
+    out = loop._recall("q", k=3, record_near_misses=True)
+    rows = _rows(tmp_path / "memory" / "near_misses.jsonl")
+    assert [r["note_id"] for r in rows] == ["Note_3", "Note_4", "Note_5"]
+    assert rows[0]["rank"] == 4 and rows[0]["of"] == 6
+    assert out[0][5]["runner_up"]["note_id"] == "Note_3"
+
+
+# ── candidates ─────────────────────────────────────────────────────────
+
+def test_candidates_are_logged_and_recur_without_creating(loop, tmp_path, monkeypatch):
+    created = []
+    monkeypatch.setattr(loop, "_add_agent_concern", lambda *a, **k: created.append(a) or "Note_x")
+    cand = [{"text": "the async pipeline keeps needing a diagram", "why": "third module today",
+             "source": "trace", "sign": "aversive", "affectable": True},
+            {"text": "", "why": "empty text is dropped"}]
+    for turn in (1, 2):
+        assert loop._log_concern_candidates(cand, turn, "User") == 1
+    rows = _rows(tmp_path / "memory" / C._CANDIDATES_FILE)
+    assert len(rows) == 2 and all("would_promote" not in r for r in rows)
+    assert loop._log_concern_candidates(cand, 3, "User") == 1
+    rows = _rows(tmp_path / "memory" / C._CANDIDATES_FILE)
+    wp = [r for r in rows if "would_promote" in r]
+    assert len(wp) == 1 and wp[0]["count"] == 3 and wp[0]["live"] is False
+    assert created == []                                            # shadow: nothing created
+    assert C.candidate_recurrence(tmp_path / "memory" / C._CANDIDATES_FILE,
+                                  "THE async  pipeline keeps needing a diagram") == 3
+    # live: promoted through the normal create path
+    monkeypatch.setattr(C, "_CANDIDATES_LIVE", True)
+    loop._log_concern_candidates(cand, 4, "User")
+    assert created and created[0][0] == cand[0]["text"]
+
+
+# ── expectations ───────────────────────────────────────────────────────
+
+def test_expect_line_reads_the_last_line_while_fresh():
+    now = datetime.now(timezone.utc)
+    fresh = (now - timedelta(hours=2)).isoformat()
+    stale = (now - timedelta(hours=30)).isoformat()
+    agent = {"wip": "findings so far\nNEXT: look again\nEXPECT: input voltage stays above 53 V",
+             "wip_updated_at": fresh, "rhythm_hours": 24}
+    assert ChatLoop.expect_line(agent, "agent", now)[0] == "input voltage stays above 53 V"
+    agent["wip_updated_at"] = stale
+    assert ChatLoop.expect_line(agent, "agent", now) is None            # older than its rhythm
+    user = {"context": "Bruce is deciding.\nEXPECT: still undecided next time",
+            "context_updated_at": stale}
+    assert ChatLoop.expect_line(user, "user", now)[0] == "still undecided next time"   # a week for users
+    assert ChatLoop.expect_line({"wip": "no line here", "wip_updated_at": fresh}, "agent", now) is None
+    assert ChatLoop.expect_line({"context": "EXPECT: x"}, "user", now) is None         # no stamp
+
+
+def test_expectation_checks_log_in_shadow_and_bump_live(loop, tmp_path, monkeypatch):
+    now = datetime.now(timezone.utc).isoformat()
+    a = _note(loop, "Collection_ac", {"kind": "agent_concern", "status": "active", "activation": 0.4,
+                                      "instruction": "x", "rhythm_hours": 24,
+                                      "wip": "w\nEXPECT: the port is closed", "wip_updated_at": now}, "agent one")
+    u = _note(loop, "Collection_uc", {"kind": "user_concern", "status": "active", "strength": 0.5,
+                                      "context": "c\nEXPECT: still waiting", "context_updated_at": now}, "user one")
+    shown = {"agent one": (a, "agent", {}, "the port is closed", 0.1),
+             "user one": (u, "user", {}, "still waiting", 0.1)}
+    checks = [{"concern": "agent one", "verdict": "violated", "direction": "aversive", "evidence": "port open"},
+              {"concern": "user one", "verdict": "violated", "direction": "aversive", "evidence": "they moved on"},
+              {"concern": "nobody", "verdict": "held"}]
+    assert loop._log_expectation_checks(checks, shown, 7) == 2
+    rows = _rows(tmp_path / "memory" / C._EXPECTATIONS_FILE)
+    assert [r["kind"] for r in rows] == ["agent", "user"] and rows[0]["live"] is False
+    get = loop.resource_manager.get_resource
+    assert get(a)["properties"]["activation"] == 0.4 and get(u)["properties"]["strength"] == 0.5
+    monkeypatch.setattr(C, "_EXPECTATIONS_LIVE", True)
+    loop._log_expectation_checks(checks + checks, shown, 8)               # duplicates: one bump each
+    assert get(a)["properties"]["activation"] == pytest.approx(0.4 + C._AGENT_CONCERN_BUMP_AMOUNT)
+    assert get(u)["properties"]["strength"] == pytest.approx(0.5 + C._USER_CONCERN_BUMP_AMOUNT)
+
+
+def test_wip_prompt_asks_for_the_expect_line(loop):
+    import inspect
+    src = inspect.getsource(C.ConcernsMixin._update_concern_wip)
+    assert "'EXPECT: '" in src and "last line" in src
+
+
+# ── companion headings ─────────────────────────────────────────────────
+
+def test_companion_sections_carry_the_two_new_headings(loop):
+    text = ("COMPANION MODEL: User\n\nHOW THEY THINK & WORK:\nfast\n\n"
+            "RELIABILITY:\nstates confidence plainly; corrected once\n\n"
+            "SHARED GROUND:\nknows the three channels cold\n\nON THEIR MIND:\nthe cat\n")
+    out = loop._companion_sections(text, ("RELIABILITY", "SHARED GROUND"))
+    assert out == "RELIABILITY: states confidence plainly; corrected once\n\nSHARED GROUND: knows the three channels cold"
+    assert "RELIABILITY" in ChatLoop._COMPANION_HEADINGS and "SHARED GROUND" in ChatLoop._COMPANION_HEADINGS
+    import discourse
+    t = discourse.COMPANION_UPDATE_TEMPLATE
+    assert t.index("RELIABILITY:") < t.index("SHARED GROUND:") < t.index("ON THEIR MIND:")
+
+
+# ── the whole reflection path, stubbed model ───────────────────────────
+
+def test_reflection_shows_the_sections_and_logs_the_shadow_rows(loop, tmp_path, monkeypatch):
+    """Drives _reflect_and_remember with a fake dialog, a reasoning record
+    carrying two thoughts, one agent concern with a fresh EXPECT line, and a
+    backend that answers with candidates and a check. Asserts what the model
+    was shown and what landed in the two shadow logs — and that nothing was
+    created or bumped."""
+    now = datetime.now(timezone.utc).isoformat()
+    a = _note(loop, "Collection_ac", {"kind": "agent_concern", "status": "active", "activation": 0.3,
+                                      "instruction": "look", "rhythm_hours": 24, "content": "watch the port",
+                                      "wip": "seen once\nEXPECT: the port stays closed", "wip_updated_at": now},
+              "watch the port")
+    loop._memories_collection_id = "Collection_mem"
+    loop._companion_state = {}
+    loop._build_dialog = lambda entity, limit: [{"source": "User", "text": "hello"},
+                                                {"source": "Tester", "text": "hi"}]
+    loop._recall = lambda *a, **k: []
+    loop._load_pending_fire_outcomes = lambda: []
+    loop._load_reasoning_records = lambda: [
+        {"turn_seq": 9, "source": "User", "autonomous": False,
+         "working_log": '--- iter 1 ---\nACTION: {"thought": "that decay clock is the same shape as WHALE", "tool": "respond", "text": "x"}\n'
+                        'ACTION: {"thought": "the port was open in the trace", "tool": "respond", "text": "y"}'}]
+    loop._near_miss_recurrent = lambda **k: [("Note_m", 3, "a memory that keeps coming close")]
+    loop._remember = lambda *a, **k: True
+    loop._record_capability_gap = lambda g: None
+    created = []
+    monkeypatch.setattr(loop, "_add_agent_concern", lambda *a, **k: created.append(a) or None)
+    seen = {}
+
+    def gen(messages, **kw):
+        seen["sys"] = messages[0]["content"]; seen["user"] = messages[1]["content"]
+        from types import SimpleNamespace
+        return SimpleNamespace(success=True, error=None, text={
+            "frame": "none", "memories": [], "user_concerns": [], "user_concerns_updated": [],
+            "user_concerns_closed": [], "agent_concerns": [], "agent_concerns_closed": [],
+            "capability_gap": None,
+            "candidates": [{"text": "the decay clock shares a shape with WHALE", "why": "noticed mid-reasoning",
+                            "source": "trace", "sign": "appetitive", "affectable": True}],
+            "expectation_checks": [{"concern": "watch the port", "verdict": "violated",
+                                    "direction": "aversive", "evidence": "the port was open"}]})
+    loop._llm_generate = gen
+    loop._reflect_and_remember("User")
+    assert "STAGE 7" in seen["sys"] and "STAGE 8" in seen["sys"]
+    u = seen["user"]
+    assert "## What Tester thought while reasoning this turn" in u and "same shape as WHALE" in u
+    assert "## Memories that came close this week and were not used" in u and "(3×)" in u
+    assert "EXPECT: the port stays closed" in u and f"0 of {C._AGENT_CONCERN_POPULATION_CAP} active" not in u
+    assert "1 of " in u and "candidates" in u.split("Return the JSON")[-1] and "expectation_checks" in u.split("Return the JSON")[-1]
+    cands = _rows(tmp_path / "memory" / C._CANDIDATES_FILE)
+    assert len(cands) == 1 and cands[0]["turn_seq"] == 9 and cands[0]["sign"] == "appetitive"
+    checks = _rows(tmp_path / "memory" / C._EXPECTATIONS_FILE)
+    assert len(checks) == 1 and checks[0]["verdict"] == "violated" and checks[0]["concern_id"] == a
+    assert created == []
+    assert loop.resource_manager.get_resource(a)["properties"]["activation"] == 0.3

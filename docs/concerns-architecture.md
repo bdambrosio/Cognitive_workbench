@@ -195,6 +195,41 @@ rather than as something already said, and the paper went out three more times.
 **Both are written only on autonomous fires.** In a workflow run neither is
 ever populated.
 
+## Population cap (2026-09-07)
+
+`_AGENT_CONCERN_POPULATION_CAP = 12` active non-seed agent concerns. A
+reflection-created concern at the cap is refused and logged as
+`concern_refused_cap` in autonomy.jsonl; the reflection prompt shows the
+count and, at the cap, says to close one first. A yield's remainder and
+`system_spawned` work pass the cap: they are debts, not choices.
+
+## Candidates and expectations — shadow (2026-09-07)
+
+Two new sources of the agent's own concerns, both writing rows under
+`<memory>/` and changing nothing until a flag in concerns.py is flipped
+(`_CANDIDATES_LIVE`, `_EXPECTATIONS_LIVE`, both False):
+
+- **Candidates.** Reflection stage 7 sees the turn's own `thought` lines
+  (from the reasoning record, capped at 4,000 chars) and memories that came
+  close three times in a week without being used (`near_misses.jsonl`,
+  written by `_recall` on the turn path) and emits `candidates`: text, why,
+  source, sign (aversive | appetitive | neutral), affectable. Rows go to
+  `concern_candidates.jsonl`; a candidate seen three times in a week and
+  affectable gets a `would_promote` row. Live: it becomes a durable agent
+  concern with no instruction, subject to the cap.
+- **Expectations.** The last line of an agent concern's WIP (after a fire)
+  and of a user concern's context (from reflection) is `EXPECT: <one
+  sentence>`. Fresh within `rhythm_hours` (agent) or a week (user). For the
+  top 5 of each shown to reflection with a fresh line, stage 8 emits
+  `expectation_checks`: held | violated | unclear, with a direction. Rows go
+  to `expectation_checks.jsonl`. Live: a violated aversive check applies the
+  existing +0.15 bump once per concern per turn; appetitive ones stay in
+  the WIP note.
+
+No new model calls: both stages ride the reflection call, and the stage
+text is appended only when the inputs exist, so a turn without them keeps a
+byte-identical prompt.
+
 ## Under `workflow_mode`
 
 `src/chat/workflow.py` suppresses **discourse**, **orientation** and

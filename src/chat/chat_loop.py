@@ -799,8 +799,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
     # strings verbatim — not classifying content by keyword.
     _COMPANION_HEADINGS = (
         'CURRENT CHAPTER', 'STATE OF MIND', 'WHAT MATTERS TO THEM',
-        'HOW THEY THINK & WORK', 'ON THEIR MIND',
-        'HOW TO BE USEFUL RIGHT NOW', 'OBSERVED DEFAULTS')
+        'HOW THEY THINK & WORK', 'RELIABILITY', 'SHARED GROUND',
+        'ON THEIR MIND', 'HOW TO BE USEFUL RIGHT NOW', 'OBSERVED DEFAULTS')
     # The fast-moving half. discourse.py's CADENCE rule marks these as
     # refreshed every conversation, so they are the part worth quoting
     # somewhere that has to judge whether anything has changed.
@@ -2157,7 +2157,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # Auto-RAG: pull top-k durable memories that match this turn's input.
         # Injected next to the Companion block in the system prompt; no ReAct
         # tool call required. Cheap miss (one embedding query).
-        recall = self._recall(text, k=3)
+        recall = self._recall(text, k=3, record_near_misses=True)
         # Concerns surface: user_concerns (top by strength) + agent_concerns
         # (top by activation). Two separate lists — the prompt builder
         # renders each in its own section. No firing on user turns;

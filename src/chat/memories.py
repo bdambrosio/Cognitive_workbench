@@ -308,7 +308,8 @@ class MemoriesMixin:
         except Exception:
             return score
 
-    def _recall(self, query: str, k: int = 3, threshold: float = 0.5
+    def _recall(self, query: str, k: int = 3, threshold: float = 0.5,
+                record_near_misses: bool = False
                 ) -> List[Tuple[str, str, str, Optional[str], Optional[str]]]:
         """Semantic search over the memories Collection. Returns ranked
         (text, category, polarity, note_id, created_at, telemetry) tuples,
@@ -325,7 +326,13 @@ class MemoriesMixin:
         Re-ranks by recency-adjusted score: fetch up to 2*k candidates
         from FAISS, apply a saturating age penalty (see _recency_adjust),
         then return the top-k. Raw similarity still dominates — recency
-        only flips ties within the same topical band."""
+        only flips ties within the same topical band.
+
+        `record_near_misses` appends every above-threshold loser
+        (`scored[k:]`) to <memory>/near_misses.jsonl. The turn path sets
+        it; the reflection's dedupe search does not, since that search is
+        about what to write, not what came close to being read. See
+        near_miss_recurrent for why the losers are kept."""
         if not self._memories_collection_id or not query:
             return []
         try:
@@ -403,6 +410,8 @@ class MemoriesMixin:
                 r_adj, _t, _c, _p, r_nid, _ca, r_emb = scored[k]
                 runner_up = {'note_id': r_nid, 'final': round(r_adj, 4),
                              'emb': round(r_emb, 4), 'rank': k + 1}
+            if record_near_misses and total > k:
+                self._record_near_misses(scored[k:], k, total, query)
             out = []
             for i, (adj, text, cat, pol, nid, ca, emb) in enumerate(scored[:k], 1):
                 factor = (adj / emb) if emb else 1.0
@@ -417,6 +426,53 @@ class MemoriesMixin:
         except Exception as e:
             logger.warning(f"[{self.character_name}] _recall failed: {e}")
             return []
+
+    # ---- near misses ----------------------------------------------------
+    #
+    # A memory that ranks just below the cutoff is discarded at turn end,
+    # and the discarding loses a signal: a memory that comes close three
+    # times in a week without being used is something the agent keeps
+    # almost thinking of. Jill named this herself (2026-09-07) as one of
+    # two places her own concerns could come from. The rows are the raw
+    # record; the count is derived at read time, never stored, per the
+    # capture principle in disposition.py.
+
+    def _near_misses_path(self) -> 'Path':
+        return self._memory_dir() / 'near_misses.jsonl'
+
+    def _record_near_misses(self, losers, k: int, total: int, query: str) -> None:
+        from utils.file_utils import append_jsonl
+        path = self._near_misses_path()
+        for i, (adj, _text, _cat, _pol, nid, _ca, emb) in enumerate(losers, k + 1):
+            if not nid:
+                continue
+            append_jsonl(path, {'note_id': nid, 'final': round(adj, 4),
+                                'emb': round(emb, 4), 'rank': i, 'of': total,
+                                'query_head': (query or '')[:80]},
+                         character=self.character_name)
+
+    def _near_miss_recurrent(self, days: int = 7, min_count: int = 3,
+                             limit: int = 5) -> List[Tuple[str, int, str]]:
+        """(note_id, count, text) for memories that came close at least
+        `min_count` times in the last `days` days and are not withdrawn.
+        Text is dereferenced through the resource manager, as _recall does."""
+        rows = near_miss_recurrent(self._near_misses_path(), days=days,
+                                   min_count=min_count, limit=limit * 2)
+        out: List[Tuple[str, int, str]] = []
+        for nid, count, _final in rows:
+            note = self.resource_manager.get_resource(nid)
+            if not note:
+                continue
+            props = note.get('properties') or {}
+            if props.get('superseded_by') or props.get('retired'):
+                continue
+            text = (note.get('content') or note.get('description') or '').strip()
+            if not text:
+                continue
+            out.append((nid, count, text))
+            if len(out) >= limit:
+                break
+        return out
 
     def _memories_log_path(self) -> 'Path':
         """Path to <memory>/memories.jsonl — one JSON record per memory
@@ -446,3 +502,43 @@ class MemoriesMixin:
             self.resource_manager.base_dir.parent.parent
             / self.character_name / 'memory'
         )
+
+
+def near_miss_recurrent(path, days: int = 7, min_count: int = 3, limit: int = 5
+                        ) -> List[Tuple[str, int, float]]:
+    """Count near-miss rows per note_id inside the window; return
+    (note_id, count, last_final) for those at or over `min_count`, most
+    frequent first. Pure: reads the file, stores nothing. Unparseable lines
+    are skipped."""
+    import json
+    from datetime import datetime, timedelta, timezone
+    from pathlib import Path as _P
+    p = _P(path)
+    if not p.is_file():
+        return []
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    counts: Dict[str, int] = {}
+    last: Dict[str, float] = {}
+    for line in p.read_text(encoding='utf-8', errors='replace').splitlines():
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        ts = row.get('ts')
+        try:
+            when = datetime.fromisoformat(str(ts).replace('Z', '+00:00')) if ts else None
+        except ValueError:
+            when = None
+        if when is not None and when.tzinfo is None:
+            when = when.replace(tzinfo=timezone.utc)
+        if when is not None and when < since:
+            continue
+        nid = row.get('note_id')
+        if not nid:
+            continue
+        counts[nid] = counts.get(nid, 0) + 1
+        last[nid] = float(row.get('final') or 0.0)
+    rows = [(nid, n, last[nid]) for nid, n in counts.items() if n >= min_count]
+    rows.sort(key=lambda r: (-r[1], -r[2]))
+    return rows[:limit]
+

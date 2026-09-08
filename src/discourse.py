@@ -484,6 +484,12 @@ WHAT MATTERS TO THEM:
 HOW THEY THINK & WORK:
 [Cognitive and decision style; tolerance for disagreement, correction, and pushback. Slow-moving. 1-2 sentences.]
 
+RELIABILITY:
+[How their stated confidence has tracked outcomes, and how much weight to give what they assert on what kinds of question: where they have been right, where they have corrected themselves, where they overstate. Observation with evidence, never a score. Slow-moving; "unclear yet" when the evidence is thin. 1-2 sentences.]
+
+SHARED GROUND:
+[What they already hold cold and should not be re-explained, and what they have not yet taken in — the calibration for how much to assume. Named topics, not adjectives. Slow-moving; revise on direct evidence. 1-2 sentences.]
+
 ON THEIR MIND:
 [The handful of open loops, people, or unresolved questions recurring lately. Append new, prune stale. 1-2 sentences or a short list.]
 
@@ -510,7 +516,7 @@ UPDATE GUIDANCE:
 
 - VALIDATION-SEEKING: If the segment shows the person presenting a frame and looking for agreement with it, record that under HOW TO BE USEFUL (e.g. "appears to be checking a frame, not asking for analysis — pushback may be more useful than concurrence"). Do not silently ratify the frame inside the model itself.
 
-- CADENCE: CURRENT CHAPTER, STATE OF MIND, ON THEIR MIND, and HOW TO BE USEFUL change often. WHAT MATTERS, HOW THEY THINK, and OBSERVED DEFAULTS rarely do. If a slow-moving field has no new evidence, carry the previous text forward unchanged.
+- CADENCE: CURRENT CHAPTER, STATE OF MIND, ON THEIR MIND, and HOW TO BE USEFUL change often. WHAT MATTERS, HOW THEY THINK, RELIABILITY, SHARED GROUND, and OBSERVED DEFAULTS rarely do. If a slow-moving field has no new evidence, carry the previous text forward unchanged.
 
 - VOICE: Plain, specific, low-affect. Not clinical, not warm, not flattering. Notes a fair witness would write for their own future use.
 

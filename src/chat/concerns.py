@@ -110,6 +110,21 @@ _AGENT_CONCERN_BUMP_THRESHOLD = 0.50   # similarity ≥ this counts as a hit
 
 _AGENT_CONCERN_BUMP_AMOUNT    = 0.15   # gained per hit (capped at 1.0)
 
+# ----- population, candidates, expectations (2026-09-07) -----
+#
+# The population once reached 34 concerns that decay could not beat. Every
+# path that lets the agent's own noticing become a concern makes that
+# easier, so the cap comes first and is live from day one; the two new
+# sources start in shadow — they write rows to <memory>/ and change nothing
+# — until a week of rows has been read. Flipping a flag is one line.
+_AGENT_CONCERN_POPULATION_CAP = 12     # active non-seed agent concerns
+_CANDIDATES_LIVE = False               # promote recurring candidates to concerns
+_EXPECTATIONS_LIVE = False             # a violated aversive expectation bumps
+_CANDIDATES_FILE = 'concern_candidates.jsonl'
+_EXPECTATIONS_FILE = 'expectation_checks.jsonl'
+_CANDIDATE_PROMOTE_COUNT = 3           # recurrences in a week before promotion
+_EXPECT_USER_FRESH_HOURS = 168.0       # a user-concern expectation older than this is not checked
+
 # rhythm_hours: declared target fire interval. Used at concern creation
 # to derive activation growth-per-elapsed-hour:
 #   growth_per_hour = (FIRE_THRESHOLD - POST_SERVICE_FLOOR) / rhythm_hours
@@ -844,6 +859,20 @@ class ConcernsMixin:
                 text, self._agent_concerns_collection_id)
             if existing:
                 return self._promote_existing_agent_concern(existing)
+        # THE CAP. Applies to concerns the agent chooses — reflection's and
+        # a promoted candidate's. A yield's remainder (skip_recurrence) and
+        # machine-scheduled work (system_spawned) are debts, not choices,
+        # and pass. Refused creates are logged so the count is visible.
+        if (not seed and not skip_recurrence
+                and not (extra_properties or {}).get('system_spawned')):
+            n = self._active_nonseed_agent_count()
+            if n >= _AGENT_CONCERN_POPULATION_CAP:
+                self._write_autonomy_event({
+                    'event': 'concern_refused_cap', 'text': text[:200],
+                    'active_nonseed': n, 'cap': _AGENT_CONCERN_POPULATION_CAP})
+                logger.info(f"[{self.character_name}] agent_concern refused at cap "
+                            f"({n}/{_AGENT_CONCERN_POPULATION_CAP}): {text[:80]!r}")
+                return None
         now_iso = datetime.now(timezone.utc).isoformat()
         properties: Dict[str, Any] = {
             "kind": "agent_concern",
@@ -1693,6 +1722,125 @@ class ConcernsMixin:
                 continue
             out.append((nid, text, a, props))
         return out
+
+    def _active_nonseed_agent_count(self) -> int:
+        return sum(1 for _nid, note, _a in self._iter_active_agent_concerns()
+                   if not (note.get('properties') or {}).get('seed'))
+
+    # ---- expectations (shadow) ------------------------------------------
+    #
+    # An expectation is the last line of the note the system already
+    # writes: `EXPECT: <one sentence>` at the end of an agent concern's WIP
+    # (written after a fire) or a user concern's context (written by
+    # reflection). No new field, no new call. It is read only while fresh:
+    # within rhythm_hours for an agent concern, a week for a user concern.
+
+    @staticmethod
+    def expect_line(props: Dict[str, Any], kind: str,
+                    now: Optional[datetime] = None) -> Optional[Tuple[str, float]]:
+        """(expectation text, age in hours) when the note carries a fresh
+        `EXPECT:` last line; else None. Pure."""
+        props = props or {}
+        body = props.get('wip') if kind == 'agent' else props.get('context')
+        stamp = props.get('wip_updated_at') if kind == 'agent' else props.get('context_updated_at')
+        if not isinstance(body, str) or not body.strip():
+            return None
+        last = body.strip().splitlines()[-1].strip()
+        if not last.upper().startswith('EXPECT:'):
+            return None
+        text = last[len('EXPECT:'):].strip()
+        if not text:
+            return None
+        try:
+            when = datetime.fromisoformat(str(stamp).replace('Z', '+00:00')) if stamp else None
+        except ValueError:
+            when = None
+        if when is None:
+            return None
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=timezone.utc)
+        age_h = ((now or datetime.now(timezone.utc)) - when).total_seconds() / 3600.0
+        if kind == 'agent':
+            fresh_h = float(props.get('rhythm_hours') or 168)
+        else:
+            fresh_h = _EXPECT_USER_FRESH_HOURS
+        if age_h > fresh_h:
+            return None
+        return text, round(age_h, 1)
+
+    def _log_concern_candidates(self, rows: List[Dict[str, Any]], turn_seq,
+                                entity: str) -> int:
+        """Shadow: append reflection's candidates to <memory>/concern_candidates.jsonl,
+        then look for recurrence over the last week. A candidate seen
+        _CANDIDATE_PROMOTE_COUNT times and affectable gets a `would_promote`
+        row; with _CANDIDATES_LIVE it becomes a durable agent concern with
+        no instruction, subject to the cap."""
+        from utils.file_utils import append_jsonl
+        path = self._memory_dir() / _CANDIDATES_FILE
+        n = 0
+        for c in rows:
+            text = str(c.get('text') or '').strip()[:120]
+            if not text:
+                continue
+            row = {'turn_seq': turn_seq, 'entity': entity, 'text': text,
+                   'why': str(c.get('why') or '')[:200],
+                   'source': c.get('source') if c.get('source') in ('trace', 'near_miss', 'both') else 'trace',
+                   'sign': c.get('sign') if c.get('sign') in ('aversive', 'appetitive', 'neutral') else 'neutral',
+                   'affectable': bool(c.get('affectable'))}
+            append_jsonl(path, row, character=self.character_name)
+            n += 1
+            count = candidate_recurrence(path, text)
+            if count >= _CANDIDATE_PROMOTE_COUNT and row['affectable']:
+                append_jsonl(path, {'turn_seq': turn_seq, 'entity': entity,
+                                    'would_promote': text, 'count': count,
+                                    'live': _CANDIDATES_LIVE},
+                             character=self.character_name)
+                if _CANDIDATES_LIVE:
+                    self._add_agent_concern(text, entity=entity, provenance='inferred',
+                                            seed=False, instruction=None, category='durable')
+        return n
+
+    def _log_expectation_checks(self, checks: List[Dict[str, Any]],
+                                shown: Dict[str, Tuple[str, str, Dict[str, Any], str, float]],
+                                turn_seq) -> int:
+        """Shadow: append reflection's expectation checks to
+        <memory>/expectation_checks.jsonl. `shown` maps the concern text the
+        model saw to (note_id, kind, props, expect, age_h). With
+        _EXPECTATIONS_LIVE a violated aversive check applies the existing
+        +0.15 bump once per concern per turn; appetitive ones are left to
+        the WIP note."""
+        from utils.file_utils import append_jsonl
+        path = self._memory_dir() / _EXPECTATIONS_FILE
+        n, bumped = 0, set()
+        now_iso = datetime.now(timezone.utc).isoformat()
+        for c in checks:
+            key = str(c.get('concern') or '').strip()
+            hit = shown.get(key)
+            if not hit:
+                continue
+            nid, kind, props, expect, age_h = hit
+            verdict = c.get('verdict') if c.get('verdict') in ('held', 'violated', 'unclear') else 'unclear'
+            direction = c.get('direction') if c.get('direction') in ('aversive', 'appetitive', 'neutral') else 'neutral'
+            append_jsonl(path, {'turn_seq': turn_seq, 'kind': kind, 'concern_id': nid,
+                                'concern': key[:120], 'expect': expect[:200],
+                                'verdict': verdict, 'direction': direction,
+                                'evidence': str(c.get('evidence') or '')[:200],
+                                'expect_age_h': age_h, 'live': _EXPECTATIONS_LIVE},
+                         character=self.character_name)
+            n += 1
+            if _EXPECTATIONS_LIVE and verdict == 'violated' and direction == 'aversive' \
+                    and nid not in bumped:
+                bumped.add(nid)
+                note = self.resource_manager.get_resource(nid)
+                if not note:
+                    continue
+                p = note.get('properties') or {}
+                if kind == 'agent':
+                    self._apply_agent_concern_evidence_bump(p, now_iso)
+                else:
+                    p['strength'] = min(1.0, float(p.get('strength') or 0.0) + _USER_CONCERN_BUMP_AMOUNT)
+                    p['last_bumped_at'] = now_iso
+        return n
 
     def _collect_concern_wip(self, exclude_id: Optional[str] = None
                              ) -> List[Tuple[str, str, float, str]]:
@@ -2607,7 +2755,11 @@ class ConcernsMixin:
                 "work blocked on something — end the WIP with one line "
                 "starting exactly 'NEXT: ' stating the single most promising "
                 "next step. If nothing is genuinely pending, omit the NEXT "
-                "line entirely — do not invent one. Max 200 words. Output "
+                "line entirely — do not invent one. Then end with one line "
+                "starting exactly 'EXPECT: ' — one sentence saying what you "
+                "expect to find on this concern's dimension the next time it "
+                "is looked at, so a later look can tell whether something "
+                "changed. Always present, last line. Max 200 words. Output "
                 "the WIP text only — no preamble, no headers."
             )
             user_msg = (
@@ -2645,3 +2797,38 @@ class ConcernsMixin:
             logger.warning(
                 f"[{self.character_name}] _update_concern_wip failed for "
                 f"{concern_id}: {e}")
+
+
+def candidate_recurrence(path, text: str, days: int = 7) -> int:
+    """How many candidate rows in the last `days` days carry this text,
+    compared after lowercasing and collapsing whitespace. Pure. In shadow
+    this is the recurrence test; when the resource manager's semantic
+    search is wanted instead, this is the one place to change."""
+    import json as _json
+    from pathlib import Path as _P
+    p = _P(path)
+    if not p.is_file():
+        return 0
+    key = ' '.join((text or '').lower().split())
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    n = 0
+    for line in p.read_text(encoding='utf-8', errors='replace').splitlines():
+        try:
+            row = _json.loads(line)
+        except ValueError:
+            continue
+        if 'would_promote' in row:
+            continue
+        ts = row.get('ts')
+        try:
+            when = datetime.fromisoformat(str(ts).replace('Z', '+00:00')) if ts else None
+        except ValueError:
+            when = None
+        if when is not None and when.tzinfo is None:
+            when = when.replace(tzinfo=timezone.utc)
+        if when is not None and when < since:
+            continue
+        if ' '.join(str(row.get('text') or '').lower().split()) == key:
+            n += 1
+    return n
+
