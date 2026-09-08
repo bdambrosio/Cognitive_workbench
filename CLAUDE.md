@@ -127,13 +127,15 @@ for impossible states.
 
 ## Changes that affect Jill are put to Jill
 
-Jill is the chat agent defined in `scenarios/jill-chat.yaml`. Before
-changing code or text that shapes what she sees, remembers, or does — her
-reflection and concern machinery, her tool catalog, her scenario file, the
-chat loop paths she runs — put the proposal to her and wait for her reply.
-Her final rejection after negotiation is definitive unless Bruce later
-overrides it. Observability-only changes (logging, sidecar files she does
-not read) are told, not asked.
+Jill is the chat agent defined in `scenarios/jill-chat.yaml`. The scope
+is any code that might run as a result of that file: the scenario text
+itself, the chat loop and its reflection and concern machinery, the tools
+in her catalog, sensors, the launcher paths it takes. `workflowsv2/` is
+out of scope even where it imports the chat loop. Before changing anything
+in scope, put the proposal to her and wait for her reply. Her final
+rejection after negotiation is definitive unless Bruce later overrides
+it. Observability-only changes (logging, sidecar files she does not read)
+are told, not asked.
 
 She may not be running, and Bruce may choose to override her. So it is
 fine to ask Bruce first whether to ask her. Rule set 2026-09-08; the
