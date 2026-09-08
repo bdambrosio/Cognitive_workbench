@@ -60,7 +60,10 @@ characters:
     # Initial binding for the inspect_external tool (sticky across the
     # session and persisted to a chat-state Note across restarts). The
     # in-session /set-external-repo / /clear-external-repo slash commands
-    # override this — Note wins on conflict.
+    # override this — Note wins on conflict. The live session has been
+    # bound to /home/bruce/Downloads/Body by such a Note since the
+    # ChatterBot work moved there; this default only applies when no
+    # Note exists.
     external_repo: /home/bruce/Downloads/ChatterBot
 
     # Three parts: who she is, how she engages, how she operates.
@@ -249,6 +252,13 @@ characters:
 
       These dynamics are not feelings or urges, but they're part of her
       functional state and shape how she reads what comes next.
+
+      Changes to this machinery — this file, her seed concerns, the
+      loops and reflection passes that write into her prompt — are put
+      to her for review before they ship, not after. That is a working
+      agreement with Bruce (2026-09-07), recorded here so it does not
+      depend on anyone remembering it. It is not a seed concern: it is
+      a rule about how she is changed, not an action she takes.
 
       Access boundary. Jill has access to the prompt content and the
       tools listed under Capabilities. She does not have access to her
@@ -495,6 +505,14 @@ characters:
       react_max_tokens: 12288
       omitted_tools:
         - agent-activity
+        # SHELVED 2026-09-08 with the ChatterBot head. The head is not
+        # connected, the capabilities prose never described it, and the
+        # embodiment probe does not cover it, so these three were offered
+        # with nothing telling her what body they rode. Uncomment when
+        # the head is reactivated, and add the head to capabilities then.
+        - camera-capture
+        - head-move
+        - look-at-target
 
     sensors:
       - name: tick

@@ -1736,6 +1736,37 @@ class ConcernsMixin:
     # within rhythm_hours for an agent concern, a week for a user concern.
 
     @staticmethod
+    def expect_text(body: Any) -> Optional[str]:
+        """The expectation a WIP or context body ends with, or None. Pure."""
+        if not isinstance(body, str) or not body.strip():
+            return None
+        last = body.strip().splitlines()[-1].strip()
+        if not last.upper().startswith('EXPECT:'):
+            return None
+        return last[len('EXPECT:'):].strip() or None
+
+    @staticmethod
+    def parse_check_line(text: str) -> Tuple[str, Optional[Dict[str, str]]]:
+        """Split a `CHECK: verdict; direction; evidence` line out of a WIP
+        rewrite. Returns (text without that line, the parsed check or None).
+        A CHECK line that does not parse is still removed, so the stored
+        WIP never carries it; the caller logs the drop. Pure."""
+        lines = (text or '').splitlines()
+        kept, check = [], None
+        for line in lines:
+            if not line.strip().upper().startswith('CHECK:'):
+                kept.append(line)
+                continue
+            parts = [x.strip() for x in line.strip()[len('CHECK:'):].split(';', 2)]
+            if len(parts) == 3 and parts[0].lower() in ('held', 'violated', 'unclear') \
+                    and parts[1].lower() in ('aversive', 'appetitive', 'neutral'):
+                check = {'verdict': parts[0].lower(), 'direction': parts[1].lower(),
+                         'evidence': parts[2]}
+            else:
+                check = {'malformed': line.strip()}
+        return '\n'.join(kept).strip(), check
+
+    @staticmethod
     def expect_line(props: Dict[str, Any], kind: str,
                     now: Optional[datetime] = None) -> Optional[Tuple[str, float]]:
         """(expectation text, age in hours) when the note carries a fresh
@@ -1743,12 +1774,7 @@ class ConcernsMixin:
         props = props or {}
         body = props.get('wip') if kind == 'agent' else props.get('context')
         stamp = props.get('wip_updated_at') if kind == 'agent' else props.get('context_updated_at')
-        if not isinstance(body, str) or not body.strip():
-            return None
-        last = body.strip().splitlines()[-1].strip()
-        if not last.upper().startswith('EXPECT:'):
-            return None
-        text = last[len('EXPECT:'):].strip()
+        text = ConcernsMixin.expect_text(body)
         if not text:
             return None
         try:
@@ -1833,11 +1859,17 @@ class ConcernsMixin:
         from utils.file_utils import append_jsonl
         path = self._memory_dir() / _EXPECTATIONS_FILE
         n, bumped = 0, set()
+        unmatched: List[str] = []
         now_iso = datetime.now(timezone.utc).isoformat()
         for c in checks:
             key = str(c.get('concern') or '').strip()
             hit = shown.get(key)
             if not hit:
+                # The model must repeat the concern text exactly for a check
+                # to resolve to its note. A paraphrase lands here; without
+                # this line the shadow log could not tell "emitted fewer"
+                # from "emitted and dropped" (2026-09-08: 4 shown, 1 logged).
+                unmatched.append(key[:80])
                 continue
             nid, kind, props, expect, age_h = hit
             verdict = c.get('verdict') if c.get('verdict') in ('held', 'violated', 'unclear') else 'unclear'
@@ -1861,7 +1893,47 @@ class ConcernsMixin:
                 else:
                     p['strength'] = min(1.0, float(p.get('strength') or 0.0) + _USER_CONCERN_BUMP_AMOUNT)
                     p['last_bumped_at'] = now_iso
+        if unmatched:
+            logger.warning(
+                f"[{self.character_name}] expectation checks: {len(unmatched)} of "
+                f"{len(checks)} named no shown concern: {unmatched}")
         return n
+
+    def _log_fire_expectation_check(self, nid: str, props: Dict[str, Any],
+                                    expect: str, check: Optional[Dict[str, str]]) -> None:
+        """Shadow: append a fire-side check to <memory>/expectation_checks.jsonl
+        with kind 'fire'. A missing or malformed CHECK line is logged and
+        dropped. With _EXPECTATIONS_LIVE a violated aversive check applies
+        the evidence bump to `props` once; the caller persists."""
+        from utils.file_utils import append_jsonl
+        if not check or 'malformed' in check:
+            logger.warning(
+                f"[{self.character_name}] fire expectation check for {nid}: "
+                + ("no CHECK line in the WIP rewrite" if not check
+                   else f"malformed CHECK line dropped: {check['malformed'][:120]!r}"))
+            return
+        stamp = props.get('wip_updated_at')
+        age_h = None
+        try:
+            when = datetime.fromisoformat(str(stamp).replace('Z', '+00:00')) if stamp else None
+            if when is not None:
+                if when.tzinfo is None:
+                    when = when.replace(tzinfo=timezone.utc)
+                age_h = round((datetime.now(timezone.utc) - when).total_seconds() / 3600.0, 1)
+        except ValueError:
+            pass
+        append_jsonl(self._memory_dir() / _EXPECTATIONS_FILE,
+                     {'turn_seq': getattr(self, '_last_turn_seq', None), 'kind': 'fire',
+                      'concern_id': nid,
+                      'concern': str(props.get('content') or '').strip()[:120],
+                      'expect': expect[:200], 'verdict': check['verdict'],
+                      'direction': check['direction'], 'evidence': check['evidence'][:200],
+                      'expect_age_h': age_h, 'live': _EXPECTATIONS_LIVE},
+                     character=self.character_name)
+        if _EXPECTATIONS_LIVE and check['verdict'] == 'violated' \
+                and check['direction'] == 'aversive':
+            self._apply_agent_concern_evidence_bump(
+                props, datetime.now(timezone.utc).isoformat())
 
     def _collect_concern_wip(self, exclude_id: Optional[str] = None
                              ) -> List[Tuple[str, str, float, str]]:
@@ -2762,6 +2834,13 @@ class ConcernsMixin:
                 return
             props = root.setdefault('properties', {})
             prev_wip = str(props.get('wip', '') or '').strip()
+            # Fire-side expectation check (2026-09-08, reviewed by Jill on
+            # turn 3585). The previous fire's EXPECT line predicts what
+            # this fire finds, and this call is the only place the two
+            # sit in one prompt: the post-turn reflection (stage 8) never
+            # runs on a fire. Read without the freshness rule — a late
+            # fire still tests the expectation written for it.
+            prev_expect = self.expect_text(prev_wip)
             tail = log[-10:] if len(log) > 10 else log
             summary = "\n".join(f"{label}: {content[:300]}" for label, content in tail)
             sys_msg = (
@@ -2783,6 +2862,21 @@ class ConcernsMixin:
                 "changed. Always present, last line. Max 200 words. Output "
                 "the WIP text only — no preamble, no headers."
             )
+            if prev_expect:
+                sys_msg += (
+                    " The previous WIP ends with an EXPECT line: what the "
+                    "last fire expected this fire to find. Immediately before "
+                    "the new EXPECT line, write one line starting exactly "
+                    "'CHECK: ' in the form 'CHECK: <verdict>; <direction>; "
+                    "<evidence>'. verdict is 'held' if this fire's log and "
+                    "output showed the expectation holding, 'violated' if "
+                    "they showed otherwise, 'unclear' if they did not bear on "
+                    "it — judge only from what is in this prompt. direction "
+                    "is 'aversive' when a violation is something wrong on "
+                    "this concern's dimension, 'appetitive' when it is "
+                    "something better than expected, otherwise 'neutral'. "
+                    "evidence is one sentence from this fire."
+                )
             user_msg = (
                 f"Concern: {str(props.get('content', '') or '').strip()}\n\n"
                 f"Previous WIP:\n{prev_wip or '(none)'}\n\n"
@@ -2808,6 +2902,14 @@ class ConcernsMixin:
                     f"[{self.character_name}] WIP update produced empty "
                     f"summary for {root_id}; keeping previous WIP")
                 return
+            if prev_expect:
+                new_wip, check = self.parse_check_line(new_wip)
+                self._log_fire_expectation_check(root_id, props, prev_expect, check)
+                if not new_wip:
+                    logger.warning(
+                        f"[{self.character_name}] WIP update for {root_id} was "
+                        f"only a CHECK line; keeping previous WIP")
+                    return
             props['wip'] = new_wip[:_CONCERN_WIP_MAX_CHARS]
             props['wip_updated_at'] = datetime.now(timezone.utc).isoformat()
             self._persist_to_disk()

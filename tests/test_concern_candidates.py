@@ -202,6 +202,73 @@ def test_wip_prompt_asks_for_the_expect_line(loop):
     assert "'EXPECT: '" in src and "last line" in src
 
 
+# ── fire-side expectation checks (2026-09-08) ─────────────────────────
+
+def test_parse_check_line_splits_and_drops():
+    parse = ChatLoop.parse_check_line
+    wip, check = parse("seen twice\nNEXT: look again\nCHECK: violated; aversive; 50.1 V read\nEXPECT: back in range")
+    assert wip == "seen twice\nNEXT: look again\nEXPECT: back in range"
+    assert check == {"verdict": "violated", "direction": "aversive", "evidence": "50.1 V read"}
+    wip, check = parse("summary\nCheck: Held; Neutral; fine; with; semicolons\nEXPECT: same")
+    assert check["verdict"] == "held" and check["evidence"] == "fine; with; semicolons"
+    wip, check = parse("summary\nCHECK: maybe\nEXPECT: same")       # malformed: removed, flagged
+    assert wip == "summary\nEXPECT: same" and "malformed" in check
+    assert parse("summary\nEXPECT: same") == ("summary\nEXPECT: same", None)
+
+
+def _fire(loop, monkeypatch, prev_wip, rewrite, activation=0.4, seen=None):
+    now = datetime.now(timezone.utc).isoformat()
+    nid = _note(loop, "Collection_ac", {"kind": "agent_concern", "status": "active", "activation": activation,
+                                        "instruction": "x", "rhythm_hours": 1, "content": "watch the volts",
+                                        "wip": prev_wip, "wip_updated_at": now}, "watch the volts")
+    loop.backend = StubBackend([rewrite])
+    if seen is not None:
+        real = loop.backend.chat
+        loop.backend.chat = lambda messages, **kw: (seen.append(messages[0]["content"]), real(messages, **kw))[1]
+    monkeypatch.setattr(loop, "_persist_to_disk", lambda: None, raising=False)
+    loop._update_concern_wip(nid, "check volts", [("ACTION", "read"), ("OBSERVATION", "50.1 V")], "low", "respond")
+    return nid
+
+
+def test_fire_check_is_asked_for_logged_and_stripped(loop, tmp_path, monkeypatch):
+    seen = []
+    nid = _fire(loop, monkeypatch, "seen once\nEXPECT: volts stay above 51.5",
+                "seen twice\nCHECK: violated; aversive; 50.1 V this fire\nEXPECT: back above 51.5 next hour", seen=seen)
+    assert "'CHECK: '" in seen[0]                                          # asked because an EXPECT line existed
+    props = loop.resource_manager.get_resource(nid)["properties"]
+    assert props["wip"] == "seen twice\nEXPECT: back above 51.5 next hour"
+    rows = _rows(tmp_path / "memory" / C._EXPECTATIONS_FILE)
+    assert len(rows) == 1 and rows[0]["kind"] == "fire" and rows[0]["verdict"] == "violated"
+    assert rows[0]["expect"] == "volts stay above 51.5" and rows[0]["concern"] == "watch the volts"
+    assert rows[0]["live"] is False and props["activation"] == 0.4          # shadow: no bump
+
+
+def test_fire_check_bumps_when_live_and_skips_without_prior_expect(loop, tmp_path, monkeypatch):
+    monkeypatch.setattr(C, "_EXPECTATIONS_LIVE", True)
+    nid = _fire(loop, monkeypatch, "seen once\nEXPECT: volts stay above 51.5",
+                "seen twice\nCHECK: violated; aversive; 50.1 V\nEXPECT: back above 51.5")
+    props = loop.resource_manager.get_resource(nid)["properties"]
+    assert props["activation"] == pytest.approx(0.4 + C._AGENT_CONCERN_BUMP_AMOUNT)
+    # held: logged, no bump
+    nid2 = _fire(loop, monkeypatch, "w\nEXPECT: fine", "w2\nCHECK: held; neutral; fine\nEXPECT: fine")
+    assert loop.resource_manager.get_resource(nid2)["properties"]["activation"] == 0.4
+    # no EXPECT on the previous WIP: nothing asked, nothing logged, a stray CHECK line is kept as text
+    seen = []
+    nid3 = _fire(loop, monkeypatch, "no expectation yet", "w3\nEXPECT: first one", seen=seen)
+    assert "'CHECK: '" not in seen[0]
+    assert loop.resource_manager.get_resource(nid3)["properties"]["wip"] == "w3\nEXPECT: first one"
+    rows = _rows(tmp_path / "memory" / C._EXPECTATIONS_FILE)
+    assert [r["verdict"] for r in rows] == ["violated", "held"] and all(r["live"] for r in rows)
+
+
+def test_fire_check_malformed_or_missing_is_dropped_and_wip_kept(loop, tmp_path, monkeypatch):
+    nid = _fire(loop, monkeypatch, "w\nEXPECT: fine", "w2\nCHECK: dunno\nEXPECT: fine")
+    assert loop.resource_manager.get_resource(nid)["properties"]["wip"] == "w2\nEXPECT: fine"
+    nid2 = _fire(loop, monkeypatch, "w\nEXPECT: fine", "w3\nEXPECT: fine")   # model ignored the ask
+    assert loop.resource_manager.get_resource(nid2)["properties"]["wip"] == "w3\nEXPECT: fine"
+    assert not (tmp_path / "memory" / C._EXPECTATIONS_FILE).exists()
+
+
 # ── companion headings ─────────────────────────────────────────────────
 
 def test_companion_sections_carry_the_two_new_headings(loop):

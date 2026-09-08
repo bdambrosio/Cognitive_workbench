@@ -718,7 +718,10 @@ class ReflectionMixin:
                         try:
                             n = self._log_expectation_checks(
                                 [c for c in checks if isinstance(c, dict)], shown_expect, turn_seq)
-                            logger.info(f"[{self.character_name}] reflection: {n} expectation check(s) logged")
+                            logger.info(
+                                f"[{self.character_name}] reflection: {n} of "
+                                f"{len(checks)} emitted expectation check(s) logged; "
+                                f"{len(shown_expect)} shown")
                         except Exception as e:                     # noqa: BLE001
                             logger.warning(f"[{self.character_name}] expectation log failed: {e}")
 

@@ -225,10 +225,22 @@ Two new sources of the agent's own concerns, both writing rows under
   to `expectation_checks.jsonl`. Live: a violated aversive check applies the
   existing +0.15 bump once per concern per turn; appetitive ones stay in
   the WIP note.
+- **Fire-side checks (2026-09-08).** Stage 8 runs only in the reflection
+  after a human turn, and the fire path returns before reflection. An agent
+  concern's expectation predicts what its next fire finds, so the WIP
+  rewrite after a fire is asked, when the previous WIP ended with an EXPECT
+  line, to write `CHECK: <verdict>; <direction>; <evidence>` immediately
+  before the new EXPECT line. The line is parsed, removed from the stored
+  WIP, and logged to `expectation_checks.jsonl` with `kind: fire`. A
+  missing or malformed line is dropped with a warning. Live: the same
+  violated-aversive bump, once per fire. Open before the flag flips
+  (raised by Jill): a structurally violated expectation on a fast rhythm
+  bumps on every fire and never drops below threshold; skip the bump above
+  threshold, or stop after repeated violations of the same line.
 
-No new model calls: both stages ride the reflection call, and the stage
-text is appended only when the inputs exist, so a turn without them keeps a
-byte-identical prompt.
+No new model calls: stages 7 and 8 ride the reflection call, the fire-side
+check rides the WIP rewrite, and each addition is appended only when its
+inputs exist, so a turn without them keeps a byte-identical prompt.
 
 ## Under `workflow_mode`
 
