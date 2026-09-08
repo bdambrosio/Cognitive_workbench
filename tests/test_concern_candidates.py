@@ -54,6 +54,7 @@ def loop(tmp_path):
     inst._memory_dir = lambda: tmp_path / "memory"
     # no embedder: recurrence search finds nothing
     inst._find_similar_concern = lambda text, cid: None
+    inst._candidate_embedder = lambda: None
     yield inst
     shutil.rmtree(Path(__file__).parent.parent / "scenarios" / world, ignore_errors=True)
 
@@ -142,6 +143,12 @@ def test_candidates_are_logged_and_recur_without_creating(loop, tmp_path, monkey
     assert created == []                                            # shadow: nothing created
     assert C.candidate_recurrence(tmp_path / "memory" / C._CANDIDATES_FILE,
                                   "THE async  pipeline keeps needing a diagram") == 3
+    # by meaning: a rephrasing counts when the embedder says so
+    fake = lambda texts: [[1.0, 0.0] if "diagram" in t else [0.0, 1.0] for t in texts]
+    assert C.candidate_recurrence(tmp_path / "memory" / C._CANDIDATES_FILE,
+                                  "modules that need a diagram to explain, again", embed=fake) == 3
+    assert C.candidate_recurrence(tmp_path / "memory" / C._CANDIDATES_FILE,
+                                  "something else entirely", embed=fake) == 0
     # live: promoted through the normal create path
     monkeypatch.setattr(C, "_CANDIDATES_LIVE", True)
     loop._log_concern_candidates(cand, 4, "User")

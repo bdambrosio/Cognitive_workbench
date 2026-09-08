@@ -1789,7 +1789,7 @@ class ConcernsMixin:
                    'affectable': bool(c.get('affectable'))}
             append_jsonl(path, row, character=self.character_name)
             n += 1
-            count = candidate_recurrence(path, text)
+            count = candidate_recurrence(path, text, embed=self._candidate_embedder())
             if count >= _CANDIDATE_PROMOTE_COUNT and row['affectable']:
                 append_jsonl(path, {'turn_seq': turn_seq, 'entity': entity,
                                     'would_promote': text, 'count': count,
@@ -1799,6 +1799,27 @@ class ConcernsMixin:
                     self._add_agent_concern(text, entity=entity, provenance='inferred',
                                             seed=False, instruction=None, category='durable')
         return n
+
+    def _candidate_embedder(self):
+        """The resource manager's sentence embedder as a callable over a
+        list of strings, or None when it is not loaded — then recurrence
+        falls back to normalised-text equality. A model never repeats a
+        sentence verbatim, so without this the would_promote signal would
+        stay at zero for the whole shadow week."""
+        rm = getattr(self, 'resource_manager', None)
+        emb = getattr(rm, 'embedder', None)
+        if emb is None:
+            init = getattr(rm, '_init_embedder', None)
+            if callable(init):
+                try:
+                    init()
+                except Exception as e:                             # noqa: BLE001
+                    logger.warning(f"[{self.character_name}] embedder init failed: {e}")
+            emb = getattr(rm, 'embedder', None)
+        if emb is None:
+            return None
+        return lambda texts: emb.encode(list(texts), convert_to_tensor=False,
+                                        show_progress_bar=False)
 
     def _log_expectation_checks(self, checks: List[Dict[str, Any]],
                                 shown: Dict[str, Tuple[str, str, Dict[str, Any], str, float]],
@@ -2799,11 +2820,14 @@ class ConcernsMixin:
                 f"{concern_id}: {e}")
 
 
-def candidate_recurrence(path, text: str, days: int = 7) -> int:
-    """How many candidate rows in the last `days` days carry this text,
-    compared after lowercasing and collapsing whitespace. Pure. In shadow
-    this is the recurrence test; when the resource manager's semantic
-    search is wanted instead, this is the one place to change."""
+def candidate_recurrence(path, text: str, days: int = 7, embed=None,
+                         threshold: float = _CONCERN_RECURRENCE_THRESHOLD) -> int:
+    """How many candidate rows in the last `days` days say the same thing
+    as `text`, including the row for `text` itself. With `embed` (a
+    callable from a list of strings to a matrix of unit-length vectors)
+    two rows are the same when their cosine similarity is at or over
+    `threshold`, the concern collections' own recurrence rule; without it,
+    when they match after lowercasing and collapsing whitespace. Pure."""
     import json as _json
     from pathlib import Path as _P
     p = _P(path)
@@ -2811,7 +2835,7 @@ def candidate_recurrence(path, text: str, days: int = 7) -> int:
         return 0
     key = ' '.join((text or '').lower().split())
     since = datetime.now(timezone.utc) - timedelta(days=days)
-    n = 0
+    texts: List[str] = []
     for line in p.read_text(encoding='utf-8', errors='replace').splitlines():
         try:
             row = _json.loads(line)
@@ -2828,7 +2852,23 @@ def candidate_recurrence(path, text: str, days: int = 7) -> int:
             when = when.replace(tzinfo=timezone.utc)
         if when is not None and when < since:
             continue
-        if ' '.join(str(row.get('text') or '').lower().split()) == key:
-            n += 1
-    return n
+        t = str(row.get('text') or '').strip()
+        if t:
+            texts.append(t)
+    if not texts:
+        return 0
+    if embed is None:
+        return sum(1 for t in texts if ' '.join(t.lower().split()) == key)
+    try:
+        vecs = embed([text] + texts)
+        import numpy as _np
+        m = _np.asarray(vecs, dtype=float)
+        norms = _np.linalg.norm(m, axis=1, keepdims=True)
+        norms[norms == 0] = 1.0
+        m = m / norms
+        sims = m[1:] @ m[0]
+        return int((sims >= threshold).sum())
+    except Exception as e:                                         # noqa: BLE001
+        logger.warning(f"candidate recurrence: embedding failed ({e}); using text equality")
+        return sum(1 for t in texts if ' '.join(t.lower().split()) == key)
 
