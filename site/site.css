@@ -103,3 +103,14 @@ footer a { text-decoration: none; margin-right: 18px; }
 
 /* Section labels on the home page are h2 elements for heading order; they keep the eyebrow look. */
 h2.eyebrow { font-weight: 400; }
+
+/* Introduction page: the video, its chapter list, and the transcript. */
+.video { display: block; width: 100%; max-width: 960px; height: auto; aspect-ratio: 16 / 9; background: #000; border: 1px solid var(--panel-edge); border-radius: 6px; margin: 8px 0 12px; }
+.chapters { list-style: none; padding: 0; margin: 0 0 32px; columns: 2; column-gap: 40px; max-width: 960px; }
+.chapters li { break-inside: avoid; padding: 6px 0; border-bottom: 1px solid var(--rule2); }
+.chapters a { text-decoration: none; color: var(--text); }
+.chapters a:hover { color: var(--accent); }
+.chapters .mono, .transcript h2 .mono { color: var(--accent); margin-right: 8px; }
+.transcript h2 { font-size: 20px; margin: 40px 0 10px; }
+.transcript p { color: var(--muted); }
+@media (max-width: 640px) { .chapters { columns: 1; } }

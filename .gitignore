@@ -154,3 +154,7 @@ workflowsv2/claims_audit/engagements/*/demo_sessions.jsonl
 
 # Chain scripts, pid files and launcher logs written at the repo root
 logs/
+
+# The introduction video is deployed by rsync from site/media/ but is too large for git;
+# the source file is Bruce's tuuyi-claims-review.mp4. Its poster and captions are committed.
+site/media/*.mp4

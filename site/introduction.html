@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A nine-minute introduction to claims review — Tuuyi</title>
+<meta name="description" content="A narrated introduction to Tuuyi's claims review for buyers of software: what a claim is, how each one is tested against the code, how findings are checked and rated, and what you receive. With chapters and a transcript.">
+<link rel="canonical" href="https://tuuyi.com/introduction">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<meta property="og:type" content="video.other">
+<meta property="og:site_name" content="Tuuyi">
+<meta property="og:title" content="A nine-minute introduction to claims review — Tuuyi">
+<meta property="og:description" content="A narrated introduction to Tuuyi's claims review for buyers of software: what a claim is, how each one is tested against the code, how findings are checked and rated, and what you receive.">
+<meta property="og:url" content="https://tuuyi.com/introduction">
+<meta property="og:image" content="https://tuuyi.com/media/introduction-poster.jpg">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="720">
+<meta property="og:video" content="https://tuuyi.com/media/tuuyi-claims-review.mp4">
+<meta property="og:video:type" content="video/mp4">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="/site.css?v=20260909">
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="/">Tuuyi</a>
+  <nav><a href="/">Home</a><a href="/how-it-works">How it works</a><a href="/pricing">Pricing</a><a href="/demo">Demo</a><a href="/about">About</a><a class="pill" href="/pricing">Beta: free claims reviews, limited</a><button class="theme" id="theme" type="button">light</button></nav>
+</header>
+<main>
+
+<h1>A nine-minute introduction</h1>
+<p class="lede">Two narrators walk through what a claims review is, how a claim is tested against the code, how findings are checked and rated, and what you receive. The transcript is below if you would rather read.</p>
+
+<video id="video" class="video" controls preload="metadata" playsinline poster="/media/introduction-poster.jpg" width="1920" height="1080">
+  <source src="/media/tuuyi-claims-review.mp4" type="video/mp4">
+  <track kind="captions" src="/media/introduction.vtt" srclang="en" label="English">
+  Your browser cannot play this video. <a href="/media/tuuyi-claims-review.mp4">Download it</a> instead, or read the transcript below.
+</video>
+<p class="small">The video is served from this site, not from a video platform.</p>
+
+<h2 class="eyebrow">Chapters</h2>
+<ol class="chapters">
+<li><a href="#t=0"><span class="mono">0:00</span> The seller says the software does X. Does it?</a></li>
+<li><a href="#t=37"><span class="mono">0:37</span> Diligence often starts with claims</a></li>
+<li><a href="#t=77"><span class="mono">1:17</span> Explicit and implied claims</a></li>
+<li><a href="#t=124"><span class="mono">2:04</span> The review begins with intake</a></li>
+<li><a href="#t=165"><span class="mono">2:45</span> Control 1: freeze the claim surface</a></li>
+<li><a href="#t=207"><span class="mono">3:27</span> A finding is a claim, a verdict and evidence</a></li>
+<li><a href="#t=251"><span class="mono">4:11</span> Example: a privacy claim that partly holds</a></li>
+<li><a href="#t=293"><span class="mono">4:53</span> Control 2: an independent check of each finding</a></li>
+<li><a href="#t=343"><span class="mono">5:43</span> Materiality is read against the buyer&#x27;s transaction</a></li>
+<li><a href="#t=388"><span class="mono">6:28</span> The delivered product is live continuation</a></li>
+<li><a href="#t=437"><span class="mono">7:17</span> Where Tuuyi fits</a></li>
+<li><a href="#t=486"><span class="mono">8:06</span> A beta engagement</a></li>
+</ol>
+<p><a class="btn primary" href="/demo">Read the finished review the video refers to</a> <a class="btn" href="/how-it-works">The method in detail</a></p>
+
+<h2 class="eyebrow">Transcript</h2>
+<div class="transcript">
+<h2 id="t0"><span class="mono">0:00</span> The seller says the software does X. Does it?</h2>
+<p>Software diligence often begins with a surprisingly simple problem. The seller says the product does something. Does the evidence support that claim?</p>
+<p>Tuuyi identifies the claims being made, checks them against the supplied code and documents, independently checks the findings, and reports what the evidence supports. The result is not just a conclusion. Each finding shows the claim, the evidence behind it, and where that evidence came from, so the buyer can check it directly. And after the report is delivered, the buyer can continue asking questions about the completed review.</p>
+<h2 id="t37"><span class="mono">0:37</span> Diligence often starts with claims</h2>
+<p>Why focus on claims? Isn&#x27;t technical diligence really about whether the code is good? Sometimes. But early in a deal, the buyer is often relying on statements such as built for privacy, production ready, or our proprietary AI. Those statements affect what the buyer thinks they are buying. They can affect the price, the terms, the timetable, or even whether the deal makes sense. Tuuyi addresses that narrower question. Which claims the buyer is being asked to rely on are supported by the available evidence, which are not, and which still depend on trust, because the supplied material cannot settle them.</p>
+<h2 id="t77"><span class="mono">1:17</span> Explicit and implied claims</h2>
+<p>What if the seller never spells out every feature as a separate claim? They usually don&#x27;t. Some claims are explicit, no telemetry, runs in Docker, supports PostgreSQL.</p>
+<p>Others come from the ordinary meaning of how the seller describes the product.</p>
+<p>If you call something a URL shortener, for example, a reasonable buyer expects it to create short codes and resolve those codes to stored URLs. But that does not give us permission to invent requirements. Calling it a URL shortener does not automatically promise analytics, custom domains, or an API. And vague descriptions such as simple, modern, or enterprise grade are not converted into testable claims merely because the words appear in the sales material.</p>
+<h2 id="t124"><span class="mono">2:04</span> The review begins with intake</h2>
+<p>Before examining the software, we establish the context of the review. Who is the buyer? What is being purchased? Which seller documents carry the claims that matter? What does the buyer already know or suspect? And what kinds of findings would actually affect price, terms, or the decision to close? Those answers come from the buyer.</p>
+<p>The review does not fill in missing deal assumptions on its own. There is also an important distinction here. The target is the software being evaluated. A claim source is a seller document describing that software. The repository is evidence used to test claims. It is not itself a claim source.</p>
+<h2 id="t165"><span class="mono">2:45</span> Control 1: freeze the claim surface</h2>
+<p>Why freeze the claims before looking at the evidence?</p>
+<p>Because otherwise the evidence can influence what gets tested. We first identify the seller&#x27;s claims. The buyer can also add specific claims they want tested. That list is reviewed and settled before we start deciding whether any claim holds. Only then does the evidence review begin. This prevents a subtle but important problem, choosing the questions after you have started seeing the answers. A review should not become more interested in the easy claims because they are easy to support or quietly lose interest in awkward ones.</p>
+<p>Every frozen claim gets attempted and gets its own finding.</p>
+<h2 id="t207"><span class="mono">3:27</span> A finding is a claim, a verdict and evidence</h2>
+<p>So what counts as evidence for a finding?</p>
+<p>It depends on what the claim says. A useful citation has to do more than point to a file. It has to bear on the particular claim and the finding records what that citation shows. Some claims require broader evidence. Suppose the seller says, we store only the hit count and nothing else. Finding the database code that increments the hit count supports one part of that statement. It does not prove the words and nothing else.</p>
+<p>To support that part, the review has to look elsewhere too. For logging, telemetry, network calls, or other places where visitor information might be recorded.</p>
+<p>The claim determines the evidence required.</p>
+<h2 id="t251"><span class="mono">4:11</span> Example: a privacy claim that partly holds</h2>
+<p>The demo contains exactly that kind of example. The seller says that only the hit is recorded and nothing else. The database code supports part of the statement. It increments the hit counter without adding other information to that table. But elsewhere, the server&#x27;s default access log records the client&#x27;s address and user agent. So the useful conclusion is not simply true or false. The evidence shows that the claim is partly true and the report preserves both sides of that finding.</p>
+<p>Whether the difference matters commercially depends on what the buyer is relying on. For a buyer paying for a particular privacy posture, it may matter a great deal.</p>
+<h2 id="t293"><span class="mono">4:53</span> Control 2: an independent check of each finding</h2>
+<p>The first review is performed with AI assistance. Who checks whether its findings are actually sound?</p>
+<p>A separate check examines each finished finding against its evidence. It asks several distinct questions. Did we state the seller&#x27;s claim accurately? Does the cited material actually relate to that claim?</p>
+<p>Does it show what the finding says it shows? Is the verdict appropriate for the evidence? And when searches were required, were they broad enough to find what mattered?</p>
+<p>This is not a second attempt to redo the whole review or find additional faults in the target. It is a check on the issued findings themselves. Some findings are also retested, including findings the first check accepted. That helps detect both false alarms and problems the checker may have missed.</p>
+<h2 id="t343"><span class="mono">5:43</span> Materiality is read against the buyer&#x27;s transaction</h2>
+<p>What happens when the evidence simply can&#x27;t answer the question? That is kept separate from finding a problem.</p>
+<p>If the evidence shows that a seller claim is wrong, partly true, or needs an important qualification, the report rates the materiality of the gap, what that demonstrated difference would change for this buyer.</p>
+<p>If the supplied materials cannot settle the claim, nothing has been found against the seller.</p>
+<p>Instead, the report describes the exposure, how much the buyer is relying on something that still has not been verified. That distinction matters. We found a problem, and we could not verify this, are not the same conclusion, and the report should never make them sound like one.</p>
+<h2 id="t388"><span class="mono">6:28</span> The delivered product is live continuation</h2>
+<p>Once I have the report, is that the end of the engagement? The review itself is finished. The findings are issued and are not quietly rewritten afterward. But the delivered product remains available for questions. You can ask why a finding received its verdict, what evidence supports it, why something was rated material, what might settle an unresolved claim, or what parts of the target the review did not examine.</p>
+<p>The continuation works from the completed report, the working record behind it, and the cited target material. And when the completed review does not answer a question, it says so rather than inventing an answer. So the report is not merely something you receive and file away, it remains available as a way to explore the completed review.</p>
+<h2 id="t437"><span class="mono">7:17</span> Where Tuuyi fits</h2>
+<p>What kind of diligence is this meant to replace? Usually, none of the large categories of diligence. Tuuyi is not a penetration test. It is not a general code quality score, an architecture assessment, legal advice, or a valuation opinion. It has a narrower purpose. Examine claims about software that a buyer or advisor is being asked to rely on, test those claims against available evidence, and make the results inspectable. That can fit small software acquisitions, claims about AI technology, acceptance of contracted software, or evaluating an open-source dependency when important decisions rest on what its documentation says.</p>
+<p>Sometimes a claims review may be enough. Sometimes it identifies exactly where deeper diligence is warranted.</p>
+<h2 id="t486"><span class="mono">8:06</span> A beta engagement</h2>
+<p>A Tuuyi engagement is deliberately bounded. The client supplies a code snapshot or repository, identifies the seller documents whose claims matter, and provides the deal context needed to understand which differences would matter commercially. Tuuyi returns the claims and verdicts, the evidence behind each finding, the independent check, buyer-specific materiality or exposure ratings, and questions that remain for the seller.</p>
+<p>After delivery, the private continuation page remains available for questions about the completed review.</p>
+<p>The aim is not to pronounce on everything about a company or its software. It is more specific. Reduce the amount of a software decision that rests on claims nobody has actually checked.</p></div>
+
+<p><a class="btn primary" href="mailto:info@tuuyi.com?subject=Beta%20claims%20review">Ask for a beta review</a> <a class="btn" href="/pricing">Pricing</a></p>
+
+</main>
+<footer>
+  <div>© 2026 Tuuyi · <a href="mailto:info@tuuyi.com">info@tuuyi.com</a></div>
+  <div><a href="/privacy">Privacy</a><a href="/demo">Demo</a><a href="/about">Contact</a></div>
+</footer>
+</div>
+<script src="/site.js?v=20260905"></script>
+<script>
+// A chapter link (#t=seconds) seeks the video and plays it; the same fragment on arrival seeks without playing.
+(function () {
+  const v = document.getElementById("video");
+  if (!v) return;
+  const secs = () => { const m = /^#t=(\d+)$/.exec(location.hash); return m ? Number(m[1]) : null; };
+  document.querySelectorAll(".chapters a").forEach(a => a.addEventListener("click", e => {
+    e.preventDefault();
+    history.replaceState(null, "", a.getAttribute("href"));
+    v.currentTime = secs(); v.play(); v.scrollIntoView({ block: "nearest" });
+  }));
+  const t = secs();
+  if (t !== null) { const seek = () => { v.currentTime = t; }; v.readyState >= 1 ? seek() : v.addEventListener("loadedmetadata", seek, { once: true }); }
+})();
+</script>
+</body>
+</html>
