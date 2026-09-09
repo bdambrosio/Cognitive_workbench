@@ -1,459 +1,351 @@
 WEBVTT
 
-NOTE Captions for the Tuuyi introduction video, transcribed from the narration.
+NOTE Captions for the Tuuyi introduction video: the narration script, cue timing aligned to the audio.
 
 1
 00:00:00.400 --> 00:00:04.500
-Software diligence often begins with a surprisingly simple problem.
+<v Presenter>Software diligence often begins with a surprisingly simple problem.
 
 2
 00:00:05.200 --> 00:00:09.260
-The seller says the product does something. Does the evidence support that claim?
+<v Presenter>The seller says the product does something. Does the evidence support that claim?
 
 3
-00:00:10.160 --> 00:00:14.780
-Tuuyi identifies the claims being made, checks them against the supplied code and documents,
+00:00:10.200 --> 00:00:19.200
+<v Presenter>Tuuyi identifies the claims being made, checks them against the supplied code and documents, independently checks the findings, and reports what the evidence supports.
 
 4
-00:00:15.240 --> 00:00:19.200
-independently checks the findings, and reports what the evidence supports.
+00:00:19.920 --> 00:00:21.640
+<v Presenter>The result is not just a conclusion.
 
 5
-00:00:19.920 --> 00:00:25.520
-The result is not just a conclusion. Each finding shows the claim, the evidence behind it,
+00:00:22.360 --> 00:00:30.320
+<v Presenter>Each finding shows the claim, the evidence behind it, and where that evidence came from, so the buyer can check it directly.
 
 6
-00:00:25.520 --> 00:00:30.320
-and where that evidence came from, so the buyer can check it directly.
+00:00:30.540 --> 00:00:36.580
+<v Presenter>And after the report is delivered, the buyer can continue asking questions about the completed review.
 
 7
-00:00:30.540 --> 00:00:36.580
-And after the report is delivered, the buyer can continue asking questions about the completed review.
+00:00:38.780 --> 00:00:43.700
+<v Buyer>Why focus on claims? Isn't technical diligence really about whether the code is good?
 
 8
-00:00:38.780 --> 00:00:43.700
-Why focus on claims? Isn't technical diligence really about whether the code is good?
+00:00:44.480 --> 00:00:45.280
+<v Presenter>Sometimes.
 
 9
-00:00:44.480 --> 00:00:49.320
-Sometimes. But early in a deal, the buyer is often relying on statements such as
+00:00:45.740 --> 00:00:56.760
+<v Presenter>But early in a deal, the buyer is often relying on statements such as ‘built for privacy,’ ‘production-ready,’ or ‘our proprietary AI.’ Those statements affect what the buyer thinks they are buying.
 
 10
-00:00:49.320 --> 00:00:53.340
-built for privacy, production ready, or our proprietary AI.
+00:00:57.420 --> 00:01:02.460
+<v Presenter>They can affect the price, the terms, the timetable, or even whether the deal makes sense.
 
 11
-00:00:53.840 --> 00:00:56.760
-Those statements affect what the buyer thinks they are buying.
+00:01:03.240 --> 00:01:16.360
+<v Presenter>Tuuyi addresses that narrower question: which claims the buyer is being asked to rely on are supported by the available evidence, which are not, and which still depend on trust because the supplied material cannot settle them.
 
 12
-00:00:57.420 --> 00:01:02.460
-They can affect the price, the terms, the timetable, or even whether the deal makes sense.
+00:01:18.710 --> 00:01:22.470
+<v Buyer>What if the seller never spells out every feature as a separate claim?
 
 13
-00:01:03.140 --> 00:01:04.900
-Tuuyi addresses that narrower question.
+00:01:23.170 --> 00:01:24.470
+<v Presenter>They usually don't.
 
 14
-00:01:05.700 --> 00:01:10.260
-Which claims the buyer is being asked to rely on are supported by the available evidence,
+00:01:25.290 --> 00:01:34.770
+<v Presenter>Some claims are explicit: ‘no telemetry,’ ‘runs in Docker,’ ‘supports PostgreSQL.’ Others come from the ordinary meaning of how the seller describes the product.
 
 15
-00:01:10.900 --> 00:01:16.360
-which are not, and which still depend on trust, because the supplied material cannot settle them.
+00:01:36.010 --> 00:01:44.410
+<v Presenter>If you call something a URL shortener, for example, a reasonable buyer expects it to create short codes and resolve those codes to stored URLs.
 
 16
-00:01:18.710 --> 00:01:22.470
-What if the seller never spells out every feature as a separate claim?
+00:01:44.890 --> 00:01:47.550
+<v Presenter>But that does not give us permission to invent requirements.
 
 17
-00:01:23.170 --> 00:01:29.470
-They usually don't. Some claims are explicit, no telemetry, runs in Docker, supports PostgreSQL.
+00:01:47.550 --> 00:01:53.190
+<v Presenter>Calling it a URL shortener does not automatically promise analytics, custom domains, or an API.
 
 18
-00:01:30.810 --> 00:01:34.770
-Others come from the ordinary meaning of how the seller describes the product.
+00:01:53.510 --> 00:02:03.410
+<v Presenter>And vague descriptions such as ‘simple,’ ‘modern,’ or ‘enterprise-grade’ are not converted into testable claims merely because the words appear in the sales material.
 
 19
-00:01:36.010 --> 00:01:38.810
-If you call something a URL shortener, for example,
+00:02:05.540 --> 00:02:10.340
+<v Presenter>Before examining the software, we establish the context of the review. Who is the buyer?
 
 20
-00:01:39.490 --> 00:01:44.410
-a reasonable buyer expects it to create short codes and resolve those codes to stored URLs.
+00:02:10.720 --> 00:02:14.880
+<v Presenter>What is being purchased? Which seller documents carry the claims that matter?
 
 21
-00:01:44.890 --> 00:01:47.550
-But that does not give us permission to invent requirements.
+00:02:15.400 --> 00:02:18.040
+<v Presenter>What does the buyer already know or suspect?
 
 22
-00:01:47.550 --> 00:01:53.190
-Calling it a URL shortener does not automatically promise analytics, custom domains, or an API.
+00:02:18.540 --> 00:02:23.500
+<v Presenter>And what kinds of findings would actually affect price, terms, or the decision to close?
 
 23
-00:01:53.510 --> 00:01:57.710
-And vague descriptions such as simple, modern, or enterprise grade
+00:02:24.260 --> 00:02:30.040
+<v Presenter>Those answers come from the buyer. The review does not fill in missing deal assumptions on its own.
 
 24
-00:01:57.710 --> 00:02:03.410
-are not converted into testable claims merely because the words appear in the sales material.
+00:02:30.520 --> 00:02:35.000
+<v Presenter>There is also an important distinction here. The target is the software being evaluated.
 
 25
-00:02:05.540 --> 00:02:08.900
-Before examining the software, we establish the context of the review.
+00:02:35.820 --> 00:02:39.280
+<v Presenter>A claim source is a seller document describing that software.
 
 26
-00:02:09.540 --> 00:02:14.880
-Who is the buyer? What is being purchased? Which seller documents carry the claims that matter?
+00:02:39.900 --> 00:02:44.080
+<v Presenter>The repository is evidence used to test claims; it is not itself a claim source.
 
 27
-00:02:15.400 --> 00:02:18.040
-What does the buyer already know or suspect?
+00:02:45.660 --> 00:02:48.820
+<v Buyer>Why freeze the claims before looking at the evidence?
 
 28
-00:02:18.540 --> 00:02:23.500
-And what kinds of findings would actually affect price, terms, or the decision to close?
+00:02:49.740 --> 00:02:52.800
+<v Presenter>Because otherwise the evidence can influence what gets tested.
 
 29
-00:02:24.260 --> 00:02:25.740
-Those answers come from the buyer.
+00:02:53.520 --> 00:02:59.100
+<v Presenter>We first identify the seller's claims. The buyer can also add specific claims they want tested.
 
 30
-00:02:26.840 --> 00:02:30.040
-The review does not fill in missing deal assumptions on its own.
+00:02:59.860 --> 00:03:04.380
+<v Presenter>That list is reviewed and settled before we start deciding whether any claim holds.
 
 31
-00:02:30.520 --> 00:02:35.000
-There is also an important distinction here. The target is the software being evaluated.
+00:03:05.260 --> 00:03:07.540
+<v Presenter>Only then does the evidence review begin.
 
 32
-00:02:35.820 --> 00:02:39.280
-A claim source is a seller document describing that software.
+00:03:08.040 --> 00:03:14.020
+<v Presenter>This prevents a subtle but important problem: choosing the questions after you have started seeing the answers.
 
 33
-00:02:39.900 --> 00:02:44.080
-The repository is evidence used to test claims. It is not itself a claim source.
+00:03:14.480 --> 00:03:22.480
+<v Presenter>A review should not become more interested in the easy claims because they are easy to support, or quietly lose interest in awkward ones.
 
 34
-00:02:45.660 --> 00:02:48.820
-Why freeze the claims before looking at the evidence?
+00:03:23.420 --> 00:03:26.400
+<v Presenter>Every frozen claim gets attempted and gets its own finding.
 
 35
-00:02:49.740 --> 00:02:52.800
-Because otherwise the evidence can influence what gets tested.
+00:03:28.450 --> 00:03:30.390
+<v Buyer>So what counts as evidence for a finding?
 
 36
-00:02:53.520 --> 00:02:59.100
-We first identify the seller's claims. The buyer can also add specific claims they want tested.
+00:03:31.430 --> 00:03:36.890
+<v Presenter>It depends on what the claim says. A useful citation has to do more than point to a file.
 
 37
-00:02:59.860 --> 00:03:04.380
-That list is reviewed and settled before we start deciding whether any claim holds.
+00:03:36.890 --> 00:03:42.290
+<v Presenter>It has to bear on the particular claim, and the finding records what that citation shows.
 
 38
-00:03:05.260 --> 00:03:07.540
-Only then does the evidence review begin.
+00:03:43.090 --> 00:03:44.830
+<v Presenter>Some claims require broader evidence.
 
 39
-00:03:08.040 --> 00:03:14.020
-This prevents a subtle but important problem, choosing the questions after you have started seeing the answers.
+00:03:45.350 --> 00:03:54.530
+<v Presenter>Suppose the seller says, ‘We store only the hit count and nothing else.’ Finding the database code that increments the hit count supports one part of that statement.
 
 40
-00:03:14.480 --> 00:03:18.300
-A review should not become more interested in the easy claims
+00:03:54.890 --> 00:04:07.390
+<v Presenter>It does not prove the words ‘and nothing else.’ To support that part, the review has to look elsewhere too—for logging, telemetry, network calls, or other places where visitor information might be recorded.
 
 41
-00:03:18.300 --> 00:03:22.480
-because they are easy to support or quietly lose interest in awkward ones.
+00:04:08.490 --> 00:04:10.530
+<v Presenter>The claim determines the evidence required.
 
 42
-00:03:23.420 --> 00:03:26.400
-Every frozen claim gets attempted and gets its own finding.
+00:04:12.590 --> 00:04:15.270
+<v Presenter>The demo contains exactly that kind of example.
 
 43
-00:03:28.450 --> 00:03:30.390
-So what counts as evidence for a finding?
+00:04:15.750 --> 00:04:19.030
+<v Presenter>The seller says that only the hit is recorded and nothing else.
 
 44
-00:03:31.430 --> 00:03:33.150
-It depends on what the claim says.
+00:04:19.910 --> 00:04:26.450
+<v Presenter>The database code supports part of the statement: it increments the hit counter without adding other information to that table.
 
 45
-00:03:33.930 --> 00:03:36.890
-A useful citation has to do more than point to a file.
+00:04:26.450 --> 00:04:32.190
+<v Presenter>But elsewhere, the server's default access log records the client's address and user agent.
 
 46
-00:03:36.890 --> 00:03:42.290
-It has to bear on the particular claim and the finding records what that citation shows.
+00:04:32.810 --> 00:04:42.490
+<v Presenter>So the useful conclusion is not simply ‘true’ or ‘false.’ The evidence shows that the claim is partly true, and the report preserves both sides of that finding.
 
 47
-00:03:43.090 --> 00:03:44.830
-Some claims require broader evidence.
+00:04:43.710 --> 00:04:48.050
+<v Presenter>Whether the difference matters commercially depends on what the buyer is relying on.
 
 48
-00:03:45.350 --> 00:03:48.910
-Suppose the seller says, we store only the hit count and nothing else.
+00:04:48.490 --> 00:04:52.730
+<v Presenter>For a buyer paying for a particular privacy posture, it may matter a great deal.
 
 49
-00:03:49.770 --> 00:03:54.530
-Finding the database code that increments the hit count supports one part of that statement.
+00:04:54.010 --> 00:04:57.290
+<v Buyer>The first review is performed with AI assistance.
 
 50
-00:03:54.890 --> 00:03:57.250
-It does not prove the words and nothing else.
+00:04:57.910 --> 00:05:00.310
+<v Buyer>Who checks whether its findings are actually sound?
 
 51
-00:03:58.330 --> 00:04:01.510
-To support that part, the review has to look elsewhere too.
+00:05:01.750 --> 00:05:05.290
+<v Presenter>A separate check examines each finished finding against its evidence.
 
 52
-00:04:01.810 --> 00:04:07.390
-For logging, telemetry, network calls, or other places where visitor information might be recorded.
+00:05:06.050 --> 00:05:10.170
+<v Presenter>It asks several distinct questions. Did we state the seller's claim accurately?
 
 53
-00:04:08.490 --> 00:04:10.530
-The claim determines the evidence required.
+00:05:10.750 --> 00:05:13.610
+<v Presenter>Does the cited material actually relate to that claim?
 
 54
-00:04:12.590 --> 00:04:15.270
-The demo contains exactly that kind of example.
+00:05:14.810 --> 00:05:19.510
+<v Presenter>Does it show what the finding says it shows? Is the verdict appropriate for the evidence?
 
 55
-00:04:15.750 --> 00:04:19.030
-The seller says that only the hit is recorded and nothing else.
+00:05:19.510 --> 00:05:24.370
+<v Presenter>And, when searches were required, were they broad enough to find what mattered?
 
 56
-00:04:19.910 --> 00:04:22.430
-The database code supports part of the statement.
+00:05:25.470 --> 00:05:30.250
+<v Presenter>This is not a second attempt to redo the whole review or find additional faults in the target.
 
 57
-00:04:22.950 --> 00:04:26.450
-It increments the hit counter without adding other information to that table.
+00:05:30.330 --> 00:05:32.750
+<v Presenter>It is a check on the issued findings themselves.
 
 58
-00:04:26.450 --> 00:04:32.190
-But elsewhere, the server's default access log records the client's address and user agent.
+00:05:33.610 --> 00:05:37.890
+<v Presenter>Some findings are also retested, including findings the first check accepted.
 
 59
-00:04:32.810 --> 00:04:36.510
-So the useful conclusion is not simply true or false.
+00:05:38.290 --> 00:05:42.790
+<v Presenter>That helps detect both false alarms and problems the checker may have missed.
 
 60
-00:04:36.710 --> 00:04:42.490
-The evidence shows that the claim is partly true and the report preserves both sides of that finding.
+00:05:44.710 --> 00:05:47.730
+<v Buyer>What happens when the evidence simply can't answer the question?
 
 61
-00:04:43.710 --> 00:04:48.050
-Whether the difference matters commercially depends on what the buyer is relying on.
+00:05:48.550 --> 00:05:51.310
+<v Presenter>That is kept separate from finding a problem.
 
 62
-00:04:48.490 --> 00:04:52.730
-For a buyer paying for a particular privacy posture, it may matter a great deal.
+00:05:52.230 --> 00:06:03.950
+<v Presenter>If the evidence shows that a seller claim is wrong, partly true, or needs an important qualification, the report rates the materiality of the gap—what that demonstrated difference would change for this buyer.
 
 63
-00:04:54.010 --> 00:04:57.290
-The first review is performed with AI assistance.
+00:06:04.890 --> 00:06:09.610
+<v Presenter>If the supplied materials cannot settle the claim, nothing has been found against the seller.
 
 64
-00:04:57.910 --> 00:05:00.310
-Who checks whether its findings are actually sound?
+00:06:10.610 --> 00:06:17.590
+<v Presenter>Instead, the report describes the exposure: how much the buyer is relying on something that still has not been verified.
 
 65
-00:05:01.750 --> 00:05:05.290
-A separate check examines each finished finding against its evidence.
+00:06:18.010 --> 00:06:19.170
+<v Presenter>That distinction matters.
 
 66
-00:05:06.050 --> 00:05:07.910
-It asks several distinct questions.
+00:06:19.990 --> 00:06:27.550
+<v Presenter>‘We found a problem’ and ‘we could not verify this’ are not the same conclusion, and the report should never make them sound like one.
 
 67
-00:05:08.470 --> 00:05:10.170
-Did we state the seller's claim accurately?
+00:06:29.760 --> 00:06:32.480
+<v Buyer>Once I have the report, is that the end of the engagement?
 
 68
-00:05:10.750 --> 00:05:13.610
-Does the cited material actually relate to that claim?
+00:06:33.380 --> 00:06:38.700
+<v Presenter>The review itself is finished. The findings are issued and are not quietly rewritten afterward.
 
 69
-00:05:14.810 --> 00:05:16.830
-Does it show what the finding says it shows?
+00:06:38.700 --> 00:06:42.400
+<v Presenter>But the delivered product remains available for questions.
 
 70
-00:05:17.330 --> 00:05:19.510
-Is the verdict appropriate for the evidence?
+00:06:43.140 --> 00:06:55.280
+<v Presenter>You can ask why a finding received its verdict, what evidence supports it, why something was rated material, what might settle an unresolved claim, or what parts of the target the review did not examine.
 
 71
-00:05:19.510 --> 00:05:24.370
-And when searches were required, were they broad enough to find what mattered?
+00:06:56.340 --> 00:07:02.440
+<v Presenter>The continuation works from the completed report, the working record behind it, and the cited target material.
 
 72
-00:05:25.470 --> 00:05:30.250
-This is not a second attempt to redo the whole review or find additional faults in the target.
+00:07:02.440 --> 00:07:09.040
+<v Presenter>And when the completed review does not answer a question, it says so rather than inventing an answer.
 
 73
-00:05:30.330 --> 00:05:32.750
-It is a check on the issued findings themselves.
+00:07:09.480 --> 00:07:12.940
+<v Presenter>So the report is not merely something you receive and file away.
 
 74
-00:05:33.610 --> 00:05:37.890
-Some findings are also retested, including findings the first check accepted.
+00:07:13.000 --> 00:07:16.860
+<v Presenter>It remains available as a way to explore the completed review.
 
 75
-00:05:38.290 --> 00:05:42.790
-That helps detect both false alarms and problems the checker may have missed.
+00:07:16.860 --> 00:07:22.240
+<v Buyer>What kind of diligence is this meant to replace?
 
 76
-00:05:44.710 --> 00:05:47.730
-What happens when the evidence simply can't answer the question?
+00:07:22.240 --> 00:07:27.340
+<v Presenter>Usually, none of the large categories of diligence. Tuuyi is not a penetration test.
 
 77
-00:05:48.550 --> 00:05:51.310
-That is kept separate from finding a problem.
+00:07:27.340 --> 00:07:34.880
+<v Presenter>It is not a general code-quality score, an architecture assessment, legal advice, or a valuation opinion.
 
 78
-00:05:52.230 --> 00:05:58.270
-If the evidence shows that a seller claim is wrong, partly true, or needs an important qualification,
+00:07:34.880 --> 00:07:45.040
+<v Presenter>It has a narrower purpose: examine claims about software that a buyer or adviser is being asked to rely on, test those claims against available evidence, and make the results inspectable.
 
 79
-00:05:58.690 --> 00:06:03.950
-the report rates the materiality of the gap, what that demonstrated difference would change for this buyer.
+00:07:45.640 --> 00:07:57.880
+<v Presenter>That can fit small software acquisitions, claims about AI technology, acceptance of contracted software, or evaluating an open-source dependency when important decisions rest on what its documentation says.
 
 80
-00:06:04.890 --> 00:06:09.610
-If the supplied materials cannot settle the claim, nothing has been found against the seller.
+00:07:58.840 --> 00:08:00.760
+<v Presenter>Sometimes a claims review may be enough.
 
 81
-00:06:10.610 --> 00:06:17.590
-Instead, the report describes the exposure, how much the buyer is relying on something that still has not been verified.
+00:08:01.220 --> 00:08:04.920
+<v Presenter>Sometimes it identifies exactly where deeper diligence is warranted.
 
 82
-00:06:18.010 --> 00:06:19.170
-That distinction matters.
+00:08:07.240 --> 00:08:09.440
+<v Presenter>A Tuuyi engagement is deliberately bounded.
 
 83
-00:06:19.990 --> 00:06:24.890
-We found a problem, and we could not verify this, are not the same conclusion,
+00:08:10.260 --> 00:08:20.780
+<v Presenter>The client supplies a code snapshot or repository, identifies the seller documents whose claims matter, and provides the deal context needed to understand which differences would matter commercially.
 
 84
-00:06:25.070 --> 00:06:27.550
-and the report should never make them sound like one.
+00:08:21.960 --> 00:08:32.340
+<v Presenter>Tuuyi returns the claims and verdicts, the evidence behind each finding, the independent check, buyer-specific materiality or exposure ratings, and questions that remain for the seller.
 
 85
-00:06:29.760 --> 00:06:32.480
-Once I have the report, is that the end of the engagement?
+00:08:33.600 --> 00:08:39.000
+<v Presenter>After delivery, the private continuation page remains available for questions about the completed review.
 
 86
-00:06:33.380 --> 00:06:34.960
-The review itself is finished.
+00:08:39.980 --> 00:08:43.400
+<v Presenter>The aim is not to pronounce on everything about a company or its software.
 
 87
-00:06:35.480 --> 00:06:38.700
-The findings are issued and are not quietly rewritten afterward.
-
-88
-00:06:38.700 --> 00:06:42.400
-But the delivered product remains available for questions.
-
-89
-00:06:43.140 --> 00:06:47.400
-You can ask why a finding received its verdict, what evidence supports it,
-
-90
-00:06:47.900 --> 00:06:52.080
-why something was rated material, what might settle an unresolved claim,
-
-91
-00:06:52.080 --> 00:06:55.280
-or what parts of the target the review did not examine.
-
-92
-00:06:56.340 --> 00:07:02.440
-The continuation works from the completed report, the working record behind it, and the cited target material.
-
-93
-00:07:02.440 --> 00:07:09.040
-And when the completed review does not answer a question, it says so rather than inventing an answer.
-
-94
-00:07:09.480 --> 00:07:16.860
-So the report is not merely something you receive and file away, it remains available as a way to explore the completed review.
-
-95
-00:07:18.600 --> 00:07:22.120
-What kind of diligence is this meant to replace?
-
-96
-00:07:22.240 --> 00:07:25.080
-Usually, none of the large categories of diligence.
-
-97
-00:07:25.700 --> 00:07:27.340
-Tuuyi is not a penetration test.
-
-98
-00:07:27.340 --> 00:07:33.880
-It is not a general code quality score, an architecture assessment, legal advice, or a valuation opinion.
-
-99
-00:07:34.180 --> 00:07:35.580
-It has a narrower purpose.
-
-100
-00:07:36.140 --> 00:07:40.820
-Examine claims about software that a buyer or advisor is being asked to rely on,
-
-101
-00:07:41.020 --> 00:07:45.040
-test those claims against available evidence, and make the results inspectable.
-
-102
-00:07:45.640 --> 00:07:52.120
-That can fit small software acquisitions, claims about AI technology, acceptance of contracted software,
-
-103
-00:07:52.120 --> 00:07:57.880
-or evaluating an open-source dependency when important decisions rest on what its documentation says.
-
-104
-00:07:58.840 --> 00:08:00.760
-Sometimes a claims review may be enough.
-
-105
-00:08:01.220 --> 00:08:04.920
-Sometimes it identifies exactly where deeper diligence is warranted.
-
-106
-00:08:07.240 --> 00:08:09.440
-A Tuuyi engagement is deliberately bounded.
-
-107
-00:08:10.260 --> 00:08:15.840
-The client supplies a code snapshot or repository, identifies the seller documents whose claims matter,
-
-108
-00:08:16.200 --> 00:08:20.780
-and provides the deal context needed to understand which differences would matter commercially.
-
-109
-00:08:21.400 --> 00:08:26.980
-Tuuyi returns the claims and verdicts, the evidence behind each finding, the independent check,
-
-110
-00:08:27.480 --> 00:08:32.340
-buyer-specific materiality or exposure ratings, and questions that remain for the seller.
-
-111
-00:08:33.600 --> 00:08:39.000
-After delivery, the private continuation page remains available for questions about the completed review.
-
-112
-00:08:39.980 --> 00:08:43.400
-The aim is not to pronounce on everything about a company or its software.
-
-113
-00:08:43.540 --> 00:08:44.820
-It is more specific.
-
-114
-00:08:44.820 --> 00:08:51.060
-Reduce the amount of a software decision that rests on claims nobody has actually checked.
+00:08:43.540 --> 00:08:51.060
+<v Presenter>It is more specific: reduce the amount of a software decision that rests on claims nobody has actually checked.

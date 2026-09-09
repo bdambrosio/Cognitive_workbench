@@ -113,4 +113,5 @@ h2.eyebrow { font-weight: 400; }
 .chapters .mono, .transcript h2 .mono { color: var(--accent); margin-right: 8px; }
 .transcript h2 { font-size: 20px; margin: 40px 0 10px; }
 .transcript p { color: var(--muted); }
+.transcript .speaker { font-weight: 500; color: var(--label); margin-right: 4px; }
 @media (max-width: 640px) { .chapters { columns: 1; } }
