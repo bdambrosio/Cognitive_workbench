@@ -1037,6 +1037,11 @@ class InfospaceResourceManager:
                           # concerns share it and retiring one would cancel
                           # an audit the agent owes itself.
                           'yield_continuation',
+                          # A concern the agent made with the `mint` action
+                          # from her own noticing (2026-09-10). The marker
+                          # lives here rather than in the text, at Jill's
+                          # request.
+                          'self_minted',
                           # Fire-time triage cache + per-concern WIP
                           # (running summary of autonomous-fire findings,
                           # kept on the root concern of a successor chain).

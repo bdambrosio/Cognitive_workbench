@@ -2015,6 +2015,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         }
         self._affect.set_trigger('autonomous' if autonomous else 'user')
         self._affect.set_mode('thinking')
+        self._minted_this_turn = False          # the `mint` action: one per turn
         self._current_turn_hops = max(0, int(hops or 0))
         self._current_turn_xid = str(xid or '')
         # Fresh slot per turn. Reset here rather than at the end of the

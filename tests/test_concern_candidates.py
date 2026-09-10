@@ -427,3 +427,77 @@ def test_reflection_shows_the_sections_and_logs_the_shadow_rows(loop, tmp_path, 
     assert len(checks) == 1 and checks[0]["verdict"] == "violated" and checks[0]["concern_id"] == a
     assert created == []
     assert loop.resource_manager.get_resource(a)["properties"]["activation"] == 0.3
+
+
+# ── self-minted concerns (the `mint` action) ───────────────────────────
+
+def _user_turn(loop):
+    loop._current_turn = {"kind": "user", "source": "User"}
+    loop._minted_this_turn = False
+    loop._last_turn_seq = 41
+
+
+def test_mint_is_refused_outside_a_user_turn_and_twice_in_one(loop, tmp_path, monkeypatch):
+    loop._current_turn = {"kind": "autonomous", "source": "Tester"}
+    loop._minted_this_turn = False
+    assert loop._run_mint("the retry path swallows one error", "check whether it still does", 24).startswith("ERROR")
+    _user_turn(loop)
+    assert loop._run_mint("", "check", 24).startswith("ERROR")           # both fields needed
+    assert loop._run_mint("x", "", 24).startswith("ERROR")
+    assert loop._run_mint("the retry path swallows one error", "check whether it still does", 24).startswith("OK")
+    assert loop._run_mint("another thing", "check it", 24).startswith("ERROR: one mint per turn")
+    assert len(_rows(tmp_path / "memory" / C._MINTS_FILE)) == 1
+
+
+def test_mint_in_shadow_records_and_creates_nothing(loop, tmp_path, monkeypatch):
+    monkeypatch.setattr(C, "_MINT_LIVE", False)
+    _user_turn(loop)
+    obs = loop._run_mint("the sign error I half-saw in disposition.py", "read the update step and say whether the sign is wrong", 2)
+    assert obs.startswith("OK: recorded") and "shadow" in obs and "outside 8-168h" in obs
+    rows = _rows(tmp_path / "memory" / C._MINTS_FILE)
+    assert rows[0]["text"].startswith("the sign error") and rows[0]["live"] is False
+    assert rows[0]["rhythm_requested"] == 2 and rows[0]["rhythm_hours"] == 8   # clamped to the floor
+    assert rows[0]["turn_seq"] == 41 and rows[0]["entity"] == "User"
+    assert loop.resource_manager.resource_registry["Collection_ac"]["properties"]["content"] == []
+    ev = _rows(tmp_path / "autonomy.jsonl")
+    assert ev[-1]["event"] == "concern_minted" and ev[-1]["live"] is False
+
+
+def test_mint_live_creates_a_durable_capped_concern(loop, tmp_path, monkeypatch):
+    monkeypatch.setattr(C, "_MINT_LIVE", True)
+    _user_turn(loop)
+    obs = loop._run_mint("the sign error I half-saw in disposition.py", "read the update step and say whether the sign is wrong", 500)
+    assert obs.startswith("OK: concern Note_") and "recorded as 168h" in obs
+    ids = loop.resource_manager.resource_registry["Collection_ac"]["properties"]["content"]
+    assert len(ids) == 1
+    note = loop.resource_manager.get_resource(ids[0]); p = note["properties"]
+    assert p["content"] == "the sign error I half-saw in disposition.py"        # no prefix
+    assert p["category"] == "durable" and p["provenance"] == "inferred" and p["seed"] is False
+    assert p["rhythm_hours"] == 168 and p["rhythm_source"] == "self" and p["self_minted"] is True
+    assert p["activation"] == 0.0 and p["instruction"].startswith("read the update step")
+    assert "system_spawned" not in p
+    # at the cap: refused, said so, still recorded
+    _user_turn(loop)
+    monkeypatch.setattr(loop, "_active_nonseed_agent_count", lambda: C._AGENT_CONCERN_POPULATION_CAP)
+    obs = loop._run_mint("something else entirely", "check it", 24)
+    assert obs.startswith("EMPTY") and "cap" in obs
+    assert len(loop.resource_manager.resource_registry["Collection_ac"]["properties"]["content"]) == 1
+    assert len(_rows(tmp_path / "memory" / C._MINTS_FILE)) == 2
+    # a near-twin revives the existing one rather than duplicating
+    _user_turn(loop)
+    monkeypatch.setattr(loop, "_active_nonseed_agent_count", lambda: 1)
+    loop._find_similar_concern = lambda text, cid: ids[0]
+    assert loop._run_mint("that sign error in disposition.py", "check again", 24).startswith("OK: concern " + ids[0])
+    assert len(loop.resource_manager.resource_registry["Collection_ac"]["properties"]["content"]) == 1
+
+
+def test_mint_is_offered_on_user_turns_only(loop):
+    loop._discovered_tools = {}
+    loop._omitted_tools = []
+    loop._peers = []
+    loop._get_external_repo = lambda: None
+    loop._current_turn = {"kind": "user", "source": "User"}
+    cat = loop._build_react_tool_catalog()
+    assert '"tool": "mint"' in cat and cat.index('"mint"') < cat.index('"display"')
+    loop._current_turn = {"kind": "autonomous", "source": "Tester"}
+    assert '"tool": "mint"' not in loop._build_react_tool_catalog()

@@ -125,6 +125,23 @@ _AGENT_CONCERN_POPULATION_CAP = 12     # active non-seed agent concerns
 _CANDIDATES_LIVE = True                # promote recurring candidates to concerns
 _EXPECTATIONS_LIVE = False             # a violated aversive expectation bumps
 _CANDIDATES_FILE = 'concern_candidates.jsonl'
+# ----- self-minted concerns (2026-09-10, agreed with Jill) -----
+#
+# The `mint` action lets the agent turn something noticed mid-turn into a
+# durable concern of her own: her sentence, her instruction, her rhythm.
+# It goes through _add_agent_concern with recurrence NOT skipped, so the
+# cap and the similarity merge apply, unlike a yield's remainder. Her
+# terms: user turns only, one mint per turn, rhythm within
+# [_MINT_RHYTHM_MIN_HOURS, _MINT_RHYTHM_MAX_HOURS] (she asked for a floor
+# of 6; 8 is the smallest allowed bucket above it), surface text is the
+# sentence itself with no prefix. Shadow first: every mint is recorded
+# to <memory>/self_mints.jsonl, and until _MINT_LIVE no concern is
+# created. The shadow period ends when the rows say enough, not on a
+# date.
+_MINT_LIVE = False
+_MINTS_FILE = 'self_mints.jsonl'
+_MINT_RHYTHM_MIN_HOURS = 8
+_MINT_RHYTHM_MAX_HOURS = 168
 _EXPECTATIONS_FILE = 'expectation_checks.jsonl'
 _CANDIDATE_PROMOTE_COUNT = 3           # recurrences in a week before promotion
 _EXPECT_USER_FRESH_HOURS = 168.0       # a user-concern expectation older than this is not checked
@@ -138,9 +155,10 @@ _EXPECT_USER_FRESH_HOURS = 168.0       # a user-concern expectation older than t
 # Allowlist matches the legacy cadence values. Default is weekly (168h)
 # — chosen to err toward not firing too much when reflection lacks
 # rhythm signal (typical for seed-derived self-orientation concerns).
-# rhythm_source provenance ('external'|'urgency'|'default') is recorded
-# on the note so we can audit how often the default fires versus
-# reflection-extracted rhythms.
+# rhythm_source provenance ('external'|'urgency'|'default'|'self') is
+# recorded on the note so we can audit how often the default fires versus
+# reflection-extracted rhythms; 'self' is a rhythm the agent chose in a
+# `mint` action.
 _AGENT_CONCERN_RHYTHM_HOURS_ALLOWED = (1, 2, 4, 8, 12, 24, 168)
 
 _AGENT_CONCERN_DEFAULT_RHYTHM_HOURS = 168    # weekly default
@@ -852,7 +870,7 @@ class ConcernsMixin:
             return None
         rhythm_hours = _snap_rhythm_hours(rhythm_hours)
         instruction = (str(instruction).strip() if instruction else '') or None
-        if rhythm_source not in ('external', 'urgency', 'default'):
+        if rhythm_source not in ('external', 'urgency', 'default', 'self'):
             rhythm_source = 'default'
         if category not in _CONCERN_CATEGORIES:
             category = 'durable'
@@ -1951,6 +1969,55 @@ class ConcernsMixin:
                 and not _repeat_violation(prev):
             self._apply_agent_concern_evidence_bump(
                 props, datetime.now(timezone.utc).isoformat())
+
+    def _run_mint(self, text: str, instruction: str, rhythm_hours: Any) -> str:
+        """The `mint` action: a durable agent concern from the agent's own
+        noticing. Returns the observation. Refused on an autonomous turn
+        and on a second mint in one turn. The requested rhythm is recorded
+        as given and clamped to the allowed range for the concern. In
+        shadow the mint is logged and no concern is created."""
+        from utils.file_utils import append_jsonl
+        turn = getattr(self, '_current_turn', None) or {}
+        if turn.get('kind') != 'user':
+            return "ERROR: mint is available on user turns only, not inside an autonomous fire"
+        if getattr(self, '_minted_this_turn', False):
+            return "ERROR: one mint per turn; a second interest in the same turn is usually the first seen from another angle"
+        text = (text or '').strip()
+        instruction = (instruction or '').strip()
+        if not text or not instruction:
+            return "ERROR: mint needs both `text` (the interest, one sentence) and `instruction` (what to do when it fires)"
+        try:
+            requested = float(rhythm_hours)
+        except (TypeError, ValueError):
+            requested = None
+        clamped = _MINT_RHYTHM_MIN_HOURS if requested is None else \
+            max(_MINT_RHYTHM_MIN_HOURS, min(_MINT_RHYTHM_MAX_HOURS, requested))
+        rhythm = _snap_rhythm_hours(clamped)
+        self._minted_this_turn = True
+        entity = self._turn_counterpart()
+        row = {'turn_seq': getattr(self, '_last_turn_seq', None), 'entity': entity,
+               'text': text[:200], 'instruction': instruction[:600],
+               'rhythm_requested': requested, 'rhythm_hours': rhythm,
+               'live': _MINT_LIVE}
+        append_jsonl(self._memory_dir() / _MINTS_FILE, row, character=self.character_name)
+        note = "" if requested is None or requested == clamped else \
+            f" (rhythm {requested:g}h is outside {_MINT_RHYTHM_MIN_HOURS}-{_MINT_RHYTHM_MAX_HOURS}h; recorded as {rhythm}h)"
+        if not _MINT_LIVE:
+            self._write_autonomy_event({'event': 'concern_minted', 'text': text[:200],
+                                        'rhythm_hours': rhythm, 'live': False})
+            return f"OK: recorded{note}. Minting is in shadow: no concern was created."
+        nid = self._add_agent_concern(
+            text, entity=entity, provenance='inferred', seed=False,
+            rhythm_hours=rhythm, rhythm_source='self',
+            instruction=instruction, skip_recurrence=False, category='durable',
+            extra_properties={'self_minted': True})
+        self._write_autonomy_event({'event': 'concern_minted', 'text': text[:200],
+                                    'rhythm_hours': rhythm, 'live': True,
+                                    'concern_id': nid})
+        if not nid:
+            return (f"EMPTY: not created{note}: the active concern population is at its cap "
+                    f"of {_AGENT_CONCERN_POPULATION_CAP}; it will take a slot when one is satisfied or closed")
+        return f"OK: concern {nid} created{note}, rhythm {rhythm}h; it fires on its own rhythm from now"
 
     def _collect_concern_wip(self, exclude_id: Optional[str] = None
                              ) -> List[Tuple[str, str, float, str]]:

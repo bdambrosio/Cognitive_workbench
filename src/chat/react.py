@@ -94,7 +94,7 @@ REACT_ACTION_SCHEMA: Dict[str, Any] = {
 
 # Tools the model can emit. Validated structurally in _parse_react_action;
 # the dispatcher in _run_react_loop knows how to run each.
-_REACT_TOOLS = ('process_text', 'recall', 'inspect', 'inspect_external', 'security', 'justify', 'agent-say', 'display', 'respond', 'yield')
+_REACT_TOOLS = ('process_text', 'recall', 'inspect', 'inspect_external', 'security', 'justify', 'agent-say', 'mint', 'display', 'respond', 'yield')
 
 # Per-iteration auto-binding: $step1, $step2, ... names the result of each
 # action so subsequent actions can reference it. Scoped to the current turn
@@ -744,6 +744,11 @@ class ReactMixin:
                 to = str(action.get('to') or '')
                 msg_text = self._resolve_react_value(action.get('text', ''), log)
                 obs = self._run_agent_say(to, msg_text)
+            elif tool == 'mint':
+                obs = self._run_mint(
+                    self._resolve_react_value(action.get('text', ''), log),
+                    self._resolve_react_value(action.get('instruction', ''), log),
+                    action.get('rhythm_hours'))
             elif tool == 'display':
                 content = self._resolve_react_value(action.get('content', ''), log)
                 fmt = (action.get('format') or 'markdown').strip().lower()
@@ -803,6 +808,8 @@ class ReactMixin:
                     builtin.insert(builtin.index("inspect") + 1, "inspect_external")
                 if getattr(self, '_peers', None):
                     builtin.insert(builtin.index("display"), "agent-say")
+                if (getattr(self, '_current_turn', None) or {}).get('kind') == 'user':
+                    builtin.insert(builtin.index("display"), "mint")
                 # Omitted tools must not appear here either — this branch is
                 # exactly where an omitted tool lands, and listing it back
                 # would invite the retry it was dropped to prevent.

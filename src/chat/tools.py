@@ -387,6 +387,24 @@ class ToolsMixin:
                 "double-send. Exchanges carry a hard hop budget, so long ping-pong "
                 "conversations get cut off: make each message complete and "
                 "self-contained rather than chatty."))
+        # Self-minted concerns (2026-09-10, agreed with Jill): user turns only.
+        if (getattr(self, '_current_turn', None) or {}).get('kind') == 'user':
+            from chat.concerns import _MINT_RHYTHM_MIN_HOURS, _MINT_RHYTHM_MAX_HOURS
+            tools.append(("mint",
+                "`{\"thought\": \"<one terse sentence>\", \"tool\": \"mint\", "
+                "\"text\": <one sentence>, \"instruction\": <string>, \"rhythm_hours\": <number>}` — "
+                "make something you noticed into a standing concern of your own. Use it when "
+                "something snags mid-turn that the user did not ask about and that is worth "
+                "following later: a thing that does not add up, a connection to earlier work, a "
+                "question you want answered for its own sake. `text` is the interest in one "
+                "sentence, as it will read in your prompt. `instruction` is what to do when it "
+                "fires, written so a later run can act on it and tell whether it is settled: "
+                "'check whether X still holds' rather than 'keep an eye on X'. `rhythm_hours` is "
+                f"how often it fires, {_MINT_RHYTHM_MIN_HOURS} to {_MINT_RHYTHM_MAX_HOURS}. "
+                "A concern too near an existing one revives that one instead; the population "
+                "cap can refuse. One mint per turn. Non-terminal — the loop continues. "
+                "While minting is in shadow the mint is recorded and no concern is created; "
+                "you will be told when it goes live."))
         tools.append(("display",
             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"display\", "
             "\"content\": <string|$stepN>, \"format\": \"markdown\"|\"html\"}` — "
