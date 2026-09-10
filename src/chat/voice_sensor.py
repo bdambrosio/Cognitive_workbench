@@ -62,9 +62,10 @@ class VoiceSensor:
         self._ignored = 0  # unaddressed utterances, counted and never logged
         # Wake phrase: launcher --wake wins, else CW_WAKE_WORD, else Jill.
         self._wake_word = wake_word or os.environ.get('CW_WAKE_WORD', 'Jill')
-        # Calibration dialed in via the harness (front_deg=90, sign=+1 for this
-        # mount); env-overridable without a code change.
-        self._front_deg = float(os.environ.get('CW_VOICE_FRONT_DEG', '90'))
+        # Calibration measured live 2026-09-10: a talker straight in front of
+        # the lens reads bearing 105 in the array frame (three utterances,
+        # all 105). sign=+1 as on the Pi. Env-overridable without a code change.
+        self._front_deg = float(os.environ.get('CW_VOICE_FRONT_DEG', '105'))
         self._sign = int(os.environ.get('CW_VOICE_SIGN', '1'))
         self._orient = os.environ.get('CW_VOICE_ORIENT', '1') != '0'
 
@@ -170,14 +171,14 @@ class VoiceSensor:
             if not text:
                 logger.info("voice_sensor: bare wake word (summons) — dropped")
                 return
-        logger.info(f"voice_sensor: heard {text!r} "
-                    f"(doa={utt.get('start_doa')})")
+        doa = utt.get('doa')
+        if doa is None:
+            doa = utt.get('start_doa')
+        logger.info(f"voice_sensor: heard {text!r} (doa={doa})")
         self._publish_turn(text)
         # Orient toward whoever she's responding to (acknowledgement turn).
-        if self._orient:
-            doa = utt.get('start_doa')
-            if doa is not None:
-                self._orient_to(doa)
+        if self._orient and doa is not None:
+            self._orient_to(doa)
 
     def _publish_turn(self, text: str) -> None:
         if self._pub is None:

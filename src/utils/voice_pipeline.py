@@ -140,17 +140,22 @@ class VoiceSegmenter:
         self._last_seq: Optional[int] = None
         self._dropped = 0
         self.start_doa: Optional[float] = None  # bearing latched at `start`
+        self._bearings: list = []  # every bearing reported during the utterance
 
     def on_event(self, evt: dict) -> Optional[dict]:
         """Returns {pcm, sample_rate, start_doa, stop_doa, dropped_frames} on
         `stop`, else None. pcm is mono S16_LE."""
         vad = evt.get("vad")
+        doa = evt.get("doa_deg")
         if vad == "start":
             self._buf = []
             self._active = True
             self._last_seq = None
             self._dropped = 0
-            self.start_doa = evt.get("doa_deg")
+            self.start_doa = doa
+            self._bearings = [doa] if doa is not None else []
+        elif vad == "active" and self._active and doa is not None:
+            self._bearings.append(doa)
         elif vad == "stop" and self._active:
             self._active = False
             pcm = b"".join(self._buf)
@@ -161,7 +166,11 @@ class VoiceSegmenter:
                 "pcm": pcm,
                 "sample_rate": self._sample_rate or 16000,
                 "start_doa": self.start_doa,
-                "stop_doa": evt.get("doa_deg"),
+                # Circular mean over the utterance. One sample at `start` is
+                # not enough: live, 2026-09-10, a talker dead ahead (105)
+                # read 219 at start and the head went to its left stop.
+                "doa": circular_mean_deg(self._bearings),
+                "stop_doa": doa,
                 "dropped_frames": self._dropped,
             }
         return None
@@ -406,6 +415,17 @@ def is_addressed(text: str, name: str, *, backend) -> bool:
         logger.error(f"voice: address-check failed: {e}")
         return False
     return yes >= 2
+
+
+def circular_mean_deg(bearings) -> Optional[float]:
+    """Mean of bearings in degrees on the circle, or None if empty."""
+    import math
+    pts = [b for b in bearings if b is not None]
+    if not pts:
+        return None
+    xs = sum(math.cos(math.radians(b)) for b in pts)
+    ys = sum(math.sin(math.radians(b)) for b in pts)
+    return math.degrees(math.atan2(ys, xs)) % 360.0
 
 
 def doa_to_pan(doa_deg: float, front_deg: float = 0.0, sign: int = 1,
