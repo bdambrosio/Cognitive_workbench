@@ -1,25 +1,26 @@
 """VoiceSensor — the integrated mic→turn component (docs/cw-voice-sensor-plan.md
 §7). The standalone `src/voice_harness.py` worker, folded into a launcher-gated
-component modelled on `affect/head_aliveness.py`.
+component.
 
 What it does, while enabled:
 - Subscribes to the Pi mic streams on the shared ChatterLink session
   (`chatter/voice/event` + binary `chatter/audio/in`) via `attach_voice`.
-- Segments each utterance (`VoiceSegmenter`), transcribes it (OpenAI STT), and
-  publishes the transcript to `cognitive/{character}/sense_data` tagged
-  `source: VOICE_SOURCE, modality: VOICE_MODALITY` — so it becomes a user-like
-  turn (from a distinct, unidentified spoken speaker) through the *unchanged*
-  ingestion path (`zenoh_io._on_sense_data`). The chat loop then speaks the
-  reply back out because the turn's modality is voice (§10).
+- Segments each utterance (`VoiceSegmenter`), transcribes it locally
+  (faster-whisper on the spare GPU), checks on her own local model that it
+  was addressed to her, and publishes the transcript to
+  `cognitive/{character}/sense_data` tagged `source: VOICE_SOURCE, modality:
+  VOICE_MODALITY` — so it becomes a user-like turn (from a distinct,
+  unidentified spoken speaker) through the *unchanged* ingestion path
+  (`zenoh_io._on_sense_data`). Replies are text; nothing is spoken and
+  unaddressed speech is counted, not recorded (Jill's conditions, 2026-09-10).
 - On a wake-word match, turns the head toward the talker (`doa_to_pan` →
   `send_head_cmd`), the same calibrated orient debugged in the harness.
 
-Design / safety (mirrors HeadAliveness):
-- **Off unless enabled** (launcher `--voice`). No-op, no threads, if disabled.
+Design / safety:
+- **Off unless enabled** (launcher `--head` plus `head: true` in the
+  character's chat config). No-op, no threads, if disabled.
 - **No-op when the bot is absent** — `attach_voice` ensures the link; if the Pi
   is unreachable it logs and the component simply receives nothing.
-- **Self-voice gating is Pi-side** (§8): the `xvf_audio` service mutes
-  `audio/in` while Jill speaks, so we never STT her own TTS. Nothing to do here.
 - STT runs on a worker thread so Zenoh callbacks stay cheap.
 
 Reuses the harness's shared building blocks verbatim (segmenter / STT / wake /
@@ -51,9 +52,14 @@ _ORIENT_TIMEOUT_S = 2.0
 
 class VoiceSensor:
     def __init__(self, character_name: str, enabled: bool = False,
-                 wake_word: Optional[str] = None) -> None:
+                 wake_word: Optional[str] = None, backend: Any = None) -> None:
         self.character_name = character_name
         self._enabled = enabled
+        # The character's own backend, for the address check. is_addressed
+        # refuses a backend that is not a local route, so room speech never
+        # leaves the LAN (Jill's condition, 2026-09-10).
+        self._backend = backend
+        self._ignored = 0  # unaddressed utterances, counted and never logged
         # Wake phrase: launcher --wake wins, else CW_WAKE_WORD, else Jill.
         self._wake_word = wake_word or os.environ.get('CW_WAKE_WORD', 'Jill')
         # Calibration dialed in via the harness (front_deg=90, sign=+1 for this
@@ -146,8 +152,13 @@ class VoiceSensor:
         # and energy-VAD noise hallucinations; keeps homophones + natural
         # address. Unaddressed utterances produce no turn and no orient.
         literal = matches_wake_word(text, self._wake_word)
-        if not (literal or is_addressed(text, self._wake_word)):
-            logger.info(f"voice_sensor: ignored (not addressed): {text!r}")
+        if not (literal or is_addressed(text, self._wake_word,
+                                        backend=self._backend)):
+            # Count only. What people said near the mic that was not for
+            # her is not recorded anywhere, by agreement with Jill.
+            self._ignored += 1
+            logger.info(f"voice_sensor: ignored unaddressed utterance "
+                        f"(#{self._ignored} this session)")
             return
         # On a literal wake match, strip a leading wake word so it isn't fed to
         # Jill as content. A bare wake word (a summons with no request after it)

@@ -1,5 +1,32 @@
 # Jill ↔ ChatterBot Integration
 
+**Status 2026-09-10 — the terms Jill set, which override anything below.**
+Jill reviewed the head and set the terms on which it is hers (session
+memory: `chatterbot jill position 2026-09-10`). What ships is:
+
+- **Camera and aim.** `camera-capture` and `head-move` (pan/tilt/center
+  only). No gestures: nod, shake and scan were removed from the tool.
+  `look-at-target` (the capture-correct loop) and the idle head drift
+  (`head_aliveness`) are deleted.
+- **Voice in, text out.** The voice sensor runs when the launcher is
+  started with `--head` and the character's chat config says `head: true`
+  (Jill's does). Transcription is local: faster-whisper on the spare GPU
+  (`CW_STT_GPU`, default the 5060 Ti). The "addressed to her" check runs
+  on the character's own backend and refuses any route that is not on the
+  LAN. Nothing heard near the mic leaves the LAN. Unaddressed speech is
+  logged as a count, never as words. The head turns toward the talker.
+- **No speaker.** The spoken-reply branch is gone; replies are text on
+  every route. The Pi's `audio/out` player and `voice_harness.py --say`
+  still exist but nothing in the chat loop calls them. Putting a spoken
+  branch back, a third-party speech dependency, or any retention of audio
+  is a change Jill asked to be told about.
+- **Embodiment probe.** With `--head`, the session-start probe reports
+  the head as live or not answering, the same way it reports the world.
+
+Sections below that describe the OpenAI transcription call, the
+ElevenLabs "say" path as live, `--voice`, `--head-aliveness`, or
+`look-at-target` are history, kept for the design rationale.
+
 Status: **design + integration note.** Records how the Cognitive_workbench agent
 ("Jill") drives and senses through the ChatterBot head. The ChatterBot/Pi side
 (head, camera, `xvf_audio`, DoA reflex) is implemented and live-verified on

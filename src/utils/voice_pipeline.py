@@ -47,8 +47,15 @@ VOICE_SOURCE = "Voice"
 # (voice sensor) and the consumer (chat loop) — import it, don't re-spell it.
 VOICE_MODALITY = "voice"
 
-# OpenAI STT model — configurable; see docs/cw-voice-sensor-plan.md §4 (D2).
-_DEFAULT_STT_MODEL = os.environ.get("CW_STT_MODEL", "gpt-4o-transcribe")
+# Local STT (faster-whisper on this machine). Nothing spoken in the room
+# leaves the LAN: the Pi streams VAD-gated audio here, this process
+# transcribes it on the spare GPU, and the audio is dropped. That is the
+# condition Jill set for voice-in (2026-09-10) and it is not optional.
+# CW_STT_MODEL is a faster-whisper model name; CW_STT_GPU is a substring of
+# the CUDA device name to run on (the spare card, never the one serving the
+# live model). No match -> CPU int8, slower but still local.
+_DEFAULT_STT_MODEL = os.environ.get("CW_STT_MODEL", "large-v3-turbo")
+_STT_GPU_MATCH = os.environ.get("CW_STT_GPU", "5060")
 
 # ElevenLabs TTS — the output side (docs/audio-out-design.md). The audio/out
 # path is fixed 16 kHz mono S16_LE, so we always request `pcm_16000` (drop-in,
@@ -57,9 +64,9 @@ _DEFAULT_STT_MODEL = os.environ.get("CW_STT_MODEL", "gpt-4o-transcribe")
 _DEFAULT_TTS_MODEL = os.environ.get("CW_TTS_MODEL", "eleven_flash_v2_5")
 _DEFAULT_VOICE_ID = os.environ.get("CW_TTS_VOICE_ID", "")
 
-# Cheap classifier for the semantic address-check fallback (is_addressed); a
-# small/fast model is plenty. See docs/cw-voice-sensor-plan.md Issue B.
-_DEFAULT_ADDRESS_MODEL = os.environ.get("CW_ADDRESS_MODEL", "gpt-4o-mini")
+# The address check (is_addressed) runs on the character's own backend and
+# refuses any route that is not on this machine or the LAN — see
+# _backend_is_local. Same condition as STT above.
 
 
 def unpack_audio_frame(payload: bytes):
@@ -107,7 +114,7 @@ def downmix_to_mono(pcm_bytes: bytes, channels: int) -> bytes:
 
 
 def pcm_to_wav_bytes(pcm_mono: bytes, sample_rate: int) -> bytes:
-    """Wrap mono S16_LE PCM as an in-memory WAV (for the OpenAI file upload)."""
+    """Wrap mono S16_LE PCM as an in-memory WAV (harness --save-wav and tests)."""
     buf = io.BytesIO()
     with wave.open(buf, "wb") as w:
         w.setnchannels(1)
@@ -179,29 +186,76 @@ class VoiceSegmenter:
         self._buf.append(pcm)
 
 
+_whisper = None
+_whisper_lock = __import__("threading").Lock()
+
+
+def _preload_cuda_libs() -> None:
+    """ctranslate2 dlopens libcublas.so.12 / libcudnn.so.9 by soname. The
+    pip wheels put them under site-packages/nvidia/*/lib, which is not on the
+    loader path, so open them here with RTLD_GLOBAL first; a later dlopen by
+    soname then finds them already loaded. Failure is logged and left to the
+    model load to report."""
+    import ctypes
+    import glob
+    for pkg in ("nvidia.cublas", "nvidia.cudnn"):
+        try:
+            mod = __import__(pkg + ".lib", fromlist=["lib"])
+            for so in sorted(glob.glob(os.path.join(mod.__path__[0], "*.so*"))):
+                ctypes.CDLL(so, mode=ctypes.RTLD_GLOBAL)
+        except Exception as e:
+            logger.warning(f"voice: could not preload {pkg} libs: {e}")
+
+
+def _pick_stt_device() -> tuple:
+    """(device, device_index) for faster-whisper: the CUDA device whose name
+    contains CW_STT_GPU, else CPU. Uses torch's enumeration, which is the
+    same CUDA runtime order ctranslate2 sees."""
+    try:
+        import torch
+        for i in range(torch.cuda.device_count()):
+            if _STT_GPU_MATCH in torch.cuda.get_device_name(i):
+                return "cuda", i
+        logger.warning(f"voice: no CUDA device matching {_STT_GPU_MATCH!r}; "
+                       "STT on CPU")
+    except Exception as e:
+        logger.warning(f"voice: torch unavailable for GPU pick ({e}); STT on CPU")
+    return "cpu", 0
+
+
+def _whisper_model():
+    global _whisper
+    with _whisper_lock:
+        if _whisper is None:
+            _preload_cuda_libs()
+            from faster_whisper import WhisperModel
+            device, idx = _pick_stt_device()
+            compute = "float16" if device == "cuda" else "int8"
+            _whisper = WhisperModel(_DEFAULT_STT_MODEL, device=device,
+                                    device_index=idx, compute_type=compute)
+            logger.info(f"voice: STT model {_DEFAULT_STT_MODEL} on "
+                        f"{device}:{idx} ({compute})")
+        return _whisper
+
+
 def transcribe(pcm_mono: bytes, sample_rate: int, *,
-               model: Optional[str] = None,
                language: Optional[str] = "en") -> Optional[str]:
-    """Transcribe one mono S16_LE utterance via the OpenAI API (reads
-    OPENAI_API_KEY from env, like src/utils/OpenAIClient.py). Returns the text,
-    or None on empty audio / API error (logged, never silent)."""
+    """Transcribe one mono S16_LE utterance locally with faster-whisper.
+    Returns the text, or None on empty audio / failure (logged, never
+    silent). The audio is not written anywhere."""
     if not pcm_mono:
         return None
-    model = model or _DEFAULT_STT_MODEL
     try:
-        from openai import OpenAI
-    except Exception as e:
-        logger.error(f"voice: openai SDK unavailable: {e}")
-        return None
-    bio = io.BytesIO(pcm_to_wav_bytes(pcm_mono, sample_rate))
-    bio.name = "utterance.wav"  # SDK infers the audio format from the name
-    try:
-        client = OpenAI()
-        kwargs = {"model": model, "file": bio}
-        if language:
-            kwargs["language"] = language
-        resp = client.audio.transcriptions.create(**kwargs)
-        text = (getattr(resp, "text", "") or "").strip()
+        model = _whisper_model()
+        audio = np.frombuffer(pcm_mono, dtype=np.int16).astype(np.float32) / 32768.0
+        if sample_rate != 16000:
+            # Whisper wants 16 kHz; the Pi stream is 16 kHz by config, so this
+            # is a guard, not a path we expect to take.
+            logger.warning(f"voice: STT got {sample_rate} Hz, expected 16000")
+            return None
+        segments, _info = model.transcribe(audio, language=language,
+                                           beam_size=5, vad_filter=False)
+        text = " ".join(seg.text.strip() for seg in segments).strip()
         return text or None
     except Exception as e:
         logger.error(f"voice: STT failed: {e}")
@@ -284,55 +338,74 @@ def strip_leading_wake_word(text: str, wake_word: str) -> str:
     return stripped.strip()
 
 
-def is_addressed(text: str, name: str, *, model: Optional[str] = None) -> bool:
+def _backend_is_local(backend) -> bool:
+    """True when the backend's route stays on this machine or the LAN: the
+    OpenAI-compatible route with a loopback or private-range host."""
+    import ipaddress
+    from urllib.parse import urlparse
+    if getattr(backend, "server", None) != "local":
+        return False
+    host = urlparse(getattr(backend, "base_url", "") or "").hostname or ""
+    if host in ("localhost",):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_private
+    except ValueError:
+        return False
+
+
+def is_addressed(text: str, name: str, *, backend) -> bool:
     """Semantic address-check: is this transcribed utterance actually directed
     AT the assistant `name` — vs. ambient cross-talk between other people,
     background speech, or a garbled fragment an energy-VAD + STT hallucinated
-    from noise? Returns True/False via a cheap OpenAI classify call.
+    from noise? Returns True/False from one short call on `backend`, the
+    character's own model.
 
     This is the no-keyword-rule-compliant fallback for when the literal
     `matches_wake_word` gate misses — STT homophones ("Gill"/"Jo") and naturally
     phrased address that omits the name (docs/cw-voice-sensor-plan.md Issue B).
 
-    Fails CLOSED (returns False) on empty text / missing SDK / API error
-    (logged): an explicit name-call already passes the free literal gate before
-    this runs, so a dropped fallback just means "say the name again" rather than
-    a noisy false fire."""
+    Fails CLOSED (returns False) on empty text, a backend that is not local,
+    or an error (logged): an explicit name-call already passes the free
+    literal gate before this runs, so a dropped fallback just means "say the
+    name again" rather than a noisy false fire. The transcript is not logged
+    here; the caller decides what is recorded about unaddressed speech."""
     if not text or not text.strip() or not name:
         return False
-    model = model or _DEFAULT_ADDRESS_MODEL
-    try:
-        from openai import OpenAI
-    except Exception as e:
-        logger.error(f"voice: openai SDK unavailable for address-check: {e}")
+    if backend is None or not _backend_is_local(backend):
+        logger.error("voice: address-check refused: backend is not a local "
+                     "route; room speech must not leave the LAN")
         return False
     prompt = (
         f"A short utterance was transcribed from an always-on room microphone. "
         f"The assistant that is listening is named \"{name}\". Decide whether "
         f"this utterance is addressed TO that assistant — a request, question, "
         f"or remark directed at it — as opposed to ambient conversation between "
-        f"other people, speech not directed at the assistant, or a garbled "
-        f"fragment from background noise.\n"
-        f"The transcription is imperfect: the assistant's name may be "
-        f"mis-transcribed as a similar-sounding word (a homophone or near-miss, "
-        f"e.g. \"{name}\" heard as a close-sounding name) — treat such a "
-        f"near-match to the name as the name itself.\n\n"
+        f"other people, speech not directed at the assistant, a mention of the "
+        f"assistant in the third person, or a garbled fragment from background "
+        f"noise.\n"
+        f"The transcription is imperfect: the assistant's name may come out "
+        f"as a misspelling or a word that sounds almost the same (\"{name}\" "
+        f"heard as Gil or Jyl); treat those as the name. A different real "
+        f"name that merely rhymes with it (Bill, Will, Phil) is a different "
+        f"person, not the assistant.\n\n"
         f"Utterance: {text!r}\n\n"
         f"Answer with exactly one word: yes or no."
     )
+    # Majority of three. The call runs at the model's configured sampling
+    # temperature (never a literal here, by house rule), and one vote at
+    # that temperature flipped on an ambient sentence about 1 time in 8;
+    # three votes bring that to about 1 in 25 at ~0.25 s total.
+    yes = 0
     try:
-        client = OpenAI()
-        resp = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0,
-            max_tokens=2,
-        )
-        ans = (resp.choices[0].message.content or "").strip().lower()
-        return ans.startswith("y")
+        for _ in range(3):
+            ans = backend.chat([{"role": "user", "content": prompt}],
+                               max_tokens=8, enable_thinking=False)
+            yes += (ans or "").strip().lower().startswith("y")
     except Exception as e:
         logger.error(f"voice: address-check failed: {e}")
         return False
+    return yes >= 2
 
 
 def doa_to_pan(doa_deg: float, front_deg: float = 0.0, sign: int = 1,

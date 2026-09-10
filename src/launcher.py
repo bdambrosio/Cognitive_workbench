@@ -489,6 +489,25 @@ def apply_embodiment_selection(characters, world: bool, factorio: bool) -> None:
                 f"{drop}* tools from every catalog")
 
 
+_HEAD_TOOLS = ('head-move', 'camera-capture')
+
+
+def apply_head_selection(characters, head: bool) -> None:
+    """Drop the ChatterBot head tools from any catalog that will not have the
+    head: every catalog without --head, and the catalogs of characters whose
+    chat config does not say `head: true` even with it. Mutates
+    `chat.omitted_tools` in place, like apply_embodiment_selection."""
+    for name, config in characters:
+        chat_cfg = config.setdefault('chat', {}) or {}
+        config['chat'] = chat_cfg
+        if head and chat_cfg.get('head'):
+            logger.info(f"head: {name} has the ChatterBot head this session")
+            continue
+        existing = list(chat_cfg.get('omitted_tools') or [])
+        chat_cfg['omitted_tools'] = existing + [t for t in _HEAD_TOOLS
+                                                if t not in existing]
+
+
 def launch_world_display(occupants: str, size: str, pos: str,
                          browser: Optional[str]) -> List[subprocess.Popen]:
     """Spawn the world server + chromium window.
@@ -664,18 +683,20 @@ def main():
                              'default so non-reasoning backends (e.g. Gemma4, whose chat '
                              'template defaults enable_thinking false) are unaffected — the '
                              'field is only sent when this flag is set.')
-    parser.add_argument('--head-aliveness', action='store_true',
-                        help='Drive gentle idle micro-gaze on the ChatterBot head '
-                             '(off by default; no-op if the bot is unreachable).')
-    parser.add_argument('--voice', action='store_true',
-                        help='Enable the ChatterBot voice sensor: Pi mic → STT → '
-                             'user-like turns, with wake-word head-orient (off by '
-                             'default; no-op if the bot is unreachable).')
+    parser.add_argument('--head', action='store_true',
+                        help='The ChatterBot head is connected. For the character '
+                             'whose chat config says `head: true`: keeps head-move '
+                             'and camera-capture in the catalog, runs the voice '
+                             'sensor (Pi mic → local STT → turns, orient toward '
+                             'the talker), and has the embodiment probe report '
+                             'the head. Without it those tools are dropped from '
+                             'every catalog. Replies are text; nothing is spoken.')
     parser.add_argument('--wake', default=None, metavar='PHRASE',
-                        help='Wake phrase for --voice (default: Jill, or '
-                             'CW_WAKE_WORD). Every turn is gated on it: a literal '
-                             'match is the free fast path; a semantic '
-                             'address-check is the fallback on a miss.')
+                        help='Wake phrase for the --head voice sensor (default: '
+                             'Jill, or CW_WAKE_WORD). Every utterance is gated on '
+                             'being addressed: a literal match is the free fast '
+                             'path; a check on the character\'s own local model '
+                             'is the fallback on a miss.')
     parser.add_argument('--affect', action='store_true',
                         help='Launch the affect (processing-state) widget window.')
     parser.add_argument('--affect-size', default='320x320',
@@ -766,6 +787,7 @@ def main():
     # Embodiment selection must happen before any ChatLoop is built — the
     # catalog is assembled from chat.omitted_tools at construction.
     apply_embodiment_selection(characters, args.world, args.factorio)
+    apply_head_selection(characters, args.head)
 
     # Add infospace flag and map name
     for _name, cfg in characters:
@@ -778,8 +800,7 @@ def main():
         # What medium actually buys is longer CONTENT (+38-63%). Subagents
         # stay clamped at 'low' by SubAgent.max_reasoning_effort.
         cfg['reasoning_effort'] = 'medium' if args.reasoning else None
-        cfg['head_aliveness_enabled'] = bool(args.head_aliveness)
-        cfg['voice_enabled'] = bool(args.voice)
+        cfg['head_enabled'] = bool(args.head) and bool((cfg.get('chat') or {}).get('head'))
         cfg['voice_wake_word'] = args.wake
 
     if args.list_only:

@@ -44,7 +44,7 @@ _CHATTER_ROUTER = (
 
 # Safe head envelope + neutral/attentive pose. Source of truth: ChatterBot
 # docs/gaze-support.md §1 (measured for this mount). Mirrored by every agent-side
-# consumer (look-at-target, head_aliveness) so the geometry lives in one place.
+# consumer (the voice sensor's orient) so the geometry lives in one place.
 PAN_MIN, PAN_MAX = 10, 170          # 0=cam right, 170=cam left
 TILT_MIN, TILT_MAX = 30, 150        # 30=up, 115=horizontal, 150=~45° down
 NEUTRAL_PAN, NEUTRAL_TILT = 90, 113  # forward, horizontal ("attentive")

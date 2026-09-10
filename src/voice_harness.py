@@ -74,7 +74,6 @@ def main() -> int:
                          "with --save-wav to also dump the synth locally.")
     ap.add_argument("--no-stt", action="store_true",
                     help="skip STT — just trace voice/audio events")
-    ap.add_argument("--model", default=None, help="OpenAI STT model override")
     args = ap.parse_args()
 
     logging.basicConfig(
@@ -163,7 +162,7 @@ def main() -> int:
             if args.no_stt:
                 continue
             t0 = time.time()
-            text = transcribe(utt["pcm"], utt["sample_rate"], model=args.model)
+            text = transcribe(utt["pcm"], utt["sample_rate"])
             ms = int((time.time() - t0) * 1000)
             print(f"[stt ] {text!r}  ({ms} ms)")
             if text and matches_wake_word(text, args.wake):

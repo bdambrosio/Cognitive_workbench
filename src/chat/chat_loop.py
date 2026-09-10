@@ -45,7 +45,6 @@ from affect.publisher import AffectPublisher  # noqa: E402
 from canvas.publisher import CanvasPublisher, default_key as canvas_default_key  # noqa: E402
 from utils.json_utils import repair_json_string  # noqa: E402
 from utils.file_utils import atomic_write_text, atomic_write_json  # noqa: E402
-from utils.voice_pipeline import VOICE_MODALITY  # noqa: E402
 from chat.backend import _ChatBackend  # noqa: E402
 from chat.memories import (  # noqa: E402,F401 — mixin + back-compat re-exports
     MemoriesMixin, _MEMORIES_COLLECTION_NAME, _MEMORY_CATEGORIES)
@@ -302,6 +301,9 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         self.attribution_enabled = bool((character_config.get('attribution') or {}).get('enabled', True))
         self.substrate_enabled = bool((character_config.get('substrate') or {}).get('enabled', True))
         self.embodiment_enabled = bool((character_config.get('embodiment') or {}).get('enabled', True))
+        # Set by the launcher: --head, for the character whose chat config
+        # says `head: true`. Read before the embodiment probe runs.
+        self._head_enabled = bool(character_config.get('head_enabled', False))
         # WORKFLOW MODE. An agent executing a procedure is not maintaining a
         # relationship, and the machinery for the second is pure weight on
         # the first. Bundled rather than set one flag at a time because they
@@ -674,19 +676,17 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         self._canvas = CanvasPublisher(
             key=canvas_default_key(self.character_name))
 
-        # Embodied idle micro-gaze for the ChatterBot head (launcher
-        # --head-aliveness). Off by default; no-op if the bot is absent.
-        from affect.head_aliveness import HeadAliveness
-        self._head_aliveness = HeadAliveness(
-            enabled=bool(character_config.get('head_aliveness_enabled', False)))
-
-        # Voice sensor: Pi mic → STT → user-like turn + wake-word orient
-        # (launcher --voice). Off by default; no-op if the bot is absent.
+        # The ChatterBot head (launcher --head, for the character whose chat
+        # config says `head: true`). When enabled: the voice sensor runs (Pi
+        # mic → local STT → user-like turn, orient toward the talker) and the
+        # embodiment probe reports whether the head answered. Off by default;
+        # no-op if the bot is absent.
         from chat.voice_sensor import VoiceSensor
         self._voice_sensor = VoiceSensor(
             self.character_name,
-            enabled=bool(character_config.get('voice_enabled', False)),
-            wake_word=character_config.get('voice_wake_word'))
+            enabled=self._head_enabled,
+            wake_word=character_config.get('voice_wake_word'),
+            backend=self.backend)
 
     # ------------------------------------------------------------------
     # LLM helper (used by character_evaluator and DiscourseTracker)
@@ -741,10 +741,43 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             except Exception:
                 lines.append(f"- {label}: not running — those tools will "
                              f"report the bridge is offline.")
+        # The ChatterBot head is not an HTTP surface: it is live when its
+        # Pi publishes head/status on the Zenoh link. Probed only for the
+        # character that has the head this session (launcher --head plus
+        # `head: true`); otherwise its tools are not in the catalog and
+        # there is nothing to report.
+        if self._head_enabled:
+            lines.append(self._probe_head_line())
+            if 'ChatterBot head' in lines[-1] and 'LIVE' in lines[-1]:
+                live.add('ChatterBot head')
         # Which surfaces answered, as a set rather than a re-read of the
         # prose above — _world_position_line needs the fact, not the line.
         self._embodiment_live = live
         return "\n".join(lines)
+
+    def _probe_head_line(self) -> str:
+        """One line on whether the desk head answered at session start."""
+        import time as _time
+        from utils.chatter_link import get_link, router
+        link = get_link()
+        err = link.ensure()
+        if err is None:
+            # status publishes at ~5 Hz; a short wait is enough to hear one.
+            deadline = _time.monotonic() + 1.5
+            while _time.monotonic() < deadline:
+                st = link.latest_head_status()
+                if st is not None and st.get('age_s', 99) < 2.0:
+                    return (f"- **ChatterBot head: LIVE** ({router()}) — the "
+                            f"pan/tilt camera head on Bruce's desk, in the "
+                            f"physical room: camera-capture to see through "
+                            f"it, head-move to aim it. Someone speaking to "
+                            f"you by name in the room arrives as a turn "
+                            f"marked as spoken. This is not the shared "
+                            f"world.")
+                _time.sleep(0.1)
+        return (f"- ChatterBot head: not answering at {router()} — head-move "
+                f"and camera-capture will report the link is down, and no "
+                f"spoken turns will arrive.")
 
     def _world_position_line(self) -> str:
         """Where this body actually is, measured this turn.
@@ -2227,12 +2260,10 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         self._append_conversation_entry(
             'out', reply_entity, reply, meta=f'act={act_type} close={close}')
         if not intentionally_silent:
-            # Speak the reply only when the turn arrived by voice — keyed on the
-            # turn's modality, not the speaker's identity, so an attributed voice
-            # turn (a resolved name) still gets spoken (cw-voice-sensor-plan.md §10).
-            speak = (not autonomous) and modality == VOICE_MODALITY
-            self._publish_say(reply, speak=speak,
-                              turn_seq=turn_seq_for_reply)
+            # Replies are text on every route, including turns that arrived
+            # by voice: the spoken branch was removed 2026-09-10 at Jill's
+            # request, and putting one back is a change to tell her about.
+            self._publish_say(reply, turn_seq=turn_seq_for_reply)
             # Agent-exchange reply routing: a turn sourced by a co-resident
             # agent gets this reply delivered back to that agent's inbox
             # (hop-budgeted in _route_reply_to_peer). The /action publish

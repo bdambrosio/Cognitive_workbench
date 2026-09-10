@@ -62,7 +62,6 @@ class ZenohMixin:
         self._peer_pubs = {}
         self._affect.attach_session(self._zenoh_session)
         self._canvas.attach_session(self._zenoh_session)
-        self._head_aliveness.attach_session(self._zenoh_session)
         self._voice_sensor.attach_session(self._zenoh_session)
         self._action_pub = self._zenoh_session.declare_publisher(
             f"cognitive/{self.character_name}/action"
@@ -234,7 +233,7 @@ class ZenohMixin:
             return None
         return ex
 
-    def _publish_say(self, text: str, *, speak: bool = False,
+    def _publish_say(self, text: str, *,
                      turn_seq: Optional[int] = None) -> None:
         if not self._action_pub:
             return
@@ -256,12 +255,6 @@ class ZenohMixin:
             self._action_pub.put(json.dumps(payload).encode('utf-8'))
         except Exception as e:
             logger.warning(f"[{self.character_name}] publish failed: {e}")
-        # Voice-sourced turns also get spoken: synthesize and ship to the bot's
-        # chatter/audio/out (docs/audio-out-design.md). Off-thread so the chat
-        # loop never blocks on the ElevenLabs round-trip; self-voice gating is
-        # Pi-side (mic muted during playback), so nothing to coordinate here.
-        if speak:
-            self._speak_async(text)
 
     def _publish_agent_message(self, peer: str, text: str, hops: int,
                                xid: str) -> None:
@@ -360,32 +353,6 @@ class ZenohMixin:
         return (f"OK: sent to {target}. Any reply arrives later as a NEW "
                 f"turn from source '{target}' — do not wait for it in this "
                 f"loop; finish this turn normally.")
-
-    def _speak_async(self, text: str) -> None:
-        import threading
-
-        def _run() -> None:
-            try:
-                from utils.voice_pipeline import synthesize
-                from utils.chatter_link import get_link
-                pcm = synthesize(text)
-                if not pcm:
-                    return  # synthesize() logged the reason (no key/voice/etc.)
-                link = get_link()
-                err = link.ensure()
-                if err:
-                    logger.warning(
-                        f"[{self.character_name}] chatter link unavailable "
-                        f"for TTS: {err}")
-                    return
-                seq = link.send_audio_out(pcm)
-                logger.info(
-                    f"[{self.character_name}] spoke utterance seq={seq} "
-                    f"({len(pcm)} pcm bytes)")
-            except Exception as e:
-                logger.warning(f"[{self.character_name}] TTS say failed: {e}")
-
-        threading.Thread(target=_run, name="tts-say", daemon=True).start()
 
     # ------------------------------------------------------------------
     # Resource queryable handlers (chat-mode subset of executive_node)
@@ -782,10 +749,6 @@ class ZenohMixin:
             self._canvas.close()
         except Exception as e:
             logger.warning(f"[{self.character_name}] canvas close failed: {e}")
-        try:
-            self._head_aliveness.close()
-        except Exception as e:
-            logger.warning(f"[{self.character_name}] head_aliveness close failed: {e}")
         try:
             self._voice_sensor.close()
         except Exception as e:
