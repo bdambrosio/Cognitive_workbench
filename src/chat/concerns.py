@@ -1896,7 +1896,7 @@ class ConcernsMixin:
                 last[nid] = row
                 n += 1
             if _EXPECTATIONS_LIVE and verdict == 'violated' and direction == 'aversive' \
-                    and nid not in bumped:
+                    and nid not in bumped and not _repeat_violation(prev):
                 bumped.add(nid)
                 note = self.resource_manager.get_resource(nid)
                 if not note:
@@ -1936,7 +1936,9 @@ class ConcernsMixin:
                 age_h = round((datetime.now(timezone.utc) - when).total_seconds() / 3600.0, 1)
         except ValueError:
             pass
-        append_jsonl(self._memory_dir() / _EXPECTATIONS_FILE,
+        path = self._memory_dir() / _EXPECTATIONS_FILE
+        prev = last_expectation_rows(path).get(nid)
+        append_jsonl(path,
                      {'turn_seq': getattr(self, '_last_turn_seq', None), 'kind': 'fire',
                       'concern_id': nid,
                       'concern': str(props.get('content') or '').strip()[:120],
@@ -1945,7 +1947,8 @@ class ConcernsMixin:
                       'expect_age_h': age_h, 'live': _EXPECTATIONS_LIVE},
                      character=self.character_name)
         if _EXPECTATIONS_LIVE and check['verdict'] == 'violated' \
-                and check['direction'] == 'aversive':
+                and check['direction'] == 'aversive' \
+                and not _repeat_violation(prev):
             self._apply_agent_concern_evidence_bump(
                 props, datetime.now(timezone.utc).isoformat())
 
@@ -2854,7 +2857,13 @@ class ConcernsMixin:
             # sit in one prompt: the post-turn reflection (stage 8) never
             # runs on a fire. Read without the freshness rule — a late
             # fire still tests the expectation written for it.
-            prev_expect = self.expect_text(prev_wip)
+            #
+            # Only the root's own fire checks. A yield continuation is a
+            # hop of the same fire minutes later, and its rewrite would
+            # test the EXPECT the previous hop just wrote: 15 of 67 fire
+            # rows by 2026-09-10 were such hops, one of them a "violated"
+            # against a time that had not yet happened. Agreed with Jill.
+            prev_expect = self.expect_text(prev_wip) if concern_id == root_id else None
             tail = log[-10:] if len(log) > 10 else log
             summary = "\n".join(f"{label}: {content[:300]}" for label, content in tail)
             sys_msg = (
@@ -2934,6 +2943,18 @@ class ConcernsMixin:
             logger.warning(
                 f"[{self.character_name}] _update_concern_wip failed for "
                 f"{concern_id}: {e}")
+
+
+def _repeat_violation(prev: Optional[Dict[str, Any]]) -> bool:
+    """True when a concern's previous logged check was also 'violated'.
+    A second violation in a row means the expectation is wrong, not the
+    world: the Ramana concern's EXPECT drifted from "a random saying" to
+    "a saying about tracing the I-thought", so a random draw violated it
+    most fires, and each bump would have brought the next fire sooner
+    (the ratchet Jill predicted on turn 3585, seen in the shadow rows by
+    2026-09-10). No bump on a repeat; activation still moves on its
+    rhythm."""
+    return bool(prev) and prev.get('verdict') == 'violated'
 
 
 def last_expectation_rows(path) -> Dict[str, Dict[str, Any]]:

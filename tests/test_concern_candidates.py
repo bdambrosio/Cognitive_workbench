@@ -184,20 +184,24 @@ def test_expectation_checks_log_in_shadow_and_bump_live(loop, tmp_path, monkeypa
                                       "context": "c\nEXPECT: still waiting", "context_updated_at": now}, "user one")
     shown = {"agent one": (a, "agent", {}, "the port is closed", 0.1),
              "user one": (u, "user", {}, "still waiting", 0.1)}
+    fine = [{"concern": "agent one", "verdict": "held", "direction": "neutral", "evidence": "closed"},
+            {"concern": "user one", "verdict": "held", "direction": "neutral", "evidence": "waiting"},
+            {"concern": "nobody", "verdict": "held"}]
     checks = [{"concern": "agent one", "verdict": "violated", "direction": "aversive", "evidence": "port open"},
-              {"concern": "user one", "verdict": "violated", "direction": "aversive", "evidence": "they moved on"},
-              {"concern": "nobody", "verdict": "held"}]
-    assert loop._log_expectation_checks(checks, shown, 7) == 2
+              {"concern": "user one", "verdict": "violated", "direction": "aversive", "evidence": "they moved on"}]
+    assert loop._log_expectation_checks(fine, shown, 7) == 2
     rows = _rows(tmp_path / "memory" / C._EXPECTATIONS_FILE)
     assert [r["kind"] for r in rows] == ["agent", "user"] and rows[0]["live"] is False
     get = loop.resource_manager.get_resource
+    assert loop._log_expectation_checks(checks, shown, 8) == 2            # shadow: logged, no bump
     assert get(a)["properties"]["activation"] == 0.4 and get(u)["properties"]["strength"] == 0.5
     monkeypatch.setattr(C, "_EXPECTATIONS_LIVE", True)
-    loop._log_expectation_checks(checks + checks, shown, 8)               # duplicates: one bump each
+    loop._log_expectation_checks(fine, shown, 9)                          # clear the repeat
+    loop._log_expectation_checks(checks + checks, shown, 10)              # duplicates in one turn: one bump each
     assert get(a)["properties"]["activation"] == pytest.approx(0.4 + C._AGENT_CONCERN_BUMP_AMOUNT)
     assert get(u)["properties"]["strength"] == pytest.approx(0.5 + C._USER_CONCERN_BUMP_AMOUNT)
-    # the repeat wrote no rows: same expectation, verdict and direction as each concern's last row
-    assert len(_rows(tmp_path / "memory" / C._EXPECTATIONS_FILE)) == 2
+    # within the turn the repeat wrote no rows: same expectation, verdict and direction as the last row
+    assert len(_rows(tmp_path / "memory" / C._EXPECTATIONS_FILE)) == 8      # two per turn 7-10
 
 
 def test_expectation_rows_are_written_on_change_only(loop, tmp_path, monkeypatch):
@@ -217,13 +221,14 @@ def test_expectation_rows_are_written_on_change_only(loop, tmp_path, monkeypatch
     rows = _rows(tmp_path / "memory" / C._EXPECTATIONS_FILE)
     assert [(r["turn_seq"], r["verdict"], r["expect"]) for r in rows] == \
         [(1, "unclear", "quiet"), (3, "held", "quiet"), (5, "held", "louder")]
-    # the live bump does not depend on a row being written
+    # live: the first violation bumps; the same violation next turn writes
+    # no row and, being a repeat, bumps nothing
     monkeypatch.setattr(C, "_EXPECTATIONS_LIVE", True)
     bad = [{"concern": "agent one", "verdict": "violated", "direction": "aversive", "evidence": "e6"}]
     loop._log_expectation_checks(bad, shown2, 6)
     loop._log_expectation_checks(bad, shown2, 7)
     assert loop.resource_manager.get_resource(a)["properties"]["activation"] == \
-        pytest.approx(0.4 + 2 * C._AGENT_CONCERN_BUMP_AMOUNT)
+        pytest.approx(0.4 + C._AGENT_CONCERN_BUMP_AMOUNT)
     assert len(_rows(tmp_path / "memory" / C._EXPECTATIONS_FILE)) == 4
 
 
@@ -290,6 +295,59 @@ def test_fire_check_bumps_when_live_and_skips_without_prior_expect(loop, tmp_pat
     assert loop.resource_manager.get_resource(nid3)["properties"]["wip"] == "w3\nEXPECT: first one"
     rows = _rows(tmp_path / "memory" / C._EXPECTATIONS_FILE)
     assert [r["verdict"] for r in rows] == ["violated", "held"] and all(r["live"] for r in rows)
+
+
+def test_fire_check_runs_on_the_root_fire_only(loop, tmp_path, monkeypatch):
+    """A yield continuation is a hop of the same fire minutes later; its
+    WIP rewrite must not test the EXPECT the previous hop just wrote."""
+    now = datetime.now(timezone.utc).isoformat()
+    root = _note(loop, "Collection_ac", {"kind": "agent_concern", "status": "active", "activation": 0.4,
+                                         "instruction": "x", "rhythm_hours": 1, "content": "watch the volts",
+                                         "wip": "seen once\nEXPECT: volts stay above 51.5",
+                                         "wip_updated_at": now}, "watch the volts")
+    hop = _note(loop, "Collection_ac", {"kind": "agent_concern", "status": "active", "activation": 0.7,
+                                        "instruction": "carry on", "successor_of": root},
+                "watch the volts — continuation (depth 1)")
+    seen = []
+    loop.backend = StubBackend(["seen twice\nCHECK: violated; aversive; 50.1 V\nEXPECT: back above 51.5"])
+    real = loop.backend.chat
+    loop.backend.chat = lambda messages, **kw: (seen.append(messages[0]["content"]), real(messages, **kw))[1]
+    monkeypatch.setattr(loop, "_persist_to_disk", lambda: None, raising=False)
+    monkeypatch.setattr(C, "_EXPECTATIONS_LIVE", True)
+    loop._update_concern_wip(hop, "carry on", [("ACTION", "read")], "same", "respond")
+    assert "'CHECK: '" not in seen[0]                                      # not asked on a hop
+    props = loop.resource_manager.get_resource(root)["properties"]
+    assert props["wip"].startswith("seen twice")                            # the root's WIP still moves
+    assert "CHECK:" in props["wip"]                                         # a stray CHECK line is kept as text
+    assert props["activation"] == 0.4                                       # no bump
+    assert not (tmp_path / "memory" / C._EXPECTATIONS_FILE).exists()
+
+
+def test_repeat_violation_does_not_bump(loop, tmp_path, monkeypatch):
+    """Two violations in a row mean the expectation is wrong: the second
+    is logged but does not bump. Fire-side and post-turn paths alike."""
+    monkeypatch.setattr(C, "_EXPECTATIONS_LIVE", True)
+    nid = _fire(loop, monkeypatch, "w\nEXPECT: a saying on enquiry",
+                "w2\nCHECK: violated; aversive; it was on grace\nEXPECT: a saying on enquiry")
+    get = loop.resource_manager.get_resource
+    assert get(nid)["properties"]["activation"] == pytest.approx(0.4 + C._AGENT_CONCERN_BUMP_AMOUNT)
+    props = get(nid)["properties"]
+    loop.backend = StubBackend(["w3\nCHECK: violated; aversive; on surrender this time\nEXPECT: a saying on enquiry"])
+    loop._update_concern_wip(nid, "deliver", [("ACTION", "fetch")], "Talk 244", "respond")
+    assert props["activation"] == pytest.approx(0.4 + C._AGENT_CONCERN_BUMP_AMOUNT)   # logged, not bumped
+    rows = _rows(tmp_path / "memory" / C._EXPECTATIONS_FILE)
+    assert [r["verdict"] for r in rows] == ["violated", "violated"]
+    # a held check in between clears the repeat
+    loop.backend = StubBackend(["w4\nCHECK: held; neutral; on enquiry\nEXPECT: a saying on enquiry"])
+    loop._update_concern_wip(nid, "deliver", [("ACTION", "fetch")], "Talk 9", "respond")
+    loop.backend = StubBackend(["w5\nCHECK: violated; aversive; on grace again\nEXPECT: a saying on enquiry"])
+    loop._update_concern_wip(nid, "deliver", [("ACTION", "fetch")], "Talk 10", "respond")
+    assert props["activation"] == pytest.approx(0.4 + 2 * C._AGENT_CONCERN_BUMP_AMOUNT)
+    # post-turn path: the concern's last row is a violation, so no bump
+    shown = {"watch the volts": (nid, "agent", {}, "a saying on enquiry", 0.5)}
+    checks = [{"concern": "watch the volts", "verdict": "violated", "direction": "aversive", "evidence": "grace"}]
+    loop._log_expectation_checks(checks, shown, 9)
+    assert props["activation"] == pytest.approx(0.4 + 2 * C._AGENT_CONCERN_BUMP_AMOUNT)
 
 
 def test_fire_check_malformed_or_missing_is_dropped_and_wip_kept(loop, tmp_path, monkeypatch):
