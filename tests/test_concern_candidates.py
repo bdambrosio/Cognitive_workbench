@@ -127,6 +127,8 @@ def test_recall_records_losers_only_when_asked(loop, tmp_path):
 # ── candidates ─────────────────────────────────────────────────────────
 
 def test_candidates_are_logged_and_recur_without_creating(loop, tmp_path, monkeypatch):
+    # Both modes are exercised; the flag's module default is not assumed.
+    monkeypatch.setattr(C, "_CANDIDATES_LIVE", False)
     created = []
     monkeypatch.setattr(loop, "_add_agent_concern", lambda *a, **k: created.append(a) or "Note_x")
     cand = [{"text": "the async pipeline keeps needing a diagram", "why": "third module today",

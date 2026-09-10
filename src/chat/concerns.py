@@ -117,8 +117,12 @@ _AGENT_CONCERN_BUMP_AMOUNT    = 0.15   # gained per hit (capped at 1.0)
 # easier, so the cap comes first and is live from day one; the two new
 # sources start in shadow — they write rows to <memory>/ and change nothing
 # — until a week of rows has been read. Flipping a flag is one line.
+# Candidates went live 2026-09-10 after 65 shadow rows (four would_promote,
+# one observation; repeat promotion merges; the cap had refused nothing),
+# put to Jill and accepted. Expectations stay in shadow until the fire-side
+# CHECK runs once per fire and a repeat violation stops bumping.
 _AGENT_CONCERN_POPULATION_CAP = 12     # active non-seed agent concerns
-_CANDIDATES_LIVE = False               # promote recurring candidates to concerns
+_CANDIDATES_LIVE = True                # promote recurring candidates to concerns
 _EXPECTATIONS_LIVE = False             # a violated aversive expectation bumps
 _CANDIDATES_FILE = 'concern_candidates.jsonl'
 _EXPECTATIONS_FILE = 'expectation_checks.jsonl'
