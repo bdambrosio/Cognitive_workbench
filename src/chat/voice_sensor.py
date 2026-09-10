@@ -60,10 +60,12 @@ class VoiceSensor:
         self._ignored = 0  # unaddressed utterances, counted and never logged
         # Wake phrase: launcher --wake wins, else CW_WAKE_WORD, else Jill.
         self._wake_word = wake_word or os.environ.get('CW_WAKE_WORD', 'Jill')
-        # Calibration measured live 2026-09-10: a talker straight in front of
-        # the lens reads bearing 105 in the array frame (three utterances,
-        # all 105). sign=+1 as on the Pi. Env-overridable without a code change.
-        self._front_deg = float(os.environ.get('CW_VOICE_FRONT_DEG', '105'))
+        # Calibration measured live 2026-09-10 (evening): the array's settled
+        # bearing reads about 90 for a talker at ChatterBot's right and about
+        # 170 at its left, so straight ahead is about 130 (the Pi's original
+        # config value). The morning's 105 was a stale register read taken as
+        # truth. sign=+1 as on the Pi. Env-overridable without a code change.
+        self._front_deg = float(os.environ.get('CW_VOICE_FRONT_DEG', '130'))
         self._sign = int(os.environ.get('CW_VOICE_SIGN', '1'))
 
         self._seg = VoiceSegmenter()

@@ -158,6 +158,8 @@ class VoiceSegmenter:
             self._bearings.append(doa)
         elif vad == "stop" and self._active:
             self._active = False
+            if doa is not None:
+                self._bearings.append(doa)
             pcm = b"".join(self._buf)
             self._buf = []
             if self._channels and self._channels > 1:
@@ -166,10 +168,13 @@ class VoiceSegmenter:
                 "pcm": pcm,
                 "sample_rate": self._sample_rate or 16000,
                 "start_doa": self.start_doa,
-                # Circular mean over the utterance. One sample at `start` is
-                # not enough: live, 2026-09-10, a talker dead ahead (105)
-                # read 219 at start and the head went to its left stop.
-                "doa": circular_mean_deg(self._bearings),
+                # The last bearing the array reported. Its DOA_VALUE register
+                # lags: the sample at `start` is still the PREVIOUS talker's
+                # bearing and it settles during the utterance (measured
+                # 2026-09-10: start 181 / stop 90 for one talker who had
+                # not moved). A mean over the utterance mixes the stale
+                # value in; the final sample is the settled one.
+                "doa": self._bearings[-1] if self._bearings else None,
                 "stop_doa": doa,
                 "dropped_frames": self._dropped,
             }
@@ -263,7 +268,7 @@ def transcribe(pcm_mono: bytes, sample_rate: int, *,
             logger.warning(f"voice: STT got {sample_rate} Hz, expected 16000")
             return None
         segments, _info = model.transcribe(audio, language=language,
-                                           beam_size=5, vad_filter=False)
+                                           beam_size=5, vad_filter=True)
         text = " ".join(seg.text.strip() for seg in segments).strip()
         return text or None
     except Exception as e:
@@ -415,17 +420,6 @@ def is_addressed(text: str, name: str, *, backend) -> bool:
         logger.error(f"voice: address-check failed: {e}")
         return False
     return yes >= 2
-
-
-def circular_mean_deg(bearings) -> Optional[float]:
-    """Mean of bearings in degrees on the circle, or None if empty."""
-    import math
-    pts = [b for b in bearings if b is not None]
-    if not pts:
-        return None
-    xs = sum(math.cos(math.radians(b)) for b in pts)
-    ys = sum(math.sin(math.radians(b)) for b in pts)
-    return math.degrees(math.atan2(ys, xs)) % 360.0
 
 
 def doa_to_pan(doa_deg: float, front_deg: float = 0.0, sign: int = 1,
