@@ -13,8 +13,11 @@ What it does, while enabled:
   unidentified spoken speaker) through the *unchanged* ingestion path
   (`zenoh_io._on_sense_data`). Replies are text; nothing is spoken and
   unaddressed speech is counted, not recorded (Jill's conditions, 2026-09-10).
-- On a wake-word match, turns the head toward the talker (`doa_to_pan` →
-  `send_head_cmd`), the same calibrated orient debugged in the harness.
+- Attaches the talker's bearing to the turn as a bracketed suffix (about how
+  far left or right of where the head points, and the pan that would face
+  them). The sensor never moves the head: Jill decides whether to look, with
+  head-move, and the camera to check (agreed 2026-09-10 after a one-sample
+  reflex sent the head to its stop).
 
 Design / safety:
 - **Off unless enabled** (launcher `--head` plus `head: true` in the
@@ -37,17 +40,12 @@ from datetime import datetime
 from typing import Any, Optional
 
 from utils.chatter_link import (
-    get_link, _payload_bytes,
-    NEUTRAL_TILT, NEUTRAL_PAN, PAN_MIN, PAN_MAX)
+    get_link, _payload_bytes, NEUTRAL_PAN, PAN_MIN, PAN_MAX)
 from utils.voice_pipeline import (
     VoiceSegmenter, transcribe, matches_wake_word, is_addressed, doa_to_pan,
     strip_leading_wake_word, VOICE_SOURCE, VOICE_MODALITY)
 
 logger = logging.getLogger('chat.voice_sensor')
-
-# Per-orient wait for the Pi to settle; short — the acknowledgement turn needs
-# no confirmation and the worker is serial.
-_ORIENT_TIMEOUT_S = 2.0
 
 
 class VoiceSensor:
@@ -67,7 +65,6 @@ class VoiceSensor:
         # all 105). sign=+1 as on the Pi. Env-overridable without a code change.
         self._front_deg = float(os.environ.get('CW_VOICE_FRONT_DEG', '105'))
         self._sign = int(os.environ.get('CW_VOICE_SIGN', '1'))
-        self._orient = os.environ.get('CW_VOICE_ORIENT', '1') != '0'
 
         self._seg = VoiceSegmenter()
         self._utterances: "queue.Queue" = queue.Queue()
@@ -98,8 +95,7 @@ class VoiceSensor:
         self._thread.start()
         logger.info(
             f"voice_sensor: listening (wake={self._wake_word!r} "
-            f"orient={self._orient} front_deg={self._front_deg} "
-            f"sign={self._sign:+d})")
+            f"front_deg={self._front_deg} sign={self._sign:+d})")
 
     def close(self) -> None:
         self._stop.set()
@@ -175,10 +171,7 @@ class VoiceSensor:
         if doa is None:
             doa = utt.get('start_doa')
         logger.info(f"voice_sensor: heard {text!r} (doa={doa})")
-        self._publish_turn(text)
-        # Orient toward whoever she's responding to (acknowledgement turn).
-        if self._orient and doa is not None:
-            self._orient_to(doa)
+        self._publish_turn(text + self._bearing_suffix(doa))
 
     def _publish_turn(self, text: str) -> None:
         if self._pub is None:
@@ -196,13 +189,31 @@ class VoiceSensor:
         except Exception as e:
             logger.warning(f"voice_sensor: sense_data put failed: {e}")
 
-    def _orient_to(self, doa: float) -> None:
+    def _bearing_suffix(self, doa: Optional[float]) -> str:
+        """" [spoken from about N degrees to the head's left; pan P faces the
+        speaker]" — or " [spoken; bearing unknown]" if the mic gave none.
+        Relative to where the head points NOW, so the number is usable
+        without knowing the array frame; "about" because a mic-array
+        bearing is a hint, not a measurement."""
+        if doa is None:
+            return " [spoken; bearing unknown]"
         pan = doa_to_pan(doa, front_deg=self._front_deg, sign=self._sign,
                          neutral_pan=NEUTRAL_PAN, pan_min=PAN_MIN,
                          pan_max=PAN_MAX)
-        try:
-            get_link().send_head_cmd(pan=pan, tilt=NEUTRAL_TILT, smooth=True,
-                                     timeout=_ORIENT_TIMEOUT_S)
-            logger.info(f"voice_sensor: orient doa={doa}° -> pan={pan:.0f}")
-        except Exception as e:
-            logger.warning(f"voice_sensor: orient failed: {e}")
+        # Beyond the pan envelope: the mic hears all round, the head turns
+        # about 80 degrees each way. Say so rather than report the clamp.
+        rel_front = ((doa - self._front_deg + 180.0) % 360.0) - 180.0
+        if abs(self._sign * rel_front) > (PAN_MAX - NEUTRAL_PAN):
+            return (f" [spoken from behind or beside the head, beyond where "
+                    f"it can turn; pan {pan:.0f} is the nearest it can face]")
+        status = get_link().latest_head_status() or {}
+        current = status.get('pan')
+        if current is None:
+            current = NEUTRAL_PAN
+        rel = pan - float(current)   # + = head's left (pan grows leftward)
+        if abs(rel) < 5:
+            where = "straight ahead of the head"
+        else:
+            where = (f"about {abs(rel):.0f} degrees to the head's "
+                     f"{'left' if rel > 0 else 'right'}")
+        return f" [spoken from {where}; pan {pan:.0f} faces the speaker]"

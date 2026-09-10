@@ -14,7 +14,10 @@ memory: `chatterbot jill position 2026-09-10`). What ships is:
   (`CW_STT_GPU`, default the 5060 Ti). The "addressed to her" check runs
   on the character's own backend and refuses any route that is not on the
   LAN. Nothing heard near the mic leaves the LAN. Unaddressed speech is
-  logged as a count, never as words. The head turns toward the talker.
+  logged as a count, never as words. The sensor never moves the head: the
+  turn carries the talker's bearing as a bracketed suffix and Jill decides
+  whether to look (agreed 2026-09-10 after a one-sample reflex sent the
+  head to its stop). The Pi's own reflex stays off.
 - **No speaker.** The spoken-reply branch is gone; replies are text on
   every route. The Pi's `audio/out` player and `voice_harness.py --say`
   still exist but nothing in the chat loop calls them. Putting a spoken

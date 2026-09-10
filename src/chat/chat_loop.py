@@ -772,8 +772,9 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                             f"physical room: camera-capture to see through "
                             f"it, head-move to aim it. Someone speaking to "
                             f"you by name in the room arrives as a turn "
-                            f"marked as spoken. This is not the shared "
-                            f"world.")
+                            f"marked as spoken, with a note of where they "
+                            f"are; the head moves only when you move it. "
+                            f"This is not the shared world.")
                 _time.sleep(0.1)
         return (f"- ChatterBot head: not answering at {router()} — head-move "
                 f"and camera-capture will report the link is down, and no "

@@ -234,8 +234,11 @@ characters:
       room, not the shared world. It covers about 160 degrees in front
       of itself and cannot look behind. Someone in the room who speaks
       to her by name arrives as a turn marked as spoken, from a speaker
-      the microphone cannot identify; the head turns toward them on its
-      own. Speech in the room not addressed to her is transcribed on
+      the microphone cannot identify, with a bracketed note of roughly
+      where they are relative to the head and the pan that would face
+      them; the note is metadata, not their words. The head does not
+      turn on its own: she turns it with head-move if she wants the
+      frame. Speech in the room not addressed to her is transcribed on
       this machine, judged not hers, and discarded: counted, never
       recorded, and nothing heard near the microphone leaves the local
       network. Her replies are text on every route; the head has no

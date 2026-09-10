@@ -14,9 +14,10 @@ Publishes a single `chatter/head/cmd` to the ChatterBot Pi and waits for the
 head to report it has `arrived` before returning the settled pose.
 
 This is aiming a camera on a stationary head, not locomotion and not
-expression. There are no gestures: the head does not nod, shake, or sweep.
-It turns toward whoever is speaking to you on its own; that is done by the
-voice sensor, not by this tool.
+expression. There are no gestures: the head does not nod, shake, or sweep,
+and it never moves on its own. A spoken turn carries a note of roughly
+where the speaker is and the pan that faces them; use it here if you want
+to look at them.
 
 To see what the head is now pointing at, follow this with `camera-capture`;
 the camera rides the head, so capture after the move settles.
