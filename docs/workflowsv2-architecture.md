@@ -89,7 +89,11 @@ marks each claim `about: target | seller`. METHOD §2 says what is not a claim.
 The surface is frozen when the last section is in. `--enumerate-only` stops
 here.
 
-**Gathering legs.** The agent works the target through the `inspect_external`
+**Gathering legs.** Before the first leg the runner builds the target's
+repository map (`src/utils/repo_map.py`) into the world's `repo_maps/`, so
+the subagent's `map` primitive answers from the cache instead of stalling
+the first evidence request; `run_meta.json` records its hash under
+`repo_map`. The agent works the target through the `inspect_external`
 subagent, naming on each request the claims it serves (`claims: [ids]`, written
 into the trace's query line). Legs end with `yield` and are continued by the
 runner; `respond` ends gathering. A leg cut by the action cap is a boundary.

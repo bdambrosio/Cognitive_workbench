@@ -54,11 +54,20 @@ from chat.subagents.subagent import Subagent
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from utils.repo_map import get_map, render_map
+
 logger = logging.getLogger(__name__)
 
 _MAX_ITERS = 12
 _MAX_READ_CHARS = 10_000
 _MAX_GREP_HITS = 50
+#: Hits shown per file. Five confirm presence and show the neighbours; a
+#: file with more is read or grepped on its own, and the count in the
+#: capped-result list says whether that is worth doing (Jill, 2026-09-11).
+_MAX_GREP_HITS_PER_FILE = 5
+#: Files enumerated in a capped result's list; past this the pattern is
+#: too broad to be a targeted question and the note says so.
+_MAX_GREP_FILES_LISTED = 200
 _MAX_LIST_ENTRIES = 200
 #: The most lines one `cite` carries. A span this long is a file, not a
 #: citation, and the auditor's context is what it would land in.
@@ -97,11 +106,10 @@ def _build_system_prompt(repo_root: Path, mode: str) -> str:
             "of your own past calls — each invocation is independent.\n"
             "\n"
             "This is an external project, not your own substrate. Read it "
-            "as documentation: when the question is about overall shape "
-            "or unfamiliar terrain, list the root and read README.md / "
-            "similar top-level docs first; then drill in. The repo's "
-            "conventions may not match anything in your training — verify "
-            "by reading."
+            "as documentation. When the query does not name a specific "
+            "path, call `map` first, then drill in; when it names a path, "
+            "go straight to it. The repo's conventions may not match "
+            "anything in your training — verify by reading."
         )
     else:
         framing = (
@@ -139,32 +147,41 @@ def _build_system_prompt(repo_root: Path, mode: str) -> str:
         "\n"
         "## Tools (one JSON object per emission)\n"
         "\n"
-        '1. {"thought": "<one sentence>", "tool": "list", "path": '
+        '1. {"thought": "<one sentence>", "tool": "map", "path": '
+        '"<relative_dir>?"} — the repository map: directories with '
+        "recursive file and line counts and a role word for the kind of "
+        "files each holds, plus the files of the directory asked for. "
+        "Without `path`, the root and two levels below it; with `path`, "
+        "that subtree. Generated once per tree state and cached, so a "
+        "call is cheap. Roles describe organization, not behavior.\n"
+        '2. {"thought": "<one sentence>", "tool": "list", "path": '
         '"<relative_dir>?"} — list files and subdirs. `path` is '
         "optional, defaults to repo root. Pass a relative subdir "
         "(e.g. `chat`, `tools/search-web`) to navigate deeper. "
         "Output: one entry per line, format `<name>\\t<size_or_DIR>` "
         "for each file/subdir; in git checkouts, gitignored entries "
         "are hidden automatically.\n"
-        '2. {"thought": "...", "tool": "read", "file": "<relative_path>", '
+        '3. {"thought": "...", "tool": "read", "file": "<relative_path>", '
         '"start_line": <int?>, "end_line": <int?>} — read a file. Omit '
         "start_line/end_line to read the whole file (capped at ~10K "
         "chars; use line ranges for larger files). Lines are 1-indexed; "
         "output format is `lineno|content`.\n"
-        '3. {"thought": "...", "tool": "grep", "pattern": "<regex>", '
+        '4. {"thought": "...", "tool": "grep", "pattern": "<regex>", '
         '"path": "<relative_path>?"} — ripgrep over the repo. `path` is '
         "optional and may be a single file OR a subdirectory. Pattern "
         "is a regex (rg's default syntax). Output format is "
         "`<relative_path>:<lineno>:<content>` per hit, capped at "
-        f"{_MAX_GREP_HITS} hits.\n"
-        '4. {"thought": "...", "tool": "cite", "file": "<relative_path>", '
+        f"{_MAX_GREP_HITS} lines and {_MAX_GREP_HITS_PER_FILE} per file; a "
+        "capped result ends with every matching file and its hit count, "
+        "so you can grep or read the ones not shown.\n"
+        '5. {"thought": "...", "tool": "cite", "file": "<relative_path>", '
         '"start_line": <int>, "end_line": <int>} — carry those lines into '
         "your answer VERBATIM. The tool copies them from the file and appends "
         "them under a CITED heading after your respond text; you never retype "
         f"them. At most {_MAX_CITE_LINES} lines per call. Use it for every span "
         "the caller will quote as evidence, once you have located it with "
         "grep and read.\n"
-        '5. {"thought": "...", "tool": "respond", "text": "<answer>"} — '
+        '6. {"thought": "...", "tool": "respond", "text": "<answer>"} — '
         "final answer to the query, exits the loop. Refer to what you cited "
         "by path and line numbers (`src/chat/chat_loop.py:1860`) and say what "
         "each span shows — the lines themselves follow your text, copied by "
@@ -184,6 +201,10 @@ def _build_system_prompt(repo_root: Path, mode: str) -> str:
         "  largest file by name relevance).\n"
         "    * 'Show me the implementation of Z' → if you know the file, "
         "  read directly; if not, grep then read around the hit.\n"
+        "- **Orientation is one call.** If the query does not name a "
+        "  specific path, call `map` first, then grep and read; a "
+        "  subtree with `path` when the root view is not enough. If the "
+        "  query names a path, skip the map and go to it.\n"
         "- **Don't loop blindly.** If grep returns 50 hits, narrow the "
         "  pattern rather than reading every hit. If a read truncates, "
         "  use a tighter line range.\n"
@@ -491,14 +512,11 @@ def _tool_grep(repo_root: Path, pattern: str,
     target = _safe_resolve(repo_root, path or '')
     if target is None:
         return f"ERROR: grep invalid or out-of-scope path: {path!r}"
-    cmd = [
+    # Flags shared by the listing call and the count-mode call a capped
+    # result makes below: same scope, same excludes, same ignore rules.
+    base = [
         'rg',
-        '--line-number',
-        '--with-filename',
-        '--no-heading',
         '--color=never',
-        f'--max-count={_MAX_GREP_HITS}',
-        '--max-columns=300',
         '--max-filesize=2M',
         '--glob=!__pycache__',
         '--glob=!*.pyc',
@@ -514,12 +532,19 @@ def _tool_grep(repo_root: Path, pattern: str,
     # them (continuation, 2026-09-03: "Redis" found nowhere in a record with
     # 45 occurrences). Outside a checkout root, search everything.
     if not _is_git_checkout(repo_root):
-        cmd.append('--no-ignore')
+        base.append('--no-ignore')
     for e in excludes or []:
         e = str(e).strip().lstrip("./").rstrip("/")
         if e:
-            cmd += [f'--glob=!{e}', f'--glob=!{e}/**']
-    cmd += ['--', pattern, str(target)]
+            base += [f'--glob=!{e}', f'--glob=!{e}/**']
+    cmd = base + [
+        '--line-number',
+        '--with-filename',
+        '--no-heading',
+        f'--max-count={_MAX_GREP_HITS_PER_FILE}',
+        '--max-columns=300',
+        '--', pattern, str(target),
+    ]
     try:
         proc = subprocess.run(
             cmd, capture_output=True, text=True, timeout=20.0,
@@ -547,11 +572,65 @@ def _tool_grep(repo_root: Path, pattern: str,
         out_lines.append(raw_line)
         total += 1
         if total >= _MAX_GREP_HITS:
-            out_lines.append(f"(grep capped at {_MAX_GREP_HITS} hits — "
-                             "narrow the pattern for full coverage)")
             break
     if not out_lines:
         return f"EMPTY: no matches for pattern {pattern!r} in {path or '.'}"
+    # COVERAGE MUST BE KNOWABLE. The lines above are the first
+    # _MAX_GREP_HITS in ripgrep's walk order, at most
+    # _MAX_GREP_HITS_PER_FILE per file, and the tail is gone. Until
+    # 2026-09-11 the observation ended with "capped — narrow the pattern",
+    # and the reader could not tell "I saw everything" from "28 more files
+    # match": in the ChatterMate audit 46 greps were capped, the 50 lines
+    # covered 12 files on average and once a single file, and 27 times the
+    # subagent went on to read or cite the partial view. For a claim of
+    # absence that truncates METHOD §8's `candidates` silently. So a second
+    # ripgrep call in count mode, same scope and excludes, lists every
+    # matching file with its hit count; count mode reads nothing and costs
+    # milliseconds. Nothing is appended when the listing was complete.
+    shown_files = {ln.split(':', 1)[0] for ln in out_lines}
+    counts: List[Tuple[str, int]] = []
+    if total >= _MAX_GREP_HITS or any(
+            sum(1 for ln in out_lines if ln.startswith(f + ':'))
+            >= _MAX_GREP_HITS_PER_FILE for f in shown_files):
+        try:
+            cproc = subprocess.run(
+                base + ['--count', '--with-filename', '--', pattern, str(target)],
+                capture_output=True, text=True, timeout=20.0, check=False)
+            for raw_line in (cproc.stdout or '').splitlines():
+                p, sep, n = raw_line.rpartition(':')
+                if not sep or not n.isdigit():
+                    continue
+                if p.startswith(root_str + '/'):
+                    p = p[len(root_str) + 1:]
+                elif p.startswith(root_str):
+                    p = p[len(root_str):]
+                counts.append((p, int(n)))
+        except Exception as e:                                   # noqa: BLE001
+            logger.warning(f"code_subagent: grep count pass failed: {e}")
+            out_lines.append(f"(grep capped at {_MAX_GREP_HITS} lines; the "
+                             f"count of matching files could not be taken: {e})")
+    if counts:
+        hits_total = sum(n for _, n in counts)
+        if hits_total > total:
+            counts.sort(key=lambda pn: (-pn[1], pn[0]))
+            unseen = sum(1 for p, _ in counts if p not in shown_files)
+            if total >= _MAX_GREP_HITS:
+                why = (f"capped at {_MAX_GREP_HITS} lines, "
+                       f"{_MAX_GREP_HITS_PER_FILE} per file")
+            else:
+                # Only the per-file cap bit: every matching file is above,
+                # some with hits beyond the five shown.
+                why = f"{_MAX_GREP_HITS_PER_FILE} hits per file shown"
+            out_lines.append(
+                f"({why}; {hits_total} hits in {len(counts)} file(s) in all, "
+                f"{hits_total - total} hits and {unseen} file(s) not shown "
+                f"above. Every matching file, with hits:)")
+            for p, n in counts[:_MAX_GREP_FILES_LISTED]:
+                out_lines.append(f"{p}  {n}")
+            if len(counts) > _MAX_GREP_FILES_LISTED:
+                out_lines.append(
+                    f"(pattern matches over {_MAX_GREP_FILES_LISTED} files; too "
+                    f"broad to enumerate, narrow the scope)")
     return 'OK: ' + "\n".join(out_lines)
 
 
@@ -578,12 +657,17 @@ class CodeSubagent(Subagent):
     def __init__(self, repo_root: Path, llm_backend, trace_dir: Path, *,
                  mode: str = 'self',
                  reasoning_effort: Optional[str] = None,
-                 excludes: Optional[List[str]] = None):
+                 excludes: Optional[List[str]] = None,
+                 map_cache_dir: Optional[Path] = None):
         super().__init__(llm_backend, trace_dir,
                          reasoning_effort=reasoning_effort)
         self.repo_root = Path(repo_root)
         self.mode = mode
         self.excludes = list(excludes or [])
+        # Where `map` keeps its cache: beside the traces, in the world
+        # directory, never inside the repo being read (utils.repo_map).
+        self.map_cache_dir = (Path(map_cache_dir) if map_cache_dir
+                              else Path(trace_dir).parent / 'repo_maps')
         self.label = 'inspect_external' if mode == 'external' else 'inspect'
         # Spans `cite` carried this run: (file, start, end, numbered text).
         self._cited: List[Tuple[str, int, int, str]] = []
@@ -610,6 +694,7 @@ class CodeSubagent(Subagent):
 
     def primitives(self):
         return {
+            'map': self._tool_map,
             'list': lambda a: _tool_list(self.repo_root, a.get('path'), self.excludes),
             'read': lambda a: _tool_read(self.repo_root, a.get('file', ''),
                                          a.get('start_line'),
@@ -619,6 +704,28 @@ class CodeSubagent(Subagent):
                                          self.excludes),
             'cite': self._tool_cite,
         }
+
+    def _tool_map(self, a: Dict[str, Any]) -> str:
+        """The repository map, or one subtree of it. Cached per tree state
+        by utils.repo_map, so only the first call after the tree changes
+        pays for generation."""
+        rel = str(a.get('path') or '').strip()
+        if rel:
+            path = _safe_resolve(self.repo_root, rel, must_be_dir=True)
+            if path is None:
+                return f"ERROR: map: {rel!r} is not a directory under the root"
+            rel = _rel_to_root(self.repo_root, path)
+            if rel == '.':
+                rel = ''
+        try:
+            m = get_map(self.repo_root, self.map_cache_dir, self.llm_backend)
+        except Exception as e:                                   # noqa: BLE001
+            logger.warning(f"{self.label}: map failed: {e}")
+            return f"ERROR: map failed: {e}"
+        text = render_map(m, rel or None)
+        if text.startswith('ERROR:'):
+            return text
+        return 'OK: ' + text
 
     def _tool_cite(self, a: Dict[str, Any]) -> str:
         """Copy a span of a file into the answer, verbatim.

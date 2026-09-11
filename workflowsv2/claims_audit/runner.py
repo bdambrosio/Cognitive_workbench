@@ -1251,6 +1251,33 @@ def main() -> int:
         _chat.get("react_max_tokens"))
 
     t0 = time.time()
+    # THE REPOSITORY MAP, WARMED BEFORE GATHERING. The code subagent's `map`
+    # primitive builds it on first use and caches it per tree state; built
+    # here instead so the first evidence request does not stall for the
+    # model calls that label directories, and so the map is in the working
+    # record before the auditor reads it (the cache directory is copied out
+    # with the traces below). Inside the wall clock on purpose: it is part of
+    # what the run costs. A failure here is logged and the run goes on —
+    # the subagent will try again on its first `map` call.
+    repo_map_meta: Dict[str, Any] = {"hash": None, "error": None}
+    try:
+        from utils.repo_map import get_map                     # noqa: E402
+        _mt = time.time()
+        _m = get_map(eng["target"],
+                     REPO / "scenarios" / args.world / name / "repo_maps",
+                     loop.backend)
+        repo_map_meta = {"hash": _m.get("tree_hash"), "files": _m.get("n_files"),
+                         "roles": _m.get("roles"),
+                         "seconds": round(time.time() - _mt, 1), "error": None}
+        logger.info("repository map: hash %s, %s files, %s of %s directories "
+                    "labelled, %.1fs", repo_map_meta["hash"], repo_map_meta["files"],
+                    (_m.get("roles") or {}).get("labelled"),
+                    (_m.get("roles") or {}).get("directories"),
+                    repo_map_meta["seconds"])
+    except Exception as e:                                     # noqa: BLE001
+        repo_map_meta["error"] = str(e)
+        logger.warning("repository map not built (%s); the subagent will "
+                       "build it on first use", e)
     legs, error = [], None
     text_first_leg = ''
     # PHASE ONE ENUMERATES, PHASE TWO ADJUDICATES, AND THE LEGS SIT BETWEEN
@@ -1781,7 +1808,8 @@ def main() -> int:
     except Exception as e:                                     # noqa: BLE001
         logger.warning("working record: scenario not copied (%s)", e)
     for src in (world_dir / "memory" / "reasoning_trace.jsonl",
-                world_dir / "inspect_traces"):
+                world_dir / "inspect_traces",
+                world_dir / "repo_maps"):
         if not src.exists():
             logger.warning("working record: %s absent", src.name)
             continue
@@ -1836,6 +1864,7 @@ def main() -> int:
             Path(cfg.get("external_repo") or ".")),
         "harness_rev": git_rev(REPO),
         "evidence_excludes": list(eng["evidence_excludes"]),
+        "repo_map": repo_map_meta,
         "files_read": files_read(record / "inspect_traces",
                                  Path(cfg.get("external_repo") or ".")),
         "files_matched": files_matched(record / "inspect_traces",

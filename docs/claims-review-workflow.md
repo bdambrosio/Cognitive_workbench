@@ -71,8 +71,12 @@ The chain job has four **steps**, one program each, in order:
    final answer. The action that matters here is an **evidence request**,
    one call to the code-reading **subagent**
    (`src/chat/subagents/code_subagent.py`), itself a small loop of
-   **primitives**, list, read, grep and cite over the target, ending in an
-   answer with the cited lines copied verbatim. Every evidence request is
+   **primitives**, map, list, read, grep and cite over the target, ending in an
+   answer with the cited lines copied verbatim. The **repository map** is
+   the target's tree with sizes, line counts and a category word per
+   directory, built once per tree state before gathering starts and kept
+   in the run's working record under `repo_maps/`; it says where to look
+   first and is never evidence. Every evidence request is
    tagged with the claims it serves. A leg ends when the agent **yields**,
    handing the remainder to the next leg, or responds, meaning it is done
    gathering. Between gathering and adjudication, or after a first

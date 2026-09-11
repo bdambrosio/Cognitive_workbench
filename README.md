@@ -210,7 +210,7 @@ traces land in sibling `*_traces/` directories.
 | Subagent | Scope | Primitives |
 |---|---|---|
 | `recall` (`src/chat/subagents/recall.py`) | per-world per-agent `memory/` dir | list, read, grep |
-| `inspect` / `inspect_external` (`src/chat/subagents/code_subagent.py`) | own `src/` or an externally-bound repo | list, read, grep (ripgrep) |
+| `inspect` / `inspect_external` (`src/chat/subagents/code_subagent.py`) | own `src/` or an externally-bound repo | map, list, read, grep (ripgrep), cite |
 | `security` (`src/chat/subagents/security.py`) | this host + LAN, RFC1918 ranges only | nmap discovery/-sV, host state, baseline diffs |
 
 ```
@@ -474,7 +474,12 @@ of read-only primitives, a `respond` exit, per-call trace files. This is
 the canonical template; the other subagents are the same shape with
 different primitive sets — `security.py` adds typed system probes and a
 wall-clock budget, `code_subagent.py` backs the `inspect` and
-`inspect_external` tools over a fenced source root.
+`inspect_external` tools over a fenced source root. Its `map` primitive
+returns a repository map (`src/utils/repo_map.py`: the tree with sizes,
+line counts and a model-written category per directory), generated once
+per tree state and cached under the world directory's `repo_maps/`, never
+inside the repo being read. A capped `grep` result ends with every
+matching file and its hit count, so a search's coverage is always knowable.
 
 **Scenario:** copy `scenarios/jill-chat.yaml`, change `world_name` and the
 character block; per-world per-agent directories are created on first run.
