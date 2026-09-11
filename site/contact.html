@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contact — Tuuyi</title>
+<meta name="description" content="Ask for a beta claims review, or write to the practice about a software acquisition or investment you are evaluating.">
+<link rel="canonical" href="https://tuuyi.com/contact">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Tuuyi">
+<meta property="og:title" content="Contact — Tuuyi">
+<meta property="og:description" content="Ask for a beta claims review, or write to the practice about a software acquisition or investment you are evaluating.">
+<meta property="og:url" content="https://tuuyi.com/contact">
+<meta property="og:image" content="https://tuuyi.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="/site.css?v=20260910">
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="/">Tuuyi</a>
+  <nav><a href="/">Home</a><a href="/how-it-works">How it works</a><a href="/pricing">Pricing</a><a href="/demo">Demo</a><a href="/about">About</a><a class="pill" href="/pricing">Beta: free claims reviews, limited</a><button class="theme" id="theme" type="button">light</button></nav>
+</header>
+<main>
+
+<h1>Write to the practice.</h1>
+<p class="lede">Ask for a beta review, or tell us what you are evaluating. We reply by email, usually within a day.</p>
+
+<div class="notice" id="sent" hidden><p><strong>Sent.</strong> Thank you. You will hear from us at the address you gave.</p></div>
+<div class="notice error" id="err-fields" hidden><p><strong>Not sent.</strong> A name, a working email address and a message are needed. Please check and try again.</p></div>
+<div class="notice error" id="err-check" hidden><p><strong>Not sent.</strong> The bot check did not pass. Please reload the page and try again.</p></div>
+<div class="notice error" id="err-send" hidden><p><strong>Not sent.</strong> Something failed on our side. Please write to <span class="mono">info@tuuyi.com</span> instead.</p></div>
+
+<form class="contact" id="contact" method="post" action="/api/contact">
+  <label>Reason
+    <select name="reason" id="reason">
+      <option value="beta">Ask for a beta claims review</option>
+      <option value="contact">Something else</option>
+    </select>
+  </label>
+  <label>Your name <input name="name" type="text" required maxlength="200" autocomplete="name"></label>
+  <label>Your email <input name="email" type="email" required maxlength="254" autocomplete="email"></label>
+  <label>Company or firm <small>optional</small> <input name="company" type="text" maxlength="300" autocomplete="organization"></label>
+  <label>Link to the software or its repository <small>optional</small> <input name="link" type="url" maxlength="500" placeholder="https://"></label>
+  <label>Message <textarea name="message" required maxlength="5000" rows="7" placeholder="What are you evaluating, and what would you like checked?"></textarea></label>
+  <div class="cf-turnstile" data-sitekey="1x00000000000000000000AA" data-theme="auto"></div>
+  <p><button class="btn primary" type="submit">Send</button></p>
+</form>
+
+<p class="note">Prefer your own mail client? The address is <span class="mono">info@tuuyi.com</span>. What you send here goes by email to the practice and nowhere else; see <a href="/privacy">Privacy</a>.</p>
+
+</main>
+<footer>
+  <div>© 2026 Tuuyi · <a href="/contact">Contact</a></div>
+  <div><a href="/privacy">Privacy</a><a href="/demo">Demo</a><a href="/about">About</a></div>
+</footer>
+</div>
+<script src="/site.js?v=20260905"></script>
+<script>
+// Preselect the reason from the link that brought the visitor here, and show
+// the outcome the receiver reported in the query string after a submission.
+(function () {
+  const q = new URLSearchParams(location.search);
+  if (q.get("reason") === "contact") document.getElementById("reason").value = "contact";
+  const show = q.get("sent") ? "sent" : q.get("error") ? "err-" + q.get("error") : null;
+  if (!show) return;
+  const el = document.getElementById(show);
+  if (el) el.hidden = false;
+  if (show === "sent") document.getElementById("contact").hidden = true;
+})();
+</script>
+</body>
+</html>

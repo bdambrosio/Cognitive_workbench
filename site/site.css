@@ -115,3 +115,15 @@ h2.eyebrow { font-weight: 400; }
 .transcript p { color: var(--muted); }
 .transcript .speaker { font-weight: 500; color: var(--label); margin-right: 4px; }
 @media (max-width: 640px) { .chapters { columns: 1; } }
+
+/* Contact page: the form and its outcome notices. */
+.contact { max-width: 640px; margin: 24px 0; }
+.contact label { display: block; margin: 0 0 18px; font-size: 15px; color: var(--label); }
+.contact label small { color: var(--muted); margin-left: 6px; }
+.contact input, .contact select, .contact textarea { display: block; width: 100%; margin-top: 6px; padding: 12px 14px; font: inherit; font-size: 16px; color: var(--text); background: var(--panel); border: 1px solid var(--btn-edge); border-radius: 4px; }
+.contact input:focus, .contact select:focus, .contact textarea:focus { outline: none; border-color: var(--accent); }
+.contact textarea { resize: vertical; min-height: 140px; }
+.contact .cf-turnstile { margin: 6px 0 18px; }
+.notice { max-width: 640px; padding: 16px 20px; margin: 20px 0; border-left: 3px solid var(--accent); background: var(--teal-bg); }
+.notice.error { border-left-color: var(--amber); background: var(--amber-bg); }
+.notice p { margin: 0; max-width: none; }
