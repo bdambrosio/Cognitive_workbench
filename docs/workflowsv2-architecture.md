@@ -91,8 +91,7 @@ here.
 
 **Gathering legs.** The agent works the target through the `inspect_external`
 subagent, naming on each request the claims it serves (`claims: [ids]`, written
-into the trace's query line) and filing at most four claims under one
-request (`TAG_INSTRUCTION`). The runner sets `subagent_map: false` for both
+into the trace's query line; `TAG_INSTRUCTION`). The runner sets `subagent_map: false` for both
 the audit and the review, so the subagent's repository-map primitive is
 absent; `run_meta.json` records that under `repo_map`. Legs end with `yield` and are continued by the
 runner; `respond` ends gathering. A leg cut by the action cap is a boundary.

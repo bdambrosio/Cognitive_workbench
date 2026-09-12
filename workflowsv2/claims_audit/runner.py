@@ -1079,17 +1079,15 @@ TAG_INSTRUCTION = (
     "Per METHOD \u00a712 step 3: on every `inspect_external` request, name in "
     "its `claims` field the ids of the claims it gathers evidence for. The "
     "record of the request is filed under those claims, and a claim is "
-    "adjudicated on the requests filed under it and nothing else. "
-    # AT MOST FOUR CLAIMS PER REQUEST. The subagent answering a request has
-    # twelve steps, and one `cite` carries one span. Measured over four chhoto
-    # audits (2026-09-11): requests filed under seven or more claims ran out
-    # of steps 40 times in 44 and came back partial; requests filed under
-    # three or fewer ran out 4 times in 17. Four is Bruce's number: three
-    # would cap more reliably, and a ChatterMate-scale audit would take too
-    # long at three.
-    "File at most four claims under one request, and ask one question per "
-    "request: a request that serves more claims than that runs the code "
-    "subagent out of its steps before it can answer, and comes back partial.")
+    "adjudicated on the requests filed under it and nothing else.")
+# A LIMIT ON CLAIMS PER REQUEST WAS TRIED AND REVERTED (2026-09-12). Four
+# claims per request obeyed, it raised model calls by a third and cap hits
+# to 21 of 25: the auditor organizes requests by where the evidence lives
+# and files every claim the material bears on, so a bundle of 7-13 claims
+# is one extraction order over a file group, read once for all of them.
+# Forcing small bundles turned extraction orders into questions about
+# behaviour, which the stateless subagent answers by re-reading the same
+# files per request and runs out of steps before citing.
 
 
 def post_run_checks(obj: Optional[Dict[str, Any]], corpus: Path,

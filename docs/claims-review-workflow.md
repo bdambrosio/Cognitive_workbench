@@ -77,9 +77,9 @@ The chain job has four **steps**, one program each, in order:
    off for the audit and the review: on chhoto, audits run with it scored
    worse on review, 49 and 47 findings holding of 58 against 55 and 55,
    with the reviewer shown unchanged.) Every evidence request is
-   tagged with the claims it serves, and at most four claims are filed
-   under one request, since a request serving more runs the subagent out
-   of its steps. A leg ends when the agent **yields**,
+   tagged with the claims it serves; the auditor organizes requests by
+   where the evidence lives and files every claim the material bears on,
+   so one request commonly serves seven or more claims. A leg ends when the agent **yields**,
    handing the remainder to the next leg, or responds, meaning it is done
    gathering. Between gathering and adjudication, or after a first
    adjudication, come **chase** legs the program forces: one for claims no
