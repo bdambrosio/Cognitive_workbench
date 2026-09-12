@@ -271,8 +271,17 @@ def _safe_resolve(repo_root: Path, name: str,
     except Exception:
         return None
     try:
-        candidate.relative_to(root)
+        rel = candidate.relative_to(root)
     except ValueError:
+        return None
+    # NOTHING UNDER .git IS READABLE OR CITABLE. Inside a checkout, read
+    # gates on gitignore and list on `git ls-files`, and `.git` is neither
+    # tracked nor ignored, so a model that guessed the path read
+    # `.git/packed-refs` and three findings cited it (chhoto, 2026-09-12).
+    # Checked here, the one place every primitive resolves through, on the
+    # RESOLVED path's parts, so a tracked symlink into .git is caught too
+    # (Jill, 2026-09-12). The call sites say why in their own message.
+    if '.git' in rel.parts:
         return None
     if must_be_dir and not candidate.is_dir():
         return None
@@ -486,11 +495,25 @@ def _structure_only(path: Path, name: str) -> str:
             + (". Its headings:\n" + "\n".join(heads) if heads else ".")
             + "\nFor what the software does, read the code, configuration and build files.")
 
+def _names_git(name: str) -> bool:
+    """True when the path as asked for has a `.git` component. The resolved
+    check lives in `_safe_resolve`; this is only so read and cite can say
+    why, instead of the generic out-of-scope message, which reads as "not
+    found" and sends the model to try other paths."""
+    try:
+        return '.git' in Path(str(name)).parts
+    except Exception:
+        return False
+
+
 def _tool_read(repo_root: Path, name: str,
                start_line: Optional[int], end_line: Optional[int],
                excludes: Optional[List[str]] = None) -> str:
     if not name:
         return "ERROR: read requires a `file` argument"
+    if _names_git(name):
+        return (f"ERROR: read refused: {name} is repository metadata, not "
+                f"materials; nothing under .git can be read or cited.")
     path = _safe_resolve(repo_root, name, must_be_file=True)
     if path is None:
         return f"ERROR: read invalid or out-of-scope file: {name!r}"
@@ -828,6 +851,9 @@ class CodeSubagent(Subagent):
         if e - s + 1 > _MAX_CITE_LINES:
             return (f"ERROR: cite span of {e - s + 1} lines exceeds the cap of "
                     f"{_MAX_CITE_LINES}; cite the lines the caller will quote")
+        if _names_git(name):
+            return (f"ERROR: cite refused: {name} is repository metadata, not "
+                    f"materials; nothing under .git can be read or cited.")
         path = _safe_resolve(self.repo_root, name, must_be_file=True)
         if path is not None and _excluded(_rel_to_root(self.repo_root, path), self.excludes):
             return (f"ERROR: cite refused: {name} is documentation, excluded from "
