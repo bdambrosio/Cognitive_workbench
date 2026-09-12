@@ -129,8 +129,10 @@ _TOOL_ENTRIES = [
      "respond text, in the order you gave; you never retype them. Up to "
      f"{_MAX_CITE_SPANS} spans per call, each at most {_MAX_CITE_LINES} "
      "lines; the single-span form `\"file\", \"start_line\", \"end_line\"` "
-     "also works. Use it for every span the caller will quote as evidence, "
-     "once you have located it with grep and read."),
+     "also works. Use it for every span the caller will quote as evidence. "
+     "Cite spans as soon as you have located a group; do not defer citation "
+     "to a final step. Cited spans are carried forward even if you hit the "
+     "step cap."),
     ('{"thought": "...", "tool": "respond", "text": "<answer>"} — '
      "final answer to the query, exits the loop. Refer to what you cited "
      "by path and line numbers (`src/chat/chat_loop.py:1860`) and say what "

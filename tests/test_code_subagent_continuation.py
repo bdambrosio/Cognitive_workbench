@@ -79,6 +79,10 @@ def test_cap_gives_a_last_word_and_offers_one_continuation(tmp_path):
     assert state['query'] == "what is in a.txt"
     assert any(ln.startswith("LAST WORD:") for ln in state['log_lines'])
     assert sum(1 for ln in state['log_lines'] if ln.startswith("ACTION ")) == 3
+    # The harness names its own lines by index; the file keeps them as written.
+    marks = state['harness']
+    assert state['log_lines'][marks['note']].startswith("NOTE: you are out of steps")
+    assert state['log_lines'][marks['last_word']] == "LAST WORD: what I found"
 
     # Resume: whole prior log in the prompt, preamble on the system prompt,
     # a fresh round of steps, no second offer.
@@ -89,7 +93,12 @@ def test_cap_gives_a_last_word_and_offers_one_continuation(tmp_path):
     assert out2.strip().startswith("finished")
     sysp = be2.prompts[0][0]['content']
     assert sysp.startswith("This is a continuation")
-    assert "ACTION 1:" in be2.prompts[0][1]['content'] and "LAST WORD:" in be2.prompts[0][1]['content']
+    resumed = be2.prompts[0][1]['content']
+    assert "ACTION 1:" in resumed
+    # The stale note is gone from the view; the last word stays, relabelled.
+    assert "you are out of steps" not in resumed
+    assert "LAST WORD:" not in resumed
+    assert "INTERIM REPORT at the step cap" in resumed and "what I found" in resumed
     assert "continue:" not in out2
     assert not (sa.state_dir / f"{cid}.json").exists()
     again = cs._run_or_resume(_sa(repo, tmp_path, _Backend()), "x", cid)

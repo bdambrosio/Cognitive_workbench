@@ -204,7 +204,39 @@ class Subagent:
             pass
         return state
 
-    def _persist_continuation(self, query: str, log_lines: List[str]) -> Optional[str]:
+    @staticmethod
+    def _resume_log(resume: Dict[str, Any]) -> List[str]:
+        """The prior log as a resumed run sees it.
+
+        The file keeps every line as written, so the record still answers
+        "what was the model told before it wrote its last word". Only the
+        view changes, and the two harness-authored lines are found by the
+        indices persisted beside the log, never by matching their text,
+        which the model may have quoted back into its own report (Jill,
+        2026-09-12). The out-of-steps note is dropped: a resumed run that
+        reads it as current responds at once with no new work (chhoto
+        2026-09-12, 9 of 9 resumptions). The last word is kept and
+        relabelled as an interim report, so the run knows it stopped, why,
+        and what it already told the caller."""
+        lines = list(resume.get('log_lines') or [])
+        marks = resume.get('harness') or {}
+        lw = marks.get('last_word')
+        if isinstance(lw, int) and 0 <= lw < len(lines) \
+                and lines[lw].startswith("LAST WORD: "):
+            lines[lw] = ("INTERIM REPORT at the step cap (what you told the "
+                         "caller when the steps ran out; the request is not "
+                         "finished): " + lines[lw][len("LAST WORD: "):])
+        note = marks.get('note')
+        if isinstance(note, int) and 0 <= note < len(lines):
+            del lines[note]                  # after the relabel: indices shift
+        return lines
+
+    def _persist_continuation(self, query: str, log_lines: List[str],
+                              harness: Optional[Dict[str, int]] = None
+                              ) -> Optional[str]:
+        """`harness` names, by index into `log_lines`, the lines this loop
+        wrote rather than the model: the out-of-steps note and the last
+        word. `_resume_log` uses them."""
         if not (self.continuable and self.state_dir):
             return None
         state_dir = Path(self.state_dir)
@@ -220,6 +252,7 @@ class Subagent:
             cid = uuid.uuid4().hex
             (state_dir / f"{cid}.json").write_text(json.dumps({
                 'query': query, 'log_lines': log_lines,
+                'harness': harness or {},
                 'state': self.continuation_state(), 'created': now,
             }), encoding='utf-8')
             return cid
@@ -239,7 +272,7 @@ class Subagent:
         prims = self.primitives()
         available = ', '.join(list(prims) + ['respond'])
         user_prefix = f"Query: {query.strip()}\n\n## Working log\n"
-        log_lines: List[str] = list(resume.get('log_lines') or []) if resume else []
+        log_lines: List[str] = self._resume_log(resume) if resume else []
         iters: List[Dict[str, Any]] = []
 
         def _build_user_msg() -> str:
@@ -393,6 +426,7 @@ class Subagent:
             # read, so the note says no tool will run. A non-respond falls
             # through to the machine salvage below. Not counted against a
             # continuation's steps: the synthesis becomes the last log item.
+            harness_marks = {'note': len(log_lines)}
             log_lines.append(
                 "NOTE: you are out of steps and no further tool will run. "
                 "Report what you found and what you did not get to, and stop: "
@@ -429,13 +463,14 @@ class Subagent:
             if text:
                 answer = (f"({self.label}: hit the step cap; reporting what "
                           f"was found)\n" + text)
+                harness_marks['last_word'] = len(log_lines)
                 log_lines.append(f"LAST WORD: {text}")
             else:
                 answer = (f"({self.label}: hit max iterations without responding; "
                           f"consider narrowing the query)"
                           + self._salvage(iters))
             if resume is None:
-                cid = self._persist_continuation(query, log_lines)
+                cid = self._persist_continuation(query, log_lines, harness_marks)
                 if cid:
                     carried = len(self.continuation_state().get('cited') or [])
                     answer += (f"\n\n(stopped at step {self.max_iters} with "
