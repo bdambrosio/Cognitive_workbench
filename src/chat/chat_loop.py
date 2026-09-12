@@ -482,6 +482,13 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # refuses to read or cite them. Not persisted: a property of the run.
         self._evidence_excludes: List[str] = [
             str(x) for x in (character_config.get('evidence_excludes') or [])]
+        # Whether the code subagents (inspect, inspect_external) offer the
+        # `map` primitive. Default on. The claims workflow runners set it
+        # False: measured on chhoto 2026-09-11/12, audits with the map
+        # scored worse on review (49 and 47 findings holding of 58, against
+        # 55 and 55) with the reviewer shown unchanged by a re-review. Like
+        # evidence_excludes, a property of the run, not persisted.
+        self._subagent_map: bool = bool(character_config.get('subagent_map', True))
 
         # Optional narrowing of the `inspect` geofence, default the whole
         # checkout. DELIBERATELY not persisted and not settable in-session,

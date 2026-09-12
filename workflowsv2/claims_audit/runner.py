@@ -1079,7 +1079,17 @@ TAG_INSTRUCTION = (
     "Per METHOD \u00a712 step 3: on every `inspect_external` request, name in "
     "its `claims` field the ids of the claims it gathers evidence for. The "
     "record of the request is filed under those claims, and a claim is "
-    "adjudicated on the requests filed under it and nothing else.")
+    "adjudicated on the requests filed under it and nothing else. "
+    # AT MOST FOUR CLAIMS PER REQUEST. The subagent answering a request has
+    # twelve steps, and one `cite` carries one span. Measured over four chhoto
+    # audits (2026-09-11): requests filed under seven or more claims ran out
+    # of steps 40 times in 44 and came back partial; requests filed under
+    # three or fewer ran out 4 times in 17. Four is Bruce's number: three
+    # would cap more reliably, and a ChatterMate-scale audit would take too
+    # long at three.
+    "File at most four claims under one request, and ask one question per "
+    "request: a request that serves more claims than that runs the code "
+    "subagent out of its steps before it can answer, and comes back partial.")
 
 
 def post_run_checks(obj: Optional[Dict[str, Any]], corpus: Path,
@@ -1203,6 +1213,7 @@ def main() -> int:
                              args.temperature, args.max_tokens,
                              eng["target"])
     cfg["evidence_excludes"] = list(eng["evidence_excludes"])
+    cfg["subagent_map"] = False
     logger.info("world=%s model=%s model=%s", args.world, args.model,
                 (cfg.get("llm_config") or {}).get("model") or "(scenario default)")
 
@@ -1251,33 +1262,17 @@ def main() -> int:
         _chat.get("react_max_tokens"))
 
     t0 = time.time()
-    # THE REPOSITORY MAP, WARMED BEFORE GATHERING. The code subagent's `map`
-    # primitive builds it on first use and caches it per tree state; built
-    # here instead so the first evidence request does not stall for the
-    # model calls that label directories, and so the map is in the working
-    # record before the auditor reads it (the cache directory is copied out
-    # with the traces below). Inside the wall clock on purpose: it is part of
-    # what the run costs. A failure here is logged and the run goes on —
-    # the subagent will try again on its first `map` call.
-    repo_map_meta: Dict[str, Any] = {"hash": None, "error": None}
-    try:
-        from utils.repo_map import get_map                     # noqa: E402
-        _mt = time.time()
-        _m = get_map(eng["target"],
-                     REPO / "scenarios" / args.world / name / "repo_maps",
-                     loop.backend)
-        repo_map_meta = {"hash": _m.get("tree_hash"), "files": _m.get("n_files"),
-                         "roles": _m.get("roles"),
-                         "seconds": round(time.time() - _mt, 1), "error": None}
-        logger.info("repository map: hash %s, %s files, %s of %s directories "
-                    "labelled, %.1fs", repo_map_meta["hash"], repo_map_meta["files"],
-                    (_m.get("roles") or {}).get("labelled"),
-                    (_m.get("roles") or {}).get("directories"),
-                    repo_map_meta["seconds"])
-    except Exception as e:                                     # noqa: BLE001
-        repo_map_meta["error"] = str(e)
-        logger.warning("repository map not built (%s); the subagent will "
-                       "build it on first use", e)
+    # NO REPOSITORY MAP ON THE AUDIT PATH. Built 2026-09-11 (the code
+    # subagent's `map` primitive, warmed here before gathering) and taken off
+    # the same day: on chhoto, two audits with the map scored worse on
+    # review, 49 and 47 findings holding of 58 against 55 and 55, and a
+    # re-review of a baseline audit under the new reviewer held 55 again, so
+    # the drop was the audits'. The search step gathered more (spans carried
+    # back 38 and 60 against 17 to 25) and the auditor asserted more than its
+    # searches earned. The flag below reaches the subagent through the
+    # scenario, the same route as evidence_excludes; Jill's own inspect
+    # calls keep the primitive.
+    repo_map_meta: Dict[str, Any] = {"enabled": False}
     legs, error = [], None
     text_first_leg = ''
     # PHASE ONE ENUMERATES, PHASE TWO ADJUDICATES, AND THE LEGS SIT BETWEEN
@@ -1808,8 +1803,7 @@ def main() -> int:
     except Exception as e:                                     # noqa: BLE001
         logger.warning("working record: scenario not copied (%s)", e)
     for src in (world_dir / "memory" / "reasoning_trace.jsonl",
-                world_dir / "inspect_traces",
-                world_dir / "repo_maps"):
+                world_dir / "inspect_traces"):
         if not src.exists():
             logger.warning("working record: %s absent", src.name)
             continue

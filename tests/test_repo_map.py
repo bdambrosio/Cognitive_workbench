@@ -98,3 +98,21 @@ def test_map_is_the_first_primitive_and_answers(tmp_path):
     assert sa._tool_map({'path': 'src'}).startswith("OK: ")
     assert sa._tool_map({'path': '../'}).startswith("ERROR:")
     assert "map" in sa.system_prompt() and "call `map` first" in sa.system_prompt()
+
+
+def test_map_can_be_switched_off_for_a_run(tmp_path):
+    """The claims workflow runs with `subagent_map: false`: no primitive, no
+    tool entry, no sentence sending the model to it; Jill's default keeps all
+    three."""
+    repo = _repo(tmp_path)
+    traces = tmp_path.parent / f"{tmp_path.name}_world2" / "inspect_traces"
+    off = cs.CodeSubagent(repo, _Backend(), traces, mode='external', map_enabled=False)
+    assert 'map' not in off.primitives()
+    p = off.system_prompt()
+    assert '"tool": "map"' not in p and "call `map` first" not in p
+    assert "list the root and read README.md" in p
+    assert p.count("\n1. {") == 1 and '"tool": "list"' in p.split("\n1. {")[1][:60]
+    on = cs.CodeSubagent(repo, _Backend(), traces, mode='external')
+    q = on.system_prompt()
+    assert '"tool": "map"' in q and "call `map` first" in q
+    assert "list the root and read README.md" not in q

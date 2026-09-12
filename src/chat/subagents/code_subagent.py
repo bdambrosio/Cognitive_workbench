@@ -89,7 +89,55 @@ _LIST_DENY_SUFFIXES = ('.pyc', '.pyo', '.so', '.bak', '.faiss', '.meta')
 # System prompt
 # ---------------------------------------------------------------------------
 
-def _build_system_prompt(repo_root: Path, mode: str) -> str:
+
+_MAP_TOOL_ENTRY = (
+    '{"thought": "<one sentence>", "tool": "map", "path": '
+    '"<relative_dir>?"} — the repository map: directories with '
+    "recursive file and line counts and a role word for the kind of "
+    "files each holds, plus the files of the directory asked for. "
+    "Without `path`, the root and two levels below it; with `path`, "
+    "that subtree. Generated once per tree state and cached, so a "
+    "call is cheap. Roles describe organization, not behavior."
+)
+
+_TOOL_ENTRIES = [
+    ('{"thought": "<one sentence>", "tool": "list", "path": '
+     '"<relative_dir>?"} — list files and subdirs. `path` is '
+     "optional, defaults to repo root. Pass a relative subdir "
+     "(e.g. `chat`, `tools/search-web`) to navigate deeper. "
+     "Output: one entry per line, format `<name>\\t<size_or_DIR>` "
+     "for each file/subdir; in git checkouts, gitignored entries "
+     "are hidden automatically."),
+    ('{"thought": "...", "tool": "read", "file": "<relative_path>", '
+     '"start_line": <int?>, "end_line": <int?>} — read a file. Omit '
+     "start_line/end_line to read the whole file (capped at ~10K "
+     "chars; use line ranges for larger files). Lines are 1-indexed; "
+     "output format is `lineno|content`."),
+    ('{"thought": "...", "tool": "grep", "pattern": "<regex>", '
+     '"path": "<relative_path>?"} — ripgrep over the repo. `path` is '
+     "optional and may be a single file OR a subdirectory. Pattern "
+     "is a regex (rg's default syntax). Output format is "
+     "`<relative_path>:<lineno>:<content>` per hit, capped at "
+     f"{_MAX_GREP_HITS} lines and {_MAX_GREP_HITS_PER_FILE} per file; a "
+     "capped result ends with every matching file and its hit count, "
+     "so you can grep or read the ones not shown."),
+    ('{"thought": "...", "tool": "cite", "file": "<relative_path>", '
+     '"start_line": <int>, "end_line": <int>} — carry those lines into '
+     "your answer VERBATIM. The tool copies them from the file and appends "
+     "them under a CITED heading after your respond text; you never retype "
+     f"them. At most {_MAX_CITE_LINES} lines per call. Use it for every span "
+     "the caller will quote as evidence, once you have located it with "
+     "grep and read."),
+    ('{"thought": "...", "tool": "respond", "text": "<answer>"} — '
+     "final answer to the query, exits the loop. Refer to what you cited "
+     "by path and line numbers (`src/chat/chat_loop.py:1860`) and say what "
+     "each span shows — the lines themselves follow your text, copied by "
+     "the tool."),
+]
+
+
+def _build_system_prompt(repo_root: Path, mode: str,
+                         map_enabled: bool = True) -> str:
     """Static system prompt — describes the subagent's role, the geofence
     root, and read-strategy discipline for code. Stable across all calls
     in a session, caches well on the anthropic route.
@@ -97,6 +145,10 @@ def _build_system_prompt(repo_root: Path, mode: str) -> str:
     `mode` is 'self' (the agent's own substrate) or 'external' (a project
     repo bound for this session). The two differ only in the framing line
     above the geofence; primitives and discipline are identical.
+
+    `map_enabled` False drops the `map` primitive, its tool entry and the
+    two sentences that send the model to it. The claims workflow runs
+    that way (chat_loop's `subagent_map`); Jill's own calls keep it.
     """
     if mode == 'external':
         framing = (
@@ -106,10 +158,15 @@ def _build_system_prompt(repo_root: Path, mode: str) -> str:
             "of your own past calls — each invocation is independent.\n"
             "\n"
             "This is an external project, not your own substrate. Read it "
-            "as documentation. When the query does not name a specific "
-            "path, call `map` first, then drill in; when it names a path, "
-            "go straight to it. The repo's conventions may not match "
-            "anything in your training — verify by reading."
+            "as documentation. "
+            + ("When the query does not name a specific path, call `map` "
+               "first, then drill in; when it names a path, go straight to "
+               "it. " if map_enabled else
+               "When the question is about overall shape or unfamiliar "
+               "terrain, list the root and read README.md / similar "
+               "top-level docs first; then drill in. ")
+            + "The repo's conventions may not match anything in your "
+            "training — verify by reading."
         )
     else:
         framing = (
@@ -146,46 +203,9 @@ def _build_system_prompt(repo_root: Path, mode: str) -> str:
         "  then grep for `W` within tests.\n"
         "\n"
         "## Tools (one JSON object per emission)\n"
-        "\n"
-        '1. {"thought": "<one sentence>", "tool": "map", "path": '
-        '"<relative_dir>?"} — the repository map: directories with '
-        "recursive file and line counts and a role word for the kind of "
-        "files each holds, plus the files of the directory asked for. "
-        "Without `path`, the root and two levels below it; with `path`, "
-        "that subtree. Generated once per tree state and cached, so a "
-        "call is cheap. Roles describe organization, not behavior.\n"
-        '2. {"thought": "<one sentence>", "tool": "list", "path": '
-        '"<relative_dir>?"} — list files and subdirs. `path` is '
-        "optional, defaults to repo root. Pass a relative subdir "
-        "(e.g. `chat`, `tools/search-web`) to navigate deeper. "
-        "Output: one entry per line, format `<name>\\t<size_or_DIR>` "
-        "for each file/subdir; in git checkouts, gitignored entries "
-        "are hidden automatically.\n"
-        '3. {"thought": "...", "tool": "read", "file": "<relative_path>", '
-        '"start_line": <int?>, "end_line": <int?>} — read a file. Omit '
-        "start_line/end_line to read the whole file (capped at ~10K "
-        "chars; use line ranges for larger files). Lines are 1-indexed; "
-        "output format is `lineno|content`.\n"
-        '4. {"thought": "...", "tool": "grep", "pattern": "<regex>", '
-        '"path": "<relative_path>?"} — ripgrep over the repo. `path` is '
-        "optional and may be a single file OR a subdirectory. Pattern "
-        "is a regex (rg's default syntax). Output format is "
-        "`<relative_path>:<lineno>:<content>` per hit, capped at "
-        f"{_MAX_GREP_HITS} lines and {_MAX_GREP_HITS_PER_FILE} per file; a "
-        "capped result ends with every matching file and its hit count, "
-        "so you can grep or read the ones not shown.\n"
-        '5. {"thought": "...", "tool": "cite", "file": "<relative_path>", '
-        '"start_line": <int>, "end_line": <int>} — carry those lines into '
-        "your answer VERBATIM. The tool copies them from the file and appends "
-        "them under a CITED heading after your respond text; you never retype "
-        f"them. At most {_MAX_CITE_LINES} lines per call. Use it for every span "
-        "the caller will quote as evidence, once you have located it with "
-        "grep and read.\n"
-        '6. {"thought": "...", "tool": "respond", "text": "<answer>"} — '
-        "final answer to the query, exits the loop. Refer to what you cited "
-        "by path and line numbers (`src/chat/chat_loop.py:1860`) and say what "
-        "each span shows — the lines themselves follow your text, copied by "
-        "the tool.\n"
+        "\n"        + "\n".join(f"{n}. {entry}" for n, entry in enumerate(
+            ([_MAP_TOOL_ENTRY] if map_enabled else []) + _TOOL_ENTRIES, 1))
+        + "\n"
         "\n"
         "## Discipline\n"
         "\n"
@@ -201,11 +221,12 @@ def _build_system_prompt(repo_root: Path, mode: str) -> str:
         "  largest file by name relevance).\n"
         "    * 'Show me the implementation of Z' → if you know the file, "
         "  read directly; if not, grep then read around the hit.\n"
-        "- **Orientation is one call.** If the query does not name a "
-        "  specific path, call `map` first, then grep and read; a "
-        "  subtree with `path` when the root view is not enough. If the "
-        "  query names a path, skip the map and go to it.\n"
-        "- **Don't loop blindly.** If grep returns 50 hits, narrow the "
+        + (("- **Orientation is one call.** If the query does not name a "
+            "  specific path, call `map` first, then grep and read; a "
+            "  subtree with `path` when the root view is not enough. If the "
+            "  query names a path, skip the map and go to it.\n")
+           if map_enabled else "")
+        + "- **Don't loop blindly.** If grep returns 50 hits, narrow the "
         "  pattern rather than reading every hit. If a read truncates, "
         "  use a tighter line range.\n"
         "- **Cite paths and line numbers in the final answer.** Format: "
@@ -658,7 +679,8 @@ class CodeSubagent(Subagent):
                  mode: str = 'self',
                  reasoning_effort: Optional[str] = None,
                  excludes: Optional[List[str]] = None,
-                 map_cache_dir: Optional[Path] = None):
+                 map_cache_dir: Optional[Path] = None,
+                 map_enabled: bool = True):
         super().__init__(llm_backend, trace_dir,
                          reasoning_effort=reasoning_effort)
         self.repo_root = Path(repo_root)
@@ -668,6 +690,7 @@ class CodeSubagent(Subagent):
         # directory, never inside the repo being read (utils.repo_map).
         self.map_cache_dir = (Path(map_cache_dir) if map_cache_dir
                               else Path(trace_dir).parent / 'repo_maps')
+        self.map_enabled = bool(map_enabled)
         self.label = 'inspect_external' if mode == 'external' else 'inspect'
         # Spans `cite` carried this run: (file, start, end, numbered text).
         self._cited: List[Tuple[str, int, int, str]] = []
@@ -681,7 +704,8 @@ class CodeSubagent(Subagent):
         return None
 
     def system_prompt(self) -> str:
-        text = _build_system_prompt(self.repo_root, self.mode)
+        text = _build_system_prompt(self.repo_root, self.mode,
+                                    map_enabled=self.map_enabled)
         if self.excludes:
             text += ("\n\n## Excluded from evidence\n\nThese paths are documentation "
                      "for this review: " + ", ".join(self.excludes) + ". They "
@@ -693,8 +717,8 @@ class CodeSubagent(Subagent):
         return text
 
     def primitives(self):
-        return {
-            'map': self._tool_map,
+        prims = {'map': self._tool_map} if self.map_enabled else {}
+        prims.update({
             'list': lambda a: _tool_list(self.repo_root, a.get('path'), self.excludes),
             'read': lambda a: _tool_read(self.repo_root, a.get('file', ''),
                                          a.get('start_line'),
@@ -703,7 +727,8 @@ class CodeSubagent(Subagent):
                                          a.get('pattern', ''), a.get('path'),
                                          self.excludes),
             'cite': self._tool_cite,
-        }
+        })
+        return prims
 
     def _tool_map(self, a: Dict[str, Any]) -> str:
         """The repository map, or one subtree of it. Cached per tree state
@@ -775,7 +800,8 @@ class CodeSubagent(Subagent):
 
 
 def inspect(query: str, repo_root: Path, llm_backend,
-            trace_dir: Path, reasoning_effort: Optional[str] = None) -> str:
+            trace_dir: Path, reasoning_effort: Optional[str] = None,
+            map_enabled: bool = True) -> str:
     """Self-introspection: navigate the agent's own codebase under
     `repo_root` (typically the repo root) and answer the query.
 
@@ -791,13 +817,15 @@ def inspect(query: str, repo_root: Path, llm_backend,
             the field is never sent (launcher --reasoning sets it).
     """
     return CodeSubagent(repo_root, llm_backend, trace_dir, mode='self',
-                        reasoning_effort=reasoning_effort).run(query)
+                        reasoning_effort=reasoning_effort,
+                        map_enabled=map_enabled).run(query)
 
 
 def inspect_external(query: str, repo_root: Path, llm_backend,
                      trace_dir: Path,
                      reasoning_effort: Optional[str] = None,
-                     excludes: Optional[List[str]] = None) -> str:
+                     excludes: Optional[List[str]] = None,
+                     map_enabled: bool = True) -> str:
     """External-codebase inspection: navigate a project repo bound for
     this session (sticky binding via `/set-external-repo` or the YAML
     `external_repo` field). Same primitives as `inspect`, neutral prompt
@@ -815,4 +843,4 @@ def inspect_external(query: str, repo_root: Path, llm_backend,
     """
     return CodeSubagent(repo_root, llm_backend, trace_dir, mode='external',
                         reasoning_effort=reasoning_effort,
-                        excludes=excludes).run(query)
+                        excludes=excludes, map_enabled=map_enabled).run(query)

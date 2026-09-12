@@ -248,6 +248,9 @@ def build_config(run: Path, world: str, model_path: Optional[Path],
     cfg["autonomy_enabled"] = False
     cfg["external_repo"] = str(target)
     cfg["inspect_repo"] = str(run)
+    # No repository map for the reviewer's subagents: off across the claims
+    # workflow (see claims_audit/runner.py for the measurement).
+    cfg["subagent_map"] = False
     return name, cfg
 
 

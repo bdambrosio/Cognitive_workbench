@@ -999,6 +999,7 @@ class ReactMixin:
                 llm_backend=self.backend,
                 trace_dir=self._inspect_traces_dir(),
                 reasoning_effort=self._reasoning_effort,
+                map_enabled=getattr(self, '_subagent_map', True),
             )
         except Exception as e:
             logger.warning(f"[{self.character_name}] inspect subagent raised: {e}")
@@ -1041,6 +1042,7 @@ class ReactMixin:
                 trace_dir=self._inspect_traces_dir(),
                 reasoning_effort=self._reasoning_effort,
                 excludes=getattr(self, '_evidence_excludes', None),
+                map_enabled=getattr(self, '_subagent_map', True),
             )
         except Exception as e:
             logger.warning(f"[{self.character_name}] inspect_external subagent raised: {e}")

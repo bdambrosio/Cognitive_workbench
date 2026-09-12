@@ -478,8 +478,10 @@ wall-clock budget, `code_subagent.py` backs the `inspect` and
 returns a repository map (`src/utils/repo_map.py`: the tree with sizes,
 line counts and a model-written category per directory), generated once
 per tree state and cached under the world directory's `repo_maps/`, never
-inside the repo being read. A capped `grep` result ends with every
-matching file and its hit count, so a search's coverage is always knowable.
+inside the repo being read; a scenario's `subagent_map: false` removes it,
+which the claims workflow runners set. A capped `grep` result ends with
+every matching file and its hit count, so a search's coverage is always
+knowable.
 
 **Scenario:** copy `scenarios/jill-chat.yaml`, change `world_name` and the
 character block; per-world per-agent directories are created on first run.
