@@ -722,10 +722,11 @@ class ReactMixin:
                 obs = self._run_remember(q)
             elif tool == 'inspect':
                 q = self._resolve_react_value(action.get('query', ''), log)
-                obs = self._run_inspect(q)
+                obs = self._run_inspect(q, continue_id=action.get('continue'))
             elif tool == 'inspect_external':
                 q = self._resolve_react_value(action.get('query', ''), log)
-                obs = self._run_inspect_external(q, claims=action.get('claims'))
+                obs = self._run_inspect_external(q, claims=action.get('claims'),
+                                                 continue_id=action.get('continue'))
             elif tool == 'security':
                 q = self._resolve_react_value(action.get('query', ''), log)
                 obs = self._run_security(q)
@@ -976,7 +977,7 @@ class ReactMixin:
         scenarios/<world>/<agent>/inspect_traces/."""
         return self._memory_dir().parent / 'inspect_traces'
 
-    def _run_inspect(self, query: str) -> str:
+    def _run_inspect(self, query: str, continue_id=None) -> str:
         """Backend for the ReAct `inspect` tool. Delegates to the
         codebase-inspection subagent (chat.subagents.code_subagent.inspect), which
         runs its own thin ReAct loop over src/ with read-only primitives
@@ -1000,6 +1001,7 @@ class ReactMixin:
                 trace_dir=self._inspect_traces_dir(),
                 reasoning_effort=self._reasoning_effort,
                 map_enabled=getattr(self, '_subagent_map', True),
+                continue_id=(str(continue_id).strip() or None) if continue_id else None,
             )
         except Exception as e:
             logger.warning(f"[{self.character_name}] inspect subagent raised: {e}")
@@ -1009,7 +1011,7 @@ class ReactMixin:
             return 'EMPTY: inspect subagent produced no answer'
         return 'OK: ' + text
 
-    def _run_inspect_external(self, query: str, claims=None) -> str:
+    def _run_inspect_external(self, query: str, claims=None, continue_id=None) -> str:
         """Backend for the ReAct `inspect_external` tool. Delegates to the
         same subagent loop as `inspect`, geofenced to the bound external
         repo (see _set_external_repo / _get_external_repo). Returns ERROR
@@ -1022,12 +1024,16 @@ class ReactMixin:
         verbatim, so the prefix is how a workflow later knows which
         enumerated claims an evidence request served (claims_audit reads it
         back with `trace_claims`)."""
-        if not query or not str(query).strip():
+        continue_id = (str(continue_id).strip() or None) if continue_id else None
+        if (not query or not str(query).strip()) and not continue_id:
             return "EMPTY: inspect_external query was empty"
+        query = str(query or '')
         ids = [int(c) for c in (claims or []) if isinstance(c, int)
                or (isinstance(c, str) and c.strip().isdigit())] \
             if isinstance(claims, list) else []
-        if ids:
+        # A resumed request keeps the query, and the claims, its first call
+        # filed it under; the stored query already carries the prefix.
+        if ids and not continue_id:
             query = f"[claims {', '.join(str(c) for c in sorted(set(ids)))}] {query}"
         repo = self._get_external_repo()
         if repo is None:
@@ -1043,6 +1049,7 @@ class ReactMixin:
                 reasoning_effort=self._reasoning_effort,
                 excludes=getattr(self, '_evidence_excludes', None),
                 map_enabled=getattr(self, '_subagent_map', True),
+                continue_id=continue_id,
             )
         except Exception as e:
             logger.warning(f"[{self.character_name}] inspect_external subagent raised: {e}")

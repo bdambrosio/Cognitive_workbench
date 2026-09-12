@@ -33,6 +33,7 @@ characterization tests on that loop first.
 import json
 import logging
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -93,6 +94,24 @@ class Subagent:
     # whose work really is reasoning can raise its own.
     max_reasoning_effort: Optional[str] = 'low'
 
+    # CONTINUATION (2026-09-12, agreed with Jill). A subclass that sets
+    # `continuable` and `state_dir` persists its working log when it hits
+    # the cap, and its answer ends with a continuation id; a later call with
+    # that id resumes the same request from the log for one more round of
+    # `max_iters`. Once: a request not done at twice the cap is too big, and
+    # splitting it beats a blind second resumption. The whole log is kept,
+    # not a summary: the observations that found nothing are what stop the
+    # resumed run treading the same ground. Ids are UUIDs so a stale log
+    # cannot be resumed by an unrelated request; files older than
+    # `state_ttl_s` are removed whenever one is written.
+    continuable: bool = False
+    state_dir: Optional[Path] = None
+    state_ttl_s: float = 6 * 3600.0
+    #: One extra emission at the cap, no tool, to report what was found.
+    #: Off by default; the code subagent turns it on (agreed with Jill for
+    #: that subagent; recall and security keep the machine salvage).
+    last_word: bool = False
+
     _EFFORT_RANK = {'low': 1, 'medium': 2, 'high': 3}
 
     @classmethod
@@ -149,16 +168,78 @@ class Subagent:
 
     # -- the loop --------------------------------------------------------
 
-    def run(self, query: str) -> str:
+    def continuation_preamble(self) -> str:
+        """Placed at the top of the system prompt of a resumed run."""
+        return (f"This is a continuation of a request you did not finish. "
+                f"Your prior working log follows the query. You have "
+                f"{self.max_iters} further steps. Continue from where the "
+                f"log stopped; do not repeat work the log already shows.")
+
+    def continuation_state(self) -> Dict[str, Any]:
+        """Subclass state to persist beside the log (code_subagent: the
+        spans already carried)."""
+        return {}
+
+    def restore_continuation_state(self, state: Dict[str, Any]) -> None:
+        pass
+
+    @classmethod
+    def load_continuation(cls, state_dir: Optional[Path],
+                          continue_id: str) -> Optional[Dict[str, Any]]:
+        """The persisted state for `continue_id`, removed on read so a
+        request is resumed at most once; None when unknown or expired."""
+        if not state_dir or not continue_id:
+            return None
+        path = Path(state_dir) / f"{continue_id}.json"
+        if not path.is_file():
+            return None
+        try:
+            state = json.loads(path.read_text(encoding='utf-8'))
+        except Exception as e:                                   # noqa: BLE001
+            logger.warning(f"continuation {continue_id}: unreadable ({e})")
+            state = None
+        try:
+            path.unlink()
+        except OSError:
+            pass
+        return state
+
+    def _persist_continuation(self, query: str, log_lines: List[str]) -> Optional[str]:
+        if not (self.continuable and self.state_dir):
+            return None
+        state_dir = Path(self.state_dir)
+        try:
+            state_dir.mkdir(parents=True, exist_ok=True)
+            now = time.time()
+            for old in state_dir.glob('*.json'):
+                try:
+                    if now - old.stat().st_mtime > self.state_ttl_s:
+                        old.unlink()
+                except OSError:
+                    pass
+            cid = uuid.uuid4().hex
+            (state_dir / f"{cid}.json").write_text(json.dumps({
+                'query': query, 'log_lines': log_lines,
+                'state': self.continuation_state(), 'created': now,
+            }), encoding='utf-8')
+            return cid
+        except Exception as e:                                   # noqa: BLE001
+            logger.warning(f"{self.label}: continuation not persisted: {e}")
+            return None
+
+    def run(self, query: str, resume: Optional[Dict[str, Any]] = None) -> str:
         early = self.precheck(query)
         if early is not None:
             return early
 
         sys_prompt = self.system_prompt()
+        if resume is not None:
+            sys_prompt = self.continuation_preamble() + "\n\n" + sys_prompt
+            self.restore_continuation_state(resume.get('state') or {})
         prims = self.primitives()
         available = ', '.join(list(prims) + ['respond'])
         user_prefix = f"Query: {query.strip()}\n\n## Working log\n"
-        log_lines: List[str] = []
+        log_lines: List[str] = list(resume.get('log_lines') or []) if resume else []
         iters: List[Dict[str, Any]] = []
 
         def _build_user_msg() -> str:
@@ -305,7 +386,64 @@ class Subagent:
     # survive whole — they are short, one file:line per row, and they are what
     # a caller most needs — while a long file read is trimmed. The caller can
     # always read a file again; it cannot re-run a search it never saw.
-        if exit_reason == 'max_iters' and not answer:
+        if exit_reason == 'max_iters' and not answer and self.last_word:
+            # THE LAST WORD. One more emission, no tool: report what was
+            # found and what was not reached. Reporting only — a model in
+            # extraction mode will spend an ambiguous free step on one more
+            # read, so the note says no tool will run. A non-respond falls
+            # through to the machine salvage below. Not counted against a
+            # continuation's steps: the synthesis becomes the last log item.
+            log_lines.append(
+                "NOTE: you are out of steps and no further tool will run. "
+                "Report what you found and what you did not get to, and stop: "
+                "emit a respond action now. Spans you cited are already "
+                "carried into your answer.")
+            # The shape is constrained, not just requested: on the first
+            # live check the model answered the note with one more read.
+            last_word_schema = {
+                "type": "object",
+                "properties": {
+                    "thought": {"type": "string", "maxLength": 4000},
+                    "tool": {"type": "string", "enum": ["respond"]},
+                    "text": {"type": "string"},
+                },
+                "required": ["thought", "tool", "text"],
+                "additionalProperties": False,
+            } if self.response_schema is not None else None
+            try:
+                raw = self.llm_backend.chat(
+                    [{'role': 'system', 'content': sys_prompt},
+                     {'role': 'user', 'content': _build_user_msg()}],
+                    max_tokens=self.max_tokens, temperature=self.temperature,
+                    reasoning_effort=self.reasoning_effort,
+                    response_schema=last_word_schema)
+            except Exception as e:                               # noqa: BLE001
+                logger.warning(f"{self.label}: last-word call failed: {e}")
+                raw = ''
+            action = repair_json_string(raw or '')
+            action = action if isinstance(action, dict) else None
+            iters.append({'raw': raw, 'action': action,
+                          'observation': '(last word)'})
+            text = (str(action.get('text', '') or '').strip()
+                    if action and action.get('tool') == 'respond' else '')
+            if text:
+                answer = (f"({self.label}: hit the step cap; reporting what "
+                          f"was found)\n" + text)
+                log_lines.append(f"LAST WORD: {text}")
+            else:
+                answer = (f"({self.label}: hit max iterations without responding; "
+                          f"consider narrowing the query)"
+                          + self._salvage(iters))
+            if resume is None:
+                cid = self._persist_continuation(query, log_lines)
+                if cid:
+                    carried = len(self.continuation_state().get('cited') or [])
+                    answer += (f"\n\n(stopped at step {self.max_iters} with "
+                               f"{carried} span(s) carried; to continue this "
+                               f"request for {self.max_iters} more steps, call "
+                               f"this tool again with `continue: \"{cid}\"`. "
+                               f"Once only.)")
+        elif exit_reason == 'max_iters' and not answer:
             answer = (f"({self.label}: hit max iterations without responding; "
                       f"consider narrowing the query)"
                       + self._salvage(iters))
@@ -357,7 +495,7 @@ class Subagent:
         used = 0
         for n, it in enumerate(iters, 1):
             obs = str(it.get('observation') or '').strip()
-            if not obs or obs.startswith('ERROR:'):
+            if not obs or obs.startswith('ERROR:') or obs == '(last word)':
                 continue
             if len(obs) > self._SALVAGE_PER_OBS:
                 obs = obs[:self._SALVAGE_PER_OBS].rstrip() + ' …[trimmed]'

@@ -72,7 +72,10 @@ The chain job has four **steps**, one program each, in order:
    one call to the code-reading **subagent**
    (`src/chat/subagents/code_subagent.py`), itself a small loop of
    **primitives**, list, read, grep and cite over the target, ending in an
-   answer with the cited lines copied verbatim. (The subagent's `map`
+   answer with the cited lines copied verbatim; one `cite` carries up to
+   ten spans. A request that hits the subagent's step cap reports what it
+   found and offers a continuation id; the auditor may resume it once,
+   filed under the same claims. (The subagent's `map`
    primitive, a repository map with a category per directory, is switched
    off for the audit and the review: on chhoto, audits run with it scored
    worse on review, 49 and 47 findings holding of 58 against 55 and 55,

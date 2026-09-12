@@ -68,6 +68,10 @@ _MAX_LIST_ENTRIES = 200
 #: The most lines one `cite` carries. A span this long is a file, not a
 #: citation, and the auditor's context is what it would land in.
 _MAX_CITE_LINES = 200
+#: Spans one `cite` call may carry (Jill, 2026-09-12): an extraction order
+#: over a file group then finishes inside the step cap. The product with
+#: _MAX_CITE_LINES bounds one observation; the subagent chose the spans.
+_MAX_CITE_SPANS = 10
 
 # Filesystem-fallback deny list (used when repo_root isn't a git checkout).
 # Inside git checkouts, .gitignore handles this and the deny list is
@@ -118,13 +122,15 @@ _TOOL_ENTRIES = [
      "matching files. The first line gives the totals; a file cut short "
      "ends with `(+N more in this file)`; files that got no line are "
      "listed after with their hit counts, so you can grep or read them."),
-    ('{"thought": "...", "tool": "cite", "file": "<relative_path>", '
-     '"start_line": <int>, "end_line": <int>} — carry those lines into '
-     "your answer VERBATIM. The tool copies them from the file and appends "
-     "them under a CITED heading after your respond text; you never retype "
-     f"them. At most {_MAX_CITE_LINES} lines per call. Use it for every span "
-     "the caller will quote as evidence, once you have located it with "
-     "grep and read."),
+    ('{"thought": "...", "tool": "cite", "spans": [{"file": '
+     '"<relative_path>", "start_line": <int>, "end_line": <int>}, ...]} — '
+     "carry those lines into your answer VERBATIM. The tool copies them "
+     "from the files and appends them under a CITED heading after your "
+     "respond text, in the order you gave; you never retype them. Up to "
+     f"{_MAX_CITE_SPANS} spans per call, each at most {_MAX_CITE_LINES} "
+     "lines; the single-span form `\"file\", \"start_line\", \"end_line\"` "
+     "also works. Use it for every span the caller will quote as evidence, "
+     "once you have located it with grep and read."),
     ('{"thought": "...", "tool": "respond", "text": "<answer>"} — '
      "final answer to the query, exits the loop. Refer to what you cited "
      "by path and line numbers (`src/chat/chat_loop.py:1860`) and say what "
@@ -710,6 +716,11 @@ class CodeSubagent(Subagent):
         self.map_cache_dir = (Path(map_cache_dir) if map_cache_dir
                               else Path(trace_dir).parent / 'repo_maps')
         self.map_enabled = bool(map_enabled)
+        # A capped request can be resumed once (Subagent.run); the log is
+        # kept beside the traces, never inside the repo being read.
+        self.continuable = True
+        self.state_dir = Path(trace_dir).parent / 'subagent_continuations'
+        self.last_word = True
         self.label = 'inspect_external' if mode == 'external' else 'inspect'
         # Spans `cite` carried this run: (file, start, end, numbered text).
         self._cited: List[Tuple[str, int, int, str]] = []
@@ -782,6 +793,27 @@ class CodeSubagent(Subagent):
         exploration that finds what nobody asked for; this keeps the loop
         and moves only the copying to the tool.
         """
+        spans = a.get('spans')
+        if spans is None:
+            spans = [a]
+        if not isinstance(spans, list) or not spans:
+            return "ERROR: cite needs `spans`: a list of {file, start_line, end_line}"
+        if len(spans) > _MAX_CITE_SPANS:
+            return (f"ERROR: cite carries at most {_MAX_CITE_SPANS} spans per call; "
+                    f"{len(spans)} given")
+        results: List[str] = []
+        for span in spans:
+            results.append(self._cite_one(span if isinstance(span, dict) else {}))
+        if len(spans) == 1:
+            return results[0]
+        ok = sum(1 for r in results if r.startswith('OK: '))
+        head = (f"OK: cited {ok} of {len(spans)} span(s); carried verbatim into "
+                f"your answer under CITED, in this order — refer to them, do not "
+                f"retype them.")
+        return head + "\n" + "\n".join(
+            r[4:] if r.startswith('OK: ') else r for r in results)
+
+    def _cite_one(self, a: Dict[str, Any]) -> str:
         name = str(a.get('file') or '').strip()
         try:
             s, e = int(a.get('start_line')), int(a.get('end_line'))
@@ -809,6 +841,23 @@ class CodeSubagent(Subagent):
         return (f"OK: cited {name}:{s}-{e} ({n} line(s)); carried verbatim into "
                 f"your answer under CITED — refer to it, do not retype it.\n{text}")
 
+    # -- continuation hooks (Subagent) ---------------------------------
+
+    def continuation_preamble(self) -> str:
+        return (f"This is a continuation of a request you did not finish. "
+                f"Your prior working log follows the query. You have "
+                f"{self.max_iters} further steps. Spans already cited are "
+                f"shown in the log and are carried into your answer; do not "
+                f"cite them again. Continue from where the log stopped and "
+                f"do not repeat work the log already shows.")
+
+    def continuation_state(self) -> Dict[str, Any]:
+        return {'cited': [list(c) for c in self._cited]}
+
+    def restore_continuation_state(self, state: Dict[str, Any]) -> None:
+        self._cited = [tuple(c) for c in (state.get('cited') or [])
+                       if isinstance(c, list) and len(c) == 4]
+
     def answer_suffix(self) -> str:
         if not self._cited:
             return ''
@@ -818,9 +867,24 @@ class CodeSubagent(Subagent):
         return '\n'.join(parts).rstrip('\n')
 
 
+def _run_or_resume(sa: 'CodeSubagent', query: str,
+                   continue_id: Optional[str]) -> str:
+    """Run a fresh request, or resume the one `continue_id` names for
+    another round of steps. The stored query is used for a resumed run so
+    the record stays filed where the first call filed it."""
+    if not continue_id:
+        return sa.run(query)
+    state = CodeSubagent.load_continuation(sa.state_dir, str(continue_id))
+    if not state:
+        return (f"ERROR: no continuation {continue_id!r} to resume — it was "
+                f"already resumed, has expired, or never existed; ask afresh.")
+    stored = str(state.get('query') or query)
+    return sa.run(f"{stored} (continuation of {continue_id})", resume=state)
+
+
 def inspect(query: str, repo_root: Path, llm_backend,
             trace_dir: Path, reasoning_effort: Optional[str] = None,
-            map_enabled: bool = True) -> str:
+            map_enabled: bool = True, continue_id: Optional[str] = None) -> str:
     """Self-introspection: navigate the agent's own codebase under
     `repo_root` (typically the repo root) and answer the query.
 
@@ -835,16 +899,17 @@ def inspect(query: str, repo_root: Path, llm_backend,
         reasoning_effort: forwarded to the backend per call; None means
             the field is never sent (launcher --reasoning sets it).
     """
-    return CodeSubagent(repo_root, llm_backend, trace_dir, mode='self',
-                        reasoning_effort=reasoning_effort,
-                        map_enabled=map_enabled).run(query)
+    sa = CodeSubagent(repo_root, llm_backend, trace_dir, mode='self',
+                      reasoning_effort=reasoning_effort, map_enabled=map_enabled)
+    return _run_or_resume(sa, query, continue_id)
 
 
 def inspect_external(query: str, repo_root: Path, llm_backend,
                      trace_dir: Path,
                      reasoning_effort: Optional[str] = None,
                      excludes: Optional[List[str]] = None,
-                     map_enabled: bool = True) -> str:
+                     map_enabled: bool = True,
+                     continue_id: Optional[str] = None) -> str:
     """External-codebase inspection: navigate a project repo bound for
     this session (sticky binding via `/set-external-repo` or the YAML
     `external_repo` field). Same primitives as `inspect`, neutral prompt
@@ -860,6 +925,7 @@ def inspect_external(query: str, repo_root: Path, llm_backend,
         excludes: paths under the root that are documentation, not evidence
             (see the module docstring); None or empty excludes nothing.
     """
-    return CodeSubagent(repo_root, llm_backend, trace_dir, mode='external',
-                        reasoning_effort=reasoning_effort,
-                        excludes=excludes, map_enabled=map_enabled).run(query)
+    sa = CodeSubagent(repo_root, llm_backend, trace_dir, mode='external',
+                      reasoning_effort=reasoning_effort,
+                      excludes=excludes, map_enabled=map_enabled)
+    return _run_or_resume(sa, query, continue_id)

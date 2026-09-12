@@ -211,7 +211,10 @@ def test_unknown_tool_is_reported_but_loop_continues(run, mod, label,
     exception, and the loop keeps going until the cap."""
     backend = FakeBackend(['{"tool": "no_such_tool"}'])
     out = run(backend, tmp_path)
-    assert backend.n_calls == mod._MAX_ITERS
+    # The code subagent gets one extra emission at the cap, the last word
+    # (no tool runs); a non-respond there falls back to the salvage text.
+    extra = 1 if mod.__name__.endswith('code_subagent') else 0
+    assert backend.n_calls == mod._MAX_ITERS + extra
     assert 'max iterations' in out
 
 

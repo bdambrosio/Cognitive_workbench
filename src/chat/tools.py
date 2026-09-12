@@ -277,7 +277,8 @@ class ToolsMixin:
              "without claiming persistence — memory writes happen via background reflection, not from "
              "inside this loop."),
             ("inspect",
-             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"inspect\", \"query\": <string>}` — "
+             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"inspect\", \"query\": <string>, "
+             "\"continue\": <id, optional>}` — "
              "query your own codebase. A separate subagent (geofenced read-only to the repo root — `src/`, "
              "`docs/`, `tests/`, `bench/`; list/read/grep primitives) navigates the tree and returns a "
              "synthesized answer with file:line citations. Use when the user asks how you work, where something "
@@ -287,13 +288,15 @@ class ToolsMixin:
              "(e.g. \"read docs/learned-disposition-design.md and summarize it\"). This is the ONLY tool for "
              "paths under your own repo; `inspect_external` reaches a different tree entirely and cannot see "
              "them. Otherwise phrase as a natural-language question (e.g. \"where is the ReAct dispatch "
-             "defined?\")."),
+             "defined?\"). An answer that ends with a continuation id was cut by the "
+             "subagent's step cap; calling again with that id in `continue` resumes that "
+             "request for another round of steps, once, instead of asking afresh."),
         ]
         external_repo = self._get_external_repo()
         if external_repo is not None:
             tools.append(("inspect_external",
                 "`{\"thought\": \"<one terse sentence>\", \"tool\": \"inspect_external\", \"query\": <string>, "
-                "\"claims\": [<int>, ...]}` — "
+                "\"claims\": [<int>, ...], \"continue\": <id, optional>}` — "
                 f"query the external project repo currently bound to this session: `{external_repo}`. "
                 "`claims` is optional: when the query gathers evidence for enumerated claims, list their ids "
                 "and the record of this request is filed under them. "
@@ -303,7 +306,10 @@ class ToolsMixin:
                 f"repo: a path like `docs/x.md` resolves under `{external_repo}` and will simply be missing — "
                 "if the user names a file that is part of YOUR substrate, use `inspect` instead. Phrase as a "
                 "natural-language question (e.g. \"how does this project structure its modules?\", "
-                "\"what does the README say about installation?\", \"where is the main entry point?\")."))
+                "\"what does the README say about installation?\", \"where is the main entry point?\"). "
+                "An answer that ends with a continuation id was cut by the subagent's step cap; "
+                "calling again with that id in `continue` resumes that request for another round "
+                "of steps, once, and keeps it filed under the claims of the first call."))
         tools.append(("security",
             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"security\", \"query\": <string>}` — "
             "investigate LAN state or local host security state. A separate subagent (read-only typed "

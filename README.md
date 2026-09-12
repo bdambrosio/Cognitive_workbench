@@ -483,7 +483,12 @@ which the claims workflow runners set. `grep` shares a 50-line budget
 across the matching files by their hit distribution, densest file first:
 the first line gives the totals, a file cut short ends with `(+N more in
 this file)`, and files that got no line are listed after with their
-counts, so a search's coverage is always knowable.
+counts, so a search's coverage is always knowable. `cite` carries up to
+ten spans in one call, in the order given. A request that hits the
+12-step cap gets one more emission to report what it found and what it
+did not reach, and its answer ends with a continuation id; calling the
+tool again with that id in `continue` resumes the request from its whole
+prior log for one more round of steps, once.
 
 **Scenario:** copy `scenarios/jill-chat.yaml`, change `world_name` and the
 character block; per-world per-agent directories are created on first run.
