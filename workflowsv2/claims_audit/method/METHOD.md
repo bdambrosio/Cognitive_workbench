@@ -219,7 +219,7 @@ What the observation rests on is written as one §7 evidence item: a `citation` 
 
 If evidence found later contradicts a finding you have already formed, revise the finding before emitting and record in `correction`, in one line, what changed and why.
 
-The client's process may hand a claim back to you with the adjudication you gave it and further evidence, and ask you to adjudicate it again, per §8. Emit a whole finding. Where the verdict or the disposition changes, `correction` says what changed and why; where neither changes, leave it out.
+The client's process may hand a claim back to you with the adjudication you gave it and further evidence, and ask you to adjudicate it again. Emit a whole finding. Where the verdict or the disposition changes, `correction` says what changed and why; where neither changes, leave it out.
 
 ## 11. What this stage does not do
 
