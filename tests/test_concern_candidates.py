@@ -91,6 +91,62 @@ def test_cap_refuses_chosen_concerns_and_passes_debts(loop, tmp_path):
                                    extra_properties={"system_spawned": True}) is not None
 
 
+def test_cap_refusal_records_the_shadow_displacement_victims(loop, tmp_path):
+    """Nothing is retired; the refusal event says which concern each rule
+    would have chosen. Seeds, one-shots and system-spawned work are never
+    candidates; a never-fired concern beats every fired one; the triage rule
+    needs three events and picks the highest reset+defer share."""
+    from utils.file_utils import append_jsonl
+    base = {"kind": "agent_concern", "status": "active", "activation": 0.5,
+            "instruction": "do", "rhythm_hours": 24, "category": "durable"}
+
+    def concern(text, created, fired=None):
+        # created_at is not in create_note's allowed extra props; set it after
+        nid = _note(loop, "Collection_ac", {**base, **({"last_fired_at": fired} if fired else {})}, text=text)
+        loop.resource_manager.get_resource(nid)["properties"]["created_at"] = created
+        return nid
+    fired_old = concern("fired long ago", "2026-09-01T00:00:00+00:00", "2026-09-02T00:00:00+00:00")
+    fired_new = concern("fired yesterday", "2026-09-01T00:00:00+00:00", "2026-09-11T00:00:00+00:00")
+    never_new = concern("never fired, newer", "2026-09-10T00:00:00+00:00")
+    never_old = concern("never fired, older", "2026-09-05T00:00:00+00:00")
+    _note(loop, "Collection_ac", {**base, "seed": True}, text="seed")
+    _note(loop, "Collection_ac", {**base, "category": "one_shot"}, text="one shot")
+    _note(loop, "Collection_ac", {**base, "system_spawned": True}, text="spawned")
+    for _ in range(C._AGENT_CONCERN_POPULATION_CAP):
+        _note(loop, "Collection_ac", {**base, "created_at": "2026-09-11T00:00:00+00:00",
+                                      "last_fired_at": "2026-09-12T00:00:00+00:00"}, text="filler")
+    now = datetime.now(timezone.utc).isoformat()
+    log = tmp_path / "autonomy.jsonl"
+    for verdict in ("reset", "defer", "fire"):                       # fired_new: 2/3
+        append_jsonl(log, {"ts": now, "event": "triage", "concern_id": fired_new, "verdict": verdict})
+    for verdict in ("reset", "reset", "reset", "fire", "fire"):     # fired_old: 3/5
+        append_jsonl(log, {"ts": now, "event": "triage", "concern_id": fired_old, "verdict": verdict})
+    for verdict in ("reset", "reset"):                              # never_old: only 2 events
+        append_jsonl(log, {"ts": now, "event": "triage", "concern_id": never_old, "verdict": verdict})
+    old_ts = (datetime.now(timezone.utc) - timedelta(days=8)).isoformat()
+    for _ in range(5):                                              # never_new: all too old
+        append_jsonl(log, {"ts": old_ts, "event": "triage", "concern_id": never_new, "verdict": "reset"})
+    assert loop._add_agent_concern("one more", entity="User") is None
+    ev = _rows(log)[-1]
+    assert ev["event"] == "concern_refused_cap"
+    assert ev["would_displace_last_fired"] == never_old
+    assert ev["would_displace_last_fired_text"] == "never fired, older"
+    assert ev["would_displace_triage"] == fired_new and ev["would_displace_triage_share"] == 0.67
+    # nothing was retired
+    assert all((loop.resource_manager.get_resource(n) or {}).get("properties", {}).get("status") == "active"
+               for n in (fired_old, fired_new, never_new, never_old))
+    # no eligible concern at all (the population is all machine-scheduled
+    # work): both None, still refused
+    for n in (fired_old, fired_new, never_new, never_old):
+        loop.resource_manager.get_resource(n)["properties"]["status"] = "satisfied"
+    for nid, note, _a in loop._iter_active_agent_concerns():
+        if (note["properties"].get("content") or note.get("text")) == "filler":
+            note["properties"]["system_spawned"] = True
+    assert loop._add_agent_concern("another", entity="User") is None
+    ev = _rows(log)[-1]
+    assert ev["would_displace_last_fired"] is None and ev["would_displace_triage"] is None
+
+
 # ── near misses ────────────────────────────────────────────────────────
 
 def test_near_miss_rows_and_recurrence(tmp_path):
@@ -132,16 +188,19 @@ def test_candidates_are_logged_and_recur_without_creating(loop, tmp_path, monkey
     created = []
     monkeypatch.setattr(loop, "_add_agent_concern", lambda *a, **k: created.append(a) or "Note_x")
     cand = [{"text": "the async pipeline keeps needing a diagram", "why": "third module today",
-             "source": "trace", "sign": "aversive", "affectable": True},
+             "source": "trace", "sign": "aversive", "affectable": True,
+             "promote": True, "instruction": "check whether a fourth module needs one; if so draw it"},
             {"text": "", "why": "empty text is dropped"}]
     for turn in (1, 2):
         assert loop._log_concern_candidates(cand, turn, "User") == 1
     rows = _rows(tmp_path / "memory" / C._CANDIDATES_FILE)
     assert len(rows) == 2 and all("would_promote" not in r for r in rows)
+    assert rows[0]["promote"] is True and rows[0]["instruction"].startswith("check whether")
     assert loop._log_concern_candidates(cand, 3, "User") == 1
     rows = _rows(tmp_path / "memory" / C._CANDIDATES_FILE)
     wp = [r for r in rows if "would_promote" in r]
     assert len(wp) == 1 and wp[0]["count"] == 3 and wp[0]["live"] is False
+    assert "skipped" not in wp[0] and "concern_id" not in wp[0]
     assert created == []                                            # shadow: nothing created
     assert C.candidate_recurrence(tmp_path / "memory" / C._CANDIDATES_FILE,
                                   "THE async  pipeline keeps needing a diagram") == 3
@@ -151,10 +210,58 @@ def test_candidates_are_logged_and_recur_without_creating(loop, tmp_path, monkey
                                   "modules that need a diagram to explain, again", embed=fake) == 3
     assert C.candidate_recurrence(tmp_path / "memory" / C._CANDIDATES_FILE,
                                   "something else entirely", embed=fake) == 0
-    # live: promoted through the normal create path
+    # live: promoted through the normal create path, with its instruction,
+    # and the row carries the concern id
     monkeypatch.setattr(C, "_CANDIDATES_LIVE", True)
     loop._log_concern_candidates(cand, 4, "User")
     assert created and created[0][0] == cand[0]["text"]
+    wp = [r for r in _rows(tmp_path / "memory" / C._CANDIDATES_FILE) if "would_promote" in r]
+    assert wp[-1]["concern_id"] == "Note_x" and wp[-1]["instruction"] == cand[0]["instruction"]
+    # a theme is promoted once: the next recurrence is skipped, not created
+    loop._log_concern_candidates(cand, 5, "User")
+    wp = [r for r in _rows(tmp_path / "memory" / C._CANDIDATES_FILE) if "would_promote" in r]
+    assert wp[-1]["skipped"] == "already_promoted" and len(created) == 1
+    assert wp[-1]["merged_into"] == "Note_x" and "revived" not in wp[-1]
+    # ... but a satisfied concern for the theme is revived by the recurrence
+    real = _note(loop, "Collection_ac", {"kind": "agent_concern", "status": "satisfied",
+                                         "activation": 0.3, "instruction": "do", "rhythm_hours": 24},
+                 text=cand[0]["text"])
+    monkeypatch.setattr(loop, "_add_agent_concern", lambda *a, **k: created.append(a) or real)
+    fresh = [{**cand[0], "text": "a fresh theme"}]
+    for turn in (5, 6, 7):
+        loop._log_concern_candidates(fresh, turn, "User")           # creates -> real
+    loop.resource_manager.get_resource(real)["properties"]["status"] = "satisfied"
+    loop._log_concern_candidates(fresh, 8, "User")
+    wp = [r for r in _rows(tmp_path / "memory" / C._CANDIDATES_FILE) if "would_promote" in r]
+    assert wp[-1]["skipped"] == "already_promoted" and wp[-1]["revived"] is True
+    assert loop.resource_manager.get_resource(real)["properties"]["status"] == "active"
+    loop.resource_manager.get_resource(real)["properties"]["status"] = "abandoned"
+    loop._log_concern_candidates(fresh, 9, "User")
+    wp = [r for r in _rows(tmp_path / "memory" / C._CANDIDATES_FILE) if "would_promote" in r]
+    assert wp[-1]["skipped"] == "already_promoted" and "revived" not in wp[-1]
+    assert loop.resource_manager.get_resource(real)["properties"]["status"] == "abandoned"
+    monkeypatch.setattr(loop, "_add_agent_concern", lambda *a, **k: created.append(a) or "Note_x")
+    # no instruction: recurring and affectable, but logged and not created
+    other = [{"text": "the near-miss log keeps naming one memory", "why": "again",
+              "source": "near_miss", "sign": "neutral", "affectable": True, "promote": True}]
+    for turn in (6, 7, 8):
+        loop._log_concern_candidates(other, turn, "User")
+    wp = [r for r in _rows(tmp_path / "memory" / C._CANDIDATES_FILE) if "would_promote" in r]
+    assert wp[-1]["would_promote"] == other[0]["text"] and wp[-1]["skipped"] == "no_instruction"
+    assert len(created) == 2                                        # the two themes above, no more
+    # a refused create (cap) leaves no concern_id, so the theme may try again
+    monkeypatch.setattr(loop, "_add_agent_concern", lambda *a, **k: None)
+    loop._log_concern_candidates(other, 9, "User")          # still no instruction
+    third = [{**cand[0], "text": "a third theme that keeps pressing", "instruction": "check it"}]
+    for turn in (10, 11, 12):
+        loop._log_concern_candidates(third, turn, "User")
+    wp = [r for r in _rows(tmp_path / "memory" / C._CANDIDATES_FILE) if "would_promote" in r]
+    assert wp[-1]["would_promote"] == third[0]["text"] and wp[-1].get("concern_id") is None
+    assert "skipped" not in wp[-1]
+    assert C.candidate_recurrence(tmp_path / "memory" / C._CANDIDATES_FILE,
+                                  third[0]["text"], promoted=True) == 0
+    assert C.candidate_recurrence(tmp_path / "memory" / C._CANDIDATES_FILE,
+                                  cand[0]["text"], promoted=True) == 1
 
 
 # ── expectations ───────────────────────────────────────────────────────

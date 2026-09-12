@@ -121,6 +121,13 @@ _AGENT_CONCERN_BUMP_AMOUNT    = 0.15   # gained per hit (capped at 1.0)
 # one observation; repeat promotion merges; the cap had refused nothing),
 # put to Jill and accepted. Expectations stay in shadow until the fire-side
 # CHECK runs once per fire and a repeat violation stops bumping.
+# 2026-09-12: a promoted candidate carries the instruction reflection wrote
+# for it; without one it is logged and not created (four instruction-less
+# promotions of one observation had held a third of the working set and
+# could never fire). A theme is promoted once: a later recurrence whose
+# earlier would_promote row created or merged a concern is skipped. A cap
+# refusal also records which concern each displacement rule would have
+# retired (shadow: nothing is retired) — see _shadow_displacement_victims.
 _AGENT_CONCERN_POPULATION_CAP = 12     # active non-seed agent concerns
 _CANDIDATES_LIVE = True                # promote recurring candidates to concerns
 _EXPECTATIONS_LIVE = False             # a violated aversive expectation bumps
@@ -891,7 +898,8 @@ class ConcernsMixin:
             if n >= _AGENT_CONCERN_POPULATION_CAP:
                 self._write_autonomy_event({
                     'event': 'concern_refused_cap', 'text': text[:200],
-                    'active_nonseed': n, 'cap': _AGENT_CONCERN_POPULATION_CAP})
+                    'active_nonseed': n, 'cap': _AGENT_CONCERN_POPULATION_CAP,
+                    **self._shadow_displacement_victims()})
                 logger.info(f"[{self.character_name}] agent_concern refused at cap "
                             f"({n}/{_AGENT_CONCERN_POPULATION_CAP}): {text[:80]!r}")
                 return None
@@ -1749,6 +1757,56 @@ class ConcernsMixin:
         return sum(1 for _nid, note, _a in self._iter_active_agent_concerns()
                    if not (note.get('properties') or {}).get('seed'))
 
+    def _shadow_displacement_victims(self) -> Dict[str, Any]:
+        """Which active concern each displacement rule would retire to make
+        room at the cap. Shadow (2026-09-12, agreed with Jill): computed and
+        written on the refusal event, nothing retired, so the two rules can
+        be compared on real refusals before either is built. Eligible: active,
+        not a seed, not a one-shot, not system_spawned.
+        `last_fired`: a concern that has never fired, oldest created first;
+        else the oldest last_fired_at. Bumps are ignored on purpose: input
+        similarity bumps every concern within the hour, so they do not
+        separate.
+        `triage`: the highest share of reset and defer verdicts among the
+        concern's triage events of the last seven days, at least three
+        events; None when no concern qualifies."""
+        from utils.file_utils import read_jsonl
+        eligible: List[Tuple[str, Dict[str, Any]]] = []
+        for nid, note, _a in self._iter_active_agent_concerns():
+            p = note.get('properties') or {}
+            if p.get('seed') or p.get('system_spawned') or self._is_one_shot_concern(p):
+                continue
+            p = {'content': note.get('text', ''), **p}
+            eligible.append((nid, p))
+        out: Dict[str, Any] = {'would_displace_last_fired': None,
+                               'would_displace_triage': None}
+        if not eligible:
+            return out
+        never = [(nid, p) for nid, p in eligible if not p.get('last_fired_at')]
+        if never:
+            nid, p = min(never, key=lambda t: str(t[1].get('created_at') or ''))
+        else:
+            nid, p = min(eligible, key=lambda t: str(t[1].get('last_fired_at') or ''))
+        out['would_displace_last_fired'] = nid
+        out['would_displace_last_fired_text'] = str(p.get('content') or '')[:80]
+        since = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        counts = {nid: [0, 0] for nid, _p in eligible}      # [reset + defer, total]
+        for e in read_jsonl(self._autonomy_log_path()):
+            cid = e.get('concern_id')
+            if e.get('event') != 'triage' or cid not in counts \
+                    or str(e.get('ts') or '') < since:
+                continue
+            counts[cid][1] += 1
+            if e.get('verdict') in ('reset', 'defer'):
+                counts[cid][0] += 1
+        scored = [(c[0] / c[1], c[1], cid) for cid, c in counts.items() if c[1] >= 3]
+        if scored:
+            share, _total, cid = max(scored)
+            out['would_displace_triage'] = cid
+            out['would_displace_triage_text'] = str(dict(eligible)[cid].get('content') or '')[:80]
+            out['would_displace_triage_share'] = round(share, 2)
+        return out
+
     # ---- expectations (shadow) ------------------------------------------
     #
     # An expectation is the last line of the note the system already
@@ -1818,11 +1876,17 @@ class ConcernsMixin:
 
     def _log_concern_candidates(self, rows: List[Dict[str, Any]], turn_seq,
                                 entity: str) -> int:
-        """Shadow: append reflection's candidates to <memory>/concern_candidates.jsonl,
+        """Append reflection's candidates to <memory>/concern_candidates.jsonl,
         then look for recurrence over the last week. A candidate seen
         _CANDIDATE_PROMOTE_COUNT times and affectable gets a `would_promote`
-        row; with _CANDIDATES_LIVE it becomes a durable agent concern with
-        no instruction, subject to the cap."""
+        row. With _CANDIDATES_LIVE it becomes a durable agent concern,
+        subject to the cap, when reflection set `promote` and wrote an
+        instruction and no earlier would_promote row for the same theme
+        already created or merged a concern; otherwise the row says why it
+        was skipped (`no_instruction`, `already_promoted`) and nothing is
+        created. The concern id, or None when the cap refused it, is
+        written on the row so the next recurrence can tell; a skipped
+        recurrence revives that concern if it had been satisfied."""
         from utils.file_utils import append_jsonl
         path = self._memory_dir() / _CANDIDATES_FILE
         n = 0
@@ -1834,18 +1898,35 @@ class ConcernsMixin:
                    'why': str(c.get('why') or '')[:200],
                    'source': c.get('source') if c.get('source') in ('trace', 'near_miss', 'both') else 'trace',
                    'sign': c.get('sign') if c.get('sign') in ('aversive', 'appetitive', 'neutral') else 'neutral',
-                   'affectable': bool(c.get('affectable'))}
+                   'affectable': bool(c.get('affectable')),
+                   'promote': bool(c.get('promote')),
+                   'instruction': str(c.get('instruction') or '').strip()[:300]}
             append_jsonl(path, row, character=self.character_name)
             n += 1
-            count = candidate_recurrence(path, text, embed=self._candidate_embedder())
+            embed = self._candidate_embedder()
+            count = candidate_recurrence(path, text, embed=embed)
             if count >= _CANDIDATE_PROMOTE_COUNT and row['affectable']:
-                append_jsonl(path, {'turn_seq': turn_seq, 'entity': entity,
-                                    'would_promote': text, 'count': count,
-                                    'live': _CANDIDATES_LIVE},
-                             character=self.character_name)
-                if _CANDIDATES_LIVE:
-                    self._add_agent_concern(text, entity=entity, provenance='inferred',
-                                            seed=False, instruction=None, category='durable')
+                wp = {'turn_seq': turn_seq, 'entity': entity,
+                      'would_promote': text, 'count': count,
+                      'instruction': row['instruction'], 'live': _CANDIDATES_LIVE}
+                prior = matching_candidate_rows(path, text, embed=embed, promoted=True)
+                if not (row['promote'] and row['instruction']):
+                    wp['skipped'] = 'no_instruction'
+                elif prior:
+                    # The theme already has a concern. A satisfied one is
+                    # revived, as the create path's similarity merge would
+                    # do if it matched the paraphrase; abandoned stays out.
+                    wp['skipped'] = 'already_promoted'
+                    wp['merged_into'] = prior[-1]['concern_id']
+                    note = self.resource_manager.get_resource(wp['merged_into'])
+                    if note and (note.get('properties') or {}).get('status') == 'satisfied':
+                        self._promote_existing_agent_concern(wp['merged_into'])
+                        wp['revived'] = True
+                elif _CANDIDATES_LIVE:
+                    wp['concern_id'] = self._add_agent_concern(
+                        text, entity=entity, provenance='inferred', seed=False,
+                        instruction=row['instruction'], category='durable')
+                append_jsonl(path, wp, character=self.character_name)
         return n
 
     def _candidate_embedder(self):
@@ -3027,44 +3108,36 @@ def _repeat_violation(prev: Optional[Dict[str, Any]]) -> bool:
 def last_expectation_rows(path) -> Dict[str, Dict[str, Any]]:
     """The most recent row per concern_id in an expectation_checks.jsonl,
     or {} when the file is absent. Pure."""
-    import json as _json
-    from pathlib import Path as _P
-    p = _P(path)
+    from utils.file_utils import read_jsonl
     out: Dict[str, Dict[str, Any]] = {}
-    if not p.is_file():
-        return out
-    for line in p.read_text(encoding='utf-8', errors='replace').splitlines():
-        try:
-            r = _json.loads(line)
-        except ValueError:
-            continue
-        if isinstance(r, dict) and r.get('concern_id'):
+    for r in read_jsonl(path):
+        if r.get('concern_id'):
             out[str(r['concern_id'])] = r
     return out
 
 
-def candidate_recurrence(path, text: str, days: int = 7, embed=None,
-                         threshold: float = _CONCERN_RECURRENCE_THRESHOLD) -> int:
-    """How many candidate rows in the last `days` days say the same thing
-    as `text`, including the row for `text` itself. With `embed` (a
-    callable from a list of strings to a matrix of unit-length vectors)
-    two rows are the same when their cosine similarity is at or over
-    `threshold`, the concern collections' own recurrence rule; without it,
-    when they match after lowercasing and collapsing whitespace. Pure."""
-    import json as _json
-    from pathlib import Path as _P
-    p = _P(path)
-    if not p.is_file():
-        return 0
+def matching_candidate_rows(path, text: str, days: int = 7, embed=None,
+                            threshold: float = _CONCERN_RECURRENCE_THRESHOLD,
+                            promoted: bool = False) -> List[Dict[str, Any]]:
+    """The candidate rows of the last `days` days that say the same thing
+    as `text`, in file order, including the row for `text` itself. With
+    `embed` (a callable from a list of strings to a matrix of unit-length
+    vectors) two rows are the same when their cosine similarity is at or
+    over `threshold`, the concern collections' own recurrence rule; without
+    it, when they match after lowercasing and collapsing whitespace. With
+    `promoted`, the rows considered are instead the would_promote rows that
+    carry a concern_id: the times this theme already became or merged into
+    a concern, each row naming which. Pure."""
+    from utils.file_utils import read_jsonl
     key = ' '.join((text or '').lower().split())
     since = datetime.now(timezone.utc) - timedelta(days=days)
+    rows: List[Dict[str, Any]] = []
     texts: List[str] = []
-    for line in p.read_text(encoding='utf-8', errors='replace').splitlines():
-        try:
-            row = _json.loads(line)
-        except ValueError:
-            continue
-        if 'would_promote' in row:
+    for row in read_jsonl(path):
+        if promoted:
+            if not row.get('concern_id') or 'would_promote' not in row:
+                continue
+        elif 'would_promote' in row:
             continue
         ts = row.get('ts')
         try:
@@ -3075,23 +3148,31 @@ def candidate_recurrence(path, text: str, days: int = 7, embed=None,
             when = when.replace(tzinfo=timezone.utc)
         if when is not None and when < since:
             continue
-        t = str(row.get('text') or '').strip()
+        t = str(row.get('would_promote' if promoted else 'text') or '').strip()
         if t:
+            rows.append(row)
             texts.append(t)
     if not texts:
-        return 0
-    if embed is None:
-        return sum(1 for t in texts if ' '.join(t.lower().split()) == key)
-    try:
-        vecs = embed([text] + texts)
-        import numpy as _np
-        m = _np.asarray(vecs, dtype=float)
-        norms = _np.linalg.norm(m, axis=1, keepdims=True)
-        norms[norms == 0] = 1.0
-        m = m / norms
-        sims = m[1:] @ m[0]
-        return int((sims >= threshold).sum())
-    except Exception as e:                                         # noqa: BLE001
-        logger.warning(f"candidate recurrence: embedding failed ({e}); using text equality")
-        return sum(1 for t in texts if ' '.join(t.lower().split()) == key)
+        return []
+    if embed is not None:
+        try:
+            vecs = embed([text] + texts)
+            import numpy as _np
+            m = _np.asarray(vecs, dtype=float)
+            norms = _np.linalg.norm(m, axis=1, keepdims=True)
+            norms[norms == 0] = 1.0
+            m = m / norms
+            sims = m[1:] @ m[0]
+            return [r for r, sim in zip(rows, sims) if sim >= threshold]
+        except Exception as e:                                     # noqa: BLE001
+            logger.warning(f"candidate recurrence: embedding failed ({e}); using text equality")
+    return [r for r, t in zip(rows, texts) if ' '.join(t.lower().split()) == key]
+
+
+def candidate_recurrence(path, text: str, days: int = 7, embed=None,
+                         threshold: float = _CONCERN_RECURRENCE_THRESHOLD,
+                         promoted: bool = False) -> int:
+    """How many candidate rows say the same thing as `text`; see
+    matching_candidate_rows for the rule and the `promoted` variant. Pure."""
+    return len(matching_candidate_rows(path, text, days, embed, threshold, promoted))
 

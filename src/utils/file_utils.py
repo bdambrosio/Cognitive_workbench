@@ -68,3 +68,22 @@ def append_jsonl(path: Union[str, Path], record: dict,
             f.write(json.dumps(rec, ensure_ascii=False) + '\n')
     except Exception as e:
         logger.warning(f"append_jsonl: write to {path} failed: {e}")
+
+
+def read_jsonl(path: Union[str, Path]) -> list:
+    """Every parseable record of a jsonl log as a list of dicts, in file
+    order. A missing file reads as empty; a line that does not parse is
+    skipped, so a partial last line from a crashed writer does not hide
+    the rest. Reader counterpart of append_jsonl."""
+    p = Path(path)
+    if not p.is_file():
+        return []
+    out = []
+    for line in p.read_text(encoding='utf-8', errors='replace').splitlines():
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(rec, dict):
+            out.append(rec)
+    return out

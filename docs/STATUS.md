@@ -82,6 +82,7 @@ point of recording this here:
 | [character_evaluator.md](character_evaluator.md) | Orientation pass (`src/character_evaluator.py`); banner 2026-07-19 — module accurate, integration section stale (live hook is `src/chat/prompts.py`, config key `orientation.enabled`) |
 | [commands.md](commands.md) | Chat-CLI slash commands; re-verified against `src/cli.py` 2026-07-19, fully accurate |
 | [concerns-architecture.md](concerns-architecture.md) | Concern layers + dynamics — REWRITTEN 2026-07-19 against `src/chat/concerns.py` (two-layer strength/activation model, triage, WIP, yield, fire-outcome capture) |
+| [concerns-status-2026-09-12.md](concerns-status-2026-09-12.md) | The agent's own concerns: cap, candidates, expectations, mint — status after the PROBE review of 2026-09-12; what landed (promotion needs an instruction, one promotion per theme, shadow displacement victims) and remaining work in dependency order |
 | [workflow-concern-layers.md](workflow-concern-layers.md) | Which layer owns what: continuation (concerns) / acceptance (METHOD + runner) / isolation (scenario); why a workflow is a standalone object — written 2026-08-26 so the question is not reopened |
 | [configuration.md](configuration.md) | Scenario YAML / LLM / tool configuration — REWRITTEN 2026-07-19 against `jill-chat.yaml` + `launcher.py` |
 | [cw-voice-sensor.md](cw-voice-sensor.md) | CW-side ChatterBot voice sensor (mic→turn): `src/chat/voice_sensor.py`, `src/utils/voice_pipeline.py` — shipped 2026-06-19 |
