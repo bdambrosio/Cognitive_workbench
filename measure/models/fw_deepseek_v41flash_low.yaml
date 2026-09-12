@@ -1,0 +1,23 @@
+# DeepSeek-V4.1-Flash served by Fireworks directly, added 2026-09-12.
+#
+# Prescreened 2026-09-12 with the real payload (measure/prescreen.py, direct
+# URL): schema-valid 6/6 across low and medium; low 251-446 completion
+# tokens in 7-10 s, medium 268-1,228 in 5-13 s. The 09-10 prescreen found
+# this model only reachable through DeepSeek's Responses API; Fireworks
+# listed it two days later and needs no backend change.
+#
+# EFFORT `low`. One of a pair (low / medium) made for the doc9 enumeration
+# comparison; neither is a house default yet.
+#
+# QUANTIZATION UNKNOWN, as for fw_deepseek_v4flash.yaml.
+#
+# TEMPERATURE resolves through src/chat/model_params.py ("deepseek-v4p1-flash"
+# -> 1.0, the publisher's value; Bruce confirmed 2026-09-12).
+llm_config:
+  server: local
+  model: "accounts/fireworks/models/deepseek-v4p1-flash"
+  vllm_url: https://api.fireworks.ai/inference/v1
+  # NAME of the env var holding the bearer token, not the token.
+  api_key: FIREWORKS_API_KEY
+  is_reasoning_model: true
+  reasoning_effort: low

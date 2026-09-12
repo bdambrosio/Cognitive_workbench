@@ -75,6 +75,11 @@ MODEL_TEMPERATURE: Dict[str, float] = {
     # model that had a temperature under one route had none under another,
     # which the guard test caught on the first run.
     "DeepSeek-V4-Flash": 1.0,
+    # DeepSeek-V4.1-Flash on Fireworks (accounts/fireworks/models/
+    # deepseek-v4p1-flash). The V4.1 model card (read 2026-09-10) gives
+    # temperature 1.0 and top_p 0.95 for its agentic evals. Bruce confirmed
+    # 2026-09-12. `v4p1` does not match the V4 key above.
+    "deepseek-v4p1-flash": 1.0,
     "nemotron-3-ultra": 1.0,
     "nemotron-3-super": 1.0,
     # MiniMax publishes 1.0 / top_p 0.95 as general guidance rather than as a
