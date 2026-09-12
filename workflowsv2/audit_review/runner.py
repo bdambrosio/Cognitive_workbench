@@ -402,10 +402,24 @@ def emit_parts(loop, method_text: str, stats: Dict[str, Any],
         out = emit(loop, method_text, head + body, schema, max_tokens)
         calls.append({"part": what,
                       **{k: v for k, v in out.items() if k not in ("raw", "obj")}})
+        if out["obj"] is None:
+            # ONE RETRY, SAME REQUEST. A part that does not parse leaves its
+            # findings "not reviewed" for the whole review, and on a route
+            # where the schema is guided rather than enforced (DeepSeek
+            # V4.1 Flash, 2026-09-12: one string cut mid-way in the first
+            # of two batches, ten findings unreviewed) the second attempt
+            # usually parses. One retry only: a route that fails twice on
+            # one part is reported, not hidden behind a loop.
+            logger.warning("%s did not parse: %s; retrying once", what,
+                           out["parse_error"])
+            out = emit(loop, method_text, head + body, schema, max_tokens)
+            calls.append({"part": what, "retry": True,
+                          **{k: v for k, v in out.items() if k not in ("raw", "obj")}})
         if out["obj"] is not None:
             parts.append(out["obj"])
         else:
-            logger.warning("%s did not parse: %s", what, out["parse_error"])
+            logger.warning("%s did not parse on the retry: %s", what,
+                           out["parse_error"])
         if partial is not None:
             partial.write_text(json.dumps(schemas.merge_parts(parts), indent=1,
                                           ensure_ascii=False) + "\n",
