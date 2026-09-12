@@ -61,10 +61,6 @@ logger = logging.getLogger(__name__)
 _MAX_ITERS = 12
 _MAX_READ_CHARS = 10_000
 _MAX_GREP_HITS = 50
-#: Hits shown per file. Five confirm presence and show the neighbours; a
-#: file with more is read or grepped on its own, and the count in the
-#: capped-result list says whether that is worth doing (Jill, 2026-09-11).
-_MAX_GREP_HITS_PER_FILE = 5
 #: Files enumerated in a capped result's list; past this the pattern is
 #: too broad to be a targeted question and the note says so.
 _MAX_GREP_FILES_LISTED = 200
@@ -117,10 +113,11 @@ _TOOL_ENTRIES = [
      '"path": "<relative_path>?"} — ripgrep over the repo. `path` is '
      "optional and may be a single file OR a subdirectory. Pattern "
      "is a regex (rg's default syntax). Output format is "
-     "`<relative_path>:<lineno>:<content>` per hit, capped at "
-     f"{_MAX_GREP_HITS} lines and {_MAX_GREP_HITS_PER_FILE} per file; a "
-     "capped result ends with every matching file and its hit count, "
-     "so you can grep or read the ones not shown."),
+     "`<relative_path>:<lineno>:<content>` per hit, grouped by file, "
+     f"densest file first, {_MAX_GREP_HITS} lines in all shared across the "
+     "matching files. The first line gives the totals; a file cut short "
+     "ends with `(+N more in this file)`; files that got no line are "
+     "listed after with their hit counts, so you can grep or read them."),
     ('{"thought": "...", "tool": "cite", "file": "<relative_path>", '
      '"start_line": <int>, "end_line": <int>} — carry those lines into '
      "your answer VERBATIM. The tool copies them from the file and appends "
@@ -558,100 +555,122 @@ def _tool_grep(repo_root: Path, pattern: str,
         e = str(e).strip().lstrip("./").rstrip("/")
         if e:
             base += [f'--glob=!{e}', f'--glob=!{e}/**']
-    cmd = base + [
-        '--line-number',
-        '--with-filename',
-        '--no-heading',
-        f'--max-count={_MAX_GREP_HITS_PER_FILE}',
-        '--max-columns=300',
-        '--', pattern, str(target),
-    ]
+    # COVERAGE MUST BE KNOWABLE, AND THE BUDGET IS SHARED BY DISTRIBUTION.
+    # Two ripgrep passes. The count pass reads no content and returns every
+    # matching file with its hit count, so the number of files, the total
+    # hits and the distribution are known before a line is shown. The
+    # per-file limit L is then the largest number such that showing up to L
+    # lines from every matching file fits the _MAX_GREP_HITS line budget:
+    # one file with 189 hits gets 50 lines; sixteen files sharing 189 get
+    # about three each; more files than the budget get one line each for
+    # the densest _MAX_GREP_HITS files and the rest are listed by count.
+    # The listing pass runs with that limit. Output is grouped by file,
+    # files ordered by hit count descending then path (the same order in
+    # the trailer), so the reader sees the density gradient rather than
+    # ripgrep's walk order, and a tie at the cutoff is deterministic.
+    #
+    # THE CONTRACT, three states each marked only when true: a file whose
+    # lines carry no annotation is complete; a file ending "(+N more in
+    # this file)" was cut short by N; a file in the trailer got no line and
+    # its count is there. The header line gives the totals first. Agreed
+    # with Jill 2026-09-12 after the fixed five-per-file limit of 2026-09-11
+    # doubled the reviewer's time on single large files (a re-review of the
+    # 09-07 audit: 44 min against 22, same verdicts) — a fixed limit cannot
+    # know the distribution, so it starves concentrated results and drops
+    # files from spread ones. Before either, the first 50 lines in walk
+    # order were kept and the tail discarded with no record of which files
+    # it held: 46 capped greps in the ChatterMate audit of 2026-09-06, 12
+    # files visible on average, once a single file.
+    #
+    # Lines are capped at 300 characters by --max-columns, so the budget is
+    # at most ~15k characters, the exposure the primitive has always had.
+    # Latency is linear in the bytes of matching files, scanned twice.
+    count_cmd = base + ['--count', '--with-filename', '--', pattern, str(target)]
     try:
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=20.0,
-            check=False,
-        )
+        cproc = subprocess.run(count_cmd, capture_output=True, text=True,
+                               timeout=20.0, check=False)
     except subprocess.TimeoutExpired:
         return "ERROR: grep timed out (>20s) — narrow the pattern or scope"
     except Exception as e:
         return f"ERROR: grep failed to launch: {e}"
-    if proc.returncode == 1:
+    if cproc.returncode == 1:
         return f"EMPTY: no matches for pattern {pattern!r} in {path or '.'}"
-    if proc.returncode != 0:
+    if cproc.returncode != 0:
+        msg = (cproc.stderr or '').strip().splitlines()[:3]
+        return f"ERROR: grep returned {cproc.returncode}: " + ' | '.join(msg)
+    root_str = str(repo_root.resolve())
+
+    def _rel(p: str) -> str:
+        if p.startswith(root_str + '/'):
+            return p[len(root_str) + 1:]
+        if p.startswith(root_str):
+            return p[len(root_str):]
+        return p
+
+    counts: List[Tuple[str, int]] = []
+    for raw_line in (cproc.stdout or '').splitlines():
+        p, sep, n = raw_line.rpartition(':')
+        if sep and n.isdigit() and int(n) > 0:
+            counts.append((_rel(p), int(n)))
+    if not counts:
+        return f"EMPTY: no matches for pattern {pattern!r} in {path or '.'}"
+    counts.sort(key=lambda pn: (-pn[1], pn[0]))
+    hits_total = sum(n for _, n in counts)
+    limit = 0
+    for cand in range(max(n for _, n in counts), 0, -1):
+        if sum(min(n, cand) for _, n in counts) <= _MAX_GREP_HITS:
+            limit = cand
+            break
+    if limit == 0:
+        # More matching files than budget lines: one line each for the
+        # densest _MAX_GREP_HITS files, the rest in the trailer.
+        limit = 1
+        shown = counts[:_MAX_GREP_HITS]
+    else:
+        shown = counts
+    unshown = counts[len(shown):]
+
+    cmd = base + [
+        '--line-number',
+        '--with-filename',
+        '--no-heading',
+        f'--max-count={limit}',
+        '--max-columns=300',
+        '--', pattern, str(target),
+    ]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True,
+                              timeout=20.0, check=False)
+    except subprocess.TimeoutExpired:
+        return "ERROR: grep timed out (>20s) — narrow the pattern or scope"
+    except Exception as e:
+        return f"ERROR: grep failed to launch: {e}"
+    if proc.returncode not in (0, 1):
         msg = (proc.stderr or '').strip().splitlines()[:3]
         return f"ERROR: grep returned {proc.returncode}: " + ' | '.join(msg)
-    root_str = str(repo_root.resolve())
-    out_lines: List[str] = []
-    total = 0
+    by_file: Dict[str, List[str]] = {}
     for raw_line in (proc.stdout or '').splitlines():
         if not raw_line:
             continue
-        if raw_line.startswith(root_str + '/'):
-            raw_line = raw_line[len(root_str) + 1:]
-        elif raw_line.startswith(root_str):
-            raw_line = raw_line[len(root_str):]
-        out_lines.append(raw_line)
-        total += 1
-        if total >= _MAX_GREP_HITS:
-            break
-    if not out_lines:
-        return f"EMPTY: no matches for pattern {pattern!r} in {path or '.'}"
-    # COVERAGE MUST BE KNOWABLE. The lines above are the first
-    # _MAX_GREP_HITS in ripgrep's walk order, at most
-    # _MAX_GREP_HITS_PER_FILE per file, and the tail is gone. Until
-    # 2026-09-11 the observation ended with "capped — narrow the pattern",
-    # and the reader could not tell "I saw everything" from "28 more files
-    # match": in the ChatterMate audit 46 greps were capped, the 50 lines
-    # covered 12 files on average and once a single file, and 27 times the
-    # subagent went on to read or cite the partial view. For a claim of
-    # absence that truncates METHOD §8's `candidates` silently. So a second
-    # ripgrep call in count mode, same scope and excludes, lists every
-    # matching file with its hit count; count mode reads nothing and costs
-    # milliseconds. Nothing is appended when the listing was complete.
-    shown_files = {ln.split(':', 1)[0] for ln in out_lines}
-    counts: List[Tuple[str, int]] = []
-    if total >= _MAX_GREP_HITS or any(
-            sum(1 for ln in out_lines if ln.startswith(f + ':'))
-            >= _MAX_GREP_HITS_PER_FILE for f in shown_files):
-        try:
-            cproc = subprocess.run(
-                base + ['--count', '--with-filename', '--', pattern, str(target)],
-                capture_output=True, text=True, timeout=20.0, check=False)
-            for raw_line in (cproc.stdout or '').splitlines():
-                p, sep, n = raw_line.rpartition(':')
-                if not sep or not n.isdigit():
-                    continue
-                if p.startswith(root_str + '/'):
-                    p = p[len(root_str) + 1:]
-                elif p.startswith(root_str):
-                    p = p[len(root_str):]
-                counts.append((p, int(n)))
-        except Exception as e:                                   # noqa: BLE001
-            logger.warning(f"code_subagent: grep count pass failed: {e}")
-            out_lines.append(f"(grep capped at {_MAX_GREP_HITS} lines; the "
-                             f"count of matching files could not be taken: {e})")
-    if counts:
-        hits_total = sum(n for _, n in counts)
-        if hits_total > total:
-            counts.sort(key=lambda pn: (-pn[1], pn[0]))
-            unseen = sum(1 for p, _ in counts if p not in shown_files)
-            if total >= _MAX_GREP_HITS:
-                why = (f"capped at {_MAX_GREP_HITS} lines, "
-                       f"{_MAX_GREP_HITS_PER_FILE} per file")
-            else:
-                # Only the per-file cap bit: every matching file is above,
-                # some with hits beyond the five shown.
-                why = f"{_MAX_GREP_HITS_PER_FILE} hits per file shown"
+        line = _rel(raw_line)
+        file_part = line.split(':', 1)[0]
+        by_file.setdefault(file_part, []).append(line)
+
+    out_lines: List[str] = [f"{hits_total} hits across {len(counts)} file(s)"]
+    for p, n in shown:
+        lines = by_file.get(p, [])
+        out_lines.extend(lines)
+        if n > len(lines):
+            out_lines.append(f"(+{n - len(lines)} more in this file)")
+    if unshown:
+        out_lines.append(
+            f"({len(unshown)} matching file(s) not shown above, with hits:)")
+        for p, n in unshown[:_MAX_GREP_FILES_LISTED]:
+            out_lines.append(f"{p}  {n}")
+        if len(unshown) > _MAX_GREP_FILES_LISTED:
             out_lines.append(
-                f"({why}; {hits_total} hits in {len(counts)} file(s) in all, "
-                f"{hits_total - total} hits and {unseen} file(s) not shown "
-                f"above. Every matching file, with hits:)")
-            for p, n in counts[:_MAX_GREP_FILES_LISTED]:
-                out_lines.append(f"{p}  {n}")
-            if len(counts) > _MAX_GREP_FILES_LISTED:
-                out_lines.append(
-                    f"(pattern matches over {_MAX_GREP_FILES_LISTED} files; too "
-                    f"broad to enumerate, narrow the scope)")
+                f"(pattern matches over {_MAX_GREP_FILES_LISTED} files; too "
+                f"broad to enumerate, narrow the scope)")
     return 'OK: ' + "\n".join(out_lines)
 
 
