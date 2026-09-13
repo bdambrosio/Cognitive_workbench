@@ -17,7 +17,7 @@ print(json.dumps({
   "main_module": "worker.js",
   "compatibility_date": "2026-09-01",
   "bindings": [
-    {"type": "send_email", "name": "SEND", "destination_address": "bruce.dambrosio@gmail.com"},
+    {"type": "send_email", "name": "SEND", "destination_address": "info@tuuyi.com"},
     {"type": "secret_text", "name": "TURNSTILE_SECRET", "text": sys.argv[1]},
   ],
 }))
