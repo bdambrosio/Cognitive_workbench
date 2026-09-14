@@ -149,6 +149,16 @@ def test_replace_findings_swaps_only_the_wanted_claims():
     assert len(obj["findings"]) == 3
 
 
+def test_replace_findings_keeps_the_first_of_two_findings_for_one_claim():
+    obj = {"findings": [{"claim_id": 1, "adjudication": {"verdict": "real"}, "evidence": [{"form": "search"}]}]}
+    again = {"obj": {"findings": [
+        {"claim_id": 1, "adjudication": {"verdict": "real_with_caveat", "gap": "g"}, "evidence": [{"form": "citation"}, {"form": "citation"}]},
+        {"claim_id": 1, "adjudication": {"verdict": "real_with_caveat", "gap": "see above"}, "evidence": [{"form": "citation"}],
+         "correction": "Superseded by the first finding for claim 1; this entry is withdrawn"}]}}
+    assert replace_findings(obj, again, wanted={1}) == 1
+    assert obj["findings"][0]["adjudication"]["gap"] == "g" and len(obj["findings"][0]["evidence"]) == 2
+
+
 def test_replace_findings_keeps_the_readjudication_questions_and_incompletion():
     obj = {"findings": [{"claim_id": 1, "adjudication": {"verdict": "unverifiable"}}],
            "questions": ["q0"], "unclaimed": [{"note": "u0", "evidence": {}}]}

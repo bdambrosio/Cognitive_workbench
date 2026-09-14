@@ -724,9 +724,21 @@ def replace_findings(obj: Dict[str, Any], again: Dict[str, Any],
     replace, and a batch that could not be attempted must not vanish into a
     clean run. Returns how many findings were replaced."""
     fresh_obj = again.get("obj") or {}
-    fresh = {f.get("claim_id"): f
-             for f in (fresh_obj.get("findings") or [])
-             if f.get("claim_id") in wanted}
+    # FIRST ONE WINS. A re-adjudication that emits two findings for one claim
+    # writes the finding first and a withdrawn stub second ("superseded by
+    # the first finding", one-pager hand-back, 2026-09-14). Keyed last-wins,
+    # the stub replaced the finding and the re-review failed it.
+    fresh: Dict[Any, Dict[str, Any]] = {}
+    for f in (fresh_obj.get("findings") or []):
+        cid = f.get("claim_id")
+        if cid not in wanted:
+            continue
+        if cid in fresh:
+            logger.warning("re-adjudication emitted a second finding for claim %s; "
+                           "keeping the first, dropping: %s", cid,
+                           str(f.get("correction") or f.get("adjudication"))[:120])
+            continue
+        fresh[cid] = f
     n = 0
     for i, f in enumerate(obj.get("findings") or []):
         if f.get("claim_id") in fresh:
