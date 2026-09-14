@@ -672,6 +672,31 @@ def chase_message(todo: Dict[Any, List[str]],
     return "\n".join(lines)
 
 
+def search_kind_message(todo: Dict[Any, Dict[str, Any]],
+                        frozen: Sequence[Dict[str, Any]]) -> str:
+    """The gathering leg that performs the search kind a finding lacks.
+    METHOD §8 requires both kinds for a finding that rests on searches."""
+    quotes = {c.get("id"): c.get("quote") for c in frozen}
+    what = {"lexical": "a lexical search: terms taken from the claim itself, "
+                       "with reasonable stems and variants, over every place "
+                       "the material could occur",
+            "structural": "a structural search: inspect the directory, module "
+                          "or document set where the material would "
+                          "reasonably appear"}
+    lines = ["These claims rest on searches, and the finding for each records "
+             "only one of the two kinds METHOD \u00a78 requires. Perform the "
+             "kind named below for each claim with inspect_external, aimed at "
+             "that claim's subject, naming the claim id in the request's "
+             "`claims` field; open every file the search names. Do not write "
+             "findings; end the leg with `yield` or `respond` when the "
+             "searches are done.", ""]
+    for cid in sorted(todo, key=lambda x: (x is None, x)):
+        lines.append(f"  claim {cid}. {quotes.get(cid)}")
+        for k in todo[cid].get("missing") or []:
+            lines.append(f"      missing: {what.get(k, k)}")
+    return "\n".join(lines)
+
+
 def untagged_message(ids: Sequence[int], frozen: Sequence[Dict[str, Any]]) -> str:
     """The gathering leg for claims no evidence request was filed under.
     METHOD §12 step 3: a claim is adjudicated on the requests filed under it
@@ -1286,7 +1311,8 @@ def main() -> int:
     emission: Optional[Dict[str, Any]] = None
     frozen: list = []
     chase: Dict[str, Any] = {"passes": [], "unopened_after": [],
-                             "untagged_passes": [], "untagged_after": []}
+                             "untagged_passes": [], "untagged_after": [],
+                             "kind_passes": [], "missing_kind_after": []}
     batch_log: List[Dict[str, Any]] = []
     traces_dir = REPO / "scenarios" / args.world / name / "inspect_traces"
     # ONE CLAIM SOURCE PER RUN, chosen from the engagement's list; a second
@@ -1596,6 +1622,83 @@ def main() -> int:
                     logger.info("reprompt recovered %d of %d",
                                 len(keep), len(missing))
 
+            # THE SEARCH-KIND CHASE (METHOD §8, added 2026-09-13). A finding
+            # that rests on searches and records one kind of the two is a
+            # defect the output check has flagged since 2026-09-05 and the
+            # runner then recorded and ignored. Over three chhoto runs on one
+            # harness it flagged eleven findings and nine of them failed the
+            # review's search-adequacy question. Same shape as the candidate
+            # chase below: one gathering leg names the claims and the kind
+            # each lacks, then only those claims are adjudicated again over
+            # the enlarged record. Two passes at most; it also stops when a
+            # leg filed no new evidence request or re-adjudicated nothing.
+            # It runs first because a new search names candidates, which the
+            # candidate chase then opens.
+            if not error and emission and emission.get("obj"):
+                about = {c.get("id"): c.get("about") for c in frozen}
+                while len(legs) < args.max_turns and len(chase["kind_passes"]) < 2:
+                    todo = schemas.missing_search_kinds(
+                        emission["obj"].get("findings") or [], about)
+                    if not todo:
+                        break
+                    before = len(evidence_traces(traces_dir))
+                    leg_no = len(legs) + 1
+                    logger.warning("search-kind chase pass %d: %d finding(s) "
+                                   "record one search kind — gathering leg %d",
+                                   len(chase["kind_passes"]) + 1, len(todo),
+                                   leg_no)
+                    exit_reason, _ = drive_leg(
+                        loop, name, args.world, leg_no,
+                        search_kind_message(todo, frozen),
+                        "search-kind chase: perform the missing search",
+                        concern_log, legs)
+                    filed = len(evidence_traces(traces_dir)) - before
+                    entry = {"leg": leg_no, "claims": sorted(todo),
+                             "missing": {str(c): todo[c]["missing"] for c in todo},
+                             "requests_filed": filed,
+                             "exit_reason": exit_reason, "readjudicated": 0}
+                    chase["kind_passes"].append(entry)
+                    if exit_reason in ("llm_error", "crashed"):
+                        error = (f"search-kind chase leg {leg_no} ended "
+                                 f"{exit_reason} — run is not valid")
+                        break
+                    if not filed:
+                        logger.warning("search-kind chase pass filed no "
+                                       "request — stopping")
+                        break
+                    todo_ids = sorted(todo, key=lambda x: (x is None, x))
+                    again = adjudicate(
+                        todo_ids,
+                        note=("These claims rest on searches, and each "
+                              "finding recorded one of the two search kinds "
+                              "METHOD \u00a78 requires. The missing kind has "
+                              "since been performed and its request is in "
+                              "the evidence below. Adjudicate these claims "
+                              "again, recording both searches as `search` "
+                              "items with what was performed, what came "
+                              "back and the candidates named. The "
+                              "adjudication each carries now:\n\n"
+                              + previous_adjudications(emission["obj"], todo_ids)
+                              + "\n\nWhere the verdict or the disposition "
+                                "changes, say in `correction` what changed "
+                                "and why, in one line (METHOD \u00a710)."))
+                    entry["parse"] = again["parse"]
+                    entry["finish"] = again["finish"]
+                    entry["readjudicated"] = replace_findings(
+                        emission["obj"], again, set(todo))
+                    logger.info("search-kind chase pass: re-adjudicated %d of %d",
+                                entry["readjudicated"], len(todo))
+                    if entry["readjudicated"] == 0:
+                        break
+                chase["missing_kind_after"] = sorted(
+                    schemas.missing_search_kinds(
+                        emission["obj"].get("findings") or [], about),
+                    key=lambda x: (x is None, x))
+                if chase["missing_kind_after"]:
+                    logger.warning("%d finding(s) still record one search "
+                                   "kind: %s", len(chase["missing_kind_after"]),
+                                   ", ".join(str(c) for c in chase["missing_kind_after"]))
+
             # THE CHASE (METHOD §8). A finding whose searches named a file the
             # run never opened — an `unverifiable` one, or a claim of absence
             # resting on its searches — is not settled by the materials; it
@@ -1742,6 +1845,12 @@ def main() -> int:
                     text=f"{len(chase['untagged_after'])} claim(s) had no "
                          f"evidence request filed under them after the chase: "
                          + ", ".join(str(c) for c in chase["untagged_after"]),
+                    severity="check")
+    if chase["missing_kind_after"]:
+        issues.note(out, stage="claims_audit", code="one_search_kind",
+                    text=f"{len(chase['missing_kind_after'])} finding(s) "
+                         f"record one search kind after the chase: "
+                         + ", ".join(str(c) for c in chase["missing_kind_after"]),
                     severity="check")
     if chase["unopened_after"]:
         issues.note(out, stage="claims_audit", code="not_examined",
@@ -1914,7 +2023,9 @@ def main() -> int:
           f"findings={fig.get('findings')}, verdicts={fig.get('verdicts')}")
     print(f"output check: {'clean' if checks['ok'] else str(len(checks['problems'])) + ' problem(s)'}")
     print(f"chase: {len(chase['passes'])} pass(es), "
-          f"{len(chase['unopened_after'])} file(s) named and not opened")
+          f"{len(chase['unopened_after'])} file(s) named and not opened; "
+          f"search-kind chase: {len(chase['kind_passes'])} pass(es), "
+          f"{len(chase['missing_kind_after'])} finding(s) still short a kind")
     print(f"deliverables: {out}/claims.json, findings.json")
     print(f"meta: {out / 'run_meta.json'}")
     # EXIT CODE: 0 when the run completed, whatever the check found; 1 when

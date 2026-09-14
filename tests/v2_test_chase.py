@@ -354,3 +354,51 @@ def test_a_binary_candidate_is_present_but_not_readable(tmp_path):
     ok = _unv(7, "present_but_not_readable", ["wordpress/plugin.zip"])
     res = sch.check_output({"findings": [ok]}, corpus, "c.md", [{"id": 7}], read={"app/a.py"})
     assert not any("candidate" in p for p in res["problems"])
+
+
+def test_missing_search_kinds_names_the_kind_each_finding_lacks():
+    # 2026-09-13: the rule the output check applied and the runner ignored,
+    # now one helper for both the check and the search-kind chase.
+    from workflowsv2.claims_audit.runner import search_kind_message
+    lex = {"form": "search", "kind": "lexical", "performed": "p", "result": "r",
+           "candidates": []}
+    stru = dict(lex, kind="structural")
+    cite = {"form": "citation", "document": "app/a.py", "lines": [1, 1],
+            "quote": "x = 1", "shows": "s"}
+    fs = [{"claim_id": 1, "adjudication": {"verdict": "unverifiable",
+                                           "unresolved_because": "not_in_the_materials"},
+           "evidence": [lex]},                                   # lacks structural
+          {"claim_id": 2, "adjudication": {"verdict": "unverifiable",
+                                           "unresolved_because": "not_in_the_materials"},
+           "evidence": [lex, stru]},                             # complete
+          {"claim_id": 3, "adjudication": {"verdict": "unverifiable",
+                                           "unresolved_because": "outside_the_materials"},
+           "evidence": [stru]},                                  # about the seller: exempt
+          {"claim_id": 4, "adjudication": {"verdict": "real"},
+           "evidence": [stru]},                                  # absence on searches, lacks lexical
+          {"claim_id": 5, "adjudication": {"verdict": "real"},
+           "evidence": [stru, cite]},                            # a citation: not resting on searches
+          {"claim_id": 6, "adjudication": {"verdict": "unverifiable",
+                                           "unresolved_because": "not_in_the_materials"},
+           "evidence": []}]                                      # no search at all
+    about = {1: "target", 2: "target", 3: "seller", 4: "target", 5: "target", 6: "document"}
+    out = sch.missing_search_kinds(fs, about)
+    assert out == {1: {"verdict": "unverifiable", "missing": ["structural"]},
+                   4: {"verdict": "real", "missing": ["lexical"]},
+                   6: {"verdict": "unverifiable", "missing": ["lexical", "structural"]}}
+    # the check reports the same findings, in its own words
+    frozen = [{"id": i, "about": about[i]} for i in about]
+    kind_lines = [p for p in sch.check_output({"findings": fs}, Path("."), "c.md", frozen)["problems"]
+                  if "needs a lexical and a structural" in p]
+    assert kind_lines == [
+        "finding 1: `unverifiable` needs a lexical and a structural search (METHOD §8); missing structural",
+        "finding 4: verdict 'real' rests on searches and needs a lexical and a structural one (METHOD §8); missing lexical",
+        "finding 6: `unverifiable` needs a lexical and a structural search (METHOD §8); missing lexical, structural"]
+    # the leg names each claim by its quote and says what the missing kind is
+    msg = search_kind_message(out, [{"id": 1, "quote": "no telemetry"},
+                                    {"id": 4, "quote": "never writes to disk"},
+                                    {"id": 6, "quote": "documented"}])
+    assert "claim 1. no telemetry" in msg and "missing: a structural search" in msg
+    assert "claim 4. never writes to disk" in msg and "missing: a lexical search" in msg
+    assert msg.index("claim 1.") < msg.index("claim 4.") < msg.index("claim 6.")
+    assert "Do not write findings" in msg

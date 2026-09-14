@@ -711,6 +711,42 @@ def doc_excluded(key: Optional[str], excludes: Optional[Sequence[str]]) -> bool:
     return False
 
 
+def missing_search_kinds(findings: Sequence[Dict[str, Any]],
+                         about: Dict[Any, Any]) -> Dict[Any, Dict[str, Any]]:
+    """METHOD §8's two-search rule, per finding that rests on searches.
+
+    Returns `{claim_id: {"verdict": v, "missing": [kinds]}}` for every finding
+    that needs both search kinds and records fewer: an `unverifiable` finding
+    on a claim about the target or a document (a claim about the seller is
+    exempt: the materials usually cannot reach it, Bruce 2026-09-06), and a
+    finding of any other verdict whose evidence is searches and no citation,
+    which is a claim of absence resting on its searches. One rule for the
+    output check and for the chase that repairs it (2026-09-13): the check
+    flagged 11 such findings across three runs and 9 of them failed the
+    review's search-adequacy question, while the runner did nothing with the
+    flag.
+    """
+    out: Dict[Any, Dict[str, Any]] = {}
+    for f in findings:
+        if not isinstance(f, dict):
+            continue
+        adj = f.get("adjudication") or {}
+        ev = [e for e in (f.get("evidence") or []) if isinstance(e, dict)]
+        v = adj.get("verdict")
+        cid = f.get("claim_id")
+        searches = [e for e in ev if e.get("form") == "search"]
+        if v == "unverifiable":
+            if about.get(cid) == "seller":
+                continue
+        elif not searches or any(e.get("form") == "citation" for e in ev):
+            continue
+        kinds = {e.get("kind") for e in searches}
+        missing = [k for k in SEARCH_KINDS if k not in kinds]
+        if missing:
+            out[cid] = {"verdict": v, "missing": missing}
+    return out
+
+
 def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
                  frozen: Sequence[Dict[str, Any]],
                  read: Optional[set] = None,
@@ -817,6 +853,7 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
                                  view.get("binary_skipped") or ())
     not_examined = 0
     unopened = sorted({k for c in candidates.values() for k in c["unopened"]})
+    short_of_a_kind = missing_search_kinds(findings, about)
     for i, f in enumerate(findings, 1):
         w = f"finding {i}"
         adj = f.get("adjudication") or {}
@@ -846,17 +883,10 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
             if because not in UNRESOLVED_BECAUSE:
                 problems.append(f"{w}: `unverifiable` requires "
                                 f"`unresolved_because` (METHOD §8)")
-            kinds = {e.get("kind") for e in ev
-                     if isinstance(e, dict) and e.get("form") == "search"}
-            missing = [k for k in SEARCH_KINDS if k not in kinds]
-            # A claim about the seller — a stated intent, a hosted service —
-            # is one METHOD §5 says the materials usually cannot reach, and
-            # searching a repository for "I will fix every bug" records
-            # nothing. The searches are not required there (Bruce,
-            # 2026-09-06, on the chhoto smoke test: four of eleven flagged
-            # findings were of this kind). Required as before for a claim
-            # about the target or a document.
-            if missing and about.get(cid) != "seller":
+            # Both search kinds, except for a claim about the seller:
+            # `missing_search_kinds` says which and why.
+            missing = (short_of_a_kind.get(cid) or {}).get("missing") or []
+            if missing:
                 problems.append(f"{w}: `unverifiable` needs a lexical and a "
                                 f"structural search (METHOD §8); missing "
                                 f"{', '.join(missing)}")
@@ -900,9 +930,7 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
                 any(isinstance(e, dict) and e.get("form") == "search" for e in ev):
             # A claim of absence holds on its searches: both kinds, and only
             # once every candidate is opened (METHOD §8).
-            kinds = {e.get("kind") for e in ev
-                     if isinstance(e, dict) and e.get("form") == "search"}
-            missing = [k for k in SEARCH_KINDS if k not in kinds]
+            missing = (short_of_a_kind.get(cid) or {}).get("missing") or []
             if missing:
                 problems.append(f"{w}: verdict {v!r} rests on searches and "
                                 f"needs a lexical and a structural one "
