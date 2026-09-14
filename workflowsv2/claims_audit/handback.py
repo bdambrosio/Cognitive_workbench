@@ -13,7 +13,10 @@ requests filed under the claims, the previous adjudication in view, and a
 note. The note names the LOCATION the review pointed at and nothing else. The
 review's reading of what the lines mean stays out of the prompt, so the
 auditor judges the lines rather than answering the reviewer (Bruce,
-2026-09-12).
+2026-09-12). Lines that do not bear on the claim are left uncited: a citation
+whose `shows` says it does no work fails the review's relevance check, and the
+note that asked for such citations cost one held finding in two of three runs
+(kind1 claim 44, kind3 claim 38, 2026-09-14).
 
 WHY A NEW RUN DIRECTORY. The audit has finished when the review finds the
 hits, and its findings.json is the record the review judged. The rewritten
@@ -63,9 +66,9 @@ def note_for(obj: Dict[str, Any], hits: List[Dict[str, Any]], ids: List[int]) ->
              "and that the finding does not cite. Nothing new has been "
              "gathered. Adjudicate these claims again on the evidence "
              "below. For each, either cite the lines named and give the "
-             "verdict METHOD §6 requires with them cited, or cite them "
-             "and say in `shows` why they do not bear on the claim. The "
-             "adjudication each carries now:", "",
+             "verdict METHOD §6 requires with them cited, or, if the lines "
+             "named do not bear on the claim, leave them uncited and return "
+             "the finding unchanged. The adjudication each carries now:", "",
              audit.previous_adjudications(obj, ids), "",
              "The lines the review named, per claim:"]
     for cid in ids:
