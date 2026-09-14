@@ -165,6 +165,19 @@ def test_surface_comment_edit_and_freeze(env):
     assert c.post("/p/surface/e1/api/draft" + _as(PRACTICE), json={"source": "README.md", "claims": claims}).status_code == 400
     assert c.post("/p/surface/e1/api/freeze" + _as(PRACTICE), json={"source": "README.md"}).status_code == 400
     assert c.get("/e/e1/surface/api" + _as(CLIENT)).json()["sources"][0]["origin"] == "frozen"
+    # the practice unfreezes for a rerun: the frozen file is archived, the draft is back, edits are allowed again
+    st.set_stage(root / "e1", "chain", "done", PRACTICE)
+    assert c.post("/p/surface/e1/api/unfreeze" + _as(CLIENT), json={"source": "README.md"}).status_code == 403
+    r = c.post("/p/surface/e1/api/unfreeze" + _as(PRACTICE), json={"source": "README.md"})
+    assert r.status_code == 200 and r.json()["frozen"] is False and r.json()["origin"] == "draft"
+    assert not jobs.surface_file(root / "e1", "README.md").is_file()
+    archived = list((root / "e1" / st.SURFACE).glob("archive_*/readme_md.surface.json"))
+    assert len(archived) == 1 and json.loads(archived[0].read_text()) == frozen
+    assert st.stage_value(root / "e1", "surface") == "draft"
+    assert st.stage_value(root / "e1", "chain") == "superseded"
+    assert c.post("/p/surface/e1/api/unfreeze" + _as(PRACTICE), json={"source": "README.md"}).status_code == 400
+    assert c.post("/p/surface/e1/api/draft" + _as(PRACTICE), json={"source": "README.md", "claims": claims}).status_code == 200
+    assert c.post("/p/surface/e1/api/freeze" + _as(PRACTICE), json={"source": "README.md"}).status_code == 200
 
 
 def test_practice_buttons_jobs_and_the_lock(env, tmp_path):

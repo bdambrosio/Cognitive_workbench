@@ -61,6 +61,8 @@
     if (ed) h += '<div class="actions"><button class="quiet addClaim" data-slug="' + esc(src.slug) + '">add a claim</button> '
       + '<button class="save" data-source="' + esc(src.source) + '">Save draft</button> '
       + '<button class="freeze" data-source="' + esc(src.source) + '">Freeze</button></div>';
+    else if (editable && src.frozen) h += '<div class="actions"><button class="quiet unfreeze" data-source="' + esc(src.source)
+      + '" title="make the surface editable again before a rerun">Unfreeze</button></div>';
     return h + "</div>";
   }
 
@@ -125,6 +127,14 @@
         if (!saved) return;
         const j = await api("api/freeze", {source: src.source});
         if (j) { data.sources = data.sources.map((s) => s.source === j.source ? j : s); render(); }
+      });
+    }
+    for (const b of document.querySelectorAll("button.unfreeze")) {
+      b.addEventListener("click", async () => {
+        const src = data.sources.find((s) => s.source === b.dataset.source);
+        if (!confirm("Unfreeze the surface for " + src.source + "? It becomes a draft again; freeze it before the rerun.")) return;
+        const j = await api("api/unfreeze", {source: src.source});
+        if (j) { data.sources = data.sources.map((s) => s.source === j.source ? j : s); render(); $("msg").textContent = "unfrozen; the frozen file is archived"; }
       });
     }
   }

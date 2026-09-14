@@ -14,8 +14,8 @@ engagements whose `seller_emails` name it. Nothing else answers.
 THE STAGES. A client's engagement home lists the ten stages of the
 engagement (workflowsv2/engagement_state.STAGES) with the current one
 marked and one line saying what is waiting on whom. The practice page has
-the buttons: materials ready, enumerate, freeze the surface, run the
-chain, release, close. A job runs as a subprocess (src/client_ui/jobs.py),
+the buttons: materials ready, enumerate, freeze the surface, unfreeze it
+for a rerun, run the chain, release, close. A job runs as a subprocess (src/client_ui/jobs.py),
 one at a time per engagement; the practice is mailed when it ends.
 
 THE CONVERSATIONS. The intake and the post-delivery page are the same
@@ -27,6 +27,10 @@ is mounted twice, under /e/<e>/intake/ and /e/<e>/report/.
 THE SURFACE. After enumeration the client reads the claim surface and
 comments on any claim; the practice edits and freezes it. The frozen file
 is in claims.json shape, which is what the audit runner's --surface reads.
+To rerun with a changed surface the practice unfreezes it: the frozen file
+moves to surface/archive_<ts>/ and becomes the draft again, and a chain
+that had finished is marked superseded so the chain button comes back.
+Refused while a job is running, because an audit reads the frozen file.
 
 THE MATERIALS. The seller (or the practice) uploads, arranges and deletes
 the files under the engagement's target/ on /e/<e>/materials/
@@ -208,6 +212,31 @@ def freeze(eng_dir: Path, source: str, by: str) -> bool:
     if all_frozen:
         state.set_stage(eng_dir, "surface", "frozen", by)
     return all_frozen
+
+
+def unfreeze(eng_dir: Path, source: str, by: str) -> None:
+    """Undo freeze for one source so the practice can edit and freeze again
+    before a rerun. The frozen file is kept under surface/archive_<ts>/ (a
+    run that used it has its own copy in claims.json; this is for the
+    practice's record) and its claims become the draft, replacing any draft
+    left from before the freeze. The surface stage goes back to "draft"; a
+    chain marked done is marked superseded so the practice page offers the
+    rerun. Refused while a job is running: an audit reads the frozen file."""
+    paths = _surface_paths(eng_dir, source)
+    if not paths["frozen"].is_file():
+        raise SystemExit(f"the surface for {source} is not frozen")
+    running = state.running_job(eng_dir)
+    if running:
+        raise SystemExit(f"a job is running ({running['id']}): unfreeze when it ends")
+    archive = paths["frozen"].parent / f"archive_{state.stamp()}"
+    archive.mkdir(exist_ok=True)
+    text = paths["frozen"].read_text(encoding="utf-8")
+    (archive / paths["frozen"].name).write_text(text, encoding="utf-8")
+    paths["draft"].write_text(text, encoding="utf-8")
+    paths["frozen"].unlink()
+    state.set_stage(eng_dir, "surface", "draft", by)
+    if state.stage_value(eng_dir, "chain") == "done":
+        state.set_stage(eng_dir, "chain", "superseded", by)
 
 
 # ---- request bodies -----------------------------------------------------------
@@ -910,6 +939,15 @@ def make_site_app(access: Access, model: Optional[Path] = None,
             mail.send(state.client_emails(eng_dir), f"Tuuyi: the claim surface for {name} is frozen",
                       "The list of claims to be tested is settled. The review runs next; "
                       "you will hear when the report is released.", _link(name))
+        return JSONResponse(surface_for(eng_dir, body.source))
+
+    @app.post("/p/surface/{name}/api/unfreeze")
+    async def practice_surface_unfreeze(name: str, body: Source, request: Request):
+        email = _practice(request)
+        eng_dir = _eng(name)
+        if body.source not in state.claim_sources(eng_dir):
+            raise HTTPException(status_code=400, detail="no such claim source")
+        _act(unfreeze, eng_dir, body.source, email)
         return JSONResponse(surface_for(eng_dir, body.source))
 
     return app
