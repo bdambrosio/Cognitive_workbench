@@ -17,7 +17,8 @@ _SRC_DIR = os.path.dirname(_THIS_DIR)
 if _SRC_DIR not in sys.path:
     sys.path.insert(0, _SRC_DIR)
 
-from chat.concerns import _AGENT_CONCERN_FIRE_THRESHOLD  # noqa: E402
+from chat.concerns import (  # noqa: E402
+    _AGENT_CONCERN_FIRE_THRESHOLD, _AGENT_CONCERN_POPULATION_CAP)
 from chat.memories import _MEMORY_CATEGORIES  # noqa: E402
 
 logger = logging.getLogger('chat_loop')
@@ -356,13 +357,24 @@ class PromptsMixin:
             # Reporting a growth/bump split would mean inventing it, so what is
             # shown instead is `last_bumped_at`, which is stored and does say
             # whether evidence has touched this concern recently.
+            # The two aggregate figures Jill asked for (2026-09-14): the
+            # non-seed count against the population cap, and every unshown
+            # activation. Both come from `_all_active`, already in hand; no
+            # further pass over the store. The cap counts non-seed concerns
+            # only (seeds are exempt), so the count is taken over all active
+            # concerns, not the visible slice. The unshown list is bounded
+            # by total_active, which is the cap plus the seeds.
             try:
                 _all_active = self._iter_active_agent_concerns()
                 total_active = len(_all_active)
                 below = sorted((a for _n, _nt, a in _all_active),
                                reverse=True)[len(agent_concerns):]
-            except Exception:
-                total_active, below = len(agent_concerns), []
+                nonseed_active = sum(
+                    1 for _n, _nt, _a in _all_active
+                    if not (_nt.get('properties') or {}).get('seed'))
+            except Exception as e:
+                logger.warning(f"agent concern trailer: store read failed: {e}")
+                total_active, below, nonseed_active = len(agent_concerns), [], None
             ac_lines: List[str] = []
             for _rank, (_nid, text, activation, props) in enumerate(agent_concerns, 1):
                 tags = []
@@ -443,8 +455,14 @@ class PromptsMixin:
                 f"{autonomy_line}\n\n"
                 + "\n".join(ac_lines)
                 + (f"\n\nShowing {len(agent_concerns)} of {total_active} "
-                   f"active. Highest not shown: {below[0]:.2f}."
+                   f"active. Not shown: "
+                   + ", ".join(f"{a:.2f}" for a in below) + "."
                    if below else "")
+                + (("\n" if below else "\n\n")
+                   + f"Non-seed {nonseed_active} / cap "
+                   f"{_AGENT_CONCERN_POPULATION_CAP} (seeds are exempt "
+                   f"from the cap)."
+                   if nonseed_active is not None else "")
             )
         # Fire digest: pending autonomous fires being surfaced this turn
         # (set at user-turn entry in _process_user_turn; empty on
