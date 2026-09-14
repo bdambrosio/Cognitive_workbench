@@ -1337,9 +1337,14 @@ def main() -> int:
             logger.info("phase 1: enumerating %s in %d section(s)",
                         src_doc.name, len(sections))
         parts, calls, raws = [], [], []
-        assembled: Dict[str, Any] = {"claim_source": src_doc.name, "claims": []}
+        # The record names the claim source by its path from the target
+        # root, as engagement.yaml does: every later stage joins it to the
+        # target. A bare filename found the document only while the claim
+        # source sat at the root (2026-09-14, docs/acquirer/one_pager.md).
+        assembled: Dict[str, Any] = {"claim_source": claim_source, "claims": []}
         if args.surface:
             assembled = json.loads(Path(args.surface).read_text(encoding="utf-8"))
+            assembled["claim_source"] = claim_source
             parts = [assembled]
         for n, sec in enumerate(sections, 1):
             part = emit_surface(loop, method_text, src_doc, sec, n,
@@ -1359,7 +1364,7 @@ def main() -> int:
                          f"(finish={part['finish']}): {part['parse_error']}")
                 break
             parts.append(part["obj"])
-            assembled = schemas.assemble_surface(src_doc.name, parts)
+            assembled = schemas.assemble_surface(claim_source, parts)
         surface = {"raw": "\n\n".join(raws),
                    "obj": assembled if parts else None,
                    "parse": max((c["parse"] for c in calls), default=None,

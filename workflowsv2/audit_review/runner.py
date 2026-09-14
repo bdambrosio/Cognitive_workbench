@@ -94,6 +94,8 @@ def unclaimed_spans(claims: Sequence[Dict[str, Any]],
     not a missed claim, and leaving them in buries the real gaps.
     """
     if not src.is_file():
+        logger.warning("unclaimed spans: claim source %s is not in the materials; "
+                       "reporting none", src)
         return []
     lines = src.read_text(encoding="utf-8", errors="replace").splitlines()
     covered = set()
