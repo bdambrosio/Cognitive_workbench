@@ -186,6 +186,7 @@ def test_scrub_guidance_is_the_practice_s(env):
     assert c.get("/p/guidance/api" + _as(CLIENT)).status_code == 403
     r = c.get("/p/guidance/" + _as(PRACTICE))
     assert r.status_code == 200 and "guidance.js" in r.text
+    assert 'href="/p/guidance/"' in c.get("/p/" + _as(PRACTICE)).text
     r = c.get("/p/guidance/api" + _as(PRACTICE))
     assert r.status_code == 200 and r.text.startswith("# Scrubbing the claim surface")
     assert "Claims about behaviour" in r.text
