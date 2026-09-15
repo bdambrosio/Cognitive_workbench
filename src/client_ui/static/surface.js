@@ -45,7 +45,7 @@
       const cm = byClaim[String(c.id)] || [];
       h += '<tr data-src="' + esc(src.slug) + '" data-id="' + esc(c.id) + '">'
         + '<td class="id">' + esc(c.id) + (c.about === "seller" ? '<div class="muted">seller</div>' : c.about === "document" ? '<div class="muted">document</div>' : "")
-          + (c.implied_by != null ? '<div class="muted">implied by ' + esc(c.implied_by) + "</div>" : "")
+          + (c.implied_by != null ? '<div class="muted">implied by ' + esc(c.implied_by) + (c.property ? ": " + esc(c.property) : "") + "</div>" : "")
           + ((c.declined || []).length ? '<div class="declined">not decomposed: ' + c.declined.map((d) => esc(d.text) + " (" + esc(d.why) + ")").join("; ") + "</div>" : "") + "</td>"
         + '<td class="lines mono"' + (ed ? ' contenteditable="true"' : "") + ">" + esc((c.lines || []).join("–")) + "</td>"
         + '<td class="quote"' + (ed ? ' contenteditable="true"' : "") + ">" + esc(c.quote) + "</td>"

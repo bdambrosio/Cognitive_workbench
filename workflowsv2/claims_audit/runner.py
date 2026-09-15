@@ -83,7 +83,7 @@ logger.setLevel(logging.INFO)
 # `schemas.py` holds the contract and the reason; this file only drives it.
 from chat.workflow import load_workflow                          # noqa: E402
 from workflowsv2 import issues                                    # noqa: E402
-from workflowsv2.claims_audit import schemas                     # noqa: E402
+from workflowsv2.claims_audit import behaviour_split, schemas    # noqa: E402
 from workflowsv2.emit import emit                                 # noqa: E402
 
 # The brief lives with its engagement, in engagements/<name>/brief.md — it is
@@ -1198,6 +1198,11 @@ def main() -> int:
     ap.add_argument("--enumerate-only", action="store_true",
                     help="stop after the claim surface is frozen: no gathering "
                          "legs, no adjudication. For comparing enumerations")
+    ap.add_argument("--no-behaviour-split", action="store_true",
+                    help="skip the pass that splits a claim about behaviour "
+                         "into a mechanism claim and a behaviour claim after "
+                         "enumeration (BEHAVIOUR_SPLIT.md). For comparing "
+                         "surfaces with and without it")
     ap.add_argument("--evidence-budget", type=int, default=EVIDENCE_BUDGET,
                     help="characters of evidence traces handed to each "
                          "adjudication call (default %(default)s); over it, "
@@ -1377,6 +1382,33 @@ def main() -> int:
                 break
             parts.append(part["obj"])
             assembled = schemas.assemble_surface(claim_source, parts)
+        # ---- split claims about behaviour, before the freeze -------------
+        # A claim that says what the software does when it runs becomes a
+        # mechanism claim and a behaviour claim (BEHAVIOUR_SPLIT.md). Only an
+        # enumerated surface: an edited one is the practice's, and the pass
+        # ran when it was enumerated. A section whose call fails keeps its
+        # claims as enumerated, and the run record says so.
+        split_record: Dict[str, Any] = {"ran": False, "calls": [], "applied": []}
+        if not error and parts and not args.surface and not args.no_behaviour_split:
+            split_record["ran"] = True
+            src_lines = src_doc.read_text(encoding="utf-8", errors="replace").splitlines()
+            for n, (lo, hi) in enumerate(sections, 1):
+                body = "\n".join(f"{k}|{t}" for k, t in enumerate(src_lines[lo - 1:hi], lo))
+                in_section = [c for c in assembled["claims"]
+                              if c.get("lines") and lo <= int(c["lines"][0]) <= hi]
+                res = behaviour_split.propose(loop.backend, body, in_section)
+                applied = behaviour_split.apply(assembled["claims"], res["splits"])
+                split_record["calls"].append({"section": [lo, hi], "parse": res["parse"],
+                                              "parse_error": res["parse_error"],
+                                              "proposed": len(res["splits"])})
+                split_record["applied"] += applied
+                logger.info("behaviour split, section %d/%d: %d split(s), parse=%s",
+                            n, len(sections), len(applied), res["parse"])
+                if res["parse"] not in (None, "parsed", "repaired"):
+                    issues.note(out, stage="claims_audit", code="behaviour_split",
+                                text=f"section {n} lines {lo}-{hi}: the split call did not "
+                                     f"parse ({res['parse_error']}); its claims stand as "
+                                     f"enumerated", severity="check")
         surface = {"raw": "\n\n".join(raws),
                    "obj": assembled if parts else None,
                    "parse": max((c["parse"] for c in calls), default=None,
@@ -1389,6 +1421,7 @@ def main() -> int:
                        {d for c in calls for d in c["response_format_dropped"]}),
                    "sections": [list(sec) for sec in sections],
                    "surface_source": "edited" if args.surface else "enumerated",
+                   "behaviour_split": split_record,
                    "calls": calls, "phase": "surface"}
         if not error:
             frozen = assembled.get("claims") or []

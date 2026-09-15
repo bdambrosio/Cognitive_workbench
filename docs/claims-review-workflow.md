@@ -46,8 +46,16 @@ the client reads it and comments. **Decompose** asks the agent to propose
 testable properties of one broad claim (`method/DECOMPOSE.md`); each
 accepted proposal becomes a **subclaim**, an ordinary claim marked
 `implied_by` its parent, with the parent's quote and lines and the
-practice's statement. **Freeze** writes the surface in its final form to
-`surface/<source>.surface.json`; after that nothing is added to it.
+practice's statement. Enumeration ends with the **behaviour split**
+(`method/BEHAVIOUR_SPLIT.md`): a claim that says what the software does when
+it runs becomes a mechanism claim, which code can settle, and a behaviour
+claim, which only records of the software running can settle. The parent's
+statement becomes the mechanism reading and the behaviour claim is appended
+as a subclaim `implied_by` it, marked `approved_by` the pass rather than a
+person. The splits are accepted unless the practice drops them on the surface
+page; `--no-behaviour-split` on the audit runner turns the pass off. **Freeze**
+writes the surface in its final form to `surface/<source>.surface.json`; after
+that nothing is added to it.
 
 ## The chain
 

@@ -302,13 +302,21 @@ def check_surface(obj: Dict[str, Any], corpus: Path,
         for j, loc in enumerate(locations(c)):
             lw = w if j == 0 else f"{w} location {j + 1}"
             q = _norm(loc.get("quote"))
+            # A DUPLICATE IS THE SAME QUOTE AND THE SAME STATEMENT. METHOD §5
+            # splits one sentence into a claim per property, and a subclaim
+            # (DECOMPOSE.md, BEHAVIOUR_SPLIT.md) carries its parent's quote,
+            # so two claims with one quote and different statements are the
+            # method at work, not a repeat. Until 2026-09-15 the quote alone
+            # was the test, and every split row was reported as a problem.
+            key = (q, _norm(c.get("statement") or ""))
             if not q:
                 problems.append(f"{lw}: no quote — METHOD §5 makes the "
                                 f"verbatim quote the claim's identity")
-            elif j == 0 and q in seen_q:
-                problems.append(f"{w}: same quote as claim {seen_q[q]}")
+            elif j == 0 and key in seen_q:
+                problems.append(f"{w}: same quote and statement as claim "
+                                f"{seen_q[key]}")
             elif j == 0:
-                seen_q[q] = cid
+                seen_q[key] = cid
             lines = loc.get("lines")
             if body and isinstance(lines, list) and len(lines) == 2 \
                     and all(isinstance(n, int) for n in lines):

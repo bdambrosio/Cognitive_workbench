@@ -230,8 +230,8 @@ def _finding(f: Dict[str, Any], rating: Optional[Dict[str, Any]],
     out += [""]
     if f.get("implied_by") is not None:
         out += [f"This is the practice's reading of claim {f['implied_by']}: a property "
-                f"a reasonable buyer would take those words to assert, written down and "
-                f"approved before testing. The quoted words are claim {f['implied_by']}'s; "
+                f"a reasonable buyer would take those words to assert, written down "
+                f"before testing. The quoted words are claim {f['implied_by']}'s; "
                 f"the finding tests the statement: {_md_safe(f.get('statement'))}"]
     if f.get("about") == "document":
         out += ["This assertion is about a document in the materials rather than "

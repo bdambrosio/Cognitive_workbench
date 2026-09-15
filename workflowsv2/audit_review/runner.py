@@ -273,7 +273,7 @@ def _finding_text(f: Dict[str, Any], claims: Dict[int, Dict[str, Any]]) -> str:
                    "settles it, and a citation into it is evidence for this claim")
     if c.get("implied_by") is not None:
         out.append(f"    implied by: claim {c['implied_by']} — the practice's reading, "
-                   f"approved before the freeze; the statement is what was tested")
+                   f"recorded before the freeze; the statement is what was tested")
     out += [f"    verdict   : {adj.get('verdict')}"]
     if adj.get("gap"):
         out.append(f"    gap       : {adj['gap']}")
@@ -434,10 +434,11 @@ def emit_parts(loop, method_text: str, stats: Dict[str, Any],
     for n, g in enumerate(groups, 1):
         body = ("Check the fidelity of these claims, per REVIEW §5 check 1 — "
                 "does each `statement` faithfully render its `quote`? A claim "
-                "carrying `implied_by` is a subclaim the practice read out of that "
-                "parent claim and approved: its statement says more than its quote "
-                "by design, and it is `faithful` when a reasonable buyer would take "
-                "the parent's words to assert it.\n\n"
+                "carrying `implied_by` and the claim it names each render part of "
+                "what one quote asserts, by design: for both, `faithful` when a "
+                "reasonable buyer would take the quoted words to assert what the "
+                "statement says, `overstates` when they would not, and not "
+                "`understates` for leaving the rest to the other claim.\n\n"
                 + json.dumps(g, ensure_ascii=False, indent=1)
                 + "\n\nEmit `claim_checks` for exactly these claims.")
         ask(f"claim_checks[{n}/{len(groups)}]", body,
