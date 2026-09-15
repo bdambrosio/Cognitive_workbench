@@ -107,3 +107,47 @@ def test_row_cap_and_the_action_is_known_to_the_loop(loop):
     assert len([l for l in out.splitlines() if l.startswith("  Note")]) == C.ConcernsMixin._CONCERN_STATE_ROW_CAP
     assert "... 3 more; narrow with a filter" in out
     assert "concern-state" in _REACT_TOOLS
+
+
+# ── the prompt block: ranked rows are fire-capable, lenses stand aside ──
+
+def _block_stub(active, autonomy=True):
+    inst = object.__new__(ChatLoop)
+    inst._iter_active_agent_concerns = lambda: active
+    inst._autonomy_enabled = autonomy
+    return inst
+
+
+def _n(nid, text, activation, **props):
+    return (nid, {"text": text, "properties": {"content": text, "status": "active", **props}}, activation)
+
+
+def test_block_ranks_fire_capable_only_and_lists_the_rest_as_standing():
+    active = [_n("Note_1", "What is Bruce working toward", 1.0, seed=True),
+              _n("Note_2", "Did what I said land", 1.0, seed=True),
+              _n("Note_3", "Track the S&P close", 0.5, instruction="check the close", rhythm_hours=24),
+              _n("Note_4", "Monitor the PV controller", 0.2, instruction="read the PV log", rhythm_hours=1)]
+    inst = _block_stub(active)
+    ranked = ChatLoop._top_active_agent_concerns(inst, fire_capable=True)
+    assert [r[0] for r in ranked] == ["Note_3", "Note_4"]                  # the 1.00 lenses are out
+    assert [r[0] for r in ChatLoop._top_active_agent_concerns(inst)][:2] == ["Note_1", "Note_2"]
+    block = inst._render_agent_concerns_block(ranked)
+    assert "- [0.50, rank 1/2] Track the S&P close" in block
+    assert "- [0.20, rank 2/2] Monitor the PV controller" in block
+    assert "fires every ~24h" in block
+    assert "Standing, not ranked" in block and "What is Bruce working toward · Did what I said land" in block
+    assert "Non-seed 2 / cap" in block                                       # the cap counts every active non-seed
+    assert "rank 1/4" not in block and "Not shown" not in block
+
+
+def test_block_shows_the_unshown_fire_capable_and_survives_no_ranked_rows():
+    active = [_n(f"Note_{i}", f"c{i}", i / 10, instruction="x", rhythm_hours=24) for i in range(1, 8)]
+    inst = _block_stub(active)
+    ranked = ChatLoop._top_active_agent_concerns(inst, fire_capable=True)
+    assert len(ranked) == 5
+    block = inst._render_agent_concerns_block(ranked)
+    assert "Showing 5 of 7 fire-capable. Not shown: 0.20, 0.10." in block
+    lenses_only = _block_stub([_n("Note_9", "a lens", 1.0, seed=True)])
+    block2 = lenses_only._render_agent_concerns_block([])
+    assert "(no fire-capable concern is active)" in block2 and "a lens" in block2
+    assert _block_stub([])._render_agent_concerns_block([]) is None

@@ -2208,7 +2208,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # (top by activation). Two separate lists — the prompt builder
         # renders each in its own section. No firing on user turns;
         # autonomous fires happen on tick via _handle_tick.
-        agent_concerns = self._top_active_agent_concerns()
+        agent_concerns = self._top_active_agent_concerns(fire_capable=True)
         user_concerns = self._top_active_user_concerns()
 
         log: List[Tuple[str, str]] = []

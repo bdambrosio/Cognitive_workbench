@@ -234,6 +234,152 @@ class PromptsMixin:
             + "\n".join(lines)
         )
 
+    def _render_agent_concerns_block(
+            self, agent_concerns: List[Tuple[str, str, float, Dict[str, Any]]]
+            ) -> Optional[str]:
+        """The `## My active concerns` block, or None when there is nothing
+        to show. `agent_concerns` is the ranked slice: fire-capable
+        concerns only, top-K by activation (chat_loop passes
+        _top_active_agent_concerns(fire_capable=True)). Concerns without
+        an instruction are read here from the store and listed on one
+        Standing line under the ranking, unranked (2026-09-15, Jill's
+        choice, Bruce's go): they cannot fire, so only a fire ever
+        decrements them, so they sat at 1.00 and filled four of the five
+        ranked rows for good. A lens and a queued action are different
+        kinds; the ranking is for the second.
+
+        EXPOSE THE COMPETITION, NOT JUST THE WINNERS. A list shown without
+        its denominator reads as "these are my concerns" when it means
+        "these five out of thirteen", so the block carries the rank, the
+        total, and every unshown activation (the two aggregate figures
+        Jill asked for, 2026-09-14), plus the non-seed count against the
+        population cap. The cap counts non-seed concerns only, so that
+        count is over every active concern, ranked or standing.
+
+        WHAT IS NOT REPORTED, AND WHY. Activation is a single running
+        scalar: _grow_agent_concerns_per_tick and
+        _apply_agent_concern_evidence_bump both do `activation = min(1.0,
+        a + x)` in place, so no record survives of how much came from
+        elapsed time and how much from evidence. What is shown instead is
+        `last_bumped_at`, which is stored and does say whether evidence
+        has touched a concern recently."""
+        try:
+            _all_active = self._iter_active_agent_concerns()
+        except Exception as e:
+            logger.warning(f"agent concern block: store read failed: {e}")
+            _all_active = []
+        ranked_pool = [(n, nt, a) for n, nt, a in _all_active
+                       if (nt.get('properties') or {}).get('instruction')]
+        standing = [(n, nt, a) for n, nt, a in _all_active
+                    if not (nt.get('properties') or {}).get('instruction')]
+        if not agent_concerns and not standing:
+            return None
+        fires = bool(getattr(self, '_autonomy_enabled', False))
+        total_ranked = len(ranked_pool) if _all_active else len(agent_concerns)
+        below = sorted((a for _n, _nt, a in ranked_pool),
+                       reverse=True)[len(agent_concerns):]
+        nonseed_active = (sum(1 for _n, _nt, _a in _all_active
+                              if not (_nt.get('properties') or {}).get('seed'))
+                          if _all_active else None)
+        ac_lines: List[str] = []
+        for _rank, (_nid, text, activation, props) in enumerate(agent_concerns, 1):
+            tags = []
+            if props.get('seed'):
+                tags.append('seed')
+            if props.get('successor_of'):
+                tags.append(f"successor d{props.get('successor_depth', 1)}")
+            bumped = str(props.get('last_bumped_at') or '')[:10]
+            if bumped:
+                tags.append(f"last evidence {bumped}")
+            tag_str = f", {','.join(tags)}" if tags else ''
+            ac_lines.append(
+                f"- [{activation:.2f}, rank {_rank}/{total_ranked}"
+                f"{tag_str}] {text}")
+            instr = (props.get('instruction') or '').strip()
+            rhythm = props.get('rhythm_hours')
+            if instr and rhythm:
+                # WHOLE WHEN NOTHING FIRES. With autonomy on, a fire
+                # passes the instruction complete as the turn's input and
+                # this line is only an awareness summary, so 120 chars is
+                # right for a list of up to five. With autonomy off no
+                # fire ever comes, and this line is the ONLY place the
+                # instruction reaches the agent — clipping it there
+                # discards the remainder the yield was taken to preserve.
+                # Measured on the ChatterMate GLM run 2026-08-29: 9,864
+                # characters of stored remainder across four concerns,
+                # 480 of them visible, and every window cut mid-word in a
+                # preamble the four shared.
+                #
+                # Affordable only because a yield now supersedes the
+                # previous continuation, so there is one live remainder
+                # rather than a stack of replaced ones.
+                body = instr if not fires else instr[:120]
+                # The schedule is real only when firing is on. Stating it
+                # unconditionally contradicted the autonomy line two lines
+                # below, in the same block: "fires every ~1h" above
+                # "nothing fires by itself".
+                if fires:
+                    ac_lines.append(
+                        f"    fires every ~{rhythm}h when activation "
+                        f"crosses {_AGENT_CONCERN_FIRE_THRESHOLD:.2f}: "
+                        f"{body}")
+                else:
+                    ac_lines.append(
+                        f"    held instruction, nothing will run it this "
+                        f"session: {body}")
+        # Whether firing actually happens is a launcher flag she
+        # otherwise cannot see (_autonomy_enabled, chat_loop.py).
+        # Without this she can describe the mechanism but not answer
+        # "will you actually go do that?" about her own concerns.
+        if fires:
+            autonomy_line = (
+                "Autonomous firing is ON this session: when one of these "
+                "crosses threshold it runs on its own, with no user turn "
+                "to prompt it.")
+        else:
+            autonomy_line = (
+                "Autonomous firing is OFF this session (the launcher's "
+                "--autonomy flag is not set). Nothing fires by itself, and "
+                "activation no longer grows with elapsed time either — "
+                "only new evidence in a turn moves it. These shape what I "
+                "attend to on turns I am given, and I say so plainly if "
+                "asked whether I will act on one unprompted.")
+        # The growth clause holds only when firing is on. With autonomy
+        # off `autonomy_line` states what actually moves activation, and
+        # asserting both put a contradiction in adjacent sentences.
+        mechanism = ("Pressure-driven: activation grows over wall-clock "
+                     "time at each concern's rhythm; firing decrements "
+                     "it. " if fires else "")
+        standing_line = ""
+        if standing:
+            names = " \u00b7 ".join(
+                str((nt.get('properties') or {}).get('content', '')
+                    or nt.get('text', '')).strip().replace('\n', ' ')[:80]
+                for _n, nt, _a in standing)
+            standing_line = (
+                f"\n\nStanding, not ranked (no instruction, so they never fire; "
+                f"they shape what I attend to): {names}")
+        ranked_text = ("\n".join(ac_lines) if ac_lines
+                       else "(no fire-capable concern is active)")
+        return (
+            f"## My active concerns (agent_concerns, ranked by activation)\n"
+            f"{mechanism}Concerns "
+            "without an instruction don't fire — they shape what I "
+            "attend to without driving action, and are listed under the ranking.\n"
+            f"{autonomy_line}\n\n"
+            + ranked_text
+            + (f"\n\nShowing {len(agent_concerns)} of {total_ranked} "
+               f"fire-capable. Not shown: "
+               + ", ".join(f"{a:.2f}" for a in below) + "."
+               if below else "")
+            + standing_line
+            + (("\n" if (below or standing_line) else "\n\n")
+               + f"Non-seed {nonseed_active} / cap "
+               f"{_AGENT_CONCERN_POPULATION_CAP} (seeds are exempt "
+               f"from the cap)."
+               if nonseed_active is not None else "")
+        )
+
     def _build_system_prompt(self, source: str, orientation: str,
                              recall: Optional[List[Tuple[str, str, str, Optional[str], Optional[str]]]] = None,
                              agent_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None,
@@ -340,130 +486,9 @@ class PromptsMixin:
         # constitutional (sources for derived concerns), distinguished
         # by tag. instruction-bearing concerns fire when activation
         # crosses threshold.
-        if agent_concerns:
-            fires = bool(getattr(self, '_autonomy_enabled', False))
-            # EXPOSE THE COMPETITION, NOT JUST THE WINNERS. This block is a
-            # top-K cut by activation, and a list shown without its denominator
-            # reads as "these are my concerns" when it means "these five out of
-            # thirteen". Rank and total are free — the full active list is
-            # already sorted upstream.
-            #
-            # WHAT IS NOT REPORTED, AND WHY. Activation is a single running
-            # scalar: _grow_agent_concerns_per_tick and
-            # _apply_agent_concern_evidence_bump both do `activation = min(1.0,
-            # a + x)` in place, so no record survives of how much came from
-            # elapsed time and how much from evidence — and once a concern
-            # saturates at 1.0 it is not recoverable by arithmetic either.
-            # Reporting a growth/bump split would mean inventing it, so what is
-            # shown instead is `last_bumped_at`, which is stored and does say
-            # whether evidence has touched this concern recently.
-            # The two aggregate figures Jill asked for (2026-09-14): the
-            # non-seed count against the population cap, and every unshown
-            # activation. Both come from `_all_active`, already in hand; no
-            # further pass over the store. The cap counts non-seed concerns
-            # only (seeds are exempt), so the count is taken over all active
-            # concerns, not the visible slice. The unshown list is bounded
-            # by total_active, which is the cap plus the seeds.
-            try:
-                _all_active = self._iter_active_agent_concerns()
-                total_active = len(_all_active)
-                below = sorted((a for _n, _nt, a in _all_active),
-                               reverse=True)[len(agent_concerns):]
-                nonseed_active = sum(
-                    1 for _n, _nt, _a in _all_active
-                    if not (_nt.get('properties') or {}).get('seed'))
-            except Exception as e:
-                logger.warning(f"agent concern trailer: store read failed: {e}")
-                total_active, below, nonseed_active = len(agent_concerns), [], None
-            ac_lines: List[str] = []
-            for _rank, (_nid, text, activation, props) in enumerate(agent_concerns, 1):
-                tags = []
-                if props.get('seed'):
-                    tags.append('seed')
-                if props.get('successor_of'):
-                    tags.append(f"successor d{props.get('successor_depth', 1)}")
-                bumped = str(props.get('last_bumped_at') or '')[:10]
-                if bumped:
-                    tags.append(f"last evidence {bumped}")
-                tag_str = f", {','.join(tags)}" if tags else ''
-                ac_lines.append(
-                    f"- [{activation:.2f}, rank {_rank}/{total_active}"
-                    f"{tag_str}] {text}")
-                instr = (props.get('instruction') or '').strip()
-                rhythm = props.get('rhythm_hours')
-                if instr and rhythm:
-                    # WHOLE WHEN NOTHING FIRES. With autonomy on, a fire
-                    # passes the instruction complete as the turn's input and
-                    # this line is only an awareness summary, so 120 chars is
-                    # right for a list of up to five. With autonomy off no
-                    # fire ever comes, and this line is the ONLY place the
-                    # instruction reaches the agent — clipping it there
-                    # discards the remainder the yield was taken to preserve.
-                    # Measured on the ChatterMate GLM run 2026-08-29: 9,864
-                    # characters of stored remainder across four concerns,
-                    # 480 of them visible, and every window cut mid-word in a
-                    # preamble the four shared.
-                    #
-                    # Affordable only because a yield now supersedes the
-                    # previous continuation, so there is one live remainder
-                    # rather than a stack of replaced ones.
-                    body = instr if not fires else instr[:120]
-                    # The schedule is real only when firing is on. Stating it
-                    # unconditionally contradicted the autonomy line two lines
-                    # below, in the same block: "fires every ~1h" above
-                    # "nothing fires by itself".
-                    if fires:
-                        ac_lines.append(
-                            f"    fires every ~{rhythm}h when activation "
-                            f"crosses {_AGENT_CONCERN_FIRE_THRESHOLD:.2f}: "
-                            f"{body}")
-                    else:
-                        ac_lines.append(
-                            f"    held instruction, nothing will run it this "
-                            f"session: {body}")
-                elif not instr:
-                    ac_lines.append(
-                        "    standing concern, no instruction (won't fire)")
-            # Whether firing actually happens is a launcher flag she
-            # otherwise cannot see (_autonomy_enabled, chat_loop.py).
-            # Without this she can describe the mechanism but not answer
-            # "will you actually go do that?" about her own concerns.
-            if getattr(self, '_autonomy_enabled', False):
-                autonomy_line = (
-                    "Autonomous firing is ON this session: when one of these "
-                    "crosses threshold it runs on its own, with no user turn "
-                    "to prompt it.")
-            else:
-                autonomy_line = (
-                    "Autonomous firing is OFF this session (the launcher's "
-                    "--autonomy flag is not set). Nothing fires by itself, and "
-                    "activation no longer grows with elapsed time either — "
-                    "only new evidence in a turn moves it. These shape what I "
-                    "attend to on turns I am given, and I say so plainly if "
-                    "asked whether I will act on one unprompted.")
-            # The growth clause holds only when firing is on. With autonomy
-            # off `autonomy_line` states what actually moves activation, and
-            # asserting both put a contradiction in adjacent sentences.
-            mechanism = ("Pressure-driven: activation grows over wall-clock "
-                         "time at each concern's rhythm; firing decrements "
-                         "it. " if fires else "")
-            parts.append(
-                f"## My active concerns (agent_concerns, ranked by activation)\n"
-                f"{mechanism}Concerns "
-                "without an instruction don't fire — they shape what I "
-                "attend to without driving action.\n"
-                f"{autonomy_line}\n\n"
-                + "\n".join(ac_lines)
-                + (f"\n\nShowing {len(agent_concerns)} of {total_active} "
-                   f"active. Not shown: "
-                   + ", ".join(f"{a:.2f}" for a in below) + "."
-                   if below else "")
-                + (("\n" if below else "\n\n")
-                   + f"Non-seed {nonseed_active} / cap "
-                   f"{_AGENT_CONCERN_POPULATION_CAP} (seeds are exempt "
-                   f"from the cap)."
-                   if nonseed_active is not None else "")
-            )
+        block = self._render_agent_concerns_block(agent_concerns or [])
+        if block:
+            parts.append(block)
         # Fire digest: pending autonomous fires being surfaced this turn
         # (set at user-turn entry in _process_user_turn; empty on
         # autonomous turns). Absent when empty — prompt stability.

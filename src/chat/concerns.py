@@ -1738,11 +1738,20 @@ class ConcernsMixin:
             out.append((nid, note, s))
         return out
 
-    def _top_active_agent_concerns(self, n: int = _AGENT_CONCERN_PROMPT_BUDGET
+    def _top_active_agent_concerns(self, n: int = _AGENT_CONCERN_PROMPT_BUDGET,
+                                   fire_capable: bool = False
                                    ) -> List[Tuple[str, str, float, Dict[str, Any]]]:
         """Top-n agent_concerns by activation, descending. Tuple:
-        (note_id, text, activation, props)."""
+        (note_id, text, activation, props). `fire_capable` keeps only
+        concerns that carry an instruction: the prompt's ranked rows
+        (2026-09-15, Jill: a concern without an instruction is a lens,
+        not queued work, and never leaves 1.00 once it gets there, so
+        ranking the two kinds together filled the rows with the lenses).
+        Reflection reads the unfiltered list; seeds are its sources."""
         active = self._iter_active_agent_concerns()
+        if fire_capable:
+            active = [t for t in active
+                      if (t[1].get('properties') or {}).get('instruction')]
         active.sort(key=lambda t: t[2], reverse=True)
         out: List[Tuple[str, str, float, Dict[str, Any]]] = []
         for nid, note, a in active[:max(0, n)]:
