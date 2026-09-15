@@ -90,6 +90,8 @@ characters:
     # continuation is what this mode wants; an unoriented one would simply be
     # unaware of the same thing more quietly.
     workflow_mode: false
+    # Map primitive off, as in continuation.yaml and the runners (2026-09-14).
+    subagent_map: false
 
     # REFLECTION AND ATTRIBUTION ARE OFF (Bruce, 2026-09-07). Both run after
     # every reply as model calls; the session answers from the record, not
