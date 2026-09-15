@@ -27,6 +27,8 @@ is mounted twice, under /e/<e>/intake/ and /e/<e>/report/.
 THE SURFACE. After enumeration the client reads the claim surface and
 comments on any claim; the practice edits and freezes it. The frozen file
 is in claims.json shape, which is what the audit runner's --surface reads.
+The scrub guidance the practice works to is SCRUB.md beside this file,
+served at /p/guidance/ and linked from every practice surface page.
 To rerun with a changed surface the practice unfreezes it: the frozen file
 moves to surface/archive_<ts>/ and becomes the draft again, and a chain
 that had finished is marked superseded so the chain button comes back.
@@ -70,6 +72,8 @@ from client_ui.registry import Registry                         # noqa: E402
 logger = logging.getLogger("client_ui.site")
 STATIC = HERE / "static"
 LETTER_TEMPLATE = state.ENGAGEMENTS / "LETTER_TEMPLATE.md"
+#: The practice's guidance for scrubbing a claim surface, served on /p/guidance/.
+SCRUB_GUIDANCE = Path(__file__).resolve().parent / "SCRUB.md"
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
 #: The mail a seller gets when named on an engagement.
@@ -854,6 +858,16 @@ def make_site_app(access: Access, model: Optional[Path] = None,
             raise HTTPException(status_code=404, detail="no log")
         lines = Path(rec["log"]).read_text(encoding="utf-8", errors="replace").splitlines()
         return PlainTextResponse("\n".join(lines[-max(1, tail):]))
+
+    @app.get("/p/guidance/")
+    async def practice_guidance_page(request: Request):
+        _practice(request)
+        return _page(request, STATIC / "guidance.html")
+
+    @app.get("/p/guidance/api")
+    async def practice_guidance_text(request: Request):
+        _practice(request)
+        return PlainTextResponse(SCRUB_GUIDANCE.read_text(encoding="utf-8"))
 
     @app.get("/p/surface/{name}/")
     async def practice_surface_page(name: str, request: Request):

@@ -180,6 +180,17 @@ def test_surface_comment_edit_and_freeze(env):
     assert c.post("/p/surface/e1/api/freeze" + _as(PRACTICE), json={"source": "README.md"}).status_code == 200
 
 
+def test_scrub_guidance_is_the_practice_s(env):
+    c, root = env
+    assert c.get("/p/guidance/" + _as(CLIENT)).status_code == 403
+    assert c.get("/p/guidance/api" + _as(CLIENT)).status_code == 403
+    r = c.get("/p/guidance/" + _as(PRACTICE))
+    assert r.status_code == 200 and "guidance.js" in r.text
+    r = c.get("/p/guidance/api" + _as(PRACTICE))
+    assert r.status_code == 200 and r.text.startswith("# Scrubbing the claim surface")
+    assert "Claims about behaviour" in r.text
+
+
 def test_practice_buttons_jobs_and_the_lock(env, tmp_path):
     c, root = env
     _new(c)

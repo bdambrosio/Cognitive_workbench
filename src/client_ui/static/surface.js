@@ -69,9 +69,12 @@
   function render() {
     $("engagement").textContent = data.name;
     document.title = data.name + " — claim surface";
-    $("intro").textContent = data.editable
-      ? "Edit any cell, drop what is not a claim, add what is missing, save the draft, then freeze. The client's comments are beside each claim."
-      : "These are the claims the review will test, as enumerated from the documents you named. Comment on any claim that is wrong, missing or beside the point; the practice reads every comment before freezing the list.";
+    if (data.editable) {
+      $("intro").innerHTML = "Edit any cell, drop what is not a claim, add what is missing, save the draft, then freeze. The client's comments are beside each claim. "
+        + '<a href="/p/guidance/' + qs + '">Read the scrub guidance</a> before you start.';
+    } else {
+      $("intro").textContent = "These are the claims the review will test, as enumerated from the documents you named. Comment on any claim that is wrong, missing or beside the point; the practice reads every comment before freezing the list.";
+    }
     $("sources").innerHTML = data.sources.map((s) => renderSource(s, data.editable)).join("");
     for (const f of document.querySelectorAll("form.comment")) {
       f.addEventListener("submit", async (e) => {
