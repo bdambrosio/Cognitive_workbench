@@ -411,6 +411,21 @@ class ToolsMixin:
                 "cap can refuse. One mint per turn. Non-terminal — the loop continues. "
                 "While minting is in shadow the mint is recorded and no concern is created; "
                 "you will be told when it goes live."))
+        # Read-only view of the live concern collections (2026-09-15, Jill's
+        # proposal). Every turn, autonomous fires included: that is where the
+        # agent reasons about its own queue.
+        tools.append(("concern-state",
+            "`{\"thought\": \"<one terse sentence>\", \"tool\": \"concern-state\", "
+            "\"collection\": \"agent\"|\"user\"|\"both\", \"by_id\": <Note_N>, "
+            "\"status\": \"active\"|\"satisfied\"|\"any\", \"has_instruction\": <bool>, "
+            "\"min_activation\": <number>, \"seed\": <bool>}` — read your live concern "
+            "collections, the same notes your prompt block is built from, with every field "
+            "the block leaves out: the whole population against the cap, activation, seed "
+            "or non-seed, whether a concern carries an instruction and can fire, rhythm, "
+            "last fire, and for one `by_id` the instruction, wip and provenance in full. "
+            "Every argument is optional; the default is the active agent concerns, highest "
+            "activation first. Read-only: it changes nothing. Non-terminal — the loop "
+            "continues."))
         tools.append(("display",
             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"display\", "
             "\"content\": <string|$stepN>, \"format\": \"markdown\"|\"html\"}` — "

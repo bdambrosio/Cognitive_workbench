@@ -2051,6 +2051,124 @@ class ConcernsMixin:
             self._apply_agent_concern_evidence_bump(
                 props, datetime.now(timezone.utc).isoformat())
 
+    # ------------------------------------------------------------------
+    # The `concern-state` action (2026-09-15, Jill's proposal, Bruce's go):
+    # a read-only view of the live concern collections from inside a
+    # turn. The prompt block shows the top five agent concerns by
+    # activation; the rest of the population, a concern by id, and the
+    # fields the block leaves out (instruction, wip, rhythm, last fire)
+    # were unreachable mid-turn, so the agent inferred them. This reads
+    # the same notes prompt assembly reads, through the resource manager,
+    # and writes nothing. No storage read of its own, no model call.
+    # ------------------------------------------------------------------
+
+    _CONCERN_STATE_ROW_CAP = 40
+
+    def _iter_concern_notes(self, collection_id: Optional[str]
+                            ) -> List[Tuple[str, Dict[str, Any]]]:
+        """Every note in a concern collection, any status: (note_id, props)."""
+        if not collection_id:
+            return []
+        coll = self.resource_manager.get_resource(collection_id)
+        if not coll:
+            return []
+        out: List[Tuple[str, Dict[str, Any]]] = []
+        for nid in (coll.get('properties') or {}).get('content', []) or []:
+            note = self.resource_manager.get_resource(nid)
+            if note:
+                out.append((nid, note.get('properties') or {}))
+        return out
+
+    def _run_concern_state(self, collection: Any = 'agent', by_id: Any = None,
+                           status: Any = 'active', has_instruction: Any = None,
+                           min_activation: Any = None, seed: Any = None) -> str:
+        """The `concern-state` action. Returns the observation: a count
+        line, then one row per matching concern, highest activation (or
+        strength) first, capped at _CONCERN_STATE_ROW_CAP rows. `by_id`
+        returns that one concern in full. `status` is a status value or
+        'any'. Filters that do not apply to a collection are ignored for
+        it (user concerns carry no instruction, seed or activation)."""
+        collection = str(collection or 'agent').strip().lower()
+        if collection not in ('agent', 'user', 'both'):
+            return "ERROR: `collection` is one of agent, user, both"
+        status = str(status or 'active').strip().lower()
+        by_id = str(by_id).strip() if by_id else None
+
+        def _bool(v: Any) -> Optional[bool]:
+            if v is None or v == '':
+                return None
+            if isinstance(v, bool):
+                return v
+            return str(v).strip().lower() in ('true', '1', 'yes')
+
+        want_instr, want_seed = _bool(has_instruction), _bool(seed)
+        try:
+            floor = float(min_activation) if min_activation not in (None, '') else None
+        except (TypeError, ValueError):
+            return "ERROR: `min_activation` must be a number"
+
+        sets = []
+        if collection in ('agent', 'both'):
+            sets.append(('agent', self._iter_concern_notes(self._agent_concerns_collection_id)))
+        if collection in ('user', 'both'):
+            sets.append(('user', self._iter_concern_notes(self._user_concerns_collection_id)))
+
+        lines: List[str] = []
+        for kind, notes in sets:
+            active = [(n, p) for n, p in notes if p.get('status') == 'active']
+            if kind == 'agent':
+                seeds = sum(1 for _n, p in active if p.get('seed'))
+                lines.append(f"agent concerns: {len(active)} active of {len(notes)} recorded; "
+                             f"{seeds} seed(s), {len(active) - seeds} non-seed against a cap of "
+                             f"{_AGENT_CONCERN_POPULATION_CAP} (seeds are exempt); "
+                             f"{sum(1 for _n, p in active if p.get('instruction'))} of the active "
+                             f"carry an instruction and can fire")
+            else:
+                lines.append(f"user concerns: {len(active)} active of {len(notes)} recorded")
+            rows = []
+            for nid, p in notes:
+                if by_id and nid != by_id:
+                    continue
+                if not by_id and status != 'any' and p.get('status') != status:
+                    continue
+                if kind == 'agent':
+                    if want_instr is not None and bool(p.get('instruction')) != want_instr:
+                        continue
+                    if want_seed is not None and bool(p.get('seed')) != want_seed:
+                        continue
+                    level = float(p.get('activation', 0.0) or 0.0)
+                else:
+                    level = float(p.get('strength', 0.0) or 0.0)
+                if floor is not None and level < floor:
+                    continue
+                rows.append((level, nid, p))
+            rows.sort(key=lambda r: -r[0])
+            shown = rows[:self._CONCERN_STATE_ROW_CAP]
+            for level, nid, p in shown:
+                text = str(p.get('content') or '').strip().replace('\n', ' ')
+                if kind == 'agent':
+                    fired = str(p.get('last_fired_at') or 'never')[:16]
+                    lines.append(
+                        f"  {nid}  act={level:.2f}  {p.get('status')}  "
+                        f"{'seed' if p.get('seed') else 'non-seed'}  "
+                        f"{'instruction' if p.get('instruction') else 'no instruction'}  "
+                        f"rhythm={p.get('rhythm_hours') or '-'}h  last_fired={fired}  | {text[:100]}")
+                    if by_id:
+                        for field in ('instruction', 'wip', 'category', 'provenance',
+                                      'created_at', 'last_bumped_at', 'triage_verdict',
+                                      'triage_reason', 'self_minted'):
+                            if p.get(field) not in (None, ''):
+                                lines.append(f"      {field}: {str(p.get(field)).strip()[:600]}")
+                else:
+                    lines.append(f"  {nid}  strength={level:.2f}  {p.get('status')}  | {text[:100]}")
+                    if by_id and p.get('context'):
+                        lines.append(f"      context: {str(p.get('context')).strip()[:600]}")
+            if len(rows) > len(shown):
+                lines.append(f"  ... {len(rows) - len(shown)} more; narrow with a filter")
+            if not rows:
+                lines.append("  (no concern matches)")
+        return "OK:\n" + "\n".join(lines)
+
     def _run_mint(self, text: str, instruction: str, rhythm_hours: Any) -> str:
         """The `mint` action: a durable agent concern from the agent's own
         noticing. Returns the observation. Refused on an autonomous turn
