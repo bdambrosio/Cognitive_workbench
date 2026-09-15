@@ -49,7 +49,11 @@ class Subagent:
 
     label: str = 'subagent'
     max_iters: int = 12
-    max_tokens: int = 8192
+    # 16384 since 2026-09-15 (Bruce). A reasoning model's thinking counts
+    # against this ceiling on the hosted route, and an emission cut at the
+    # ceiling is paid for and then retried at double: a wasted call each
+    # time it bites. A ceiling costs nothing until it is reached.
+    max_tokens: int = 16384
     # None -> the model's configured temperature. inspect_external is a
     # subagent, so this sits on the audit path; a literal here is the
     # same silent variable as the one in the ReAct loop.
