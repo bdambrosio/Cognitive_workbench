@@ -83,6 +83,26 @@ def test_history_shows_the_greeting_before_any_client_turn(tmp_path, monkeypatch
     assert s.history() == [{"who": "agent", "text": "reply to Practice"}]
 
 
+def test_deliverable_digest_is_one_block_per_claim_with_its_rating(tmp_path):
+    import json
+    from workflowsv2.claims_audit.post_session import deliverable_digest
+    merged = {"findings": [
+        {"claim_source": "README.md", "claim_id": 7, "quote": "q7", "adjudication": {"verdict": "contradicted", "gap": "g" * 500},
+         "review": {"outcome": "holds"}},
+        {"claim_source": "README.md", "claim_id": 9, "quote": "q9", "adjudication": {"verdict": "unverifiable", "unresolved_because": "outside_the_materials"}}],
+        "questions": [{"claim_source": "README.md", "claim_id": 9, "question": "where is the figure recorded?"}]}
+    (tmp_path / "materiality.json").write_text(json.dumps({
+        "ratings": [{"claim_source": "README.md", "claim_id": 7, "materiality": "material", "basis": "b7", "borderline": True}],
+        "exposures": [{"claim_source": "README.md", "claim_id": 9, "exposure": "not_material", "basis": "b9"}]}))
+    d = deliverable_digest(merged, tmp_path)
+    assert d.startswith("## The deliverable, loaded at session start")
+    assert "### README.md #7 — contradicted; materiality: material (borderline); check: holds" in d
+    assert "### README.md #9 — unverifiable; exposure: not_material" in d
+    assert "unresolved because: outside_the_materials" in d and "rating basis: b9" in d
+    assert "gap: " + "g" * 400 + "…" in d          # clipped, marked
+    assert "- (README.md #9) where is the figure recorded?" in d
+
+
 def test_post_session_findings_for_the_evidence_pane(tmp_path):
     from workflowsv2.claims_audit.post_session import PostSession
     s = PostSession.__new__(PostSession)

@@ -1,0 +1,864 @@
+{
+ "claim_source": "technical_report.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "Prepared by Tuuyi, September 2026.",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The report was prepared by Tuuyi in September 2026.",
+   "about": "document"
+  },
+  {
+   "id": 2,
+   "quote": "This report describes the claims-review product as it exists in the repository at the date of writing.",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The report describes the product as it actually exists in the repository at the stated date — that its description matches the code.",
+   "about": "document"
+  },
+  {
+   "id": 3,
+   "quote": "Where a figure is quoted, it comes from our own run records.",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "Every figure quoted in the report originates from the seller's own run records.",
+   "about": "document",
+   "locations": [
+    {
+     "quote": "the last three chains held 56, 58 and 55",
+     "lines": [
+      39,
+      39
+     ]
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "quote": "Claims Review takes the documents a software seller hands a buyer, the README, the technical overview, the sales one-pager, and checks every factual assertion in them against the seller's source code.",
+   "lines": [
+    7,
+    7
+   ],
+   "statement": "The product checks every factual assertion in the seller's documents against the seller's source code.",
+   "about": "target"
+  },
+  {
+   "id": 5,
+   "quote": "The output is a finding per claim, with a verdict, the evidence the verdict rests on, and a citation into the code for every piece of evidence.",
+   "lines": [
+    7,
+    7
+   ],
+   "statement": "The product's output is one finding per claim, each carrying a verdict, its evidence, and a code citation for every piece of evidence.",
+   "about": "target"
+  },
+  {
+   "id": 6,
+   "quote": "An independent second pass reviews each finding against its own evidence and records whether it holds.",
+   "lines": [
+    7,
+    7
+   ],
+   "statement": "An independent second pass reviews every finding against its own evidence and records whether it holds.",
+   "about": "target"
+  },
+  {
+   "id": 7,
+   "quote": "The buyer receives a report that reads against thresholds the buyer set at intake: what they are paying for, what would change the price, what would end the deal.",
+   "lines": [
+    7,
+    7
+   ],
+   "statement": "The report the buyer receives is read against buyer-set intake thresholds (price-changing and deal-ending criteria).",
+   "about": "target"
+  },
+  {
+   "id": 8,
+   "quote": "The product is a pipeline of stages, each a separate process with its own method document and its own model configuration.",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The product is a pipeline of stages, each a separate process with its own method document and its own model configuration.",
+   "about": "target"
+  },
+  {
+   "id": 9,
+   "quote": "The stages, in order, are enumeration of the claim surface, the audit, the review, hand-back, materiality, and the report.",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The pipeline has six stages, in the stated order: enumeration, audit, review, hand-back, materiality, report.",
+   "about": "target"
+  },
+  {
+   "id": 10,
+   "quote": "All of them live under `workflowsv2/` in the repository.",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "All pipeline stages live under `workflowsv2/` in the repository.",
+   "about": "target"
+  },
+  {
+   "id": 11,
+   "quote": "Each stage is a runner script that drives a ReAct agent through a written method.",
+   "lines": [
+    13,
+    13
+   ],
+   "statement": "Each stage is a runner script that drives a ReAct agent through a written method document.",
+   "about": "target"
+  },
+  {
+   "id": 12,
+   "quote": "The runner enforces everything the method cannot: output shape, closed vocabularies, mechanical checks.",
+   "lines": [
+    13,
+    13
+   ],
+   "statement": "Each runner mechanically enforces output shape, closed vocabularies, and other mechanical checks on the agent's output.",
+   "about": "target"
+  },
+  {
+   "id": 13,
+   "quote": "The agent gathers evidence through a code subagent.",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "The agent gathers evidence through a code subagent component.",
+   "about": "target"
+  },
+  {
+   "id": 14,
+   "quote": "The subagent is the only component that reads the target.",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "The code subagent is the only component that reads the target repository.",
+   "about": "target"
+  },
+  {
+   "id": 15,
+   "quote": "It can list directories, read files, search with regular expressions, and cite line ranges.",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "The subagent can list directories, read files, search with regular expressions, and cite line ranges.",
+   "about": "target"
+  },
+  {
+   "id": 16,
+   "quote": "It cannot read anything under `.git`",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "The subagent cannot read anything under `.git`.",
+   "about": "target"
+  },
+  {
+   "id": 17,
+   "quote": "and it cannot read files the engagement has excluded as documentation.",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "The subagent cannot read files the engagement has excluded as documentation.",
+   "about": "target"
+  },
+  {
+   "id": 18,
+   "quote": "Every read, search and citation it makes is written to a trace file, one file per evidence request, so the record of what was looked at is complete and separate from the agent's reasoning.",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "Every subagent read, search and citation is written to a trace file (one per evidence request), giving a complete record of what was looked at, separate from the agent's reasoning.",
+   "about": "target"
+  },
+  {
+   "id": 19,
+   "quote": "The audit stage works from a frozen claim surface.",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "The audit stage adjudicates a frozen claim surface produced by enumeration.",
+   "about": "target"
+  },
+  {
+   "id": 20,
+   "quote": "a human at the practice scrubs it",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "A human at the practice scrubs the enumerated claim surface before the audit runs.",
+   "about": "target"
+  },
+  {
+   "id": 21,
+   "quote": "the audit adjudicates exactly those claims and no others",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "The audit adjudicates exactly the frozen claims and no others.",
+   "about": "target"
+  },
+  {
+   "id": 22,
+   "quote": "One finding per frozen claim, always.",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "The audit always produces exactly one finding per frozen claim.",
+   "about": "target"
+  },
+  {
+   "id": 23,
+   "quote": "A claim that the materials cannot settle gets the verdict unverifiable, with the searches that were made recorded as its evidence.",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "A claim the materials cannot settle receives the verdict unverifiable, with the searches made recorded as its evidence.",
+   "about": "target"
+  },
+  {
+   "id": 24,
+   "quote": "Evidence is source. Documentation, including the claim source itself, is never accepted as evidence for a claim about what the software does; the only exception is a claim about the document itself, such as a licence statement.",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "The product's evidence rule admits only source as evidence: documentation, including the claim source itself, is never accepted as evidence for a claim about what the software does, the sole exception being a claim about a document itself, such as a licence statement.",
+   "about": "target"
+  },
+  {
+   "id": 25,
+   "quote": "This rule is enforced in the subagent, not only in the method: a citation into an excluded document is refused at the point of citation.",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "The documentation-exclusion rule is enforced mechanically in the subagent: a citation into an excluded document is refused at the point of citation, not merely prohibited by the written method.",
+   "about": "target"
+  },
+  {
+   "id": 26,
+   "quote": "Every citation carries the document, the line range, the quoted text, and a sentence saying what the lines show.",
+   "lines": [
+    23,
+    23
+   ],
+   "statement": "Every citation in the product's output carries four elements: the document, the line range, the quoted text, and a sentence saying what the lines show.",
+   "about": "target"
+  },
+  {
+   "id": 27,
+   "quote": "Before the review starts, the runner verifies mechanically for every citation that the document exists, the line range lies inside it, and the quoted text appears at those lines.",
+   "lines": [
+    23,
+    23
+   ],
+   "statement": "Before the review starts, the runner mechanically verifies every citation: that the document exists, the line range lies inside it, and the quoted text appears at those lines.",
+   "about": "target"
+  },
+  {
+   "id": 28,
+   "quote": "All output is schema-constrained JSON, so a malformed finding is impossible.",
+   "lines": [
+    23,
+    23
+   ],
+   "statement": "All of the product's output is schema-constrained JSON, with the consequence that a malformed finding is impossible.",
+   "about": "target"
+  },
+  {
+   "id": 29,
+   "quote": "For these the method requires two searches over the whole tree, one lexical and one structural, and a finding for an absence claim always records both.",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "For claims of absence, the method requires two searches over the whole tree, one lexical and one structural, and every absence-claim finding records both.",
+   "about": "target"
+  },
+  {
+   "id": 30,
+   "quote": "A finding that records only one is sent back for the missing search before the audit closes.",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "An absence-claim finding that records only one of the two searches is sent back for the missing search before the audit closes.",
+   "about": "target"
+  },
+  {
+   "id": 31,
+   "quote": "The review is a separate stage, run by a separate process, with a method of its own.",
+   "lines": [
+    29,
+    29
+   ],
+   "statement": "The review is a separate stage of the pipeline, run as a separate process, with a method document of its own.",
+   "about": "target"
+  },
+  {
+   "id": 32,
+   "quote": "It can be run with a different model from the audit.",
+   "lines": [
+    29,
+    29
+   ],
+   "statement": "The review stage can be run with a different model configuration from the audit stage.",
+   "about": "target"
+  },
+  {
+   "id": 33,
+   "quote": "The reviewer receives the findings, the frozen claims, the target, and for every citation the cited lines placed under the finding.",
+   "lines": [
+    29,
+    29
+   ],
+   "statement": "The reviewer is given the findings, the frozen claims, the target, and, for every citation, the cited lines placed under the finding.",
+   "about": "target"
+  },
+  {
+   "id": 34,
+   "quote": "It does not compute statistics; the runner recomputes every count from the artifacts",
+   "lines": [
+    29,
+    29
+   ],
+   "statement": "The reviewer does not compute statistics; the runner recomputes every count from the artifacts.",
+   "about": "target"
+  },
+  {
+   "id": 35,
+   "quote": "the review never reads the audit's account of itself",
+   "lines": [
+    29,
+    29
+   ],
+   "statement": "The review never reads the audit's account of itself.",
+   "about": "target"
+  },
+  {
+   "id": 36,
+   "quote": "The review is fully independent: the reviewer never sees the auditor's reasoning.",
+   "lines": [
+    31,
+    31
+   ],
+   "statement": "The review is fully independent in that the reviewer never sees the auditor's reasoning.",
+   "about": "target"
+  },
+  {
+   "id": 37,
+   "quote": "It records four observations per finding: whether the cited material bears on the claim, whether it shows what the finding says it shows, whether the verdict is calibrated to the evidence, and whether the searches were adequate.",
+   "lines": [
+    31,
+    31
+   ],
+   "statement": "The reviewer records four observations per finding: whether the cited material bears on the claim, whether it shows what the finding says it shows, whether the verdict is calibrated to the evidence, and whether the searches were adequate.",
+   "about": "target"
+  },
+  {
+   "id": 38,
+   "quote": "A finding holds when all four are clean.",
+   "lines": [
+    31,
+    31
+   ],
+   "statement": "A finding holds when all four of the reviewer's observations are clean.",
+   "about": "target"
+  },
+  {
+   "id": 39,
+   "quote": "The outcome is derived by the runner from the observations; the reviewer never writes it.",
+   "lines": [
+    31,
+    31
+   ],
+   "statement": "The outcome of the review is derived by the runner from the observations; the reviewer never writes the outcome itself.",
+   "about": "target"
+  },
+  {
+   "id": 40,
+   "quote": "Every exception the reviewer raises is retested by a second reviewer that has not seen the first review.",
+   "lines": [
+    33,
+    33
+   ],
+   "statement": "Every exception the reviewer raises is retested by a second reviewer that has not seen the first review.",
+   "about": "target"
+  },
+  {
+   "id": 41,
+   "quote": "A sample of findings that hold is retested as well, so a reviewer that passes everything is caught.",
+   "lines": [
+    33,
+    33
+   ],
+   "statement": "A sample of findings that held is also retested, so that a reviewer who passes everything is caught.",
+   "about": "target"
+  },
+  {
+   "id": 42,
+   "quote": "The review also runs a recall pass: for every finding rated fully real, it reads the evidence requests filed under that claim and names lines in the audit's own record that qualify the claim and were not cited.",
+   "lines": [
+    35,
+    35
+   ],
+   "statement": "The review runs a recall pass: for every finding rated fully real, it reads the evidence requests filed under that claim and names lines in the audit's own record that qualify the claim and were not cited.",
+   "about": "target"
+  },
+  {
+   "id": 43,
+   "quote": "Those claims are handed back to the auditor for re-adjudication with the named lines in front of it.",
+   "lines": [
+    35,
+    35
+   ],
+   "statement": "Claims named by the recall pass are handed back to the auditor for re-adjudication with the named lines in front of it.",
+   "about": "target"
+  },
+  {
+   "id": 44,
+   "quote": "Our reference target is a small open-source Rust web service",
+   "lines": [
+    39,
+    39
+   ],
+   "statement": "The seller's reference target, used for the measured figures in this section, is a small open-source Rust web service.",
+   "about": "seller"
+  },
+  {
+   "id": 45,
+   "quote": "a 58-claim README",
+   "lines": [
+    39,
+    39
+   ],
+   "statement": "The reference target's README contains 58 claims.",
+   "about": "seller"
+  },
+  {
+   "id": 46,
+   "quote": "the audit-review-hand-back chain consistently holds 55 to 58 of 58 findings under independent review",
+   "lines": [
+    39,
+    39
+   ],
+   "statement": "On the reference target, the audit-review-hand-back chain consistently retains 55 to 58 of 58 findings after independent review.",
+   "about": "target"
+  },
+  {
+   "id": 47,
+   "quote": "Over 95% of findings hold.",
+   "lines": [
+    39,
+    39
+   ],
+   "statement": "More than 95% of all findings produced by the pipeline hold under independent review.",
+   "about": "target"
+  },
+  {
+   "id": 48,
+   "quote": "Every finding the search-completion step sent back has held on review, twelve of twelve across three runs.",
+   "lines": [
+    39,
+    39
+   ],
+   "statement": "All twelve findings returned by the search-completion step across three runs have held on review.",
+   "about": "target"
+  },
+  {
+   "id": 49,
+   "quote": "Enumeration on the same README is stable to within a few claims across runs.",
+   "lines": [
+    41,
+    41
+   ],
+   "statement": "Claim enumeration on the reference README varies by only a few claims between runs.",
+   "about": "target"
+  },
+  {
+   "id": 50,
+   "quote": "Verdicts are stable in kind",
+   "lines": [
+    41,
+    41
+   ],
+   "statement": "The verdicts assigned to a given claim are stable in kind across runs.",
+   "about": "target"
+  },
+  {
+   "id": 51,
+   "quote": "the one claim in that README that the code contradicts, a cookie the README says is not set, has been found contradicted or partial in every run",
+   "lines": [
+    41,
+    41
+   ],
+   "statement": "The reference README contains exactly one claim the code contradicts — that a cookie is not set — and the pipeline has returned a contradicted or partial verdict for it in every run.",
+   "about": "target"
+  },
+  {
+   "id": 52,
+   "quote": "The pipeline has been exercised end to end on two external open-source targets and on a set of fixture documents with planted defects",
+   "lines": [
+    43,
+    43
+   ],
+   "statement": "The pipeline has been run end to end against two external open-source targets and against fixture documents with planted defects.",
+   "about": "target"
+  },
+  {
+   "id": 53,
+   "quote": "every planted defect was found",
+   "lines": [
+    43,
+    43
+   ],
+   "statement": "Every defect planted in the fixture documents was found by the pipeline.",
+   "about": "target"
+  },
+  {
+   "id": 54,
+   "quote": "The pipeline is model-agnostic: any OpenAI-compatible endpoint can serve any stage",
+   "lines": [
+    47,
+    47
+   ],
+   "statement": "Any OpenAI-compatible endpoint can serve as the model for any stage of the pipeline.",
+   "about": "target"
+  },
+  {
+   "id": 55,
+   "quote": "Production runs use GLM-5.3-Flash on a hosted provider",
+   "lines": [
+    47,
+    47
+   ],
+   "statement": "The seller's production runs of the pipeline use the GLM-5.3-Flash model on a hosted provider.",
+   "about": "seller"
+  },
+  {
+   "id": 56,
+   "quote": "a cheaper model has passed our qualification gates and is available as an alternative",
+   "lines": [
+    47,
+    47
+   ],
+   "statement": "A cheaper model has passed the seller's qualification gates and can be used as an alternative model for the pipeline.",
+   "about": "seller"
+  },
+  {
+   "id": 57,
+   "quote": "Local serving on our own GPUs is supported for development",
+   "lines": [
+    47,
+    47
+   ],
+   "statement": "The pipeline supports serving models locally on the seller's own GPUs for development.",
+   "about": "target"
+  },
+  {
+   "id": 58,
+   "quote": "Sampling settings are fixed per model in code",
+   "lines": [
+    47,
+    47
+   ],
+   "statement": "Sampling settings are fixed per model in the codebase, not chosen per run.",
+   "about": "target"
+  },
+  {
+   "id": 59,
+   "quote": "recorded in every run record, together with the target commit, the harness commit, and the resolved model name, so a run can be reproduced",
+   "lines": [
+    47,
+    47
+   ],
+   "statement": "Every run record records the sampling settings together with the target commit, the harness commit and the resolved model name, so that a run can be reproduced.",
+   "about": "target"
+  },
+  {
+   "id": 60,
+   "quote": "Temperature has never varied between runs of the same model.",
+   "lines": [
+    47,
+    47
+   ],
+   "statement": "No run of the pipeline has ever used a different temperature from another run of the same model.",
+   "about": "target"
+  },
+  {
+   "id": 61,
+   "quote": "An engagement's automated stages complete in about an hour on a target the size of the reference service",
+   "lines": [
+    49,
+    49
+   ],
+   "statement": "The automated stages of an engagement complete in roughly one hour on a target the size of the reference service.",
+   "about": "target"
+  },
+  {
+   "id": 62,
+   "quote": "The dominant cost is the audit's evidence gathering; review and hand-back are a fraction of it",
+   "lines": [
+    49,
+    49
+   ],
+   "statement": "The audit's evidence gathering dominates the cost of an engagement, with review and hand-back accounting for only a fraction of it.",
+   "about": "target"
+  },
+  {
+   "id": 63,
+   "quote": "An engagement is a directory: the target, the claim sources by path, the buyer's transaction description and thresholds, the runs, and a state file that records which stage each run has reached.",
+   "lines": [
+    53,
+    53
+   ],
+   "statement": "An engagement is stored as a directory containing the target, the claim sources by path, the buyer's transaction description and thresholds, the runs, and a state file.",
+   "about": "target"
+  },
+  {
+   "id": 64,
+   "quote": "a state file that records which stage each run has reached",
+   "lines": [
+    53,
+    53
+   ],
+   "statement": "A state file in the engagement directory records which stage each run has reached.",
+   "about": "target"
+  },
+  {
+   "id": 65,
+   "quote": "Intake is captured through a guided form on the client site.",
+   "lines": [
+    53,
+    53
+   ],
+   "statement": "Intake is captured through a guided form hosted on the client site.",
+   "about": "target"
+  },
+  {
+   "id": 66,
+   "quote": "The site runs as a single process behind Cloudflare Access",
+   "lines": [
+    53,
+    53
+   ],
+   "statement": "The client site runs as a single process behind Cloudflare Access.",
+   "about": "target"
+  },
+  {
+   "id": 67,
+   "quote": "a client opens their engagement by email identity",
+   "lines": [
+    53,
+    53
+   ],
+   "statement": "A client authenticates to their engagement by email identity.",
+   "about": "target"
+  },
+  {
+   "id": 68,
+   "quote": "a seller can upload materials to a dataroom the buyer never sees",
+   "lines": [
+    53,
+    53
+   ],
+   "statement": "Sellers can upload materials to a dataroom that the buyer cannot see.",
+   "about": "target"
+  },
+  {
+   "id": 69,
+   "quote": "Reports are delivered as self-contained printable pages",
+   "lines": [
+    53,
+    53
+   ],
+   "statement": "Reports are delivered as self-contained printable pages.",
+   "about": "target"
+  },
+  {
+   "id": 70,
+   "quote": "with a letter that states the liability posture of the practice",
+   "lines": [
+    53,
+    53
+   ],
+   "statement": "Delivered reports include a letter stating the liability posture of the practice.",
+   "about": "target"
+  },
+  {
+   "id": 71,
+   "quote": "The pipeline runs unattended end to end, from intake to delivered report.",
+   "lines": [
+    55,
+    55
+   ],
+   "statement": "The pipeline operates without human intervention from intake through to the delivered report.",
+   "about": "target"
+  },
+  {
+   "id": 72,
+   "quote": "A test suite of over 130 tests covers the workflow code",
+   "lines": [
+    59,
+    59
+   ],
+   "statement": "A test suite of more than 130 tests exists for the workflow code.",
+   "about": "target"
+  },
+  {
+   "id": 73,
+   "quote": "covers the workflow code: schemas, the chase logic, the output checks, batching, the hand-back, and the state machine",
+   "lines": [
+    59,
+    59
+   ],
+   "statement": "The test suite covers schemas, the chase logic, the output checks, batching, the hand-back, and the state machine.",
+   "about": "target"
+  },
+  {
+   "id": 74,
+   "quote": "The measurement harness under `measure/` holds the fixtures, the graded runs, and the scripts that produced the figures in section 5.",
+   "lines": [
+    59,
+    59
+   ],
+   "statement": "The measurement harness under `measure/` contains the fixtures, the graded runs, and the scripts that produced the section 5 figures.",
+   "about": "target"
+  },
+  {
+   "id": 75,
+   "quote": "The reviewer's own verdicts move between runs on identical text; two or three findings per run flip for no change in the finding.",
+   "lines": [
+    63,
+    63
+   ],
+   "statement": "Reviewer verdicts are unstable across runs on identical text: two or three findings per run flip with no change in the input.",
+   "about": "target"
+  },
+  {
+   "id": 76,
+   "quote": "The recall pass names different lines on successive runs of the same claim",
+   "lines": [
+    63,
+    63
+   ],
+   "statement": "The recall pass is unstable: it names different lines on successive runs of the same claim.",
+   "about": "target"
+  },
+  {
+   "id": 77,
+   "quote": "so the uncited-adverse figure is a sample, not a count",
+   "lines": [
+    63,
+    63
+   ],
+   "statement": "The uncited-adverse figure is a sample rather than a count.",
+   "about": "target"
+  },
+  {
+   "id": 78,
+   "quote": "Calibration of caveated verdicts is the largest remaining failure class",
+   "lines": [
+    63,
+    63
+   ],
+   "statement": "Calibration of caveated verdicts is the largest remaining failure class.",
+   "about": "target"
+  },
+  {
+   "id": 79,
+   "quote": "no mechanism addresses it yet",
+   "lines": [
+    63,
+    63
+   ],
+   "statement": "No mechanism exists yet to address calibration of caveated verdicts.",
+   "about": "target"
+  },
+  {
+   "id": 80,
+   "quote": "Runs on the reference target take between fifty and ninety minutes for the audit alone.",
+   "lines": [
+    63,
+    63
+   ],
+   "statement": "The audit alone takes between fifty and ninety minutes per run on the reference target.",
+   "about": "target"
+  },
+  {
+   "id": 81,
+   "quote": "Larger targets have not been measured.",
+   "lines": [
+    63,
+    63
+   ],
+   "statement": "No measurements exist for targets larger than the reference target.",
+   "about": "target"
+  },
+  {
+   "id": 82,
+   "quote": "A second workflow, a security audit over the same method template, exists and has been run",
+   "lines": [
+    67,
+    67
+   ],
+   "statement": "A second workflow, a security audit over the same method template, exists and has been run.",
+   "about": "target"
+  },
+  {
+   "id": 83,
+   "quote": "but its enumeration is not yet stable enough for delivery",
+   "lines": [
+    67,
+    67
+   ],
+   "statement": "The security audit workflow's enumeration is not yet stable enough for delivery.",
+   "about": "target"
+  },
+  {
+   "id": 84,
+   "quote": "Best-of-N selection on the pre-review output check, and a stronger model at hand-back, are designed",
+   "lines": [
+    67,
+    67
+   ],
+   "statement": "Best-of-N selection on the pre-review output check and a stronger model at hand-back have been designed.",
+   "about": "seller"
+  },
+  {
+   "id": 85,
+   "quote": "Best-of-N selection on the pre-review output check, and a stronger model at hand-back, are designed and not built.",
+   "lines": [
+    67,
+    67
+   ],
+   "statement": "Best-of-N selection on the pre-review output check and a stronger model at hand-back are not built.",
+   "about": "target"
+  }
+ ]
+}

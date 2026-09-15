@@ -23,6 +23,55 @@ logger = logging.getLogger("continuation.session")
 SOURCE = "User"
 
 
+def _clip(text: Any, n: int) -> str:
+    t = " ".join(str(text or "").split())
+    return t if len(t) <= n else t[:n].rstrip() + "…"
+
+
+def deliverable_digest(merged: Dict[str, Any], merged_dir: Path,
+                       gap_chars: int = 400, basis_chars: int = 300) -> str:
+    """The delivered findings and ratings as prompt text, one block per
+    claim: quote, verdict, gap, the check's outcome, the rating and its
+    basis. Sized for the prompt (a 58-claim run is under 10k tokens); the
+    full text of every field is in the files under `inspect`, which the
+    block names."""
+    ratings: Dict[Any, Dict[str, Any]] = {}
+    mp = merged_dir / "materiality.json"
+    if mp.is_file():
+        m = json.loads(mp.read_text(encoding="utf-8"))
+        for key in ("ratings", "exposures"):
+            for r in m.get(key) or []:
+                ratings[(r.get("claim_source"), r.get("claim_id"))] = r
+    lines = [f"## The deliverable, loaded at session start (merged/{merged_dir.name})",
+             "The findings as delivered and the ratings as given, one block per claim. "
+             "Complete text of every field: merged.json, materiality.json and "
+             "report.md under `inspect`."]
+    for f in merged.get("findings") or []:
+        adj = f.get("adjudication") or {}
+        key = (f.get("claim_source"), f.get("claim_id"))
+        r = ratings.get(key) or {}
+        rating = r.get("materiality") or r.get("exposure")
+        lines.append("")
+        lines.append(f"### {f.get('claim_source')} #{f.get('claim_id')} — {adj.get('verdict')}"
+                     + (f"; {'exposure' if 'exposure' in r else 'materiality'}: {rating}"
+                        + (" (borderline)" if r.get("borderline") else "") if rating else "")
+                     + (f"; check: {(f.get('review') or {}).get('outcome')}"
+                        if (f.get("review") or {}).get("outcome") else ""))
+        lines.append(f"quote: {_clip(f.get('quote'), 240)}")
+        if adj.get("gap"):
+            lines.append(f"gap: {_clip(adj.get('gap'), gap_chars)}")
+        if adj.get("unresolved_because"):
+            lines.append(f"unresolved because: {adj.get('unresolved_because')}")
+        if r.get("basis"):
+            lines.append(f"rating basis: {_clip(r.get('basis'), basis_chars)}")
+    qs = merged.get("questions") or []
+    if qs:
+        lines += ["", "### Questions put to the seller"]
+        for q in qs:
+            lines.append(f"- ({q.get('claim_source')} #{q.get('claim_id')}) {_clip(q.get('question'), 300)}")
+    return "\n".join(lines)
+
+
 class PostSession:
     def __init__(self, engagement: str, model: Optional[Path] = None,
                  intake: Optional[str] = None, merged: Optional[Path] = None,
@@ -68,6 +117,15 @@ class PostSession:
                     "history" if self.resumed else "new")
         self.name, cfg = ct.build_config(self.eng_dir, self.world, model, self.target,
                                          scenario_path=scenario)
+        # THE DELIVERABLE IS IN THE PROMPT (2026-09-14). It was reviewed,
+        # delivered and does not change, so it is loaded once here rather
+        # than rediscovered through the inspect subagent on every question:
+        # the one recorded turn before this ran three subagent passes over
+        # report.md, merged.json and materiality.json to answer one question,
+        # about five minutes. CONTINUATION.md §1 and §3 say what is here and
+        # what stays under `inspect` (the record and the materials).
+        cfg["capabilities"] = (str(cfg.get("capabilities") or "").rstrip() + "\n\n"
+                               + deliverable_digest(self.merged, self.merged_dir))
         from chat.chat_loop import ChatLoop                    # noqa: E402
         from chat.model_params import TOP_P                    # noqa: E402
         self.loop = ChatLoop(character_name=self.name, character_config=cfg)

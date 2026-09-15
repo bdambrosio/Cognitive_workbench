@@ -1,0 +1,251 @@
+{
+ "claim_source": "docs/acquirer/one_pager.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "Every claim a seller makes about their software, checked against the code, with a citation.",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "Every seller claim is checked against the target's code and is accompanied by a citation to that code.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "adjudicates each one against the seller's source",
+     "lines": [
+      5,
+      5
+     ]
+    },
+    {
+     "quote": "An agent adjudicates each claim against the code.",
+     "lines": [
+      10,
+      10
+     ]
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "quote": "Tuuyi Claims Review reads those documents, extracts every factual assertion",
+   "lines": [
+    5,
+    5
+   ],
+   "statement": "The product reads the seller's documents (the README, the technical overview, the sales deck) and extracts every factual assertion from them.",
+   "about": "target"
+  },
+  {
+   "id": 3,
+   "quote": "The result is a report the buyer's counsel and engineers can read side by side: a verdict per claim, and for each verdict the lines of code it rests on.",
+   "lines": [
+    5,
+    5
+   ],
+   "statement": "The output report contains a verdict for every claim, and for each verdict the lines of code that verdict rests on.",
+   "about": "target"
+  },
+  {
+   "id": 4,
+   "quote": "Every assertion in the seller's documents becomes a claim, quoted verbatim",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The enumeration step is complete: every factual assertion in the seller's documents becomes a claim, and each is quoted verbatim.",
+   "about": "target"
+  },
+  {
+   "id": 5,
+   "quote": "on a frozen surface",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The set of enumerated claims is frozen before adjudication begins.",
+   "about": "target"
+  },
+  {
+   "id": 6,
+   "quote": "reviewed by a person before the audit begins",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The frozen claim surface is reviewed by a human before the audit starts.",
+   "about": "target"
+  },
+  {
+   "id": 7,
+   "quote": "Evidence is source only; documentation is never evidence.",
+   "lines": [
+    10,
+    10
+   ],
+   "statement": "Only source code is admitted as evidence; documentation is never used as evidence.",
+   "about": "target"
+  },
+  {
+   "id": 8,
+   "quote": "100% of citations are verified mechanically before review.",
+   "lines": [
+    10,
+    10
+   ],
+   "statement": "Every citation is verified by a mechanical check before the review step, without exception.",
+   "about": "target"
+  },
+  {
+   "id": 9,
+   "quote": "An independent reviewer, run as a separate process and optionally a different model,",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "A reviewer exists that is independent of the auditor, run as a separate process and optionally as a different model.",
+   "about": "target"
+  },
+  {
+   "id": 10,
+   "quote": "checks every finding against its own evidence",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The independent reviewer checks every finding against its own evidence, without exception.",
+   "about": "target"
+  },
+  {
+   "id": 11,
+   "quote": "Nothing the auditor wrote about its own work reaches the reviewer.",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The reviewer never sees anything the auditor wrote about its own work; the reviewer's inputs are isolated from the auditor's self-account.",
+   "about": "target"
+  },
+  {
+   "id": 12,
+   "quote": "Findings are rated against the buyer's stated thresholds",
+   "lines": [
+    12,
+    12
+   ],
+   "statement": "Findings are rated against thresholds the buyer has stated.",
+   "about": "target"
+  },
+  {
+   "id": 13,
+   "quote": "delivered as a printable report with a covering letter",
+   "lines": [
+    12,
+    12
+   ],
+   "statement": "The deliverable is a printable report accompanied by a covering letter.",
+   "about": "target"
+  },
+  {
+   "id": 14,
+   "quote": "Over 95% of findings hold under independent review on our reference target.",
+   "lines": [
+    16,
+    16
+   ],
+   "statement": "On the seller's reference target, more than 95% of findings survive independent review.",
+   "about": "target"
+  },
+  {
+   "id": 15,
+   "quote": "Every review exception is retested by a second reviewer.",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "Each finding that is an exception under review is retested by a second reviewer, without exception.",
+   "about": "target"
+  },
+  {
+   "id": 16,
+   "quote": "Claims of absence are settled by two complete searches of the tree, always.",
+   "lines": [
+    18,
+    18
+   ],
+   "statement": "Claims of absence are always settled by two complete searches of the target tree, without exception.",
+   "about": "target"
+  },
+  {
+   "id": 17,
+   "quote": "Every run pins the target commit, the harness commit, the model and its sampling settings.",
+   "lines": [
+    19,
+    19
+   ],
+   "statement": "Every run records the exact target commit, harness commit, model and model sampling settings used.",
+   "about": "target"
+  },
+  {
+   "id": 18,
+   "quote": "Runs are reproducible.",
+   "lines": [
+    19,
+    19
+   ],
+   "statement": "A run can be reproduced.",
+   "about": "target"
+  },
+  {
+   "id": 19,
+   "quote": "Model-agnostic: runs on hosted or on-premises models.",
+   "lines": [
+    20,
+    20
+   ],
+   "statement": "The product runs on hosted models and on on-premises models.",
+   "about": "target"
+  },
+  {
+   "id": 20,
+   "quote": "The seller's dataroom is never visible to the buyer.",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "At no point is the seller's dataroom visible to the buyer.",
+   "about": "target"
+  },
+  {
+   "id": 21,
+   "quote": "Tuuyi is the only claims-review service that cites source lines for every verdict and has an independent reviewer pass on every finding.",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "No other claims-review service both cites source lines for every verdict and has an independent reviewer pass on every finding; Tuuyi is unique in this.",
+   "about": "target"
+  },
+  {
+   "id": 22,
+   "quote": "Delivered in days, not weeks,",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "The engagement is delivered in days rather than weeks.",
+   "about": "target"
+  },
+  {
+   "id": 23,
+   "quote": "at a fixed price per engagement",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "The engagement is priced at a fixed price per engagement.",
+   "about": "target"
+  }
+ ]
+}

@@ -81,6 +81,10 @@ characters:
     # continuation is what this mode wants; an unoriented one would simply be
     # unaware of the same thing more quietly.
     workflow_mode: false
+    # The map primitive is off here as in the runners: a question that names
+    # no path would otherwise build a map of the engagement directory, whose
+    # shape changes with every run, through the model (2026-09-14).
+    subagent_map: false
 
     # REFLECTION AND ATTRIBUTION ARE OFF (Bruce, 2026-09-07). Both run after
     # every reply as model calls; the session answers from the record, not

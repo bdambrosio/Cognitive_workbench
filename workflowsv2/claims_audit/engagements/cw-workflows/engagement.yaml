@@ -1,0 +1,47 @@
+# claims-audit engagement: cw-workflows
+#
+# Created 2026-09-14T19-21-21Z. A self-review: the target is this repository at
+# commit 1c6bde8d, cloned locally, and the claim sources are the two seller
+# documents under docs/acquirer/ written for a prospective acquirer of the
+# claims-review product. The practice wrote both documents and the buyer
+# below; nothing here describes a real deal.
+
+target: target
+
+claim_sources:
+  - docs/acquirer/technical_report.md
+  - docs/acquirer/one_pager.md
+
+retention: keep
+
+# THE BUYER IS ILLUSTRATIVE. Written by the practice so the ratings read
+# against stated thresholds the way a real engagement's do.
+transaction: |
+  Client: an illustrative acquirer of the claims-review product, written by the practice
+  Acting for the client: the practice
+  Counterparty: Tuuyi, as seller
+  Subject: the claims-review pipeline under workflowsv2/, its method documents, the client site and the measurement harness, to be operated by the buyer's own engineers
+  Price and basis: nominal; the buyer assumes the technical report and the one-pager are accurate
+  Structure: asset purchase
+  Timetable: none; illustrative
+
+thresholds: |
+  Paying for: a pipeline that adjudicates a seller's claims against source with cited evidence, an independent review of every finding, and reproducible runs, as the technical report describes
+  Would change the price or the terms: a review that is less independent than stated; performance figures the run records do not bear out; stages described as automated that are run by hand; model support narrower than stated
+  Would end the deal: a licence or ownership problem with the code, or a dependency on a hosted model the buyer cannot replace
+
+client_emails:
+  - sales@tuuyi.com
+seller_emails: []
+
+# Documentation is not evidence. The method documents under workflowsv2/*/method/
+# are the text the agents execute and stay in; the website under site/ is the
+# seller's own marketing and stays out.
+evidence_excludes:
+  - docs/
+  - README.md
+  - AGENTS.md
+  - BACKGROUND.md
+  - CLAUDE.md
+  - test_primitives.md
+  - site/
