@@ -153,6 +153,10 @@ def main() -> int:
     checks = audit.post_run_checks(
         obj, target, claim_source, frozen, out,
         read=set(audit.files_read(traces_dir, target)), excludes=excludes)
+    if (checks.get("figures") or {}).get("prefixed_quotes"):
+        # The check rewrote quotes that carried the line-number display.
+        (out / "findings.json").write_text(
+            json.dumps(obj, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     meta["hand_back"] = {
         "source_run": run.name, "review_hits": ids, "batches": log,
         "replaced": replaced, "world": world,

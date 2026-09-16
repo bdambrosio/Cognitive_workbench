@@ -1881,6 +1881,12 @@ def main() -> int:
                                  read=set(files_read(traces_dir, eng["target"])),
                                  excludes=eng["evidence_excludes"],
                                  also=(emission or {}).get("batch_defects") or ())
+    if obj is not None and (checks.get("figures") or {}).get("prefixed_quotes"):
+        # The check rewrote quotes that carried the line-number display;
+        # the file written above predates that.
+        (out / "findings.json").write_text(
+            json.dumps(obj, indent=1, ensure_ascii=False) + "\n",
+            encoding="utf-8")
     if obj is not None and (out / "findings.partial.json").is_file():
         (out / "findings.partial.json").unlink()
     # A CHECK PROBLEM IS NOT A FAILED RUN (Bruce, 2026-09-03). The run

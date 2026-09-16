@@ -457,6 +457,34 @@ def salvage_findings(text: str) -> Optional[Dict[str, Any]]:
 _DECORATION = re.compile(r"[*_`]+|^\s*[-*+]\s+|^\s*\d+\.\s+", re.M)
 
 
+_LINE_PREFIX = re.compile(r"^\s*(\d+)\|")
+
+
+def strip_line_prefixes(quote: str, lo: int) -> Optional[str]:
+    """The quote with the runner's line-number display stripped, or None.
+
+    Files reach the model line-numbered, `123|text`, so it can cite by
+    line. Ten of 545 citations in one hand-back (ChatterMate, 2026-09-16)
+    copied that display into the quote, prefixes and all, and each failed
+    the verbatim check although the lines cited were right. This
+    recognises exactly that shape and nothing else: every line of the
+    quote carries a prefix, and the numbers run consecutively from the
+    first cited line. Source text that happens to start with digits and a
+    pipe does not match unless it also counts the cited lines, so a quote
+    that resolves as given is never touched, whichever model wrote it.
+    """
+    lines = quote.splitlines()
+    if not lines:
+        return None
+    out: List[str] = []
+    for i, line in enumerate(lines):
+        m = _LINE_PREFIX.match(line)
+        if not m or int(m.group(1)) != lo + i:
+            return None
+        out.append(line[m.end():])
+    return "\n".join(out)
+
+
 def _norm(s: str) -> str:
     """Compare quotes the way a reader would: ignoring whitespace and markdown.
 
@@ -775,13 +803,18 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
     view = corpus_view(corpus)
     docs = corpus_index(corpus)
     joined: List[str] = []
+    prefixed: List[str] = []
     # Citations into documents the engagement excluded from evidence
     # (METHOD §7). Recorded, not failed: a claim about the document itself
     # may cite it, and the review judges relevance with the mark in view.
     excluded_cites: List[Dict[str, Any]] = []
 
-    def _cite(where: str, doc: Any, lines: Any, quote: Any) -> None:
-        """One citation, against the corpus. METHOD §7.
+    def _cite(where: str, doc: Any, lines: Any, quote: Any,
+              item: Optional[Dict[str, Any]] = None) -> None:
+        """One citation, against the corpus. METHOD §7. `item` is the
+        evidence object the quote came from; a quote accepted only after
+        its line-number prefixes are stripped is rewritten there, so every
+        later stage reads source text.
 
         A QUOTE THAT JOINS LINES OF THE CITED RANGE IS COUNTED, NOT FAILED.
         METHOD §7 asks for one contiguous span, and the whole-quote test is
@@ -822,6 +855,18 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
                 if len(pieces) > 1 and all(pc in span for pc in pieces):
                     joined.append(where)
                     return
+                # THE LINE-NUMBER DISPLAY COPIED INTO THE QUOTE. Accepted
+                # only when the stripped text resolves, and rewritten in
+                # place so the finding carries the source text.
+                stripped = strip_line_prefixes(quote, lo)
+                if stripped and _norm(stripped):
+                    s_pieces = [_norm(x) for x in stripped.splitlines() if _norm(x)]
+                    if _norm(stripped) in span or (
+                            len(s_pieces) > 1 and all(pc in span for pc in s_pieces)):
+                        prefixed.append(where)
+                        if item is not None:
+                            item["quote"] = stripped
+                        return
                 whole = _norm("\n".join(body))
                 missing = [pc for pc in pieces if pc not in span] or [_norm(quote)]
                 problems.append(
@@ -968,7 +1013,7 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
                     problems.append(f"{ew}: form {form!r} requires {field!r} "
                                     f"(METHOD §7)")
             if form == "citation":
-                _cite(ew, e.get("document"), e.get("lines"), e.get("quote"))
+                _cite(ew, e.get("document"), e.get("lines"), e.get("quote"), e)
             elif form == "derived":
                 basis = e.get("basis") or []
                 if len(basis) < 2:
@@ -977,7 +1022,7 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
                 for k, b in enumerate(basis, 1):
                     if isinstance(b, dict):
                         _cite(f"{ew} basis {k}", b.get("document"),
-                              b.get("lines"), b.get("quote"))
+                              b.get("lines"), b.get("quote"), b)
 
     for cid in sorted(ids - set(seen), key=lambda x: (x is None, x)):
         problems.append(f"claim {cid} in the frozen surface has no finding — "
@@ -993,7 +1038,7 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
         e = (u or {}).get("evidence") or {}
         if e.get("form") == "citation":
             _cite(f"unclaimed {i}", e.get("document"), e.get("lines"),
-                  e.get("quote"))
+                  e.get("quote"), e)
 
     return {"ok": not problems, "problems": problems,
             "figures": {"findings": len(findings),
@@ -1001,7 +1046,8 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
                         "adjudicated": len(seen),
                         "verdicts": verdicts,
                         "evidence_forms": forms,
-                        "joined_quotes": joined, "excluded_citations": excluded_cites,
+                        "joined_quotes": joined, "prefixed_quotes": prefixed,
+                        "excluded_citations": excluded_cites,
                         # METHOD §8: findings recorded `not_examined`, and the
                         # files searches named that the run never opened.
                         "not_examined": not_examined,
