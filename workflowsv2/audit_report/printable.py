@@ -54,7 +54,12 @@ def to_body(md_text: str) -> str:
     before the sections a reader treats as separate documents, each finding
     boxed, the materials line marked as front matter. The browser's document
     pane uses this; `to_html` wraps it in a page."""
-    md = MarkdownIt("commonmark").enable("table")
+    # RAW HTML OFF. The markdown carries seller text quoted verbatim, and a
+    # ChatterMate quote carried a literal `<script>` tag (2026-09-16): with
+    # raw HTML on, the browser opened a script element there and swallowed
+    # everything after claim 18, in the page and in the 67-page PDF printed
+    # from it. With raw HTML off, a tag in quoted text renders as text.
+    md = MarkdownIt("commonmark", {"html": False}).enable("table")
     body = md.render(md_text)
     # Page breaks before the sections a reader treats as separate documents.
     for name in PAGE_BREAK_BEFORE:

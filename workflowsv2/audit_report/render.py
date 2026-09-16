@@ -134,6 +134,9 @@ def _md_safe(text: Any) -> str:
     because the text never starts a line on its own."""
     s = " ".join(str(text or "").split())
     s = s.replace("```", "\\`\\`\\`").replace("|", "\\|")
+    # A `<` starts raw HTML in CommonMark; a quoted `<script>` tag swallowed
+    # the rest of the rendered report (2026-09-16). Escaped, it stays text.
+    s = s.replace("<", "\\<")
     return s
 
 
