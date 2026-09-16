@@ -44,7 +44,8 @@ def deliverable_digest(merged: Dict[str, Any], merged_dir: Path,
                 ratings[(r.get("claim_source"), r.get("claim_id"))] = r
     lines = [f"## The deliverable, loaded at session start (merged/{merged_dir.name})",
              "The findings as delivered and the ratings as given, one block per claim. "
-             "Complete text of every field: merged.json, materiality.json and "
+             "The complete record of any claim, evidence and rating included: the "
+             "`claim` action. The files themselves: merged.json, materiality.json and "
              "report.md under `inspect`."]
     for f in merged.get("findings") or []:
         adj = f.get("adjudication") or {}
@@ -129,6 +130,14 @@ class PostSession:
         from chat.chat_loop import ChatLoop                    # noqa: E402
         from chat.model_params import TOP_P                    # noqa: E402
         self.loop = ChatLoop(character_name=self.name, character_config=cfg)
+        # THE CLAIM RECORD IS AN ACTION (2026-09-16). A question about a named
+        # claim was spending most of its turn in inspect-subagent steps that
+        # located and re-read the delivered files; record.py holds the same
+        # data indexed by claim and resolves each citation against the
+        # materials at call time. See record.py for the measurements.
+        from workflowsv2.claims_audit import record as rec              # noqa: E402
+        self.record = rec.ClaimRecord(self.merged, self.merged_dir, self.target)
+        rec.register(self.loop, self.record)
         logger.info("continuation model=%s top_p=%s",
                     self.loop.backend.resolved_model(), TOP_P)
 

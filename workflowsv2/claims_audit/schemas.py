@@ -511,6 +511,45 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", _DECORATION.sub(" ", s or "")).strip()
 
 
+def quote_at(body: List[str], lo: int, hi: int, quote: str
+             ) -> Tuple[str, Optional[str]]:
+    """Where a quote stands against lines `lo`-`hi` of `body` (1-based,
+    inclusive, already known to be inside the file).
+
+    Returns `(status, detail)`:
+      "exact"     the quote is within those lines (compared by `_norm`);
+      "joined"    each newline-separated piece of the quote is within those
+                  lines, though the whole is not (bullets copied with the
+                  sub-bullets between them dropped);
+      "prefixed"  the quote carried the line-number display and resolves
+                  once it is stripped; `detail` is the stripped quote;
+      "elsewhere" the quote is in the file but not at those lines;
+      "missing"   the quote is not in the file; `detail` is the first piece
+                  not found at those lines.
+
+    The audit's output check (`check_output`) and the consultation's claim
+    record (record.py) both decide a citation this way, so the rule lives
+    once, here.
+    """
+    span = _norm("\n".join(body[lo - 1:hi]))
+    q = _norm(quote)
+    if q in span:
+        return "exact", None
+    pieces = [_norm(x) for x in quote.splitlines() if _norm(x)]
+    if len(pieces) > 1 and all(pc in span for pc in pieces):
+        return "joined", None
+    stripped = strip_line_prefixes(quote, lo)
+    if stripped and _norm(stripped):
+        s_pieces = [_norm(x) for x in stripped.splitlines() if _norm(x)]
+        if _norm(stripped) in span or (
+                len(s_pieces) > 1 and all(pc in span for pc in s_pieces)):
+            return "prefixed", stripped
+    if q in _norm("\n".join(body)):
+        return "elsewhere", None
+    missing = [pc for pc in pieces if pc not in span] or [q]
+    return "missing", missing[0]
+
+
 #: Directory names never read as materials when the target is not a git
 #: worktree. `.git` holds thousands of binary objects; a dependency tree is
 #: not the target. Every other directory is materials, dot-directories
@@ -849,32 +888,26 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
                             f"numbers, or the range is wrong")
             return
         if isinstance(quote, str) and _norm(quote):
-            span = _norm("\n".join(body[lo - 1:hi]))
-            if _norm(quote) not in span:
-                pieces = [_norm(x) for x in quote.splitlines() if _norm(x)]
-                if len(pieces) > 1 and all(pc in span for pc in pieces):
-                    joined.append(where)
-                    return
+            status, detail = quote_at(body, lo, hi, quote)
+            if status == "exact":
+                return
+            if status == "joined":
+                joined.append(where)
+                return
+            if status == "prefixed":
                 # THE LINE-NUMBER DISPLAY COPIED INTO THE QUOTE. Accepted
                 # only when the stripped text resolves, and rewritten in
                 # place so the finding carries the source text.
-                stripped = strip_line_prefixes(quote, lo)
-                if stripped and _norm(stripped):
-                    s_pieces = [_norm(x) for x in stripped.splitlines() if _norm(x)]
-                    if _norm(stripped) in span or (
-                            len(s_pieces) > 1 and all(pc in span for pc in s_pieces)):
-                        prefixed.append(where)
-                        if item is not None:
-                            item["quote"] = stripped
-                        return
-                whole = _norm("\n".join(body))
-                missing = [pc for pc in pieces if pc not in span] or [_norm(quote)]
-                problems.append(
-                    f"{where}: quote is not at {doc}:{lo}-{hi}"
-                    + ("; it is elsewhere in that document"
-                       if _norm(quote) in whole else
-                       f"; this part is not at those lines: "
-                       f"{missing[0][:80]!r}"))
+                prefixed.append(where)
+                if item is not None:
+                    item["quote"] = detail
+                return
+            problems.append(
+                f"{where}: quote is not at {doc}:{lo}-{hi}"
+                + ("; it is elsewhere in that document"
+                   if status == "elsewhere" else
+                   f"; this part is not at those lines: "
+                   f"{(detail or '')[:80]!r}"))
 
     findings = obj.get("findings")
     if not isinstance(findings, list):
