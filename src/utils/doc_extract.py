@@ -11,7 +11,7 @@ labels where pdfplumber jammed them together (e.g. "Total liabilities" vs
 "Totalliabilities"), which matters for grep/readability — validated on a
 Berkshire 10-K balance sheet, 2026-06-19.
 
-v1 scope: PDF only. `extract_to_markdown` dispatches on file extension and
+Scope: PDF and HTML. `extract_to_markdown` dispatches on file extension and
 is the seam a future document-inspection subagent would reuse to
 materialize a text view of a mixed-document directory (see
 docs/financial-analysis-tools-plan.md, Decision 2/3).
@@ -105,15 +105,94 @@ def pdf_to_markdown(source: Union[str, Path, bytes, bytearray],
     return "\n\n".join(parts).strip()
 
 
+# Elements that start a new block of output. Everything else is inline and
+# continues the block it sits in.
+_HTML_BLOCKS = {"h1", "h2", "h3", "h4", "h5", "h6", "p", "li", "ul", "ol",
+                "div", "section", "article", "aside", "blockquote", "dl",
+                "dt", "dd", "figure", "figcaption", "details", "summary",
+                "pre", "hr", "address"}
+# Left out: not the page's own text, or not text a reader sees.
+_HTML_DROPPED = {"script", "style", "nav", "header", "footer", "video",
+                 "audio", "form", "noscript", "template"}
+
+
+def html_to_markdown(source: Union[str, Path]) -> str:
+    """Extract the readable text of an HTML page as markdown: the page's
+    `<main>` element (the `<body>` if there is none), headings as `#` lines,
+    list items as `- ` lines, every other block as one line, tables as
+    markdown tables. Navigation, header, footer, forms, scripts and media
+    elements are left out. `source` is a path, or the HTML itself as a
+    string."""
+    from bs4 import BeautifulSoup
+    from bs4.element import Comment, NavigableString
+
+    html = source.read_text(encoding="utf-8", errors="replace") \
+        if isinstance(source, Path) else str(source)
+    soup = BeautifulSoup(html, "html.parser")
+    root = soup.find("main") or soup.body or soup
+
+    parts: List[str] = []
+    run: List[str] = []       # inline text of the block being read
+    prefix = [""]             # markdown marker for the next block emitted
+
+    def flush() -> None:
+        text = " ".join("".join(run).split())
+        run.clear()
+        if text:
+            parts.append(prefix[0] + text)
+            prefix[0] = ""
+
+    def walk(node) -> None:
+        for child in node.children:
+            if isinstance(child, Comment):
+                continue
+            if isinstance(child, NavigableString):
+                run.append(str(child))
+            elif child.name in _HTML_DROPPED:
+                continue
+            elif child.name == "table":
+                flush()
+                md = _table_to_markdown(
+                    [[" ".join(c.get_text(" ").split())
+                      for c in tr.find_all(["th", "td"])]
+                     for tr in child.find_all("tr")])
+                if md:
+                    parts.append(md)
+            elif child.name in _HTML_BLOCKS:
+                flush()
+                if child.name[0] == "h" and child.name[1:].isdigit():
+                    prefix[0] = "#" * int(child.name[1:]) + " "
+                elif child.name == "li":
+                    prefix[0] = "- "
+                elif child.name == "blockquote":
+                    prefix[0] = "> "
+                walk(child)
+                flush()
+                prefix[0] = ""
+            else:
+                # Two inline elements with nothing between them are set apart
+                # by styling, not by a space in the text: two chips in a row.
+                if child.name == "br" or getattr(child.previous_sibling,
+                                                 "name", None):
+                    run.append(" ")
+                walk(child)
+
+    walk(root)
+    flush()
+    return "\n\n".join(parts).strip()
+
+
 def extract_to_markdown(path: Union[str, Path],
                         *, max_pages: Optional[int] = None) -> str:
-    """Dispatch on file extension and extract to markdown. v1 handles PDF
-    only; other types raise ValueError so the gap is explicit rather than
+    """Dispatch on file extension and extract to markdown. Handles PDF and
+    HTML; other types raise ValueError so the gap is explicit rather than
     silently returning nothing."""
     p = Path(path)
     suffix = p.suffix.lower()
     if suffix == ".pdf":
         return pdf_to_markdown(p, max_pages=max_pages)
+    if suffix in (".html", ".htm"):
+        return html_to_markdown(p)
     raise ValueError(
         f"extract_to_markdown: unsupported file type {suffix!r} "
-        f"(v1 supports .pdf only)")
+        f"(supports .pdf, .html)")
