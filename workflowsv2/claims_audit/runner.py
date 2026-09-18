@@ -992,11 +992,33 @@ def _merge_emissions(parts: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
             "evidence": parts[0].get("evidence")}
 
 
+def transaction_subject(transaction: Optional[str]) -> Optional[str]:
+    """The text of the transaction block's `Subject:` line, which the intake
+    writes (intake/schemas.py) and a hand-made engagement.yaml copies."""
+    for line in (transaction or "").splitlines():
+        label, _, text = line.strip().partition(":")
+        if label == "Subject" and text.strip():
+            return text.strip()
+    return None
+
+
 def emit_surface(loop, method_text: str, claim_source: Path,
                  section: Tuple[int, int], n: int, of: int,
-                 so_far: Sequence[Dict[str, Any]], max_tokens: int
-                 ) -> Dict[str, Any]:
+                 so_far: Sequence[Dict[str, Any]], max_tokens: int,
+                 subject: Optional[str] = None) -> Dict[str, Any]:
     """Phase one, one section: enumerate its claims, before any evidence.
+
+    THE ENUMERATOR IS TOLD WHAT THE BUYER WOULD ACQUIRE (`subject`, the
+    transaction's Subject line). METHOD §5 tags a claim `target` when it
+    concerns "the product, code, infrastructure, business or terms the buyer
+    would acquire", and until 2026-09-17 nothing in this call said what that
+    was. A README names its product in every sentence, so the gap did not
+    show. A service's website says "the review does X" and "we check Y": all
+    43 claims of tuuyi.com's how-it-works page came back tagged `seller`,
+    though the software that does those things was the target, and a claim
+    tagged `seller` is neither split nor tested against the code. Nothing
+    else of the engagement is passed: the buyer's suspicions and thresholds
+    stay out of enumeration.
 
     NO TOOLS AND NO LEGS. Enumeration is reading one document, which the runner
     can hand over directly and line-numbered. Giving the agent a tool loop to
@@ -1015,7 +1037,12 @@ def emit_surface(loop, method_text: str, claim_source: Path,
     body = "\n".join(f"{k}|{t}" for k, t in enumerate(lines[lo - 1:hi], lo))
     prior = ("\n".join(f"  {c['id']}. {c.get('quote')}" for c in so_far)
              or "  (none yet)")
-    user = (f"The claim source for this run is `{claim_source.name}`, "
+    acquired = (f"What the buyer would acquire in this engagement, as the "
+                f"engagement states it: {subject}\nA statement of what that "
+                f"product or service does concerns the target, whether the "
+                f"sentence names the product, the service or \"we\".\n\n"
+                if subject else "")
+    user = (f"{acquired}The claim source for this run is `{claim_source.name}`, "
             f"{len(lines)} lines. This is section {n} of {of}, lines {lo} to "
             f"{hi}, with the line numbers your citations refer to:\n\n"
             f"{body}\n\n"
@@ -1365,7 +1392,8 @@ def main() -> int:
             parts = [assembled]
         for n, sec in enumerate(sections, 1):
             part = emit_surface(loop, method_text, src_doc, sec, n,
-                                len(sections), assembled["claims"], emit_tokens)
+                                len(sections), assembled["claims"], emit_tokens,
+                                subject=transaction_subject(eng.get("transaction")))
             calls.append({k: v for k, v in part.items() if k not in ("raw", "obj")})
             raws.append(part.get("raw") or "")
             logger.info("section %d/%d lines %d-%d: %s, finish=%s, %d chars",
