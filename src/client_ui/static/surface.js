@@ -51,6 +51,7 @@
         + '<td class="id">' + esc(c.id) + (c.about === "seller" ? '<div class="muted">seller</div>' : c.about === "document" ? '<div class="muted">document</div>' : "")
           + (c.implied_by != null ? '<div class="muted">implied by ' + esc(c.implied_by) + (c.property ? ": " + esc(c.property) : "") + "</div>" : "")
           + (c.same_as ? '<div class="muted">same as ' + esc(c.same_as.source) + " " + esc(c.same_as.id) + "</div>" : "")
+          + (c.within ? '<div class="muted">within ' + esc(c.within.source) + " " + esc(c.within.id) + "</div>" : "")
           + ((c.declined || []).length ? '<div class="declined">not decomposed: ' + c.declined.map((d) => esc(d.text) + " (" + esc(d.why) + ")").join("; ") + "</div>" : "") + "</td>"
         + '<td class="lines mono"' + (ed ? ' contenteditable="true"' : "") + ">" + esc((c.lines || []).join("–")) + "</td>"
         + '<td class="quote"' + (ed ? ' contenteditable="true"' : "") + ">" + esc(c.quote) + "</td>"
@@ -60,6 +61,8 @@
         + '<form class="comment" data-src="' + esc(src.source) + '" data-id="' + esc(c.id) + '"><input placeholder="comment"><button>add</button></form></td>'
         + (ed ? '<td><button class="quiet drop" title="leave this claim out">' + (dup ? "keep" : "drop") + "</button>"
               + (c.same_as ? '<div class="declined">tested as ' + esc(c.same_as.source) + " " + esc(c.same_as.id) + ": " + esc(c.same_as.statement) + "</div>" : "")
+              // A narrower claim stays in the audit: its verdict is not yet read from the wider one's.
+              + (c.within ? '<div class="declined">covered by ' + esc(c.within.source) + " " + esc(c.within.id) + ": " + esc(c.within.statement) + "</div>" : "")
               + (c.implied_by == null ? '<button class="quiet decompose" title="ask for the testable properties a reasonable buyer would take this claim to assert">decompose</button>' : "") + "</td>" : "")
         + "</tr>";
     }

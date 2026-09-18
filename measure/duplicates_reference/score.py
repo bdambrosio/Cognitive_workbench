@@ -40,20 +40,32 @@ def main(path: str) -> int:
     for k in ref["order"]:
         for c in json.loads((HERE / "claims" / f"{k}.json").read_text(encoding="utf-8"))["claims"]:
             claims[f"{k}{c['id']}"] = c["statement"]
-    marks = {frozenset((f"{by_source[p['source']]}{p['id']}",
-                        f"{by_source[p['same_as']['source']]}{p['same_as']['id']}")): p
-             for p in got["pairs"]}
+    def key(p):
+        o = p.get("other") or p.get("same_as")
+        return frozenset((f"{by_source[p['source']]}{p['id']}",
+                          f"{by_source[o['source']]}{o['id']}"))
+    marks = {key(p): p for p in got["pairs"]}
+    as_same = {k for k, p in marks.items() if p.get("relation", "same") == "same"}
+    as_within = {k for k, p in marks.items() if p.get("relation") == "within"}
     same = {frozenset(p) for p in ref["same"]}
     ent = {frozenset(p) for p in ref["entailed_by"]}
-    print(f"{len(marks)} marks: {len(same & set(marks))} of {len(same)} same pairs found, "
-          f"{len(ent & set(marks))} of {len(ent)} entailed pairs marked, "
-          f"{len(set(marks) - same - ent)} marks in neither list")
+    print(f"{len(marks)} marks: same {len(same & as_same)} of {len(same)} found as same"
+          f" ({len(same & as_within)} as within); entailed {len(ent & as_within)} of {len(ent)}"
+          f" found as within ({len(ent & as_same)} as same); {len(set(marks) - same - ent)} marks in neither list")
+    wrong_way = [k for k in ent & as_within
+                 if f"{by_source[marks[k]['source']]}{marks[k]['id']}" not in
+                 {a for a, b in ref["entailed_by"] if frozenset((a, b)) == k}]
+    if wrong_way:
+        print(f"  within marks with the narrower claim on the wrong side: {len(wrong_way)}")
     for k in sorted(set(marks) - same - ent, key=str):
         a, b = sorted(k)
         print(f"  ? {a} ~ {b}: {claims[a][:70]} | {claims[b][:70]}")
     for k in sorted(same - set(marks), key=str):
         a, b = sorted(k)
         print(f"  missed same: {a} ~ {b}")
+    for k in sorted(ent - set(marks), key=str):
+        a, b = sorted(k)
+        print(f"  missed entailed: {a} ~ {b}")
     return 0
 
 

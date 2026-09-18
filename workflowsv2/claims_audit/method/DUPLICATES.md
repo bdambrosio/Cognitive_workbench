@@ -4,7 +4,9 @@
 
 A seller says the same thing in more than one place: the README says the service uses less than 10 MB of memory, and the project's web page says it again. Each document is enumerated on its own, so the same assertion is listed once for each document that makes it, and each listing would be tested and reported separately. This step finds the listings that repeat an earlier one, so that the assertion is tested once and the report can say every place it was made.
 
-> For each new claim, say which earlier claim makes the same assertion, if one does.
+A seller also says a thing narrowly in one place and widely in another: "the site URL is configurable" on one page, and "the application is configured through environment variables covering the site URL, credentials and storage" on another. Where the wider claim holds, the narrower holds with it. This step also finds such pairs, so that the narrower claim is tested through the wider one and the report says which claim covers it.
+
+> For each new claim, say which earlier claim makes the same assertion, if one does; and where a claim shown beside it is wider or narrower than it, say which of the two is the narrower.
 
 You propose. A person at the practice sees every pair you name, with both statements side by side, and keeps any claim you were wrong about.
 
@@ -17,7 +19,7 @@ The **new claims**: claims from the document now being considered, each with its
 - **Two claims are the same assertion when one verdict, reached on the same evidence, would settle both.** The test: imagine the first claim has been tested and found contradicted. If the second claim must then be contradicted too, for the same reason, and the same again for every other verdict, they are the same assertion. "The service uses less than 10 MB of RAM under regular load" and "RAM usage is under 10 MB in normal operation" are the same assertion.
 - **A different figure, scope, condition or subject makes a different assertion.** "Under 10 MB of RAM" and "under 5 MB of RAM" are two claims, and a seller who states both has made both. "Links can be filtered by their notes" and "links can be filtered by short link, long link and notes" are two claims, because the second could fail where the first holds. "A Docker image is provided" and "the image runs under Docker or Podman" are two claims.
 - **A claim about one document and the same words about another document are two claims.** "This file is licensed under MIT" in the README and in the CLI guide are settled by two different files, and each is a claim about its own document.
-- **A wider claim and a narrower claim are not the same assertion**, even when testing the wider one would go most of the way to settling the narrower. Leave both.
+- **A wider claim and a narrower claim are not the same assertion; the narrower is entailed by the wider.** Two tests, and a pair is entailed only when it passes both. First: if the wider claim holds, the narrower must hold, with nothing left to test. "The application is configured through environment variables covering the site URL, credentials and storage" holding means "the site URL is configurable" holds. Second: the narrower claim carries no figure, limit or boundary of its own. "Under 5 MB of RAM" is not entailed by "under 10 MB of RAM"; it holds or fails on its own figure. Either claim of a pair can be the wider one, the new claim or the earlier claim shown beside it. A wider claim that fails leaves the narrower claim open, which is why an entailed claim is marked and not merged.
 - **A claim about what the code provides and a claim about what happens when the software runs are not the same assertion**, even when their words are close. "The target contains code that counts visits" and "when the target runs, visits are counted" are two claims.
 - **Wording does not matter; what would be tested does.** Two statements in different words that would be settled by the same lines of code in the same way are the same assertion. Two statements in nearly the same words that differ in a number are not.
 - **Name the earliest.** When several earlier claims make the same assertion, name the one listed first.
@@ -29,9 +31,10 @@ One JSON object. Its shape is enforced; this section says what makes a field cor
 
 | Field | Contents |
 |---|---|
-| `pairs[]` | One entry for each new claim that makes the same assertion as an earlier claim; none for a new claim that does not |
+| `pairs[]` | One entry for each pair you name. A new claim has at most one entry naming it as the same as, or narrower than, an earlier claim; it may have any number of entries naming an earlier claim as narrower than it. None for a new claim with no such pair |
 | `pairs[].claim_id` | The `id` of the new claim, as given to you |
-| `pairs[].same_as_source` | The document of the earlier claim, exactly as given to you |
-| `pairs[].same_as_id` | The `id` of the earlier claim within that document |
+| `pairs[].other_source` | The document of the earlier claim, exactly as given to you |
+| `pairs[].other_id` | The `id` of the earlier claim within that document |
+| `pairs[].relation` | `same`; `new_within_earlier` when the new claim is the narrower; `earlier_within_new` when the earlier claim is the narrower |
 
 Emit nothing outside the JSON object.

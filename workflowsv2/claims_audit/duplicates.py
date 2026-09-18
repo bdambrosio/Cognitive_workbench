@@ -14,11 +14,15 @@ plumbing.
 
 WHAT IT CHANGES. The latest enumeration run of each source, in the order
 engagement.yaml lists them. A claim found to repeat an earlier one gets
-`same_as: {"source", "id", "statement"}` in that run's claims.json, and the
-whole result is written to `<engagement>/surface/duplicates.json`. Nothing is
-removed. The surface page shows a marked claim with the earlier statement
-beside it, left out unless the practice keeps it: a wrong pairing is visible
-and undone with one click, and the record says what was folded into what.
+`same_as: {"source", "id", "statement"}` in that run's claims.json; a claim
+found narrower than another, in either document, gets `within: {...}` naming
+the wider one (DUPLICATES.md §3, approved 2026-09-17). The whole result is
+written to `<engagement>/surface/duplicates.json`. Nothing is removed. The
+surface page shows a `same_as` claim struck out beside the earlier statement,
+left out unless the practice keeps it, and a `within` claim with the wider
+statement beside it, still in: its verdict can be read from the wider claim's
+finding only once the report derives it (not built), so until then it is
+audited like any other and the mark is information.
 
 ONLY CLOSE PAIRS ARE JUDGED (Bruce, 2026-09-17). Comparing each new claim
 with every earlier one had the model reason through thousands of pairs, about
@@ -102,14 +106,16 @@ NEAREST = 5                      # earlier claims shown for one new claim, at mo
 FLOOR = 0.70                     # cosine similarity below which none is shown
 EMBEDDER = "BAAI/bge-small-en-v1.5"
 Key = Tuple[str, int]
+RELATIONS = ("same", "new_within_earlier", "earlier_within_new")
 
 
 def schema() -> Dict[str, Any]:
     pair = {"type": "object", "properties": {
         "claim_id": {"type": "integer", "minimum": 1},
-        "same_as_source": {"type": "string"},
-        "same_as_id": {"type": "integer", "minimum": 1}},
-        "required": ["claim_id", "same_as_source", "same_as_id"]}
+        "other_source": {"type": "string"},
+        "other_id": {"type": "integer", "minimum": 1},
+        "relation": {"type": "string", "enum": list(RELATIONS)}},
+        "required": ["claim_id", "other_source", "other_id", "relation"]}
     return {"type": "object", "properties": {
         "pairs": {"type": "array", "items": pair}}, "required": ["pairs"]}
 
@@ -159,29 +165,50 @@ def propose(backend, source: str, new: Sequence[Tuple[Dict[str, Any], Sequence[T
 
 
 def accept(pairs: Sequence[Dict[str, Any]], source: str, order: Sequence[str],
-           claims: Dict[Key, Dict[str, Any]], marked: Dict[Key, Key]) -> Dict[Key, Key]:
-    """The pairings that point backwards to a claim that stands, each
-    followed through any marked claim to the one it points at."""
-    out: Dict[Key, Key] = {}
+           claims: Dict[Key, Dict[str, Any]], same: Dict[Key, Key],
+           within: Dict[Key, Key]) -> Tuple[Dict[Key, Key], Dict[Key, Key]]:
+    """The pairings that are kept, as two maps: {claim: the earlier claim it
+    is the same as} and {narrower claim: the wider claim it is within}.
+    `same` and `within` are what earlier batches marked.
+
+    A `same` pairing points backwards, to a source listed earlier or a
+    smaller id in this one, and is followed through any claim already marked
+    the same as another. A `within` pairing points either way (the narrower
+    claim can be the earlier one); the wider claim is followed through a
+    `same` mark, a claim marked the same as another absorbs nothing, and a
+    claim has at most one mark of its own. A claim about a document is about
+    its own file (DUPLICATES.md says so; the model still paired "this
+    document is MIT-licensed" across three files on 2026-09-17), so the
+    enumerator's `about` tag refuses such a pair in either relation."""
+    out_same: Dict[Key, Key] = {}
+    out_within: Dict[Key, Key] = {}
+
+    def taken(k: Key) -> bool:
+        return k in same or k in within or k in out_same or k in out_within
+
     for p in pairs:
         try:
             new: Key = (source, int(p["claim_id"]))
-            old: Key = (str(p["same_as_source"]), int(p["same_as_id"]))
+            other: Key = (str(p["other_source"]), int(p["other_id"]))
+            relation = str(p["relation"])
         except (KeyError, TypeError, ValueError):
             continue
-        old = marked.get(old, out.get(old, old))
-        if new not in claims or old not in claims or new in out or new == old:
+        other = same.get(other, out_same.get(other, other))
+        if new not in claims or other not in claims or new == other or relation not in RELATIONS:
             continue
-        backwards = (order.index(old[0]) < order.index(source) if old[0] != source
-                     else old[1] < new[1]) if old[0] in order else False
-        # A claim about a document is about its own file. DUPLICATES.md says
-        # so; the model still paired "this document is MIT-licensed" across
-        # three files on 2026-09-17, so the enumerator's `about` tag decides.
-        own_file = (new[0] != old[0] and "document" in
-                    (claims[new].get("about"), claims[old].get("about")))
-        if backwards and not own_file and old not in marked and old not in out:
-            out[new] = old
-    return out
+        if new[0] != other[0] and "document" in (claims[new].get("about"), claims[other].get("about")):
+            continue
+        if relation == "same":
+            backwards = (order.index(other[0]) < order.index(source) if other[0] != source
+                         else other[1] < new[1]) if other[0] in order else False
+            if backwards and not taken(new) and not taken(other):
+                out_same[new] = other
+            continue
+        narrower, wider = (new, other) if relation == "new_within_earlier" else (other, new)
+        if taken(narrower) or wider in same or wider in out_same:
+            continue
+        out_within[narrower] = wider
+    return out_same, out_within
 
 
 def _touched(eng_dir: Path, source: str) -> bool:
@@ -207,7 +234,8 @@ def run(eng_dir: Path, model_yaml: Path) -> Dict[str, Any]:
     index = {k: i for i, k in enumerate(keys)}
     vectors = embed([str(claims[k].get("statement") or "") for k in keys])
     sim = vectors @ vectors.T
-    marked: Dict[Key, Key] = {}
+    marked: Dict[Key, Key] = {}          # claim -> the earlier claim it is the same as
+    within: Dict[Key, Key] = {}          # narrower claim -> the wider claim
     emissions: List[Dict[str, Any]] = []
     skipped: List[str] = []
     for n, src in enumerate(order):
@@ -235,33 +263,41 @@ def run(eng_dir: Path, model_yaml: Path) -> Dict[str, Any]:
                 raise SystemExit(f"{src} claims {batch[0]['id']}-{batch[-1]['id']}: the "
                                  f"comparison returned nothing usable ({out['parse']}: "
                                  f"{out['parse_error']}); no claim was marked")
-            got = accept(out["pairs"], src, order, claims, marked)
-            marked.update(got)
+            got_same, got_within = accept(out["pairs"], src, order, claims, marked, within)
+            marked.update(got_same)
+            within.update(got_within)
             emissions.append({"source": src, "claims": [c["id"] for c in batch],
-                              "proposed": len(out["pairs"]), "accepted": len(got),
+                              "proposed": len(out["pairs"]), "same": len(got_same),
+                              "within": len(got_within),
                               "parse": out["parse"], "parse_error": out["parse_error"]})
-            logger.info("%s claims %s-%s: %d proposed, %d accepted", src, batch[0]["id"],
-                        batch[-1]["id"], len(out["pairs"]), len(got))
+            logger.info("%s claims %s-%s: %d proposed, %d same, %d within", src,
+                        batch[0]["id"], batch[-1]["id"], len(out["pairs"]),
+                        len(got_same), len(got_within))
     for src in order:
         if src in skipped:
             continue
         f = runs[src] / "claims.json"
         doc = json.loads(f.read_text(encoding="utf-8"))
         for c in doc.get("claims") or []:
-            old = marked.get((src, int(c["id"])))
+            k = (src, int(c["id"]))
             c.pop("same_as", None)
-            if old is not None:
-                c["same_as"] = {"source": old[0], "id": old[1],
-                                "statement": claims[old].get("statement")}
+            c.pop("within", None)
+            for key, m in (("same_as", marked), ("within", within)):
+                o = m.get(k)
+                if o is not None:
+                    c[key] = {"source": o[0], "id": o[1],
+                              "statement": claims[o].get("statement")}
         atomic_write_text(f, json.dumps(doc, indent=1, ensure_ascii=False) + "\n")
     record = {"at": state.stamp(), "model": backend.resolved_model(), "order": order,
               "runs": {s: r.name for s, r in runs.items()}, "skipped": skipped,
               "emissions": emissions,
               "pairs": [{"source": n[0], "id": n[1], "statement": claims[n].get("statement"),
                          "similarity": round(float(sim[index[n], index[o]]), 3),
-                         "same_as": {"source": o[0], "id": o[1],
-                                     "statement": claims[o].get("statement")}}
-                        for n, o in sorted(marked.items(), key=lambda kv: (order.index(kv[0][0]), kv[0][1]))]}
+                         "relation": rel,
+                         "other": {"source": o[0], "id": o[1],
+                                   "statement": claims[o].get("statement")}}
+                        for rel, m in (("same", marked), ("within", within))
+                        for n, o in sorted(m.items(), key=lambda kv: (order.index(kv[0][0]), kv[0][1]))]}
     d = eng_dir / state.SURFACE
     d.mkdir(exist_ok=True)
     atomic_write_text(d / "duplicates.json", json.dumps(record, indent=1, ensure_ascii=False) + "\n")
