@@ -1,0 +1,400 @@
+{
+ "claim_source": "claim_sources/site/pricing.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "Three levels, from a free demo to attested due diligence.",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The seller's offering is structured as three levels, ranging from a free demo to attested due diligence.",
+   "about": "seller"
+  },
+  {
+   "id": 2,
+   "quote": "A claims review is priced by the size of the claim set and quoted after intake",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "A claims review is priced according to the size of the claim set, not by a fixed rate or code volume.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Priced by the claims, quoted before we start.",
+     "lines": [
+      5,
+      5
+     ]
+    },
+    {
+     "quote": "The work scales with how much the software says about itself, not with how much code there is.",
+     "lines": [
+      7,
+      7
+     ]
+    },
+    {
+     "quote": "The quote follows the size of the claim set: a small target with one short claim document is a small job; a typical business engagement, one or two documents and up to about 150 claims, is a larger one.",
+     "lines": [
+      23,
+      23
+     ]
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "quote": "The practice is in beta.",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The seller's claims-review practice is currently in beta.",
+   "about": "seller"
+  },
+  {
+   "id": 8,
+   "quote": "Developers evaluating a repository of their own can write to us for access to run one; we set these up by hand for now.",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "Developers evaluating their own repository can request access to run a claims review on it; access is set up manually by the seller at present.",
+   "about": "seller"
+  },
+  {
+   "id": 10,
+   "quote": "The claims review, plus a full reading of the record and a signed opinion by a practitioner with buy-side and sell-side experience, available to your deal team through closing.",
+   "lines": [
+    31,
+    31
+   ],
+   "statement": "Attested due diligence comprises the claims review plus a full reading of the record and a signed opinion by an experienced practitioner.",
+   "about": "seller"
+  },
+  {
+   "id": 11,
+   "quote": "a signed opinion by a practitioner with buy-side and sell-side experience, available to your deal team through closing",
+   "lines": [
+    31,
+    31
+   ],
+   "statement": "The signed opinion is given by a practitioner with buy-side and sell-side experience, who is available to the buyer's deal team through closing.",
+   "about": "seller"
+  },
+  {
+   "id": 12,
+   "quote": "The fee is set at intake.",
+   "lines": [
+    31,
+    31
+   ],
+   "statement": "The fee for attested due diligence is set at intake.",
+   "about": "seller",
+   "restates": 16
+  },
+  {
+   "id": 13,
+   "quote": "A conversation about what you are evaluating and, for a deal, your thresholds, held in your own time",
+   "lines": [
+    39,
+    39
+   ],
+   "statement": "Intake is a conversation about what the buyer is evaluating and, for a deal, the buyer's thresholds, held in the buyer's own time.",
+   "about": "target"
+  },
+  {
+   "id": 14,
+   "quote": "over a page that fills the engagement form as you talk",
+   "lines": [
+    39,
+    39
+   ],
+   "statement": "The intake page is built to fill the engagement form itself as the intake conversation proceeds.",
+   "about": "target"
+  },
+  {
+   "id": 16,
+   "quote": "An independent re-reading of every finding's evidence",
+   "lines": [
+    47,
+    47
+   ],
+   "statement": "The check stage includes an independent re-reading of every finding's evidence.",
+   "about": "target"
+  },
+  {
+   "id": 17,
+   "quote": "ratings against your thresholds, replicated and looked at again where they differ",
+   "lines": [
+    47,
+    47
+   ],
+   "statement": "Ratings are made against the buyer's thresholds, are replicated, and are looked at again where the replications differ.",
+   "about": "target"
+  },
+  {
+   "id": 18,
+   "quote": "Findings with their citations, what was and was not examined, questions to put to the seller, and a signed conclusion if you ask for one.",
+   "lines": [
+    51,
+    51
+   ],
+   "statement": "The report includes findings with their citations, a statement of what was and was not examined, questions to put to the seller, and a signed conclusion on request.",
+   "about": "target"
+  },
+  {
+   "id": 19,
+   "quote": "A private page where you can ask about any finding for the life of the decision",
+   "lines": [
+    55,
+    55
+   ],
+   "statement": "The target provides a private page on which the buyer can ask about any finding.",
+   "about": "target"
+  },
+  {
+   "id": 21,
+   "quote": "Every search and every file opened, kept, so any finding can be traced back to what was looked at.",
+   "lines": [
+    59,
+    59
+   ],
+   "statement": "The target logs every search performed and every file opened into a working record.",
+   "about": "target"
+  },
+  {
+   "id": 22,
+   "quote": "Running the software, load or penetration testing, a review of code quality or architecture, and legal or financial advice.",
+   "lines": [
+    63,
+    63
+   ],
+   "statement": "The service does not include running the software, load or penetration testing, a review of code quality or architecture, or legal or financial advice (heading 'What it does not include', line 61, supplies the negation).",
+   "about": "target"
+  },
+  {
+   "id": 23,
+   "quote": "Materials the seller does not supply, whatever sits on a hosted service, in a private module, or on a third party's platform, are reported as unsettled rather than guessed at.",
+   "lines": [
+    63,
+    63
+   ],
+   "statement": "Materials the seller does not supply are reported as unsettled rather than guessed at, whatever sits on a hosted service, in a private module, or on a third party's platform.",
+   "about": "target"
+  },
+  {
+   "id": 24,
+   "quote": "Intake takes about a day.",
+   "lines": [
+    67,
+    67
+   ],
+   "statement": "Intake takes about a day.",
+   "about": "target"
+  },
+  {
+   "id": 27,
+   "quote": "with the report the day after",
+   "lines": [
+    67,
+    67
+   ],
+   "statement": "For a typical business engagement, the report comes the day after the review.",
+   "about": "target"
+  },
+  {
+   "id": 28,
+   "quote": "Attested engagements add the time for a full reading, agreed at intake.",
+   "lines": [
+    67,
+    67
+   ],
+   "statement": "Attested engagements take longer by the time needed for a full reading, which is agreed at intake.",
+   "about": "target"
+  },
+  {
+   "id": 29,
+   "quote": "For paid engagements the repository is examined on isolated, single-tenant hardware",
+   "lines": [
+    71,
+    71
+   ],
+   "statement": "For paid engagements, the repository is examined on isolated, single-tenant hardware.",
+   "about": "target"
+  },
+  {
+   "id": 30,
+   "quote": "the practice controls",
+   "lines": [
+    71,
+    71
+   ],
+   "statement": "That hardware is controlled by the practice (the relative clause in line 71 attaches to the isolated, single-tenant hardware).",
+   "about": "target"
+  },
+  {
+   "id": 31,
+   "quote": "in an environment created for the engagement",
+   "lines": [
+    71,
+    71
+   ],
+   "statement": "The target has a provisioning process that stands up an examination environment for an engagement.",
+   "about": "target"
+  },
+  {
+   "id": 32,
+   "quote": "deleted afterwards",
+   "lines": [
+    71,
+    71
+   ],
+   "statement": "The target has a teardown process that removes the examination environment when an engagement ends.",
+   "about": "target"
+  },
+  {
+   "id": 33,
+   "quote": "None of the seller's code is sent to any cloud model service",
+   "lines": [
+    71,
+    71
+   ],
+   "statement": "None of the seller's code is sent to any cloud model service.",
+   "about": "target"
+  },
+  {
+   "id": 35,
+   "quote": "Your deal terms are held in the engagement file",
+   "lines": [
+    71,
+    71
+   ],
+   "statement": "The buyer's deal terms are held in the engagement file.",
+   "about": "target"
+  },
+  {
+   "id": 36,
+   "quote": "nowhere else",
+   "lines": [
+    71,
+    71
+   ],
+   "statement": "The buyer's deal terms are held nowhere else (the boundary in line 71, 'and nowhere else').",
+   "about": "target"
+  },
+  {
+   "id": 37,
+   "quote": "A free beta review is the exception: it runs on a hosted model.",
+   "lines": [
+    71,
+    71
+   ],
+   "statement": "The target's beta path is configured to run free beta reviews on a hosted model.",
+   "about": "target"
+  },
+  {
+   "id": 38,
+   "quote": "Terms, retention and the limitation of liability are set out in the engagement letter.",
+   "lines": [
+    73,
+    73
+   ],
+   "statement": "The terms, retention and limitation of liability are set out in the engagement letter.",
+   "about": "target"
+  },
+  {
+   "id": 39,
+   "quote": "over a page that fills the engagement form as you talk",
+   "lines": [
+    39,
+    39
+   ],
+   "statement": "During an intake conversation, the engagement form is filled in by the page as the conversation happens.",
+   "about": "target",
+   "implied_by": 14,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 40,
+   "quote": "A private page where you can ask about any finding for the life of the decision",
+   "lines": [
+    55,
+    55
+   ],
+   "statement": "That private page remains available to the buyer for the life of the decision.",
+   "about": "target",
+   "implied_by": 19,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 41,
+   "quote": "with the record behind each answer",
+   "lines": [
+    55,
+    55
+   ],
+   "statement": "Each answer the buyer receives on that page actually comes with the record behind it.",
+   "about": "target",
+   "implied_by": 20,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 42,
+   "quote": "Every search and every file opened, kept, so any finding can be traced back to what was looked at.",
+   "lines": [
+    59,
+    59
+   ],
+   "statement": "The working record is kept, so that any finding can be traced back to the searches and files that were looked at for it.",
+   "about": "target",
+   "implied_by": 21,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 43,
+   "quote": "in an environment created for the engagement",
+   "lines": [
+    71,
+    71
+   ],
+   "statement": "For each paid engagement, a fresh examination environment is in fact created for that engagement.",
+   "about": "target",
+   "implied_by": 31,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 44,
+   "quote": "deleted afterwards",
+   "lines": [
+    71,
+    71
+   ],
+   "statement": "The examination environment is in fact deleted after the engagement.",
+   "about": "target",
+   "implied_by": 32,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 45,
+   "quote": "A free beta review is the exception: it runs on a hosted model.",
+   "lines": [
+    71,
+    71
+   ],
+   "statement": "A free beta review actually runs on a hosted model when it is performed.",
+   "about": "target",
+   "implied_by": 37,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  }
+ ]
+}

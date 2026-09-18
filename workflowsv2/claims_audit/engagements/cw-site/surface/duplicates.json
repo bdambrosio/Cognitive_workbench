@@ -1,5 +1,5 @@
 {
- "at": "2026-09-18T01-52-19Z",
+ "at": "2026-09-18T02-31-11Z",
  "model": "accounts/fireworks/models/glm-5p3-flash",
  "order": [
   "claim_sources/site/how-it-works.md",
@@ -52,7 +52,8 @@
     40
    ],
    "proposed": 1,
-   "accepted": 1,
+   "same": 0,
+   "within": 1,
    "parse": "parsed",
    "parse_error": null
   },
@@ -90,8 +91,9 @@
     34,
     35
    ],
-   "proposed": 6,
-   "accepted": 6,
+   "proposed": 12,
+   "same": 6,
+   "within": 5,
    "parse": "parsed",
    "parse_error": null
   },
@@ -105,8 +107,9 @@
     41,
     44
    ],
-   "proposed": 1,
-   "accepted": 1,
+   "proposed": 0,
+   "same": 0,
+   "within": 0,
    "parse": "parsed",
    "parse_error": null
   },
@@ -144,8 +147,9 @@
     32,
     33
    ],
-   "proposed": 5,
-   "accepted": 5,
+   "proposed": 7,
+   "same": 3,
+   "within": 3,
    "parse": "parsed",
    "parse_error": null
   },
@@ -175,8 +179,9 @@
     58,
     59
    ],
-   "proposed": 3,
-   "accepted": 3,
+   "proposed": 9,
+   "same": 2,
+   "within": 6,
    "parse": "parsed",
    "parse_error": null
   },
@@ -196,8 +201,9 @@
     12,
     13
    ],
-   "proposed": 7,
-   "accepted": 7,
+   "proposed": 8,
+   "same": 4,
+   "within": 2,
    "parse": "parsed",
    "parse_error": null
   },
@@ -227,30 +233,34 @@
     21,
     22,
     23,
+    24,
     25,
     26,
     27,
     28,
     31,
-    32,
-    34
+    32
    ],
-   "proposed": 10,
-   "accepted": 10,
+   "proposed": 15,
+   "same": 11,
+   "within": 1,
    "parse": "parsed",
    "parse_error": null
   },
   {
    "source": "claim_sources/site/pricing.md",
    "claims": [
+    34,
     35,
     37,
     38,
     40,
-    41
+    41,
+    42
    ],
-   "proposed": 0,
-   "accepted": 0,
+   "proposed": 3,
+   "same": 2,
+   "within": 1,
    "parse": "parsed",
    "parse_error": null
   },
@@ -278,8 +288,9 @@
     26,
     28
    ],
-   "proposed": 0,
-   "accepted": 0,
+   "proposed": 5,
+   "same": 2,
+   "within": 3,
    "parse": "parsed",
    "parse_error": null
   },
@@ -305,8 +316,9 @@
     23,
     24
    ],
-   "proposed": 6,
-   "accepted": 6,
+   "proposed": 4,
+   "same": 2,
+   "within": 0,
    "parse": "parsed",
    "parse_error": null
   },
@@ -344,8 +356,9 @@
     32,
     35
    ],
-   "proposed": 9,
-   "accepted": 9,
+   "proposed": 18,
+   "same": 7,
+   "within": 9,
    "parse": "parsed",
    "parse_error": null
   },
@@ -357,8 +370,9 @@
     39,
     40
    ],
-   "proposed": 1,
-   "accepted": 1,
+   "proposed": 2,
+   "same": 1,
+   "within": 1,
    "parse": "parsed",
    "parse_error": null
   },
@@ -376,30 +390,21 @@
     9,
     10
    ],
-   "proposed": 3,
-   "accepted": 3,
+   "proposed": 2,
+   "same": 2,
+   "within": 0,
    "parse": "parsed",
    "parse_error": null
   }
  ],
  "pairs": [
   {
-   "source": "claim_sources/site/how-it-works.md",
-   "id": 34,
-   "statement": "Each rating is made twice, independently.",
-   "similarity": 0.722,
-   "same_as": {
-    "source": "claim_sources/site/how-it-works.md",
-    "id": 4,
-    "statement": "The review includes an independent check."
-   }
-  },
-  {
    "source": "claim_sources/site/index.md",
    "id": 3,
    "statement": "Every finding the service produces is cited to a file and a line, without exception.",
    "similarity": 0.823,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/how-it-works.md",
     "id": 3,
     "statement": "Every finding in the review output is cited to a file and line."
@@ -410,7 +415,8 @@
    "id": 10,
    "statement": "The seller's uploaded repository and documents sit on a page that only the seller and the practice can open.",
    "similarity": 0.918,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/how-it-works.md",
     "id": 9,
     "statement": "The page holding the uploaded materials can be opened only by the seller and the practice."
@@ -418,21 +424,11 @@
   },
   {
    "source": "claim_sources/site/index.md",
-   "id": 19,
-   "statement": "The claims in the named documents are independently reviewed as part of the service.",
-   "similarity": 0.787,
-   "same_as": {
-    "source": "claim_sources/site/how-it-works.md",
-    "id": 4,
-    "statement": "The review includes an independent check."
-   }
-  },
-  {
-   "source": "claim_sources/site/index.md",
    "id": 20,
    "statement": "The claims and findings are rated against criteria specific to the buyer rather than a fixed scale.",
    "similarity": 0.792,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/how-it-works.md",
     "id": 5,
     "statement": "The service rates findings against the buyer's thresholds."
@@ -440,10 +436,23 @@
   },
   {
    "source": "claim_sources/site/index.md",
+   "id": 21,
+   "statement": "The report is signed by a person who takes responsibility for it.",
+   "similarity": 0.791,
+   "relation": "same",
+   "other": {
+    "source": "claim_sources/site/how-it-works.md",
+    "id": 6,
+    "statement": "The review is signed by a person."
+   }
+  },
+  {
+   "source": "claim_sources/site/index.md",
    "id": 30,
    "statement": "The review does not execute the target's code.",
    "similarity": 0.801,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/how-it-works.md",
     "id": 19,
     "statement": "The review does not run the software: nothing is compiled, executed or measured."
@@ -454,43 +463,11 @@
    "id": 33,
    "statement": "The claim list is fixed before any evidence is gathered.",
    "similarity": 0.831,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/how-it-works.md",
     "id": 2,
     "statement": "The list of claims is frozen before any claim is tested."
-   }
-  },
-  {
-   "source": "claim_sources/site/index.md",
-   "id": 44,
-   "statement": "Answers the buyer reads on the question page come accompanied by the working record behind each of them.",
-   "similarity": 0.858,
-   "same_as": {
-    "source": "claim_sources/site/index.md",
-    "id": 36,
-    "statement": "The private question page provides access to the working record underlying each answer to a buyer's question."
-   }
-  },
-  {
-   "source": "claim_sources/site/introduction-transcript.md",
-   "id": 2,
-   "statement": "The service contains a mechanism that checks identified claims against the code and documents supplied for the engagement.",
-   "similarity": 0.778,
-   "same_as": {
-    "source": "claim_sources/site/index.md",
-    "id": 2,
-    "statement": "The service has a review process that takes the seller's claims about a software product and that product's code and compares the claims against the code."
-   }
-  },
-  {
-   "source": "claim_sources/site/introduction-transcript.md",
-   "id": 3,
-   "statement": "The service contains a checking process, separate from the process that produced the findings, that verifies the findings.",
-   "similarity": 0.705,
-   "same_as": {
-    "source": "claim_sources/site/how-it-works.md",
-    "id": 4,
-    "statement": "The review includes an independent check."
    }
   },
   {
@@ -498,7 +475,8 @@
    "id": 6,
    "statement": "The service provides a channel through which the buyer can ask questions about the completed review after the report is delivered.",
    "similarity": 0.771,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/index.md",
     "id": 8,
     "statement": "The deliverable includes a private page where the buyer can ask about any part of the report."
@@ -509,7 +487,8 @@
    "id": 11,
    "statement": "Vague descriptions such as 'simple,' 'modern,' or 'enterprise-grade' are excluded from the claim surface; they are not converted into testable claims merely because they appear in the sales material.",
    "similarity": 0.773,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/how-it-works.md",
     "id": 23,
     "statement": "Vague general statements that a reasonable buyer would not rely on are not treated as claims."
@@ -520,7 +499,8 @@
    "id": 17,
    "statement": "The claim list is reviewed and settled before any adjudication of whether claims hold; the evidence review begins only after that.",
    "similarity": 0.75,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/how-it-works.md",
     "id": 2,
     "statement": "The list of claims is frozen before any claim is tested."
@@ -531,7 +511,8 @@
    "id": 41,
    "statement": "The service is not a penetration test.",
    "similarity": 0.853,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/how-it-works.md",
     "id": 37,
     "statement": "The review is not a penetration test."
@@ -539,24 +520,14 @@
   },
   {
    "source": "claim_sources/site/introduction-transcript.md",
-   "id": 58,
-   "statement": "In operation, the continuation's answers are grounded in those sources — the completed report, the working record, and the cited target material.",
-   "similarity": 0.886,
-   "same_as": {
-    "source": "claim_sources/site/introduction-transcript.md",
-    "id": 38,
-    "statement": "The continuation's question-answering draws on the completed report, the working record behind it, and the cited target material as its sources."
-   }
-  },
-  {
-   "source": "claim_sources/site/introduction-transcript.md",
-   "id": 59,
-   "statement": "When the completed review cannot answer a question put to it, the continuation states that it cannot rather than giving an invented answer.",
-   "similarity": 0.935,
-   "same_as": {
-    "source": "claim_sources/site/introduction-transcript.md",
-    "id": 39,
-    "statement": "The continuation's question-answering includes a path that, when the completed review does not answer a question, states that it cannot rather than producing an invented answer."
+   "id": 48,
+   "statement": "When the service runs its review, the identified claims are checked against the code and documents actually supplied for that engagement.",
+   "similarity": 0.797,
+   "relation": "same",
+   "other": {
+    "source": "claim_sources/site/index.md",
+    "id": 42,
+    "statement": "In operation, the seller's claims about a software product are actually checked against that product's actual code."
    }
   },
   {
@@ -564,7 +535,8 @@
    "id": 1,
    "statement": "Tuuyi provides a claims review service offered to buyers of software — the category exists and its core function is performed.",
    "similarity": 0.8,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/index.md",
     "id": 1,
     "statement": "The service belongs to the category it names: it performs technical due diligence for software acquisitions — that the core function of the category exists is what is claimed."
@@ -572,21 +544,11 @@
   },
   {
    "source": "claim_sources/site/introduction.md",
-   "id": 2,
-   "statement": "The claims review tests each claim against the target's code.",
-   "similarity": 0.829,
-   "same_as": {
-    "source": "claim_sources/site/index.md",
-    "id": 18,
-    "statement": "Every claim in the documents the buyer names is tested against the target's code."
-   }
-  },
-  {
-   "source": "claim_sources/site/introduction.md",
    "id": 3,
    "statement": "The review checks the findings it produces.",
    "similarity": 0.814,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/how-it-works.md",
     "id": 4,
     "statement": "The review includes an independent check."
@@ -597,7 +559,8 @@
    "id": 6,
    "statement": "The introduction video is not served from an external video platform.",
    "similarity": 0.711,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/introduction.md",
     "id": 5,
     "statement": "The introduction video is hosted and served by the site itself."
@@ -605,35 +568,26 @@
   },
   {
    "source": "claim_sources/site/introduction.md",
-   "id": 7,
-   "statement": "The review process begins with an intake step.",
-   "similarity": 0.815,
-   "same_as": {
-    "source": "claim_sources/site/introduction-transcript.md",
-    "id": 12,
-    "statement": "The review begins with an intake step, before examining the software, that establishes the review's context by asking the buyer who the buyer is, what is being purchased, which seller documents carry the material claims, what the buyer already knows or suspects, and which kinds of findings would affect price, terms, or the decision to close."
-   }
-  },
-  {
-   "source": "claim_sources/site/introduction.md",
    "id": 8,
    "statement": "The review method includes a control that freezes the claim surface before findings are made.",
    "similarity": 0.736,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/how-it-works.md",
     "id": 2,
     "statement": "The list of claims is frozen before any claim is tested."
    }
   },
   {
-   "source": "claim_sources/site/introduction.md",
-   "id": 10,
-   "statement": "Each finding undergoes an independent check — the check is separate from the work that produced the finding.",
-   "similarity": 0.747,
-   "same_as": {
-    "source": "claim_sources/site/how-it-works.md",
+   "source": "claim_sources/site/pricing.md",
+   "id": 1,
+   "statement": "The seller's offering is structured as three levels, ranging from a free demo to attested due diligence.",
+   "similarity": 0.712,
+   "relation": "same",
+   "other": {
+    "source": "claim_sources/site/index.md",
     "id": 4,
-    "statement": "The review includes an independent check."
+    "statement": "The service's engagement spans from a free demo to a delivered signed opinion."
    }
   },
   {
@@ -641,7 +595,8 @@
    "id": 3,
    "statement": "The price for a claims review is quoted after an intake step, before the work begins.",
    "similarity": 0.845,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/index.md",
     "id": 17,
     "statement": "The price of a claims review is given as a quote after the intake conversation rather than published."
@@ -652,7 +607,20 @@
    "id": 4,
    "statement": "During the beta period, a limited number of claims reviews are provided at no fee.",
    "similarity": 0.83,
-   "same_as": {
+   "relation": "same",
+   "other": {
+    "source": "claim_sources/site/index.md",
+    "id": 5,
+    "statement": "The service is currently offered in beta, with claims reviews free of charge and availability limited."
+   }
+  },
+  {
+   "source": "claim_sources/site/pricing.md",
+   "id": 5,
+   "statement": "The seller's claims-review practice is currently in beta.",
+   "similarity": 0.823,
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/index.md",
     "id": 5,
     "statement": "The service is currently offered in beta, with claims reviews free of charge and availability limited."
@@ -663,7 +631,8 @@
    "id": 6,
    "statement": "The demo tier is free of charge.",
    "similarity": 0.919,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/index.md",
     "id": 14,
     "statement": "The demo tier is offered at no charge."
@@ -674,7 +643,8 @@
    "id": 7,
    "statement": "The free demo lets a buyer read a completed claims review of a small open-source project and put questions to it.",
    "similarity": 0.882,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/index.md",
     "id": 15,
     "statement": "The demo contains a completed claims review of a small open-source project together with an interface a visitor can use to question it."
@@ -685,7 +655,8 @@
    "id": 9,
    "statement": "Attested due diligence is priced per engagement rather than per claim set.",
    "similarity": 0.924,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/index.md",
     "id": 22,
     "statement": "Attested due diligence is priced by quote per engagement rather than published."
@@ -693,13 +664,14 @@
   },
   {
    "source": "claim_sources/site/pricing.md",
-   "id": 15,
-   "statement": "The review tests every claim in the agreed documents against the repository and the materials supplied.",
-   "similarity": 0.729,
-   "same_as": {
+   "id": 19,
+   "statement": "The target provides a private page on which the buyer can ask about any finding.",
+   "similarity": 0.878,
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/index.md",
-    "id": 34,
-    "statement": "Each frozen claim is then tested against the code and the documents the buyer supplied."
+    "id": 8,
+    "statement": "The deliverable includes a private page where the buyer can ask about any part of the report."
    }
   },
   {
@@ -707,7 +679,8 @@
    "id": 20,
    "statement": "The private page is built to present each answer together with the record behind it.",
    "similarity": 0.866,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/index.md",
     "id": 36,
     "statement": "The private question page provides access to the working record underlying each answer to a buyer's question."
@@ -718,7 +691,8 @@
    "id": 25,
    "statement": "A review of a small target is usually returned within a few days of receiving the materials.",
    "similarity": 0.971,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/index.md",
     "id": 12,
     "statement": "A small target's review is returned within days of receiving the materials."
@@ -729,7 +703,8 @@
    "id": 26,
    "statement": "A typical business engagement is returned within a week of receiving the materials.",
    "similarity": 0.827,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/index.md",
     "id": 13,
     "statement": "A typical deal's review is returned in about a week."
@@ -740,65 +715,59 @@
    "id": 34,
    "statement": "The buyer never sees the examination environment or the materials in it.",
    "similarity": 0.766,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/how-it-works.md",
     "id": 11,
     "statement": "The buyer names the claim documents but does not receive the examination materials."
    }
   },
   {
-   "source": "claim_sources/site/about.md",
-   "id": 5,
-   "statement": "The service Tuuyi provides is checking a software business's claims against the software it actually ships.",
-   "similarity": 0.794,
-   "same_as": {
+   "source": "claim_sources/site/pricing.md",
+   "id": 41,
+   "statement": "Each answer the buyer receives on that page actually comes with the record behind it.",
+   "similarity": 0.884,
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/index.md",
-    "id": 2,
-    "statement": "The service has a review process that takes the seller's claims about a software product and that product's code and compares the claims against the code."
+    "id": 44,
+    "statement": "Answers the buyer reads on the question page come accompanied by the working record behind each of them."
    }
   },
   {
-   "source": "claim_sources/site/about.md",
-   "id": 15,
-   "statement": "A person is answerable for the result the service produces.",
-   "similarity": 0.746,
-   "same_as": {
+   "source": "claim_sources/site/demo.md",
+   "id": 18,
+   "statement": "No part of a seller's code is sent to any cloud service during paid engagements.",
+   "similarity": 0.9,
+   "relation": "same",
+   "other": {
+    "source": "claim_sources/site/pricing.md",
+    "id": 33,
+    "statement": "None of the seller's code is sent to any cloud model service."
+   }
+  },
+  {
+   "source": "claim_sources/site/demo.md",
+   "id": 24,
+   "statement": "A question submitted in the running demo receives a reply that addresses the review.",
+   "similarity": 0.79,
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/index.md",
-    "id": 21,
-    "statement": "The report is signed by a person who takes responsibility for it."
+    "id": 43,
+    "statement": "A visitor to the demo can ask questions about the completed claims review and receive answers to them."
    }
   },
   {
    "source": "claim_sources/site/about.md",
-   "id": 19,
-   "statement": "The practice uses a fixed method, applied the same way every time, to check each claim against the code.",
-   "similarity": 0.752,
-   "same_as": {
-    "source": "claim_sources/site/how-it-works.md",
-    "id": 1,
-    "statement": "The claims-review service performs code due diligence in fixed steps."
-   }
-  },
-  {
-   "source": "claim_sources/site/about.md",
-   "id": 20,
-   "statement": "The pipeline includes tooling that records what was examined during a review.",
-   "similarity": 0.763,
-   "same_as": {
-    "source": "claim_sources/site/how-it-works.md",
-    "id": 7,
-    "statement": "The record of the review is kept."
-   }
-  },
-  {
-   "source": "claim_sources/site/about.md",
-   "id": 21,
-   "statement": "The resulting report can be checked line by line against the recorded evidence.",
-   "similarity": 0.776,
-   "same_as": {
-    "source": "claim_sources/site/index.md",
-    "id": 7,
-    "statement": "The deliverable includes a report the buyer can check line by line."
+   "id": 6,
+   "statement": "Tuuyi is a practice with a single service; claims review is the only thing it does.",
+   "similarity": 0.713,
+   "relation": "same",
+   "other": {
+    "source": "claim_sources/site/about.md",
+    "id": 5,
+    "statement": "The service Tuuyi provides is checking a software business's claims against the software it actually ships."
    }
   },
   {
@@ -806,7 +775,8 @@
    "id": 24,
    "statement": "During the beta period, a limited number of claims reviews are provided at no charge.",
    "similarity": 0.824,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/index.md",
     "id": 5,
     "statement": "The service is currently offered in beta, with claims reviews free of charge and availability limited."
@@ -814,10 +784,11 @@
   },
   {
    "source": "claim_sources/site/privacy.md",
-   "id": 10,
-   "statement": "Demo questions and answers are retained for a few days.",
-   "similarity": 0.788,
-   "same_as": {
+   "id": 11,
+   "statement": "The demo includes a deletion process that removes stored demo questions and answers once the few-day retention period ends.",
+   "similarity": 0.817,
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/demo.md",
     "id": 21,
     "statement": "The demo's server retains conversations under a retention setting that schedules their deletion a few days after they are created."
@@ -825,21 +796,11 @@
   },
   {
    "source": "claim_sources/site/privacy.md",
-   "id": 12,
-   "statement": "The demo runs on a hosted (third-party) inference service rather than the seller's own hardware.",
-   "similarity": 0.778,
-   "same_as": {
-    "source": "claim_sources/site/demo.md",
-    "id": 13,
-    "statement": "The demo runs on a hosted (cloud) model."
-   }
-  },
-  {
-   "source": "claim_sources/site/privacy.md",
    "id": 14,
    "statement": "The demo is restricted to a public project; it cannot be pointed at confidential material.",
    "similarity": 0.754,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/demo.md",
     "id": 15,
     "statement": "The demo is limited to a public project, because of the cloud inference service it uses."
@@ -850,7 +811,8 @@
    "id": 18,
    "statement": "A paid review runs on hardware the practice controls — privately owned or rented as a sole tenant.",
    "similarity": 0.766,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/demo.md",
     "id": 17,
     "statement": "Paid engagements run on isolated, single-tenant hardware controlled by the practice."
@@ -861,7 +823,8 @@
    "id": 21,
    "statement": "In a paid engagement, no seller code is sent to a cloud model service.",
    "similarity": 0.908,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/pricing.md",
     "id": 33,
     "statement": "None of the seller's code is sent to any cloud model service."
@@ -872,7 +835,8 @@
    "id": 22,
    "statement": "A free beta review may be run on a hosted service rather than the practice's own hardware.",
    "similarity": 0.777,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/pricing.md",
     "id": 37,
     "statement": "The target's beta path is configured to run free beta reviews on a hosted model."
@@ -883,7 +847,8 @@
    "id": 23,
    "statement": "Seller-supplied repositories and documents are received through a page on the engagement site.",
    "similarity": 0.914,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/how-it-works.md",
     "id": 8,
     "statement": "The service has the seller upload the repository and documents to be examined to a page of the engagement site."
@@ -894,7 +859,8 @@
    "id": 24,
    "statement": "The page holding the seller's repository and documents is accessible only to the seller and the practice.",
    "similarity": 0.906,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/how-it-works.md",
     "id": 9,
     "statement": "The page holding the uploaded materials can be opened only by the seller and the practice."
@@ -902,21 +868,11 @@
   },
   {
    "source": "claim_sources/site/privacy.md",
-   "id": 25,
-   "statement": "The seller's repository and documents are not delivered to the client.",
-   "similarity": 0.796,
-   "same_as": {
-    "source": "claim_sources/site/how-it-works.md",
-    "id": 11,
-    "statement": "The buyer names the claim documents but does not receive the examination materials."
-   }
-  },
-  {
-   "source": "claim_sources/site/privacy.md",
    "id": 39,
    "statement": "The environment created for a paid engagement is actually deleted after the engagement ends and does not continue to exist.",
    "similarity": 0.815,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/pricing.md",
     "id": 44,
     "statement": "The examination environment is in fact deleted after the engagement."
@@ -924,21 +880,11 @@
   },
   {
    "source": "claim_sources/site/contact.md",
-   "id": 2,
-   "statement": "The practice replies to enquiries by email, usually within one day.",
-   "similarity": 0.849,
-   "same_as": {
-    "source": "claim_sources/site/about.md",
-    "id": 23,
-    "statement": "Enquiries via the contact form receive a reply within one business day."
-   }
-  },
-  {
-   "source": "claim_sources/site/contact.md",
    "id": 8,
    "statement": "The contact form sends each submitted message by email to the practice's address.",
    "similarity": 0.931,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/privacy.md",
     "id": 31,
     "statement": "Contact form submissions are sent by email to the practice."
@@ -949,10 +895,395 @@
    "id": 9,
    "statement": "Boundary claim: submitted data is transmitted or stored nowhere besides the email to the practice.",
    "similarity": 0.815,
-   "same_as": {
+   "relation": "same",
+   "other": {
     "source": "claim_sources/site/privacy.md",
     "id": 32,
     "statement": "Contact form submissions are stored nowhere besides the email sent to the practice."
+   }
+  },
+  {
+   "source": "claim_sources/site/how-it-works.md",
+   "id": 5,
+   "statement": "The service rates findings against the buyer's thresholds.",
+   "similarity": 0.769,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/pricing.md",
+    "id": 17,
+    "statement": "Ratings are made against the buyer's thresholds, are replicated, and are looked at again where the replications differ."
+   }
+  },
+  {
+   "source": "claim_sources/site/how-it-works.md",
+   "id": 25,
+   "statement": "The report states findings on each claim.",
+   "similarity": 0.738,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/introduction-transcript.md",
+    "id": 5,
+    "statement": "The service's findings are rendered with fields for the claim, the evidence behind it, and the provenance of that evidence."
+   }
+  },
+  {
+   "source": "claim_sources/site/how-it-works.md",
+   "id": 31,
+   "statement": "An unsettled claim is never counted against the seller.",
+   "similarity": 0.702,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/introduction-transcript.md",
+    "id": 35,
+    "statement": "The report contains logic that, when the supplied materials cannot settle a claim, records no finding against the seller and instead describes the buyer's exposure — how much the buyer is relying on something unverified."
+   }
+  },
+  {
+   "source": "claim_sources/site/how-it-works.md",
+   "id": 34,
+   "statement": "Each rating is made twice, independently.",
+   "similarity": 0.722,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/how-it-works.md",
+    "id": 4,
+    "statement": "The review includes an independent check."
+   }
+  },
+  {
+   "source": "claim_sources/site/how-it-works.md",
+   "id": 37,
+   "statement": "The review is not a penetration test.",
+   "similarity": 0.709,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/introduction-transcript.md",
+    "id": 42,
+    "statement": "The service is not a general code-quality score, not an architecture assessment, not legal advice, and not a valuation opinion."
+   }
+  },
+  {
+   "source": "claim_sources/site/how-it-works.md",
+   "id": 38,
+   "statement": "The review is not a code-quality review.",
+   "similarity": 0.748,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/introduction-transcript.md",
+    "id": 42,
+    "statement": "The service is not a general code-quality score, not an architecture assessment, not legal advice, and not a valuation opinion."
+   }
+  },
+  {
+   "source": "claim_sources/site/how-it-works.md",
+   "id": 39,
+   "statement": "The review is not legal advice.",
+   "similarity": 0.72,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/introduction-transcript.md",
+    "id": 42,
+    "statement": "The service is not a general code-quality score, not an architecture assessment, not legal advice, and not a valuation opinion."
+   }
+  },
+  {
+   "source": "claim_sources/site/index.md",
+   "id": 2,
+   "statement": "The service has a review process that takes the seller's claims about a software product and that product's code and compares the claims against the code.",
+   "similarity": 0.75,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/how-it-works.md",
+    "id": 18,
+    "statement": "Claims are tested against the code, configuration and build files by reading them and following what they fix, the way a reviewer would."
+   }
+  },
+  {
+   "source": "claim_sources/site/index.md",
+   "id": 6,
+   "statement": "The service is aimed at buyers and advisers of small software companies.",
+   "similarity": 0.803,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/introduction-transcript.md",
+    "id": 43,
+    "statement": "The service is applicable to small software acquisitions, claims about AI technology, acceptance of contracted software, and evaluation of open-source dependencies where important decisions rest on the documentation."
+   }
+  },
+  {
+   "source": "claim_sources/site/index.md",
+   "id": 11,
+   "statement": "The buyer identifies the documents carrying the seller's claims and is never shown the code.",
+   "similarity": 0.847,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/how-it-works.md",
+    "id": 11,
+    "statement": "The buyer names the claim documents but does not receive the examination materials."
+   }
+  },
+  {
+   "source": "claim_sources/site/index.md",
+   "id": 15,
+   "statement": "The demo contains a completed claims review of a small open-source project together with an interface a visitor can use to question it.",
+   "similarity": 0.739,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/demo.md",
+    "id": 5,
+    "statement": "The demo contains a question-answering interface wired to the engagement's record and to a model that composes replies."
+   }
+  },
+  {
+   "source": "claim_sources/site/index.md",
+   "id": 18,
+   "statement": "Every claim in the documents the buyer names is tested against the target's code.",
+   "similarity": 0.716,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/how-it-works.md",
+    "id": 18,
+    "statement": "Claims are tested against the code, configuration and build files by reading them and following what they fix, the way a reviewer would."
+   }
+  },
+  {
+   "source": "claim_sources/site/index.md",
+   "id": 25,
+   "statement": "The service is aimed at advisers and buyers of software businesses in the $1M to $5M range, at the pre-letter-of-intent stage.",
+   "similarity": 0.81,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/index.md",
+    "id": 6,
+    "statement": "The service is aimed at buyers and advisers of small software companies."
+   }
+  },
+  {
+   "source": "claim_sources/site/index.md",
+   "id": 28,
+   "statement": "The service excludes penetration testing, code quality or architecture review, and legal advice.",
+   "similarity": 0.73,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/introduction-transcript.md",
+    "id": 42,
+    "statement": "The service is not a general code-quality score, not an architecture assessment, not legal advice, and not a valuation opinion."
+   }
+  },
+  {
+   "source": "claim_sources/site/index.md",
+   "id": 32,
+   "statement": "The engagement begins with an intake conversation covering what is being evaluated, what is already known, and what would change the decision or the price.",
+   "similarity": 0.713,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/introduction-transcript.md",
+    "id": 12,
+    "statement": "The review begins with an intake step, before examining the software, that establishes the review's context by asking the buyer who the buyer is, what is being purchased, which seller documents carry the material claims, what the buyer already knows or suspects, and which kinds of findings would affect price, terms, or the decision to close."
+   }
+  },
+  {
+   "source": "claim_sources/site/index.md",
+   "id": 34,
+   "statement": "Each frozen claim is then tested against the code and the documents the buyer supplied.",
+   "similarity": 0.766,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/how-it-works.md",
+    "id": 18,
+    "statement": "Claims are tested against the code, configuration and build files by reading them and following what they fix, the way a reviewer would."
+   }
+  },
+  {
+   "source": "claim_sources/site/introduction-transcript.md",
+   "id": 3,
+   "statement": "The service contains a checking process, separate from the process that produced the findings, that verifies the findings.",
+   "similarity": 0.734,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/introduction-transcript.md",
+    "id": 31,
+    "statement": "The separate check asks, for each finding: whether the seller's claim was stated accurately, whether the cited material relates to that claim, whether it shows what the finding says, whether the verdict fits the evidence, and, where searches were required, whether they were broad enough."
+   }
+  },
+  {
+   "source": "claim_sources/site/introduction.md",
+   "id": 7,
+   "statement": "The review process begins with an intake step.",
+   "similarity": 0.815,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/introduction-transcript.md",
+    "id": 12,
+    "statement": "The review begins with an intake step, before examining the software, that establishes the review's context by asking the buyer who the buyer is, what is being purchased, which seller documents carry the material claims, what the buyer already knows or suspects, and which kinds of findings would affect price, terms, or the decision to close."
+   }
+  },
+  {
+   "source": "claim_sources/site/introduction.md",
+   "id": 13,
+   "statement": "The engagement is offered in beta — the service is at a beta stage.",
+   "similarity": 0.764,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/index.md",
+    "id": 5,
+    "statement": "The service is currently offered in beta, with claims reviews free of charge and availability limited."
+   }
+  },
+  {
+   "source": "claim_sources/site/pricing.md",
+   "id": 31,
+   "statement": "The target has a provisioning process that stands up an examination environment for an engagement.",
+   "similarity": 0.722,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/privacy.md",
+    "id": 20,
+    "statement": "The paid-review setup creates an environment dedicated to each engagement and includes a process that deletes that environment when the engagement ends."
+   }
+  },
+  {
+   "source": "claim_sources/site/pricing.md",
+   "id": 32,
+   "statement": "The target has a teardown process that removes the examination environment when an engagement ends.",
+   "similarity": 0.739,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/privacy.md",
+    "id": 20,
+    "statement": "The paid-review setup creates an environment dedicated to each engagement and includes a process that deletes that environment when the engagement ends."
+   }
+  },
+  {
+   "source": "claim_sources/site/pricing.md",
+   "id": 35,
+   "statement": "The buyer's deal terms are held in the engagement file.",
+   "similarity": 0.754,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/pricing.md",
+    "id": 38,
+    "statement": "The terms, retention and limitation of liability are set out in the engagement letter."
+   }
+  },
+  {
+   "source": "claim_sources/site/demo.md",
+   "id": 3,
+   "statement": "The identity of the reviewed project is withheld in the demo.",
+   "similarity": 0.776,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/demo.md",
+    "id": 6,
+    "statement": "Apart from the withheld identity, the demo is unmodified from what a client receives."
+   }
+  },
+  {
+   "source": "claim_sources/site/demo.md",
+   "id": 13,
+   "statement": "The demo runs on a hosted (cloud) model.",
+   "similarity": 0.728,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/demo.md",
+    "id": 15,
+    "statement": "The demo is limited to a public project, because of the cloud inference service it uses."
+   }
+  },
+  {
+   "source": "claim_sources/site/privacy.md",
+   "id": 3,
+   "statement": "The demo sets exactly one cookie.",
+   "similarity": 0.794,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/privacy.md",
+    "id": 7,
+    "statement": "The demo sets a single cookie whose function is to identify the visitor's browser to the demo."
+   }
+  },
+  {
+   "source": "claim_sources/site/privacy.md",
+   "id": 5,
+   "statement": "The site's page-view counting via Cloudflare Web Analytics uses no cookies.",
+   "similarity": 0.76,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/privacy.md",
+    "id": 1,
+    "statement": "The public website sets no cookies on visitors."
+   }
+  },
+  {
+   "source": "claim_sources/site/privacy.md",
+   "id": 10,
+   "statement": "Demo questions and answers are retained for a few days.",
+   "similarity": 0.788,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/demo.md",
+    "id": 21,
+    "statement": "The demo's server retains conversations under a retention setting that schedules their deletion a few days after they are created."
+   }
+  },
+  {
+   "source": "claim_sources/site/privacy.md",
+   "id": 19,
+   "statement": "A paid review runs in an environment created specifically for that engagement.",
+   "similarity": 0.765,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/pricing.md",
+    "id": 31,
+    "statement": "The target has a provisioning process that stands up an examination environment for an engagement."
+   }
+  },
+  {
+   "source": "claim_sources/site/privacy.md",
+   "id": 25,
+   "statement": "The seller's repository and documents are not delivered to the client.",
+   "similarity": 0.796,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/how-it-works.md",
+    "id": 11,
+    "statement": "The buyer names the claim documents but does not receive the examination materials."
+   }
+  },
+  {
+   "source": "claim_sources/site/privacy.md",
+   "id": 29,
+   "statement": "The seller's repository remains inside the engagement's environment and is not taken out of it.",
+   "similarity": 0.811,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/privacy.md",
+    "id": 30,
+    "statement": "The seller's repository is kept inside the engagement environment, and the environment's deletion process covers the repository together with the rest of the environment."
+   }
+  },
+  {
+   "source": "claim_sources/site/privacy.md",
+   "id": 35,
+   "statement": "The contact form's bot protection sets no cookie.",
+   "similarity": 0.759,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/privacy.md",
+    "id": 1,
+    "statement": "The public website sets no cookies on visitors."
+   }
+  },
+  {
+   "source": "claim_sources/site/privacy.md",
+   "id": 40,
+   "statement": "When the engagement environment is deleted after the engagement, the seller's repository is actually deleted with it and does not survive the deletion.",
+   "similarity": 0.757,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site/pricing.md",
+    "id": 44,
+    "statement": "The examination environment is in fact deleted after the engagement."
    }
   }
  ]

@@ -1,0 +1,87 @@
+{
+ "claim_source": "claim_sources/site/contact.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "Ask for a beta claims review, or write to the practice about a software acquisition or investment you are evaluating.",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The practice offers a beta claims review of software acquisitions or investments that the enquirer is evaluating.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Ask for a beta review, or tell us what you are evaluating.",
+     "lines": [
+      7,
+      7
+     ]
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "quote": "Sent. Thank you.",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "On successful submission the contact form shows a sent confirmation state.",
+   "about": "target"
+  },
+  {
+   "id": 4,
+   "quote": "You will hear from us at the address you gave.",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The practice's reply is sent to the email address the submitter entered in the form.",
+   "about": "seller"
+  },
+  {
+   "id": 5,
+   "quote": "Not sent. A name, a working email address and a message are needed.",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The form rejects submission unless a name, a working email address and a message are all provided.",
+   "about": "target"
+  },
+  {
+   "id": 6,
+   "quote": "Not sent. The bot check did not pass.",
+   "lines": [
+    13,
+    13
+   ],
+   "statement": "The form includes a bot check, and failing it prevents submission.",
+   "about": "target"
+  },
+  {
+   "id": 7,
+   "quote": "Not sent. Something failed on our side. Please write to info@tuuyi.com instead.",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "When submission fails on the server side, the form shows an error state directing the sender to write to info@tuuyi.com instead.",
+   "about": "target"
+  },
+  {
+   "id": 10,
+   "quote": "What you send here goes by email to the practice",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "When the contact form is submitted, the submission is actually delivered by email to the practice.",
+   "about": "target",
+   "implied_by": 8,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  }
+ ]
+}

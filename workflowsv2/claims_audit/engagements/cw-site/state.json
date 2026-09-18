@@ -15,6 +15,26 @@
    "value": "confirmed",
    "at": "2026-09-17T17-15-24Z",
    "by": "cli"
+  },
+  "letter": {
+   "value": "accepted",
+   "at": "2026-09-18T01-54-58Z",
+   "by": "cli"
+  },
+  "intake": {
+   "value": "done",
+   "at": "2026-09-18T01-54-58Z",
+   "by": "cli"
+  },
+  "materials": {
+   "value": "ready",
+   "at": "2026-09-18T01-54-58Z",
+   "by": "cli"
+  },
+  "enumeration": {
+   "value": "done",
+   "at": "2026-09-18T01-54-58Z",
+   "by": "cli"
   }
  },
  "jobs": []

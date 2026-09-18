@@ -1,0 +1,434 @@
+{
+ "claim_source": "claim_sources/site/index.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "Technical due diligence for software acquisitions",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The service belongs to the category it names: it performs technical due diligence for software acquisitions — that the core function of the category exists is what is claimed.",
+   "about": "target"
+  },
+  {
+   "id": 2,
+   "quote": "the seller's claims checked against the code",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The service has a review process that takes the seller's claims about a software product and that product's code and compares the claims against the code.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "We check what the software says about itself against what its code actually does.",
+     "lines": [
+      11,
+      11
+     ]
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "quote": "From a free demo to a signed opinion",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The service's engagement spans from a free demo to a delivered signed opinion.",
+   "about": "target"
+  },
+  {
+   "id": 5,
+   "quote": "Beta: free claims reviews, limited",
+   "lines": [
+    5,
+    5
+   ],
+   "statement": "The service is currently offered in beta, with claims reviews free of charge and availability limited.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "We are in beta. For a limited number of engagements, a claims review is free.",
+     "lines": [
+      74,
+      74
+     ]
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "quote": "For buyers and advisers of small software companies",
+   "lines": [
+    13,
+    13
+   ],
+   "statement": "The service is aimed at buyers and advisers of small software companies.",
+   "about": "target"
+  },
+  {
+   "id": 7,
+   "quote": "A report you can check line by line",
+   "lines": [
+    43,
+    43
+   ],
+   "statement": "The deliverable includes a report the buyer can check line by line.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "A report you can check line by line",
+     "lines": [
+      72,
+      72
+     ]
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "quote": "a private page where you can ask about any part of it",
+   "lines": [
+    43,
+    43
+   ],
+   "statement": "The deliverable includes a private page where the buyer can ask about any part of the report.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "a page where you can keep asking",
+     "lines": [
+      72,
+      72
+     ]
+    },
+    {
+     "quote": "a private page where you can ask about any finding in your own time",
+     "lines": [
+      116,
+      116
+     ]
+    }
+   ]
+  },
+  {
+   "id": 9,
+   "quote": "| Part | What it holds |\n| --- | --- |\n| Executive summary | What was examined, and the findings rated material, one line each. |\n| What the review showed | Each gap: the claim as written, the verdict, the evidence quoted with its file and lines, the independent check's outcome, and what the gap would change for you. |\n| Unsettled claims | Claims the materials cannot settle, why, and how much rests on each. |\n| Claims that hold | Listed with their evidence, so the good news is checkable too. |\n| Questions for the seller | What to ask to close the gaps the materials left. |\n| Appendix | Every claim and its verdict, in document order. |",
+   "lines": [
+    45,
+    52
+   ],
+   "statement": "The report has a fixed shape comprising the six listed parts — executive summary, what the review showed, unsettled claims, claims that hold, questions for the seller, and an appendix — each holding what its row describes.",
+   "about": "target"
+  },
+  {
+   "id": 11,
+   "quote": "you name the documents that carry the seller's claims and never see the code",
+   "lines": [
+    56,
+    56
+   ],
+   "statement": "The buyer identifies the documents carrying the seller's claims and is never shown the code.",
+   "about": "target"
+  },
+  {
+   "id": 12,
+   "quote": "A small target comes back within days of receiving the materials",
+   "lines": [
+    56,
+    56
+   ],
+   "statement": "A small target's review is returned within days of receiving the materials.",
+   "about": "target"
+  },
+  {
+   "id": 13,
+   "quote": "a typical deal in about a week",
+   "lines": [
+    56,
+    56
+   ],
+   "statement": "A typical deal's review is returned in about a week.",
+   "about": "target"
+  },
+  {
+   "id": 14,
+   "quote": "Free",
+   "lines": [
+    62,
+    62
+   ],
+   "statement": "The demo tier is offered at no charge.",
+   "about": "seller"
+  },
+  {
+   "id": 15,
+   "quote": "Read a completed claims review of a small open-source project and ask it questions.",
+   "lines": [
+    64,
+    64
+   ],
+   "statement": "The demo contains a completed claims review of a small open-source project together with an interface a visitor can use to question it.",
+   "about": "target"
+  },
+  {
+   "id": 16,
+   "quote": "If you have a repository of your own to evaluate, write to us and we will set you up to run one.",
+   "lines": [
+    64,
+    64
+   ],
+   "statement": "The practice states it will set up a visitor who supplies their own repository to run a claims review on it — a statement of intent about the seller's own activity.",
+   "about": "seller"
+  },
+  {
+   "id": 17,
+   "quote": "Quoted after intake",
+   "lines": [
+    70,
+    70
+   ],
+   "statement": "The price of a claims review is given as a quote after the intake conversation rather than published.",
+   "about": "seller"
+  },
+  {
+   "id": 18,
+   "quote": "Every claim in the documents you name, tested against the code",
+   "lines": [
+    72,
+    72
+   ],
+   "statement": "Every claim in the documents the buyer names is tested against the target's code.",
+   "about": "target"
+  },
+  {
+   "id": 21,
+   "quote": "signed by a person who stands behind it",
+   "lines": [
+    72,
+    72
+   ],
+   "statement": "The report is signed by a person who takes responsibility for it.",
+   "about": "target"
+  },
+  {
+   "id": 22,
+   "quote": "Quoted per engagement",
+   "lines": [
+    80,
+    80
+   ],
+   "statement": "Attested due diligence is priced by quote per engagement rather than published.",
+   "about": "seller",
+   "locations": [
+    {
+     "quote": "A person reads the result and stands behind it.",
+     "lines": [
+      120,
+      120
+     ]
+    }
+   ]
+  },
+  {
+   "id": 23,
+   "quote": "The claims review, plus a reading of the whole record by someone who has sat on both sides of a deal.",
+   "lines": [
+    82,
+    82
+   ],
+   "statement": "The attested due diligence tier consists of the claims review plus a reading of the whole record by a reviewer who has sat on both sides of a deal.",
+   "about": "target"
+  },
+  {
+   "id": 24,
+   "quote": "A signed opinion, and a person on call to your deal team while it matters.",
+   "lines": [
+    82,
+    82
+   ],
+   "statement": "The attested tier delivers a signed opinion and puts a person on call to the buyer's deal team for the duration that matters.",
+   "about": "target"
+  },
+  {
+   "id": 25,
+   "quote": "Advisers and buyers of software businesses in the $1M to $5M range, at the point where the seller's description of the product is the main thing on the table.",
+   "lines": [
+    88,
+    88
+   ],
+   "statement": "The service is aimed at advisers and buyers of software businesses in the $1M to $5M range, at the pre-letter-of-intent stage.",
+   "about": "target"
+  },
+  {
+   "id": 26,
+   "quote": "A claims review sits a rung below a full technical due diligence: narrower, quicker, and priced so it can be done before the letter of intent rather than after.",
+   "lines": [
+    88,
+    88
+   ],
+   "statement": "A claims review is narrower, quicker and priced lower than a full technical due diligence, such that it can be done before the letter of intent rather than after.",
+   "about": "target"
+  },
+  {
+   "id": 27,
+   "quote": "The same method serves a developer choosing an open-source dependency on the strength of its README; the free demo is that case.",
+   "lines": [
+    88,
+    88
+   ],
+   "statement": "The method works when the only claim source is a README, and the free demo demonstrates exactly that case.",
+   "about": "target"
+  },
+  {
+   "id": 28,
+   "quote": "It is not a penetration test, not a review of code quality or architecture, and not legal advice.",
+   "lines": [
+    90,
+    90
+   ],
+   "statement": "The service excludes penetration testing, code quality or architecture review, and legal advice.",
+   "about": "target"
+  },
+  {
+   "id": 29,
+   "quote": "It reads the code",
+   "lines": [
+    90,
+    90
+   ],
+   "statement": "The review reads the target's code.",
+   "about": "target"
+  },
+  {
+   "id": 31,
+   "quote": "It reports the state of each claim and what a gap would change for you.",
+   "lines": [
+    90,
+    90
+   ],
+   "statement": "The report states the status of each claim and the consequence each gap would have for the buyer.",
+   "about": "target"
+  },
+  {
+   "id": 32,
+   "quote": "A short conversation about what you are evaluating and why: what you already know, what would change your mind, and, for a deal, what would move the price or end it.",
+   "lines": [
+    98,
+    98
+   ],
+   "statement": "The engagement begins with an intake conversation covering what is being evaluated, what is already known, and what would change the decision or the price.",
+   "about": "target"
+  },
+  {
+   "id": 34,
+   "quote": "and then each one is tested against the code and the documents supplied",
+   "lines": [
+    104,
+    104
+   ],
+   "statement": "Each frozen claim is then tested against the code and the documents the buyer supplied.",
+   "about": "target"
+  },
+  {
+   "id": 35,
+   "quote": "twice, and looked at again when the two readings differ",
+   "lines": [
+    110,
+    110
+   ],
+   "statement": "Every gap is rated twice, and the rating is re-examined when the two readings disagree.",
+   "about": "target"
+  },
+  {
+   "id": 36,
+   "quote": "with the working record behind every answer",
+   "lines": [
+    116,
+    116
+   ],
+   "statement": "The private question page provides access to the working record underlying each answer to a buyer's question.",
+   "about": "target"
+  },
+  {
+   "id": 37,
+   "quote": "The reading is done by language models",
+   "lines": [
+    120,
+    120
+   ],
+   "statement": "The review reading is performed by language models.",
+   "about": "target"
+  },
+  {
+   "id": 38,
+   "quote": "but not by asking one a question and taking its word",
+   "lines": [
+    120,
+    120
+   ],
+   "statement": "The reading is not a single model's unverified answer taken on trust.",
+   "about": "target"
+  },
+  {
+   "id": 39,
+   "quote": "The models work inside a fixed procedure that keeps the list of claims separate from the verdicts, keeps every search and every file opened, and refuses a finding it cannot cite.",
+   "lines": [
+    120,
+    120
+   ],
+   "statement": "The models operate inside a fixed procedure that separates the claim list from the verdicts, retains a record of every search and every file opened, and refuses findings that cannot be cited.",
+   "about": "target"
+  },
+  {
+   "id": 40,
+   "quote": "The report says on every line which part was machine and which was judgment.",
+   "lines": [
+    120,
+    120
+   ],
+   "statement": "Every line of the report attributes its content to machine work or to human judgment.",
+   "about": "target"
+  },
+  {
+   "id": 41,
+   "quote": "Machine drafts. A person confirms and signs. The report tells you which is which.",
+   "lines": [
+    122,
+    122
+   ],
+   "statement": "Same assertion as the report-attribution claim: machines draft, a person confirms and signs, and the report distinguishes the two.",
+   "about": "target",
+   "restates": 47
+  },
+  {
+   "id": 42,
+   "quote": "the seller's claims checked against the code",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "In operation, the seller's claims about a software product are actually checked against that product's actual code.",
+   "about": "target",
+   "implied_by": 2,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 43,
+   "quote": "Read a completed claims review of a small open-source project and ask it questions.",
+   "lines": [
+    64,
+    64
+   ],
+   "statement": "A visitor to the demo can ask questions about the completed claims review and receive answers to them.",
+   "about": "target",
+   "implied_by": 15,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  }
+ ]
+}

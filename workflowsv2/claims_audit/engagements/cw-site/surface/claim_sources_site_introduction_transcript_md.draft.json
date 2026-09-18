@@ -1,0 +1,609 @@
+{
+ "claim_source": "claim_sources/site/introduction-transcript.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "Tuuyi identifies the claims being made",
+   "lines": [
+    5,
+    5
+   ],
+   "statement": "The service contains a mechanism that identifies the claims the seller makes about the product from the seller's material.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "We first identify the seller's claims.",
+     "lines": [
+      27,
+      27
+     ]
+    },
+    {
+     "quote": "examine claims about software that a buyer or adviser is being asked to rely on",
+     "lines": [
+      61,
+      61
+     ]
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "quote": "reports what the evidence supports",
+   "lines": [
+    5,
+    5
+   ],
+   "statement": "The service contains a mechanism that generates a report from the results of its review.",
+   "about": "target"
+  },
+  {
+   "id": 5,
+   "quote": "Each finding shows the claim, the evidence behind it, and where that evidence came from, so the buyer can check it directly",
+   "lines": [
+    5,
+    5
+   ],
+   "statement": "The service's findings are rendered with fields for the claim, the evidence behind it, and the provenance of that evidence.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "the finding records what that citation shows",
+     "lines": [
+      33,
+      33
+     ]
+    },
+    {
+     "quote": "make the results inspectable",
+     "lines": [
+      61,
+      61
+     ]
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "quote": "Tuuyi addresses that narrower question: which claims the buyer is being asked to rely on are supported by the available evidence, which are not, and which still depend on trust because the supplied material cannot settle them.",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The service contains a mechanism that assigns each claim one of three outcomes: supported by the available evidence, not supported, or still dependent on trust because the supplied material cannot settle it.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "reduce the amount of a software decision that rests on claims nobody has actually checked",
+     "lines": [
+      65,
+      65
+     ]
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "quote": "Some claims are explicit: 'no telemetry,' 'runs in Docker,' 'supports PostgreSQL.'",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "The service enumerates explicit seller statements, such as 'no telemetry,' 'runs in Docker,' and 'supports PostgreSQL,' as claims.",
+   "about": "target"
+  },
+  {
+   "id": 9,
+   "quote": "Others come from the ordinary meaning of how the seller describes the product.",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "The service also enumerates claims implied by the ordinary meaning of how the seller describes the product, not only explicit statements.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "If you call something a URL shortener, for example, a reasonable buyer expects it to create short codes and resolve those codes to stored URLs.",
+     "lines": [
+      17,
+      17
+     ]
+    }
+   ]
+  },
+  {
+   "id": 10,
+   "quote": "But that does not give us permission to invent requirements. Calling it a URL shortener does not automatically promise analytics, custom domains, or an API.",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "Implied claims are bounded by ordinary meaning: a category description does not automatically promise additional features such as analytics, custom domains, or an API, and the service does not invent requirements beyond them.",
+   "about": "target"
+  },
+  {
+   "id": 12,
+   "quote": "Before examining the software, we establish the context of the review. Who is the buyer? What is being purchased? Which seller documents carry the claims that matter? What does the buyer already know or suspect? And what kinds of findings would actually affect price, terms, or the decision to close?",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "The review begins with an intake step, before examining the software, that establishes the review's context by asking the buyer who the buyer is, what is being purchased, which seller documents carry the material claims, what the buyer already knows or suspects, and which kinds of findings would affect price, terms, or the decision to close.",
+   "about": "target",
+   "restates": 12
+  },
+  {
+   "id": 13,
+   "quote": "Those answers come from the buyer.",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "The answers to the intake questions are supplied by the buyer.",
+   "about": "target"
+  },
+  {
+   "id": 14,
+   "quote": "The review does not fill in missing deal assumptions on its own.",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "The review does not supply missing deal assumptions itself; it relies on what the buyer provides.",
+   "about": "target"
+  },
+  {
+   "id": 15,
+   "quote": "The repository is evidence used to test claims; it is not itself a claim source.",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "The review treats the repository as evidence for testing claims and does not treat it as a claim source.",
+   "about": "target"
+  },
+  {
+   "id": 16,
+   "quote": "The buyer can also add specific claims they want tested.",
+   "lines": [
+    27,
+    27
+   ],
+   "statement": "In addition to the seller's claims, the buyer can add specific claims to be tested.",
+   "about": "target"
+  },
+  {
+   "id": 18,
+   "quote": "Every frozen claim gets attempted and gets its own finding.",
+   "lines": [
+    27,
+    27
+   ],
+   "statement": "Every frozen claim is attempted, and each frozen claim produces its own finding.",
+   "about": "target"
+  },
+  {
+   "id": 19,
+   "quote": "A useful citation has to do more than point to a file. It has to bear on the particular claim",
+   "lines": [
+    33,
+    33
+   ],
+   "statement": "A citation used in a finding bears on the particular claim being adjudicated, rather than merely pointing at a file.",
+   "about": "target"
+  },
+  {
+   "id": 20,
+   "quote": "Some claims require broader evidence.",
+   "lines": [
+    33,
+    33
+   ],
+   "statement": "Some claims require evidence beyond a single citation.",
+   "about": "target"
+  },
+  {
+   "id": 21,
+   "quote": "To support that part, the review has to look elsewhere too—for logging, telemetry, network calls, or other places where visitor information might be recorded.",
+   "lines": [
+    33,
+    33
+   ],
+   "statement": "For the exclusion part of a claim such as 'we store only the hit count and nothing else', the review searches beyond the named mechanism — logging, telemetry, network calls, and other places where visitor information might be recorded.",
+   "about": "target"
+  },
+  {
+   "id": 22,
+   "quote": "The claim determines the evidence required.",
+   "lines": [
+    33,
+    33
+   ],
+   "statement": "The evidence required for a finding is determined by what the claim asserts.",
+   "about": "target",
+   "restates": 22
+  },
+  {
+   "id": 23,
+   "quote": "The demo contains exactly that kind of example. The seller says that only the hit is recorded and nothing else.",
+   "lines": [
+    37,
+    37
+   ],
+   "statement": "The demo contains an example of the kind just discussed: a seller privacy claim, whose content is that only the hit is recorded and nothing else.",
+   "about": "target"
+  },
+  {
+   "id": 24,
+   "quote": "it increments the hit counter",
+   "lines": [
+    37,
+    37
+   ],
+   "statement": "The demo's database code increments the hit counter.",
+   "about": "target"
+  },
+  {
+   "id": 25,
+   "quote": "without adding other information to that table",
+   "lines": [
+    37,
+    37
+   ],
+   "statement": "The demo's database code adds no information to that table beyond the hit count.",
+   "about": "target"
+  },
+  {
+   "id": 26,
+   "quote": "the server's default access log records the client's address and user agent",
+   "lines": [
+    37,
+    37
+   ],
+   "statement": "The demo's server is configured with (or ships with enabled) its default access log, which writes an entry for each request it handles.",
+   "about": "target"
+  },
+  {
+   "id": 27,
+   "quote": "the useful conclusion is not simply ‘true’ or ‘false.’ The evidence shows that the claim is partly true",
+   "lines": [
+    37,
+    37
+   ],
+   "statement": "For the demo's privacy example, the review's conclusion is that the claim is partly true rather than simply true or false.",
+   "about": "target"
+  },
+  {
+   "id": 28,
+   "quote": "the report preserves both sides of that finding",
+   "lines": [
+    37,
+    37
+   ],
+   "statement": "The report preserves both sides of a partly-true finding — the part the evidence supports and the part it does not.",
+   "about": "target"
+  },
+  {
+   "id": 29,
+   "quote": "Whether the difference matters commercially depends on what the buyer is relying on.",
+   "lines": [
+    37,
+    37
+   ],
+   "statement": "The review treats the commercial significance of a gap as depending on the buyer's reliance rather than judging it itself.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "If the evidence shows that a seller claim is wrong, partly true, or needs an important qualification, the report rates the materiality of the gap—what that demonstrated difference would change for this buyer.",
+     "lines": [
+      49,
+      49
+     ]
+    }
+   ]
+  },
+  {
+   "id": 30,
+   "quote": "The first review is performed with AI assistance.",
+   "lines": [
+    41,
+    41
+   ],
+   "statement": "The first review of the claims is performed with AI assistance.",
+   "about": "target"
+  },
+  {
+   "id": 31,
+   "quote": "It asks several distinct questions. Did we state the seller's claim accurately? Does the cited material actually relate to that claim? Does it show what the finding says it shows? Is the verdict appropriate for the evidence? And, when searches were required, were they broad enough to find what mattered?",
+   "lines": [
+    43,
+    43
+   ],
+   "statement": "The separate check asks, for each finding: whether the seller's claim was stated accurately, whether the cited material relates to that claim, whether it shows what the finding says, whether the verdict fits the evidence, and, where searches were required, whether they were broad enough.",
+   "about": "target"
+  },
+  {
+   "id": 32,
+   "quote": "This is not a second attempt to redo the whole review or find additional faults in the target. It is a check on the issued findings themselves.",
+   "lines": [
+    43,
+    43
+   ],
+   "statement": "The separate check does not redo the whole review or look for additional faults in the target; its scope is the issued findings themselves.",
+   "about": "target"
+  },
+  {
+   "id": 33,
+   "quote": "Some findings are also retested, including findings the first check accepted.",
+   "lines": [
+    43,
+    43
+   ],
+   "statement": "Some findings are retested, and the retesting includes findings the first check accepted.",
+   "about": "target"
+  },
+  {
+   "id": 34,
+   "quote": "That helps detect both false alarms and problems the checker may have missed.",
+   "lines": [
+    43,
+    43
+   ],
+   "statement": "The retesting helps detect both false alarms and problems the checker missed.",
+   "about": "target"
+  },
+  {
+   "id": 35,
+   "quote": "If the supplied materials cannot settle the claim, nothing has been found against the seller. Instead, the report describes the exposure: how much the buyer is relying on something that still has not been verified.",
+   "lines": [
+    49,
+    49
+   ],
+   "statement": "The report contains logic that, when the supplied materials cannot settle a claim, records no finding against the seller and instead describes the buyer's exposure — how much the buyer is relying on something unverified.",
+   "about": "target"
+  },
+  {
+   "id": 36,
+   "quote": "The review itself is finished. The findings are issued and are not quietly rewritten afterward.",
+   "lines": [
+    55,
+    55
+   ],
+   "statement": "The target issues findings at delivery in a form that is not subject to later modification.",
+   "about": "target"
+  },
+  {
+   "id": 37,
+   "quote": "You can ask why a finding received its verdict, what evidence supports it, why something was rated material, what might settle an unresolved claim, or what parts of the target the review did not examine.",
+   "lines": [
+    55,
+    55
+   ],
+   "statement": "The post-delivery continuation provides for answering the listed question types: reasoning behind verdicts, evidence behind findings, basis for materiality ratings, what might settle unresolved claims, and which parts of the target were not examined.",
+   "about": "target"
+  },
+  {
+   "id": 38,
+   "quote": "The continuation works from the completed report, the working record behind it, and the cited target material.",
+   "lines": [
+    55,
+    55
+   ],
+   "statement": "The continuation's question-answering draws on the completed report, the working record behind it, and the cited target material as its sources.",
+   "about": "target"
+  },
+  {
+   "id": 39,
+   "quote": "And when the completed review does not answer a question, it says so rather than inventing an answer.",
+   "lines": [
+    55,
+    55
+   ],
+   "statement": "The continuation's question-answering includes a path that, when the completed review does not answer a question, states that it cannot rather than producing an invented answer.",
+   "about": "target"
+  },
+  {
+   "id": 40,
+   "quote": "Usually, none of the large categories of diligence.",
+   "lines": [
+    61,
+    61
+   ],
+   "statement": "The service does not usually replace any of the large categories of diligence; it is positioned as something other than a substitute for them.",
+   "about": "target"
+  },
+  {
+   "id": 42,
+   "quote": "It is not a general code-quality score, an architecture assessment, legal advice, or a valuation opinion.",
+   "lines": [
+    61,
+    61
+   ],
+   "statement": "The service is not a general code-quality score, not an architecture assessment, not legal advice, and not a valuation opinion.",
+   "about": "target"
+  },
+  {
+   "id": 43,
+   "quote": "That can fit small software acquisitions, claims about AI technology, acceptance of contracted software, or evaluating an open-source dependency when important decisions rest on what its documentation says.",
+   "lines": [
+    61,
+    61
+   ],
+   "statement": "The service is applicable to small software acquisitions, claims about AI technology, acceptance of contracted software, and evaluation of open-source dependencies where important decisions rest on the documentation.",
+   "about": "target"
+  },
+  {
+   "id": 44,
+   "quote": "The client supplies a code snapshot or repository, identifies the seller documents whose claims matter, and provides the deal context needed to understand which differences would matter commercially.",
+   "lines": [
+    65,
+    65
+   ],
+   "statement": "In an engagement the client supplies three things: a code snapshot or repository, identification of the seller documents whose claims matter, and the deal context needed to understand which differences would matter commercially.",
+   "about": "target"
+  },
+  {
+   "id": 45,
+   "quote": "Tuuyi returns the claims and verdicts, the evidence behind each finding, the independent check, buyer-specific materiality or exposure ratings, and questions that remain for the seller.",
+   "lines": [
+    65,
+    65
+   ],
+   "statement": "The engagement delivers five things: the claims and their verdicts, the evidence behind each finding, the independent check, buyer-specific materiality or exposure ratings, and the questions that remain for the seller.",
+   "about": "target"
+  },
+  {
+   "id": 46,
+   "quote": "The aim is not to pronounce on everything about a company or its software.",
+   "lines": [
+    65,
+    65
+   ],
+   "statement": "The service does not set out to pronounce on everything about a company or its software; its scope is bounded.",
+   "about": "target"
+  },
+  {
+   "id": 47,
+   "quote": "Tuuyi identifies the claims being made",
+   "lines": [
+    5,
+    5
+   ],
+   "statement": "When the service reviews an engagement, it identifies the claims the seller makes about the product.",
+   "about": "target",
+   "implied_by": 1,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 48,
+   "quote": "checks them against the supplied code and documents",
+   "lines": [
+    5,
+    5
+   ],
+   "statement": "When the service runs its review, the identified claims are checked against the code and documents actually supplied for that engagement.",
+   "about": "target",
+   "implied_by": 2,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 49,
+   "quote": "independently checks the findings",
+   "lines": [
+    5,
+    5
+   ],
+   "statement": "When the service produces findings, they are verified by a check that is independent of the process that produced them.",
+   "about": "target",
+   "implied_by": 3,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 50,
+   "quote": "reports what the evidence supports",
+   "lines": [
+    5,
+    5
+   ],
+   "statement": "The report the service delivers states what the evidence supports, rather than unverified assertions.",
+   "about": "target",
+   "implied_by": 4,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 51,
+   "quote": "Each finding shows the claim, the evidence behind it, and where that evidence came from, so the buyer can check it directly",
+   "lines": [
+    5,
+    5
+   ],
+   "statement": "Each finding in the report the service delivers displays the claim, the evidence behind it, and where that evidence came from.",
+   "about": "target",
+   "implied_by": 5,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 52,
+   "quote": "after the report is delivered, the buyer can continue asking questions about the completed review",
+   "lines": [
+    5,
+    5
+   ],
+   "statement": "After the report is delivered, the buyer is able to continue asking questions about the completed review.",
+   "about": "target",
+   "implied_by": 6,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 53,
+   "quote": "Tuuyi addresses that narrower question: which claims the buyer is being asked to rely on are supported by the available evidence, which are not, and which still depend on trust because the supplied material cannot settle them.",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "In a review the service delivers, each claim the buyer is asked to rely on is classified into one of the three outcomes.",
+   "about": "target",
+   "implied_by": 7,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 54,
+   "quote": "the server's default access log records the client's address and user agent",
+   "lines": [
+    37,
+    37
+   ],
+   "statement": "When the demo's server handles requests in operation, its default access log records the client's address and user agent.",
+   "about": "target",
+   "implied_by": 26,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 55,
+   "quote": "If the supplied materials cannot settle the claim, nothing has been found against the seller. Instead, the report describes the exposure: how much the buyer is relying on something that still has not been verified.",
+   "lines": [
+    49,
+    49
+   ],
+   "statement": "When the report is produced on materials that cannot settle a claim, the resulting report records no finding against the seller and instead describes the buyer's exposure, as claimed.",
+   "about": "target",
+   "implied_by": 35,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 56,
+   "quote": "The review itself is finished. The findings are issued and are not quietly rewritten afterward.",
+   "lines": [
+    55,
+    55
+   ],
+   "statement": "After the findings are issued, they remain unmodified — no quiet rewriting of the issued findings occurs.",
+   "about": "target",
+   "implied_by": 36,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 57,
+   "quote": "You can ask why a finding received its verdict, what evidence supports it, why something was rated material, what might settle an unresolved claim, or what parts of the target the review did not examine.",
+   "lines": [
+    55,
+    55
+   ],
+   "statement": "When asked questions of these types after delivery, the continuation answers each of them.",
+   "about": "target",
+   "implied_by": 37,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  }
+ ]
+}
