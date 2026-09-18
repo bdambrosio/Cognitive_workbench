@@ -1,5 +1,6 @@
 """The report stage: three classes from the record, a document that assembles
 without the agent, and the prose check."""
+import json
 import sys
 from pathlib import Path
 
@@ -223,3 +224,29 @@ def test_an_outside_claim_shows_the_links_the_claim_source_gives():
             in "\n".join(render._finding(badge, None, "exposure")))
     not_outside = f(3, "see https://x.example", because="not_in_the_materials")
     assert "Where the claim source points" not in "\n".join(render._finding(not_outside, None, "exposure"))
+
+
+def test_a_covered_claim_names_the_wider_claim_and_keeps_its_own_verdict(tmp_path):
+    """A claim the duplicates pass marked as within a wider one is audited on
+    its own (Bruce, 2026-09-17: never derived); the report shows the wider
+    claim and its verdict beside it, once in the finding and once in the
+    appendix, and defines the term."""
+    eng = tmp_path / "eng"
+    (eng / "surface").mkdir(parents=True)
+    (eng / "merged" / "m1").mkdir(parents=True)
+    (eng / "surface" / "duplicates.json").write_text(json.dumps({"pairs": [
+        {"source": "README.md", "id": 5, "relation": "within",
+         "other": {"source": "README.md", "id": 2, "statement": "the wider claim"}},
+        {"source": "README.md", "id": 3, "relation": "same",
+         "other": {"source": "README.md", "id": 1, "statement": "x"}}]}), encoding="utf-8")
+    rec = _record()
+    rec["covered"] = render.covered_by(eng / "merged" / "m1")
+    assert list(rec["covered"]) == ["README.md#5"]
+    text = render.assemble(rec, None, "t", "eng", None, False)
+    assert ("**Covered by:** README.md, claim 2, a wider claim of which this one is a part: "
+            "\"the wider claim\". That claim's verdict: holds. This claim was tested on its own; "
+            "the verdict above is its own.") in text
+    assert "| README.md | 5 | 5 | claim 5 text | real_with_caveat | decisive | README.md 2 |" in text
+    assert "| README.md | 2 | 2 | claim 2 text | real |  |  |" in text
+    assert "marked *covered by* names a wider claim" in text
+    assert render.covered_by(tmp_path / "nowhere" / "merged" / "m") == {}

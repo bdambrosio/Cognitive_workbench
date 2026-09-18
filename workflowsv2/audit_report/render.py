@@ -19,12 +19,15 @@ re-judges: every verdict, gap, rating and basis is the record's, copied.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
 from workflowsv2.audit_materiality import schemas as ms
 from workflowsv2.claims_audit.schemas import NOT_EXAMINED
+
+logger = logging.getLogger("audit_report.render")
 
 #: Highest consequence first.
 _ORDER = {m: i for i, m in enumerate(reversed(ms.MATERIALITY))}
@@ -58,7 +61,28 @@ def load(merged_dir: Path) -> Dict[str, Any]:
     merged_dir = Path(merged_dir)
     merged = json.loads((merged_dir / "merged.json").read_text(encoding="utf-8"))
     ratings = json.loads((merged_dir / "materiality.json").read_text(encoding="utf-8"))
-    return {"merged": merged, "ratings": ratings, "dir": merged_dir}
+    return {"merged": merged, "ratings": ratings, "dir": merged_dir,
+            "covered": covered_by(merged_dir)}
+
+
+def covered_by(merged_dir: Path) -> Dict[str, Dict[str, Any]]:
+    """{finding key: the wider claim} for every claim the duplicates pass
+    marked as within another (claims_audit/duplicates.py, record at
+    <engagement>/surface/duplicates.json; the merged directory sits at
+    <engagement>/merged/<name>). A covered claim is audited on its own like
+    any other (Bruce, 2026-09-17: its verdict is never derived from the
+    wider claim's); the report says which claim covers it and how that one
+    came out, so the reader sees the two together."""
+    f = Path(merged_dir).resolve().parents[1] / "surface" / "duplicates.json"
+    if not f.is_file():
+        return {}
+    try:
+        pairs = json.loads(f.read_text(encoding="utf-8")).get("pairs") or []
+    except Exception as e:                                     # noqa: BLE001
+        logger.warning("duplicates record %s not read: %s", f, e)
+        return {}
+    return {f"{p['source']}#{p['id']}": p["other"]
+            for p in pairs if p.get("relation") == "within" and p.get("other")}
 
 
 def _key(f: Dict[str, Any]) -> str:
@@ -218,7 +242,9 @@ def _links(f: Dict[str, Any]) -> List[str]:
 
 
 def _finding(f: Dict[str, Any], rating: Optional[Dict[str, Any]],
-             field: str, questions: Optional[List[str]] = None) -> List[str]:
+             field: str, questions: Optional[List[str]] = None,
+             covered: Optional[Dict[str, Any]] = None,
+             verdicts: Optional[Dict[str, str]] = None) -> List[str]:
     adj = f.get("adjudication") or {}
     v = adj.get("verdict")
     head = f"### {f.get('claim_source')}, claim {f.get('claim_id')}"
@@ -244,6 +270,14 @@ def _finding(f: Dict[str, Any], rating: Optional[Dict[str, Any]],
                 "hosted service, which the supplied materials are not "
                 "expected to reach.", ""]
     out += [f"**Verdict:** {VERDICT_WORDS.get(v, v)}.", ""]
+    if covered:
+        wk = f"{covered.get('source')}#{covered.get('id')}"
+        wv = (verdicts or {}).get(wk)
+        out += [f"**Covered by:** {covered.get('source')}, claim {covered.get('id')}, a wider "
+                f"claim of which this one is a part: \"{_md_safe(covered.get('statement'))}\". "
+                + (f"That claim's verdict: {VERDICT_WORDS.get(wv, wv)}. " if wv else
+                   "That claim is not in this report. ")
+                + "This claim was tested on its own; the verdict above is its own.", ""]
     if adj.get("gap"):
         out += [f"**The gap:** {_md_safe(adj['gap'])}", ""]
     if adj.get("unresolved_because"):
@@ -388,7 +422,10 @@ def _how_to_read() -> List[str]:
         "would change for this transaction. A *check* is an independent "
         "second pass over each finding's evidence, and a *retest* is a "
         "second check, blind to the first, on the findings the check "
-        "questioned. Each finding ends with the check's outcome.", "",
+        "questioned. Each finding ends with the check's outcome. A finding "
+        "marked *covered by* names a wider claim of which this one is a "
+        "part, with that claim's verdict beside it; the two were tested "
+        "separately and each verdict is its own.", "",
         "**Verdicts**, and the class each puts a claim in:", "",
         "| verdict | meaning | class |", "|---|---|---|",
         "| contradicted | " + VERDICT_WORDS["contradicted"] + " | shown |",
@@ -445,6 +482,9 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
     by_m = _ratings_by_key(ratings, "ratings")
     by_e = _ratings_by_key(ratings, "exposures")
     by_q = _questions_by_key(merged)
+    covered = record.get("covered") or {}
+    verdicts = {_key(f): (f.get("adjudication") or {}).get("verdict")
+                for f in merged.get("findings") or []}
     runs = merged.get("runs") or []
     dates = sorted({(r.get("captured_at_utc") or "")[:10] for r in runs} - {""})
     revs = sorted({r.get("target_rev") or "" for r in runs} - {""})
@@ -504,22 +544,22 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
 
     out += ["## What the review showed", ""] + _slot("shown_note", prose)
     for f in _ordered(classes["shown"], by_m, "materiality"):
-        out += _finding(f, by_m.get(_key(f)), "materiality", by_q.get(_key(f)))
+        out += _finding(f, by_m.get(_key(f)), "materiality", by_q.get(_key(f)), covered.get(_key(f)), verdicts)
     if not classes["shown"]:
         out += ["No finding showed a gap.", ""]
     out += ["## Unsettled claims", ""] + _slot("unsettled_note", prose)
     for f in _ordered(classes["unsettled"], by_e, "exposure"):
-        out += _finding(f, by_e.get(_key(f)), "exposure", by_q.get(_key(f)))
+        out += _finding(f, by_e.get(_key(f)), "exposure", by_q.get(_key(f)), covered.get(_key(f)), verdicts)
     if not classes["unsettled"]:
         out += ["None.", ""]
     if classes["seller_unsettled"]:
         out += ["## Unsettled claims about the seller", "", SELLER_LINE, ""]
         for f in _ordered(classes["seller_unsettled"], by_e, "exposure"):
-            out += _finding(f, by_e.get(_key(f)), "exposure", by_q.get(_key(f)))
+            out += _finding(f, by_e.get(_key(f)), "exposure", by_q.get(_key(f)), covered.get(_key(f)), verdicts)
     if classes["not_examined"]:
         out += ["## Claims not examined", ""] + _slot("not_examined_note", prose)
         for f in _ordered(classes["not_examined"], by_e, "exposure"):
-            out += _finding(f, by_e.get(_key(f)), "exposure", by_q.get(_key(f)))
+            out += _finding(f, by_e.get(_key(f)), "exposure", by_q.get(_key(f)), covered.get(_key(f)), verdicts)
     out += ["## Claims that hold", "",
             "| claim source | id | claim | evidence |", "|---|---|---|---|"]
     for f in sorted(classes["holds"], key=lambda x: (x.get("claim_source") or "",
@@ -581,17 +621,19 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
             "The claim surface as the review froze it, in document order, with "
             "the verdict each claim received and, where rated, its "
             "materiality or exposure.", "",
-            "| source | id | lines | claim | verdict | rating |",
-            "|---|---|---|---|---|---|"]
+            "| source | id | lines | claim | verdict | rating | covered by |",
+            "|---|---|---|---|---|---|---|"]
     for f in sorted(merged.get("findings") or [],
                     key=lambda x: (x.get("claim_source") or "", x.get("claim_id") or 0)):
         k = _key(f)
         r = by_m.get(k) or by_e.get(k) or {}
         rating = r.get("materiality") or r.get("exposure") or ""
         q = _md_safe(f.get("quote"))
+        c = covered.get(k) or {}
         out.append(f"| {f.get('claim_source')} | {f.get('claim_id')} | "
                    f"{_lines_bare(f.get('lines'))} | {q[:120]} | "
-                   f"{(f.get('adjudication') or {}).get('verdict')} | {rating} |")
+                   f"{(f.get('adjudication') or {}).get('verdict')} | {rating} | "
+                   f"{(c.get('source') + ' ' + str(c.get('id'))) if c else ''} |")
     return "\n".join(out).rstrip() + "\n"
 
 
