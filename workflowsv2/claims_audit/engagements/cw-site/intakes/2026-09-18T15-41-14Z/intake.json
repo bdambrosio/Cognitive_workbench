@@ -1,0 +1,35 @@
+{
+ "identify": {
+  "client": "Merrow Lane Partners, a fictional private-equity firm of eleven people that buys software companies valued between $2M and $15M; invented by the practice for testing",
+  "acting": "the firm's vice-president for technical diligence, for Merrow Lane Partners",
+  "counterparty": "Tuuyi, as the seller of the claims-review service",
+  "confidentiality": "the firm's non-disclosure agreements with the sellers it deals with forbid passing a seller's source code to any third party other than a named adviser; the firm will name Tuuyi as an adviser only if the website's statements about how seller code is handled are true"
+ },
+ "situation": {
+  "subject": "the claims-review service as Tuuyi's public website describes it, to be retained first for one attested review on a live deal (a $4.2M purchase of a scheduling-software company) and, if that goes well, for every deal the firm does, about six a year",
+  "price": "$5,000 for the first review, fee set at intake; the firm has budgeted $30,000 a year for six reviews; the firm assumes the website describes the service accurately and has seen nothing else",
+  "structure": "a service engagement under Tuuyi's engagement letter, one review at a time, no retainer",
+  "timetable": "the live deal's exclusivity period ends in 21 days; the firm needs the report in hand within 10 days of the seller uploading the code"
+ },
+ "background": {
+  "target": "Tuuyi's claims-review pipeline and client site, which the firm cannot see; the firm sees only the website",
+  "claim_sources": "the pages of tuuyi.com: how it works, the home page, the introduction and its video transcript, pricing, the demo page, about, privacy and contact",
+  "known": "the firm ran the free demo once and found the report readable; a partner doubts that the independent check is independent in any real sense, and doubts that a language model's citations can be trusted without a person checking each one"
+ },
+ "assessment": {
+  "paying_for": "six things, which the firm listed and said were the whole of it: every seller claim listed and frozen before testing, every finding cited to a file and line that the firm's own engineer can open and confirm, every finding checked a second time independently, ratings made against the thresholds the firm states, a person's signature on the conclusion, and the seller's code kept on hardware Tuuyi controls",
+  "price_movers": "an independent check that re-uses the first reader's conclusions or is skipped for some findings; citations that are not verified mechanically as the website says; a rating step that does not use the firm's stated thresholds; a turnaround longer than the website states, because the exclusivity period is short; a step the website describes as done by a person that is done by the tooling alone, or the reverse; the working record not being kept, because the committee may ask for it a year later",
+  "walk_away": "any of a seller's code reaching a cloud model service or any party other than Tuuyi on a paid engagement; the seller's materials being visible to anyone but the seller and the practice; the firm's deal terms being stored anywhere other than the engagement file"
+ },
+ "recommendation": {
+  "scope": "every page of the website as a claim source, tested against the repository that runs the service; the firm has no interest in the free demo level or the developer beta beyond whether they are described honestly"
+ },
+ "open_questions": [],
+ "notes": [
+  "INVENTED BY THE PRACTICE 2026-09-18 as test data for the tier stage. No such buyer, deal or conversation exists.",
+  "the buyer said the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again",
+  "the buyer said it does not care how the intake page is built or how long intake takes, so long as the report arrives inside the 10 days",
+  "the buyer said it has no view on the limits the website states (not a penetration test, not a code-quality review, not legal advice); it has other advisers for those",
+  "paying_for narrowed by the practice 2026-09-18 after the first tier smoke test: the opening phrase 'a report the firm's investment committee can rely on' reached almost every claim and was removed"
+ ]
+}

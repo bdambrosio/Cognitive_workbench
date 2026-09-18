@@ -1,0 +1,12 @@
+transaction: |
+  Client: Pennywhistle Software Ltd, a fictional company of fourteen people that sells an email-campaign product to small retailers, about 900 paying customers, a third of them in the European Union; invented by the practice for testing
+  Acting for the client: the company's head of engineering, for Pennywhistle Software Ltd
+  Counterparty: the maintainer of Chhoto URL, as seller
+  Subject: the Chhoto URL link shortener: the copyright in the source code, the project name and the project's domain, with the maintainer contracted for 40 hours of handover over three months. The buyer will run one instance per customer as a branded short-link add-on to its email product
+  Price and basis: $60,000, of which $15,000 is held back for six months against the documentation proving accurate; the price was set from the README and the documentation pages alone, on the assumption that they are accurate
+  Structure: asset purchase with a six-month holdback; the seller warrants ownership of the code and the accuracy of the published documentation
+  Timetable: 30 days to closing; the buyer wants the add-on on sale in the following quarter
+thresholds: |
+  Paying for: a link shortener that (1) records nothing about the people who click a link beyond a count of hits, so the buyer can offer it to European customers without a new data-processing assessment; (2) is small enough to run one instance per customer on the buyer's cheapest virtual machines, 256 MB of memory each, which is what makes the add-on profitable at $4 a month; (3) can be deployed and configured by two operations engineers working from the documentation alone; and (4) the buyer will own outright
+  Would change the price or terms: any logging or tracking of visitors beyond the hit count; memory, image-size or resource figures materially worse than stated, because at 900 instances the hosting cost is the margin; a security or hardening measure the documentation describes as present or on by default that is absent or off; environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that; a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial
+  Would end the deal: the seller not owning the code, or a licence on the code or a dependency that stops the buyer selling a hosted service built on it; personal data of visitors stored or sent anywhere; a dependency on a database or outside service the buyer cannot run on its own machines

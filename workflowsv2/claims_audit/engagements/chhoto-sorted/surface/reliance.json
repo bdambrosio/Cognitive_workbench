@@ -1,0 +1,189 @@
+{
+ "at": "2026-09-18T17-35-31Z",
+ "model": "accounts/fireworks/models/glm-5p3-flash",
+ "use": "Pennywhistle Software will run Chhoto URL as a branded short-link add-on to its email-campaign product: one instance per customer, about 900 instances, each on one of the buyer's cheapest 256 MB virtual machines, deployed and configured by its two operations engineers working from the documentation alone and using Docker Compose only. The buyer's product will create and manage links through the service, and each customer's visitors will follow the short links in emails. The buyer is paying for a link shortener that records nothing about visitors beyond a count of hits, which lets it offer the add-on to its European customers without a new data-processing assessment; that is small enough to run one instance per customer, which is what makes the add-on profitable at $4 a month; that can be deployed and configured from the documentation alone; and that the buyer will own outright. The price is $60,000 with $15,000 held back six months against the documentation proving accurate.",
+ "items": [
+  {
+   "item": "Creating short links and redirecting visitors straight to the destination URL, with no intermediate page and no limit on the long URL's length",
+   "reliance": "depends",
+   "if_it_failed": "There is no add-on to sell; with nobody at the buyer reading Rust, repairing the core means replacing the product, which is costly for this buyer.",
+   "source": "buyer",
+   "buyer_words": "\"a link shortener\"; \"The buyer will run one instance per customer as a branded short-link add-on to its email product\""
+  },
+  {
+   "item": "Recording nothing about visitors beyond a per-link hit count — no tracking, no cookies, no visitor data stored or sent anywhere, and nothing beyond the necessary features that could record more",
+   "reliance": "depends",
+   "if_it_failed": "The buyer cannot offer the add-on to its European customers without a new data-processing assessment, and since the recording happens inside code it cannot read, this is not something it can patch; the deal would end.",
+   "source": "buyer",
+   "buyer_words": "\"records nothing about the people who click a link beyond a count of hits, so the buyer can offer it to European customers without a new data-processing assessment\"; walk-away: \"personal data of visitors stored or sent anywhere\""
+  },
+  {
+   "item": "Hit counts that reflect each link's actual traffic",
+   "reliance": "depends",
+   "if_it_failed": "The buyer would be selling a counter that miscounts; fixing the counting code means Rust nobody at the buyer reads well, so this would be costly for this buyer.",
+   "source": "buyer",
+   "buyer_words": "\"records nothing about the people who click a link beyond a count of hits\""
+  },
+  {
+   "item": "Memory and resource figures as stated, small enough for one instance per customer on the buyer's 256 MB virtual machines, and the stated compressed image sizes",
+   "reliance": "depends",
+   "if_it_failed": "At 900 instances the hosting cost is the margin, so a materially worse footprint makes the add-on unprofitable, and the buyer cannot slim code it cannot read; it would have to renegotiate the price or abandon one-instance-per-customer.",
+   "source": "buyer",
+   "buyer_words": "\"small enough to run one instance per customer on the buyer's cheapest virtual machines, 256 MB of memory each, which is what makes the add-on profitable at $4 a month\"; \"memory, image-size or resource figures materially worse than stated, because at 900 instances the hosting cost is the margin\""
+  },
+  {
+   "item": "Deploying and configuring each instance from the documentation alone, using the provided Docker image and Docker Compose file",
+   "reliance": "depends",
+   "if_it_failed": "Writing a Compose file or deployment script by hand is commodity work the engineers can do cheaply, but discovering undocumented configuration from code they cannot read would be costly.",
+   "source": "buyer",
+   "buyer_words": "\"can be deployed and configured by two operations engineers working from the documentation alone\"; \"it deploys with Docker Compose only\""
+  },
+  {
+   "item": "Environment variables, defaults, command-line options and API routes behaving exactly as the documentation describes",
+   "reliance": "depends",
+   "if_it_failed": "The engineers can write their own corrections into a runbook cheaply, but the price was set assuming the documentation is accurate, and the holdback exists against exactly this failure.",
+   "source": "buyer",
+   "buyer_words": "\"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\""
+  },
+  {
+   "item": "The HTTP API as documented — creating, editing, listing, expanding and deleting links through the documented endpoints, with JSON responses, batching, pagination and the documented field names",
+   "reliance": "depends",
+   "if_it_failed": "The add-on has no way to manage roughly 900 customer instances by hand; automating the web UI instead would be fragile and costly, and repairing the API means Rust the buyer cannot read.",
+   "source": "buyer",
+   "buyer_words": "\"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\""
+  },
+  {
+   "item": "API key and password authentication working as documented — CHHOTO_API_KEY, the X-API-Key header and the login cookie",
+   "reliance": "uses",
+   "if_it_failed": "The buyer could confine each instance to a private network reachable only by its own product, which is commodity networking work for its engineers, though it departs from how the documentation says to deploy.",
+   "source": "inference",
+   "buyer_words": "\"one instance per customer as a branded short-link add-on to its email product\""
+  },
+  {
+   "item": "Security and hardening behaviour as documented — restricted protocols on accepted links, insecure-key warnings, public mode and its forced expiry",
+   "reliance": "uses",
+   "if_it_failed": "The engineers could add compensating controls around the instance, which is commodity work, but hardening inside the code sits in Rust they cannot read, so closing that gap themselves would be costly.",
+   "source": "buyer",
+   "buyer_words": "\"a security or hardening measure the documentation describes as present or on by default that is absent or off\""
+  },
+  {
+   "item": "The Helm chart and any Kubernetes material",
+   "reliance": "does_not_use",
+   "if_it_failed": "Nothing; the buyer's plan does not touch it.",
+   "source": "buyer",
+   "buyer_words": "\"the buyer said it will not use the Helm chart or any Kubernetes material; it deploys with Docker Compose only\""
+  },
+  {
+   "item": "The web interface as an administration tool the operations engineers can use to manage links",
+   "reliance": "uses",
+   "if_it_failed": "The engineers could manage links through the API or a database client instead — commodity work, cheap for them.",
+   "source": "buyer",
+   "buyer_words": "\"its customers will never see it, only the buyer's operations engineers will\""
+  },
+  {
+   "item": "The web interface's appearance — responsive layout, dark mode, styling",
+   "reliance": "does_not_use",
+   "if_it_failed": "Nothing; the buyer's plan does not touch it.",
+   "source": "buyer",
+   "buyer_words": "\"the web interface's appearance does not matter\""
+  },
+  {
+   "item": "Custom short slugs chosen at link creation",
+   "reliance": "uses",
+   "if_it_failed": "The buyer could accept random slugs for every link, which costs nothing operationally, but the price assumed the feature and changing slug generation means Rust code.",
+   "source": "buyer",
+   "buyer_words": "\"custom slugs\" (named among documented features that are price movers if missing or partial)"
+  },
+  {
+   "item": "Link expiry — links stopping automatically after a chosen time, with delays in seconds up to the documented cap",
+   "reliance": "uses",
+   "if_it_failed": "The buyer could schedule deletions from its own product against the API, which is commodity work for its engineers, but the price assumed the feature.",
+   "source": "buyer",
+   "buyer_words": "\"expiry\" (named among documented features that are price movers if missing or partial)"
+  },
+  {
+   "item": "The official command-line client for operating the service from a terminal",
+   "reliance": "uses",
+   "if_it_failed": "The buyer could drive the API with curl or its own scripts instead; the CLI is a thin client and replacing it is cheap commodity work.",
+   "source": "buyer",
+   "buyer_words": "\"the command-line client\" (named among documented features that are price movers if missing or partial)"
+  },
+  {
+   "item": "Editing existing links, attaching notes to them, and filtering the link list",
+   "reliance": "uses",
+   "if_it_failed": "The engineers could keep their own records outside the tool and delete-and-recreate links instead of editing them — cheap, commodity work.",
+   "source": "inference",
+   "buyer_words": "\"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\""
+  },
+  {
+   "item": "QR code generation for short links",
+   "reliance": "uses",
+   "if_it_failed": "A QR generator is commodity and the buyer's product could make codes from the short link itself, but the buyer has not said; a person should ask.",
+   "source": "inference",
+   "buyer_words": ""
+  },
+  {
+   "item": "Storing links in an embedded SQLite database with no external database or outside service",
+   "reliance": "depends",
+   "if_it_failed": "No engineering on the buyer's side substitutes for it: at 900 instances, running an outside database beside every instance would eat the margin, so the buyer would have to redesign or drop the add-on.",
+   "source": "buyer",
+   "buyer_words": "walk-away: \"a dependency on a database or outside service the buyer cannot run on its own machines\""
+  },
+  {
+   "item": "Database behaviour as documented — ACID by default, WAL mode and tuning options, and upgrades that do not mangle the database",
+   "reliance": "uses",
+   "if_it_failed": "The engineers could run with defaults or rebuild an instance from a backup, which is cheap commodity work for one customer's data.",
+   "source": "inference",
+   "buyer_words": "\"deployed and configured by two operations engineers working from the documentation alone\""
+  },
+  {
+   "item": "Ownership of the code, the project name and the domain, under a licence that permits selling a hosted service built on it",
+   "reliance": "depends",
+   "if_it_failed": "No engineering effort substitutes for the right to run and sell the service; the buyer would walk away.",
+   "source": "buyer",
+   "buyer_words": "\"the buyer will own outright\"; walk-away: \"the seller not owning the code, or a licence on the code or a dependency that stops the buyer selling a hosted service built on it\""
+  },
+  {
+   "item": "Maintainability and upkeep — the Rust and Actix Web backend, the plain HTML and vanilla JS frontend, the maintainer's stated intent to fix bugs and security issues, and support for the latest release",
+   "reliance": "uses",
+   "if_it_failed": "During the handover and holdback window the buyer depends on the seller's fixes, since its own engineers cannot read the Rust; after that it must maintain the code itself, which is costly for a fourteen-person team.",
+   "source": "inference",
+   "buyer_words": "\"nobody at the buyer reads Rust well\"; \"the maintainer contracted for 40 hours of handover over three months\""
+  },
+  {
+   "item": "The documented vulnerability reporting channels",
+   "reliance": "uses",
+   "if_it_failed": "The buyer owns the code and could fall back on its own review and fixes, but without Rust readers that fallback is slow and costly.",
+   "source": "inference",
+   "buyer_words": "\"nobody at the buyer reads Rust well\""
+  },
+  {
+   "item": "Branding surface — the configurable site URL and the custom landing page",
+   "reliance": "uses",
+   "if_it_failed": "Branding can live in the domain name, which the buyer controls in any case, but the buyer has not said whether it needs the landing page; a person should ask.",
+   "source": "inference",
+   "buyer_words": "\"a branded short-link add-on to its email product\""
+  },
+  {
+   "item": "Random slug generation that keeps producing working links as the number of links per instance grows, including the configurable slug styles and lengths",
+   "reliance": "uses",
+   "if_it_failed": "The buyer has not said how many links a single customer's instance will hold; a person should ask.",
+   "source": "inference",
+   "buyer_words": "\"one instance per customer as a branded short-link add-on to its email product\""
+  },
+  {
+   "item": "The absence of user management — one set of credentials per instance, no organisation-wide accounts",
+   "reliance": "does_not_use",
+   "if_it_failed": "Nothing; the buyer's plan does not touch it.",
+   "source": "inference",
+   "buyer_words": "\"one instance per customer\""
+  },
+  {
+   "item": "The project's community, history and ecosystem — popularity, contributors, translations, who else uses it, the hosted demo instance, the maintainer's biography, and the unofficial third-party extensions, ports and packages",
+   "reliance": "does_not_use",
+   "if_it_failed": "Nothing; nothing the buyer pays for rests on them.",
+   "source": "buyer",
+   "buyer_words": "\"the buyer asked that claims about the project's community (stars, contributors, translations, who else uses it) not be tested, because nothing the buyer pays for rests on them\"; \"the buyer said it has no interest in the project's popularity, its history, or how it compares with other shorteners\""
+  }
+ ]
+}
