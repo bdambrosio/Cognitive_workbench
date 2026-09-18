@@ -36,6 +36,8 @@ header a, .site a { color: #6ea0ff; }
 table.claims td[contenteditable] { outline: 1px dashed var(--rule); }
 table.claims td[contenteditable]:focus { outline: 1px solid var(--accent2); }
 table.claims tr.dropped td { text-decoration: line-through; opacity: .5; }
+/* The statement a duplicate was matched with is read, not struck. */
+table.claims tr.dropped .declined { display: inline-block; text-decoration: none; }
 table.claims td.comments { min-width: 220px; }
 table.claims .c { font-size: 13px; margin-bottom: 4px; }
 table.claims .c .by { color: var(--muted); font-family: var(--mono); font-size: 11px; }

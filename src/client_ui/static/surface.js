@@ -43,9 +43,14 @@
     h += '<table class="claims"><tr><th>#</th><th>lines</th><th>quote</th><th>statement</th><th>comments</th>' + (ed ? "<th></th>" : "") + "</tr>";
     for (const c of src.claims) {
       const cm = byClaim[String(c.id)] || [];
-      h += '<tr data-src="' + esc(src.slug) + '" data-id="' + esc(c.id) + '">'
+      // A claim the duplicates pass marked starts left out: the earlier claim is
+      // the one tested. The statement it was matched with is shown under its
+      // own, and "keep" brings it back.
+      const dup = !!c.same_as && ed;
+      h += '<tr data-src="' + esc(src.slug) + '" data-id="' + esc(c.id) + '"' + (dup ? ' data-dropped="1" class="dropped"' : "") + ">"
         + '<td class="id">' + esc(c.id) + (c.about === "seller" ? '<div class="muted">seller</div>' : c.about === "document" ? '<div class="muted">document</div>' : "")
           + (c.implied_by != null ? '<div class="muted">implied by ' + esc(c.implied_by) + (c.property ? ": " + esc(c.property) : "") + "</div>" : "")
+          + (c.same_as ? '<div class="muted">same as ' + esc(c.same_as.source) + " " + esc(c.same_as.id) + "</div>" : "")
           + ((c.declined || []).length ? '<div class="declined">not decomposed: ' + c.declined.map((d) => esc(d.text) + " (" + esc(d.why) + ")").join("; ") + "</div>" : "") + "</td>"
         + '<td class="lines mono"' + (ed ? ' contenteditable="true"' : "") + ">" + esc((c.lines || []).join("–")) + "</td>"
         + '<td class="quote"' + (ed ? ' contenteditable="true"' : "") + ">" + esc(c.quote) + "</td>"
@@ -53,7 +58,8 @@
         // (the declined parts of a decomposed claim are shown under its id, below)
         + '<td class="comments">' + cm.map((x) => '<div class="c"><span class="by">' + esc(x.by) + "</span> " + esc(x.text) + "</div>").join("")
         + '<form class="comment" data-src="' + esc(src.source) + '" data-id="' + esc(c.id) + '"><input placeholder="comment"><button>add</button></form></td>'
-        + (ed ? '<td><button class="quiet drop" title="leave this claim out">drop</button>'
+        + (ed ? '<td><button class="quiet drop" title="leave this claim out">' + (dup ? "keep" : "drop") + "</button>"
+              + (c.same_as ? '<div class="declined">tested as ' + esc(c.same_as.source) + " " + esc(c.same_as.id) + ": " + esc(c.same_as.statement) + "</div>" : "")
               + (c.implied_by == null ? '<button class="quiet decompose" title="ask for the testable properties a reasonable buyer would take this claim to assert">decompose</button>' : "") + "</td>" : "")
         + "</tr>";
     }

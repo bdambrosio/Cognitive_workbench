@@ -1,0 +1,201 @@
+{
+ "engagement": "chhoto-sorted",
+ "by": "Claude, by reading, 2026-09-17, no model output consulted",
+ "same": [
+  [
+   "W1",
+   "R5"
+  ],
+  [
+   "W3",
+   "W2"
+  ],
+  [
+   "W5",
+   "R48"
+  ],
+  [
+   "W6",
+   "R42"
+  ],
+  [
+   "W7",
+   "R7"
+  ],
+  [
+   "W8",
+   "R9"
+  ],
+  [
+   "W10",
+   "R3"
+  ],
+  [
+   "W11",
+   "R51"
+  ],
+  [
+   "W13",
+   "R20"
+  ],
+  [
+   "W14",
+   "R25"
+  ],
+  [
+   "W15",
+   "R27"
+  ],
+  [
+   "W23",
+   "R62"
+  ],
+  [
+   "W24",
+   "R64"
+  ],
+  [
+   "T3",
+   "C3"
+  ],
+  [
+   "T4",
+   "C4"
+  ]
+ ],
+ "same_notes": {
+  "W5": "borderline: 'no frontend framework' against 'styled with Pure CSS'",
+  "W7": "one claim equal to R7 and R8 together"
+ },
+ "entailed_by": [
+  [
+   "R57",
+   "R44"
+  ],
+  [
+   "R19",
+   "R59"
+  ],
+  [
+   "R31",
+   "C10"
+  ],
+  [
+   "R21",
+   "W12"
+  ],
+  [
+   "C32",
+   "C25"
+  ],
+  [
+   "C41",
+   "C25"
+  ],
+  [
+   "C29",
+   "C31"
+  ],
+  [
+   "C33",
+   "C34"
+  ],
+  [
+   "C39",
+   "C40"
+  ],
+  [
+   "C43",
+   "C53"
+  ],
+  [
+   "C60",
+   "C59"
+  ],
+  [
+   "W2",
+   "R47"
+  ],
+  [
+   "W4",
+   "R47"
+  ],
+  [
+   "W16",
+   "R29"
+  ],
+  [
+   "W17",
+   "R30"
+  ],
+  [
+   "W18",
+   "R34"
+  ],
+  [
+   "R45",
+   "W19"
+  ],
+  [
+   "R41",
+   "W20"
+  ],
+  [
+   "W22",
+   "R61"
+  ]
+ ],
+ "entailed_notes": {
+  "W2": "R14 entails it too",
+  "W16": "R28 and R29 together",
+  "W17": "R30 and R33 together",
+  "W18": "any UI claim; R34 chosen"
+ },
+ "contradictions_between_claims": [
+  [
+   "R23",
+   "R7"
+  ],
+  [
+   "R24",
+   "R9"
+  ],
+  [
+   "C61",
+   "C55"
+  ],
+  [
+   "C61",
+   "R52"
+  ]
+ ],
+ "sources": {
+  "R": {
+   "claim_source": "README.md",
+   "enumeration_run": "2026-09-17T20-22-14Z_enum_chhoto-sorted_readme_md_20260917T193725Z"
+  },
+  "C": {
+   "claim_source": "docs/CLI.md",
+   "enumeration_run": "2026-09-17T20-26-26Z_enum_chhoto-sorted_docs_cli_md_20260917T193725Z"
+  },
+  "S": {
+   "claim_source": "docs/SECURITY.md",
+   "enumeration_run": "2026-09-17T20-34-10Z_enum_chhoto-sorted_docs_security_md_20260917T193725Z"
+  },
+  "T": {
+   "claim_source": "docs/TOOLS.md",
+   "enumeration_run": "2026-09-17T20-34-37Z_enum_chhoto-sorted_docs_tools_md_20260917T193725Z"
+  },
+  "W": {
+   "claim_source": "claim_sources/site_index_html.md",
+   "enumeration_run": "2026-09-17T20-36-10Z_enum_chhoto-sorted_claim_sources_site_index_html_md_20260917T193725Z"
+  }
+ },
+ "order": [
+  "R",
+  "C",
+  "S",
+  "T",
+  "W"
+ ]
+}

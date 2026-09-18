@@ -1,0 +1,377 @@
+{
+ "claim_source": "claim_sources/site_index_html.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "Selfhosted URL Shortener",
+   "lines": [
+    1,
+    1
+   ],
+   "statement": "The target contains the code needed to create and manage short links on infrastructure the operator controls.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "selfhosted URL shortener",
+     "lines": [
+      3,
+      3
+     ]
+    },
+    {
+     "quote": "self-hosted URL shortener",
+     "lines": [
+      5,
+      5
+     ]
+    },
+    {
+     "quote": "a lightweight URL shortener",
+     "lines": [
+      9,
+      9
+     ]
+    },
+    {
+     "quote": "provides the core tools needed to create and manage short links on your own infrastructure",
+     "lines": [
+      9,
+      9
+     ]
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "quote": "written in Rust",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The target's implementation language is Rust.",
+   "about": "target",
+   "same_as": {
+    "source": "README.md",
+    "id": 14,
+    "statement": "The product is a Rust rewrite of the simply-shorten project — a provenance and implementation-language claim"
+   }
+  },
+  {
+   "id": 3,
+   "quote": "written in Rust",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "Restatement of claim 3: the implementation language is Rust.",
+   "about": "target",
+   "restates": 3,
+   "locations": [
+    {
+     "quote": "written in async Rust",
+     "lines": [
+      11,
+      11
+     ]
+    }
+   ],
+   "same_as": {
+    "source": "README.md",
+    "id": 14,
+    "statement": "The product is a Rust rewrite of the simply-shorten project — a provenance and implementation-language claim"
+   }
+  },
+  {
+   "id": 4,
+   "quote": "using Actix Web as the backend",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The backend web framework is Actix Web.",
+   "about": "target",
+   "same_as": {
+    "source": "README.md",
+    "id": 47,
+    "statement": "The backend is written in Rust using the Actix Web framework."
+   }
+  },
+  {
+   "id": 5,
+   "quote": "The frontend is written in html, css, and vanilla javascript",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The frontend is implemented in HTML, CSS and vanilla JavaScript, with no frontend framework.",
+   "about": "target",
+   "same_as": {
+    "source": "README.md",
+    "id": 48,
+    "statement": "The frontend is written in plain HTML and vanilla JS, styled with Pure CSS."
+   }
+  },
+  {
+   "id": 6,
+   "quote": "Links are stored in an SQLite database",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The data store for links is SQLite.",
+   "about": "target",
+   "same_as": {
+    "source": "README.md",
+    "id": 42,
+    "statement": "Links are stored in an SQLite database."
+   }
+  },
+  {
+   "id": 7,
+   "quote": "distributed in a tiny container image (<4.5 MB for the scratch image and <8.5 MB for the alpine image, both compressed)",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The distributed container image is smaller than 4.5 MB compressed (scratch variant) and smaller than 8.5 MB compressed (alpine variant). A quantity claim naming two image variants.",
+   "about": "target"
+  },
+  {
+   "id": 8,
+   "quote": "uses <10 MB of RAM under regular load",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The service uses less than 10 MB of RAM under regular load.",
+   "about": "target",
+   "same_as": {
+    "source": "README.md",
+    "id": 9,
+    "statement": "The service runs in under 10 MB of RAM in ordinary operation"
+   }
+  },
+  {
+   "id": 9,
+   "quote": "It’s free and open source, released under the MIT license",
+   "lines": [
+    13,
+    13
+   ],
+   "statement": "The software is free and open source, released under the MIT licence.",
+   "about": "document"
+  },
+  {
+   "id": 10,
+   "quote": "maintained by SinTan1729",
+   "lines": [
+    13,
+    13
+   ],
+   "statement": "The project is maintained by SinTan1729.",
+   "about": "target",
+   "same_as": {
+    "source": "README.md",
+    "id": 3,
+    "statement": "The project is maintained by SinTan1729."
+   }
+  },
+  {
+   "id": 11,
+   "quote": "No tracking.",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "Claim of absence: the target performs no tracking of users.",
+   "about": "target",
+   "same_as": {
+    "source": "README.md",
+    "id": 51,
+    "statement": "Under the heading 'Bloat that will not be implemented', the target performs no tracking or spying of any kind."
+   }
+  },
+  {
+   "id": 12,
+   "quote": "Create short URLs with generated slugs or custom aliases.",
+   "lines": [
+    29,
+    29
+   ],
+   "statement": "The target supports creating short URLs both with auto-generated slugs and with custom aliases.",
+   "about": "target"
+  },
+  {
+   "id": 13,
+   "quote": "Set short links to expire automatically after a chosen duration.",
+   "lines": [
+    33,
+    33
+   ],
+   "statement": "The target contains code by which an operator can give a short link a duration after which it is set to expire.",
+   "about": "target",
+   "same_as": {
+    "source": "README.md",
+    "id": 20,
+    "statement": "The tool contains expiry logic that deactivates or removes links after a user-chosen time."
+   }
+  },
+  {
+   "id": 14,
+   "quote": "Track how many times a short link has been used.",
+   "lines": [
+    37,
+    37
+   ],
+   "statement": "The target contains code that maintains a per-link hit count.",
+   "about": "target",
+   "same_as": {
+    "source": "README.md",
+    "id": 25,
+    "statement": "The tool contains hit-counting code that keeps a per-link visit count."
+   }
+  },
+  {
+   "id": 15,
+   "quote": "Update existing links and manage their metadata.",
+   "lines": [
+    41,
+    41
+   ],
+   "statement": "The target supports editing existing links and managing their metadata.",
+   "about": "target"
+  },
+  {
+   "id": 16,
+   "quote": "Attach notes to links and filter them in the web UI.",
+   "lines": [
+    45,
+    45
+   ],
+   "statement": "The target supports attaching notes to links and filtering links by note in the web UI.",
+   "about": "target"
+  },
+  {
+   "id": 17,
+   "quote": "Generate QR codes and integrate with the service programmatically.",
+   "lines": [
+    49,
+    49
+   ],
+   "statement": "The target supports generating QR codes for short links and exposes a programmatic API.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Use the web interface to create, edit, and manage short URLs on your own instance.",
+     "lines": [
+      69,
+      69
+     ]
+    }
+   ]
+  },
+  {
+   "id": 18,
+   "quote": "Snappy WebUI",
+   "lines": [
+    53,
+    53
+   ],
+   "statement": "The target has a web UI (asserted by the Screenshots section heading; 'Snappy' is puffery and is not part of the claim).",
+   "about": "target"
+  },
+  {
+   "id": 19,
+   "quote": "Run Chhoto URL with Docker, Podman, or another OCI-compatible container workflow.",
+   "lines": [
+    61,
+    61
+   ],
+   "statement": "The target is deployable as an OCI-compatible container, e.g. with Docker or Podman.",
+   "about": "target"
+  },
+  {
+   "id": 20,
+   "quote": "Set the required environment variables for the site URL, credentials, and storage configuration.",
+   "lines": [
+    65,
+    65
+   ],
+   "statement": "The target is configured through environment variables covering the site URL, credentials and storage.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Use the web interface to create, edit, and manage short URLs on your own instance.",
+     "lines": [
+      69,
+      69
+     ]
+    }
+   ]
+  },
+  {
+   "id": 21,
+   "quote": "I’m a Mathematics researcher and do some programming as a hobby.",
+   "lines": [
+    75,
+    75
+   ],
+   "statement": "About the seller: the seller is Sayantan Santra, a mathematics researcher who programs as a hobby.",
+   "about": "seller"
+  },
+  {
+   "id": 22,
+   "quote": "Selfhosted URL Shortener",
+   "lines": [
+    1,
+    1
+   ],
+   "statement": "When the target runs, short links created on it actually work in operation: a visitor who follows a created short link is sent to its destination.",
+   "about": "target",
+   "implied_by": 1,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "same_as": {
+    "source": "README.md",
+    "id": 63,
+    "statement": "Opening a short URL in a browser sends the visitor directly to the correct long URL, with no intermediate redirection page."
+   }
+  },
+  {
+   "id": 23,
+   "quote": "Set short links to expire automatically after a chosen duration.",
+   "lines": [
+    33,
+    33
+   ],
+   "statement": "When the target runs, a short link with an expiry duration set actually stops working after that duration passes, without anyone intervening manually.",
+   "about": "target",
+   "implied_by": 13,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "same_as": {
+    "source": "README.md",
+    "id": 62,
+    "statement": "Links stop working automatically once the chosen time has passed, without any manual action."
+   }
+  },
+  {
+   "id": 24,
+   "quote": "Track how many times a short link has been used.",
+   "lines": [
+    37,
+    37
+   ],
+   "statement": "When the target runs, each actual use of a short link is reflected in that link's hit count.",
+   "about": "target",
+   "implied_by": 14,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "same_as": {
+    "source": "README.md",
+    "id": 64,
+    "statement": "Each visit to a short link is counted, so the recorded hit count reflects the link's actual traffic."
+   }
+  }
+ ]
+}

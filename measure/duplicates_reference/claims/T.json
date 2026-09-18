@@ -1,0 +1,115 @@
+{
+ "claim_source": "docs/TOOLS.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "SPDX-FileCopyrightText: 2023-2026 Sayantan Santra <sayantan.santra689@gmail.com>",
+   "lines": [
+    1,
+    1
+   ],
+   "statement": "The document carries a copyright notice attributing it to Sayantan Santra for the years 2023-2026.",
+   "about": "document",
+   "same_as": {
+    "source": "README.md",
+    "id": 1,
+    "statement": "The document is copyright 2023-2026 by Sayantan Santra (author and origin provenance)."
+   }
+  },
+  {
+   "id": 2,
+   "quote": "SPDX-License-Identifier: MIT",
+   "lines": [
+    2,
+    2
+   ],
+   "statement": "The document states that it is licensed under the MIT licence.",
+   "about": "document",
+   "same_as": {
+    "source": "README.md",
+    "id": 2,
+    "statement": "The document is licensed under the MIT licence."
+   }
+  },
+  {
+   "id": 3,
+   "quote": "It's maintained by me",
+   "lines": [
+    8,
+    8
+   ],
+   "statement": "The official Chhoto URL CLI application is maintained by the seller.",
+   "about": "seller",
+   "same_as": {
+    "source": "docs/CLI.md",
+    "id": 3,
+    "statement": "The official CLI app is maintained by the seller (the author)."
+   }
+  },
+  {
+   "id": 4,
+   "quote": "I cannot promise to provide proper support",
+   "lines": [
+    8,
+    8
+   ],
+   "statement": "The seller does not promise to provide proper support for the official CLI application.",
+   "about": "seller",
+   "same_as": {
+    "source": "docs/CLI.md",
+    "id": 4,
+    "statement": "The seller does not promise proper support for the CLI app."
+   }
+  },
+  {
+   "id": 5,
+   "quote": "The following tools are 3rd party, and are not supported officially.",
+   "lines": [
+    13,
+    13
+   ],
+   "statement": "The tools listed in this document are third-party and are not officially supported by the seller.",
+   "about": "seller"
+  },
+  {
+   "id": 6,
+   "quote": "There's an unofficial browser extension maintained by [@SolninjaA](https://github.com/SolninjaA) for shortening URLs easily using Chhoto URL.",
+   "lines": [
+    18,
+    18
+   ],
+   "statement": "An unofficial browser extension for shortening URLs using Chhoto URL exists, maintained by @SolninjaA.",
+   "about": "target"
+  },
+  {
+   "id": 7,
+   "quote": "There's an unofficial Raycast extension maintained by [@paranoidPhantom](https://github.com/paranoidPhantom) for shortening URLs efficiently using Chhoto URL.",
+   "lines": [
+    23,
+    23
+   ],
+   "statement": "An unofficial Raycast extension for shortening URLs using Chhoto URL exists, maintained by @paranoidPhantom.",
+   "about": "target"
+  },
+  {
+   "id": 8,
+   "quote": "There's an unofficial FreeBSD port maintained by [@jcpsantiago](https://github.com/jcpsantiago) for installing Chhoto URL.",
+   "lines": [
+    28,
+    28
+   ],
+   "statement": "An unofficial FreeBSD port for installing Chhoto URL exists, maintained by @jcpsantiago.",
+   "about": "target"
+  },
+  {
+   "id": 9,
+   "quote": "There's an unoffical NixOS package maintained by [@Defelo](https://github.com/Defelo) for Chhoto URL.",
+   "lines": [
+    34,
+    34
+   ],
+   "statement": "An unofficial NixOS package for Chhoto URL exists, maintained by @Defelo.",
+   "about": "target"
+  }
+ ]
+}

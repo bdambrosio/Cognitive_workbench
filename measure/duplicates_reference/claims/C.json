@@ -1,0 +1,763 @@
+{
+ "claim_source": "docs/CLI.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "SPDX-License-Identifier: MIT",
+   "lines": [
+    2,
+    2
+   ],
+   "statement": "This document is licensed under the MIT licence.",
+   "about": "document",
+   "same_as": {
+    "source": "README.md",
+    "id": 2,
+    "statement": "The document is licensed under the MIT licence."
+   }
+  },
+  {
+   "id": 2,
+   "quote": "There's an official CLI app for Linux.",
+   "lines": [
+    6,
+    6
+   ],
+   "statement": "The project has an official CLI application that runs on Linux.",
+   "about": "target"
+  },
+  {
+   "id": 3,
+   "quote": "It's maintained by me",
+   "lines": [
+    6,
+    6
+   ],
+   "statement": "The official CLI app is maintained by the seller (the author).",
+   "about": "seller"
+  },
+  {
+   "id": 4,
+   "quote": "even though I cannot promise to provide proper support",
+   "lines": [
+    6,
+    6
+   ],
+   "statement": "The seller does not promise proper support for the CLI app.",
+   "about": "seller"
+  },
+  {
+   "id": 5,
+   "quote": "The instructions below describe how to use all the features using `curl`.",
+   "lines": [
+    7,
+    7
+   ],
+   "statement": "This document's instructions cover all of the product's features, usable via curl.",
+   "about": "document"
+  },
+  {
+   "id": 6,
+   "quote": "The application can be used from the terminal using something like `curl`.",
+   "lines": [
+    11,
+    12
+   ],
+   "statement": "The service can be operated from a terminal using curl.",
+   "about": "target"
+  },
+  {
+   "id": 7,
+   "quote": "You can get the version of `chhoto-url` the server is running using `curl http://localhost:4567/api/version` and\nget the siteurl using `curl http://localhost:4567/api/siteurl`.",
+   "lines": [
+    14,
+    15
+   ],
+   "statement": "The server implements an /api/version route and an /api/siteurl route that respond to requests.",
+   "about": "target"
+  },
+  {
+   "id": 8,
+   "quote": "These routes are accessible without any authentication.",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "The /api/version and /api/siteurl routes require no authentication.",
+   "about": "target"
+  },
+  {
+   "id": 9,
+   "quote": "**This is required for programs that rely on a JSON response from Chhoto URL.**",
+   "lines": [
+    19,
+    19
+   ],
+   "statement": "Programs that rely on JSON responses from the service must use API key validation.",
+   "about": "target"
+  },
+  {
+   "id": 10,
+   "quote": "In order to use API key validation, set the [`CHHOTO_API_KEY`](./INSTALLATION.md#chhoto_api_key) environment variable.",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "API key validation is enabled by setting the CHHOTO_API_KEY environment variable.",
+   "about": "target"
+  },
+  {
+   "id": 11,
+   "quote": "If this is not set, the API will default to cookie validation (see section above).",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "When CHHOTO_API_KEY is not set, the API defaults to cookie validation.",
+   "about": "target"
+  },
+  {
+   "id": 12,
+   "quote": "If the API key is insecure, a warning will be outputted along with a generated\nAPI key which may be used.",
+   "lines": [
+    22,
+    23
+   ],
+   "statement": "The server checks whether the configured API key is insecure and, if so, generates a usable replacement key and emits a warning message.",
+   "about": "target"
+  },
+  {
+   "id": 13,
+   "quote": "**All responses for requests using API key are JSON encoded.**",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "The server serializes its responses to API-key-authenticated requests as JSON.",
+   "about": "target"
+  },
+  {
+   "id": 14,
+   "quote": "For each response, the response code will be `200`, `401`, `400`, `500`, or `404`, depending on the context.",
+   "lines": [
+    29,
+    29
+   ],
+   "statement": "The server's request handlers and error paths are written to return only the status codes 200, 401, 400, 500 and 404, selecting among them by context.",
+   "about": "target"
+  },
+  {
+   "id": 15,
+   "quote": "Some of the requests/responses use `shorturl` and `longurl`, while some use `shortlink` and `longlink`.",
+   "lines": [
+    33,
+    33
+   ],
+   "statement": "The API names the short and long URL fields inconsistently: some requests and responses use shorturl/longurl and others use shortlink/longlink.",
+   "about": "target"
+  },
+  {
+   "id": 16,
+   "quote": "I don't want to change it since it might break compatibility, and the issue isn't big enough to make that worth it.",
+   "lines": [
+    34,
+    35
+   ],
+   "statement": "The seller does not intend to change the API's field naming, because changing it might break compatibility.",
+   "about": "seller"
+  },
+  {
+   "id": 17,
+   "quote": "curl -X POST \\\n    -H \"X-API-Key: <YOUR_API_KEY>\" \\\n    -d '{ \\\n        \"shortlink\":\"<shortlink>\", \\\n        \"longlink\":\"<longlink>\", \\\n        \"expiry_delay\": <expiry_delay>, \\\n        \"notes\": \"<notes>\" \\\n        }' \\\n    http://localhost:4567/api/new",
+   "lines": [
+    42,
+    50
+   ],
+   "statement": "Links are added by sending a POST request to the /api/new endpoint.",
+   "about": "target"
+  },
+  {
+   "id": 18,
+   "quote": "    -H \"X-API-Key: <YOUR_API_KEY>\" \\",
+   "lines": [
+    43,
+    43
+   ],
+   "statement": "Requests to the API are authenticated by an X-API-Key header carrying the caller's API key.",
+   "about": "target"
+  },
+  {
+   "id": 19,
+   "quote": "    -d '{ \\\n        \"shortlink\":\"<shortlink>\", \\\n        \"longlink\":\"<longlink>\", \\\n        \"expiry_delay\": <expiry_delay>, \\\n        \"notes\": \"<notes>\" \\\n        }' \\",
+   "lines": [
+    44,
+    49
+   ],
+   "statement": "The link-creation request body accepts the fields shortlink, longlink, expiry_delay and notes.",
+   "about": "target"
+  },
+  {
+   "id": 20,
+   "quote": "If `<shortlink>` is empty or omitted, one will be generated automatically.",
+   "lines": [
+    53,
+    53
+   ],
+   "statement": "If the shortlink field is empty or omitted, the server generates a short link automatically.",
+   "about": "target"
+  },
+  {
+   "id": 21,
+   "quote": "The `<expiry_delay>` is specified in seconds.",
+   "lines": [
+    54,
+    54
+   ],
+   "statement": "The expiry_delay parameter is interpreted as a number of seconds.",
+   "about": "target"
+  },
+  {
+   "id": 22,
+   "quote": "It is capped to a maximum of 5 years.",
+   "lines": [
+    54,
+    54
+   ],
+   "statement": "The expiry_delay value is capped at a maximum of 5 years.",
+   "about": "target"
+  },
+  {
+   "id": 23,
+   "quote": "A missing `<expiry_delay>` or a value of 0 will disable expiry.",
+   "lines": [
+    54,
+    55
+   ],
+   "statement": "Omitting expiry_delay or setting it to 0 disables expiry for the created link.",
+   "about": "target"
+  },
+  {
+   "id": 24,
+   "quote": "{\n    \"success\": true,\n    \"error\": false,\n    \"shorturl\": \"<shortlink>\",\n    \"expiry_time\": <expiry_time>\n}",
+   "lines": [
+    60,
+    65
+   ],
+   "statement": "A successful creation request is answered with a JSON object containing the fields success, error, shorturl and expiry_time.",
+   "about": "target"
+  },
+  {
+   "id": 25,
+   "quote": "{\n  \"success\": false,\n  \"error\": true,\n  \"reason\": \"<reason>\"\n}",
+   "lines": [
+    71,
+    75
+   ],
+   "statement": "A failed request is answered with a JSON object containing the fields success, error and reason.",
+   "about": "target"
+  },
+  {
+   "id": 26,
+   "quote": "Multiple links can be created in a single request by sending an array of objects like the example below.",
+   "lines": [
+    78,
+    78
+   ],
+   "statement": "The target's creation endpoint accepts a request body that is an array of link objects and contains code that creates a link for each object in the array.",
+   "about": "target"
+  },
+  {
+   "id": 27,
+   "quote": "In that case, the response is an array containing one result per input object (in order), each in one of the formats shown above.",
+   "lines": [
+    102,
+    103
+   ],
+   "statement": "For a batch creation request, the server responds with an array holding one result per input object, in the same order as the inputs, each in one of the documented response formats.",
+   "about": "target"
+  },
+  {
+   "id": 28,
+   "quote": "Except for malformed requests or internal server errors, the HTTP status code is always `200`.",
+   "lines": [
+    105,
+    105
+   ],
+   "statement": "The target's request handling returns HTTP status 200 for responses other than malformed-request rejections and internal server errors, indicating failure through the body's success field instead of the status code.",
+   "about": "target"
+  },
+  {
+   "id": 29,
+   "quote": "curl -H \"X-API-Key: <YOUR_API_KEY>\" \\\n-d '<shortlink>' http://localhost:4567/api/getconfig",
+   "lines": [
+    113,
+    114
+   ],
+   "statement": "The server exposes a `/api/getconfig` endpoint which, given a shortlink and an API key, returns the configuration for that backend.",
+   "about": "target"
+  },
+  {
+   "id": 30,
+   "quote": "(This would work without authentication in public mode.)",
+   "lines": [
+    117,
+    117
+   ],
+   "statement": "In public mode, the `/api/getconfig` endpoint works without authentication.",
+   "about": "target"
+  },
+  {
+   "id": 31,
+   "quote": "{\n    \"version\": \"<version>\",\n    \"site_url\": \"<site_url>\",\n    \"allow_capital_letters\": true/false,\n    \"public_mode\": true/false,\n    \"public_mode_expiry_delay\": \"<delay>\",\n    \"slug_style\": \"<style>\",\n    \"slug_length\": \"<len>\",\n    \"try_longer_slug\": true/false\n}",
+   "lines": [
+    121,
+    130
+   ],
+   "statement": "A successful `/api/getconfig` reply is a JSON object with the fields version, site_url, allow_capital_letters, public_mode, public_mode_expiry_delay, slug_style, slug_length and try_longer_slug.",
+   "about": "target"
+  },
+  {
+   "id": 32,
+   "quote": "{\n  \"success\": false,\n  \"error\": true,\n  \"reason\": \"<reason>\"\n}",
+   "lines": [
+    134,
+    138
+   ],
+   "statement": "A failed `/api/getconfig` reply is a JSON object with success false, error true, and a reason field.",
+   "about": "target"
+  },
+  {
+   "id": 33,
+   "quote": "curl -H \"X-API-Key: <YOUR_API_KEY>\" http://localhost:4567/api/whoami",
+   "lines": [
+    146,
+    146
+   ],
+   "statement": "The server exposes a `/api/whoami` endpoint which, given an API key, returns the current user's role.",
+   "about": "target"
+  },
+  {
+   "id": 34,
+   "quote": "The server will reply with `admin` if admin access is granted, `public` if admin access is not granted but public mode is enabled,\nand `nobody` if no access is granted.",
+   "lines": [
+    149,
+    150
+   ],
+   "statement": "The `/api/whoami` reply is `admin` when admin access is granted, `public` when admin access is not granted but public mode is enabled, and `nobody` when no access is granted.",
+   "about": "target"
+  },
+  {
+   "id": 35,
+   "quote": "curl -X PUT \\\n-H \"X-API-Key: <YOUR_API_KEY>\" \\\n-d '{ \\\n    \"shortlink\":\"<shortlink>\", \\\n    \"longlink\":\"<longlink>\", \\\n    \"reset_hits\": <bool>, \\\n    \"expiry_time\": <time>, \\\n    \"notes\": <notes> \\\n    }' \\\nhttp://localhost:4567/api/edit",
+   "lines": [
+    157,
+    166
+   ],
+   "statement": "The server exposes a `/api/edit` endpoint which edits an existing short link, accepting shortlink, longlink, reset_hits, expiry_time and notes, and requiring an API key.",
+   "about": "target"
+  },
+  {
+   "id": 36,
+   "quote": "The fields `expiry_time` and `notes` are optional.",
+   "lines": [
+    169,
+    169
+   ],
+   "statement": "In an `/api/edit` request, the expiry_time and notes fields are optional.",
+   "about": "target"
+  },
+  {
+   "id": 37,
+   "quote": "The existing values will be kept in the database if nothing is provided.",
+   "lines": [
+    169,
+    169
+   ],
+   "statement": "When optional `/api/edit` fields are not provided, the existing values for them are kept in the database.",
+   "about": "target"
+  },
+  {
+   "id": 38,
+   "quote": "{\n    \"success\": true/false,\n    \"error\": false/true,\n    \"reason\": \"<reason\"\n}",
+   "lines": [
+    174,
+    178
+   ],
+   "statement": "An `/api/edit` reply is a JSON object with success, error and reason fields.",
+   "about": "target"
+  },
+  {
+   "id": 39,
+   "quote": "curl -H \"X-API-Key: <YOUR_API_KEY>\" \\\n-d '<shortlink>' http://localhost:4567/api/expand",
+   "lines": [
+    186,
+    187
+   ],
+   "statement": "The target exposes an /api/expand endpoint that accepts an API key header and a shortlink in the request body and contains a handler that looks up that shortlink and returns its stored information.",
+   "about": "target"
+  },
+  {
+   "id": 40,
+   "quote": "{\n    \"success\": true,\n    \"error\": false,\n    \"longurl\": \"<longurl>\",\n    \"hits\": \"<hits>\",\n    \"expiry_time\": <expiry_time>,\n    \"notes\": \"<notes>\"\n}",
+   "lines": [
+    193,
+    200
+   ],
+   "statement": "A successful /api/expand reply is JSON containing the fields success, error, longurl, hits, expiry_time and notes.",
+   "about": "target"
+  },
+  {
+   "id": 41,
+   "quote": "{\n  \"success\": false,\n  \"error\": true,\n  \"reason\": \"<reason>\"\n}",
+   "lines": [
+    206,
+    210
+   ],
+   "statement": "A failed /api/expand reply is JSON containing success set to false, error set to true, and a reason field.",
+   "about": "target"
+  },
+  {
+   "id": 42,
+   "quote": "(This route is not accessible using cookie validation.)",
+   "lines": [
+    213,
+    213
+   ],
+   "statement": "The /api/expand route cannot be accessed using cookie validation, only API key validation.",
+   "about": "target"
+  },
+  {
+   "id": 43,
+   "quote": "curl -H \"X-API-Key: <YOUR_API_KEY>\" http://localhost:4567/api/all",
+   "lines": [
+    220,
+    220
+   ],
+   "statement": "The target exposes an /api/all endpoint that accepts an API key header and contains a handler that gathers the currently available links and returns them as a list.",
+   "about": "target"
+  },
+  {
+   "id": 44,
+   "quote": "`page_after`: An offset where to start pagination after. It should be a valid shortlink, or an empty response will be received.\n   This is faster, and the preferred way of doing pagination.",
+   "lines": [
+    225,
+    226
+   ],
+   "statement": "/api/all supports a page_after parameter that paginates starting after a given offset, which must be a valid shortlink or an empty response is returned; it is the faster, preferred pagination method.",
+   "about": "target"
+  },
+  {
+   "id": 45,
+   "quote": "`page_size`: The size of a returned page in number of shortlinks. Default value is 10.",
+   "lines": [
+    227,
+    227
+   ],
+   "statement": "/api/all supports a page_size parameter giving the number of shortlinks per page, whose default value is 10.",
+   "about": "target"
+  },
+  {
+   "id": 46,
+   "quote": "`page_no`: Alternative way of doing pagination. This is slower, and should be used only when using `page_after` isn't viable.",
+   "lines": [
+    228,
+    228
+   ],
+   "statement": "/api/all supports a page_no parameter as an alternative, slower pagination method, to be used only when page_after is not viable.",
+   "about": "target"
+  },
+  {
+   "id": 47,
+   "quote": "`filter`: For filtering links. The filter is applied on `shorturl`, `longurl`, and `notes` fields.",
+   "lines": [
+    229,
+    229
+   ],
+   "statement": "/api/all supports a filter parameter, and the filter is applied on the shorturl, longurl and notes fields.",
+   "about": "target"
+  },
+  {
+   "id": 48,
+   "quote": "Must be ASCII, and at least 3\n   characters long.",
+   "lines": [
+    229,
+    230
+   ],
+   "statement": "The filter parameter must be ASCII and at least 3 characters long.",
+   "about": "target"
+  },
+  {
+   "id": 49,
+   "quote": "Only alphanumeric characters are used for the filtering. Everything else is treated as a separator.",
+   "lines": [
+    230,
+    230
+   ],
+   "statement": "Only alphanumeric characters take part in filtering; every other character in the filter is treated as a separator.",
+   "about": "target"
+  },
+  {
+   "id": 50,
+   "quote": "None of the parameters are required. In absence of all of those, all shortlinks are returned.",
+   "lines": [
+    232,
+    232
+   ],
+   "statement": "None of the /api/all query parameters are required, and when none are given all shortlinks are returned.",
+   "about": "target"
+  },
+  {
+   "id": 51,
+   "quote": "The entries should be positive integers.",
+   "lines": [
+    232,
+    232
+   ],
+   "statement": "The numeric /api/all parameter entries must be positive integers.",
+   "about": "target"
+  },
+  {
+   "id": 52,
+   "quote": "If only `page_size` is provided, the first page is returned.",
+   "lines": [
+    233,
+    233
+   ],
+   "statement": "When only page_size is provided to /api/all, the first page is returned.",
+   "about": "target"
+  },
+  {
+   "id": 53,
+   "quote": "[\n    ...\n  {\n    \"shortlink\": \"<shortlink>\",\n    \"longlink\": \"<longlink>\",\n    \"hits\": <hits>,\n    \"expiry_time\": <expiry_time>,\n    \"notes\": \"<notes>\"\n  },\n    ...\n]",
+   "lines": [
+    238,
+    248
+   ],
+   "statement": "A successful /api/all reply is an array of entries, each containing the fields shortlink, longlink, hits, expiry_time and notes.",
+   "about": "target"
+  },
+  {
+   "id": 54,
+   "quote": "curl -X DELETE -H \"X-API-Key: <YOUR_API_KEY>\" http://localhost:4567/api/del/<shortlink>",
+   "lines": [
+    256,
+    256
+   ],
+   "statement": "The target exposes a DELETE /api/del/{shortlink} endpoint that contains a handler which deletes the link named by the shortlink in the path (for example, `example` for `http://localhost:4567/example`).",
+   "about": "target"
+  },
+  {
+   "id": 55,
+   "quote": "The server will output when the instance is accessed over API, when an incorrect API key is received, etc.",
+   "lines": [
+    262,
+    262
+   ],
+   "statement": "The target contains output/logging code that is wired to print messages when the instance is accessed over the API and when an incorrect API key is received, among other events.",
+   "about": "target"
+  },
+  {
+   "id": 56,
+   "quote": "curl -X POST -d \"<your-password>\" -c cookie.txt http://localhost:4567/api/login",
+   "lines": [
+    269,
+    269
+   ],
+   "statement": "When a password is set up, POSTing the password to /api/login returns an authentication cookie that can be stored and reused.",
+   "about": "target"
+  },
+  {
+   "id": 57,
+   "quote": "You should receive \"Correct password!\" if the provided password was correct.",
+   "lines": [
+    272,
+    272
+   ],
+   "statement": "A correct password submitted to /api/login receives the response \"Correct password!\".",
+   "about": "target"
+  },
+  {
+   "id": 58,
+   "quote": "For any subsequent\nrequest, please add `-b cookie.txt` to provide authentication. Unless specified, all API methods should work with cookies.",
+   "lines": [
+    272,
+    273
+   ],
+   "statement": "Subsequent requests authenticate by presenting the stored cookie, and, unless specified otherwise, all API methods work with cookie authentication.",
+   "about": "target"
+  },
+  {
+   "id": 59,
+   "quote": "If you do not define a [`CHHOTO_PASSWORD`](./INSTALLATION.md#chhoto_password) environment variable when starting the docker\nimage, authentication will be disabled.",
+   "lines": [
+    277,
+    278
+   ],
+   "statement": "If the CHHOTO_PASSWORD environment variable is not defined when starting the docker image, authentication is disabled.",
+   "about": "target"
+  },
+  {
+   "id": 60,
+   "quote": "This if not recommended in actual use however, as it will allow anyone to create new links and delete\nold ones.",
+   "lines": [
+    280,
+    281
+   ],
+   "statement": "With authentication disabled, the target's link-creation and link-deletion paths are coded to accept requests without requiring any credentials.",
+   "about": "target"
+  },
+  {
+   "id": 61,
+   "quote": "Since there are no logs, it's impossible to prove that those links aren't created by you.",
+   "lines": [
+    282,
+    282
+   ],
+   "statement": "The service keeps no logs.",
+   "about": "target"
+  },
+  {
+   "id": 62,
+   "quote": "You can get the version of `chhoto-url` the server is running using `curl http://localhost:4567/api/version` and\nget the siteurl using `curl http://localhost:4567/api/siteurl`.",
+   "lines": [
+    14,
+    15
+   ],
+   "statement": "A request to /api/version returns the version of chhoto-url the server is running, and a request to /api/siteurl returns the site URL.",
+   "about": "target",
+   "implied_by": 7,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 63,
+   "quote": "If the API key is insecure, a warning will be outputted along with a generated\nAPI key which may be used.",
+   "lines": [
+    22,
+    23
+   ],
+   "statement": "When the configured API key is insecure, the server outputs a warning together with a generated API key that can be used.",
+   "about": "target",
+   "implied_by": 12,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 64,
+   "quote": "**All responses for requests using API key are JSON encoded.**",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "Every response the server sends to a request authenticated with an API key is JSON-encoded.",
+   "about": "target",
+   "implied_by": 13,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 65,
+   "quote": "For each response, the response code will be `200`, `401`, `400`, `500`, or `404`, depending on the context.",
+   "lines": [
+    29,
+    29
+   ],
+   "statement": "The response code the server actually sends for any request is one of 200, 401, 400, 500 and 404, chosen according to the context of the request.",
+   "about": "target",
+   "implied_by": 14,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 66,
+   "quote": "Multiple links can be created in a single request by sending an array of objects like the example below.",
+   "lines": [
+    78,
+    78
+   ],
+   "statement": "A single request sent to the creation endpoint with an array of link objects results in multiple links being created.",
+   "about": "target",
+   "implied_by": 26,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 67,
+   "quote": "Except for malformed requests or internal server errors, the HTTP status code is always `200`.",
+   "lines": [
+    105,
+    105
+   ],
+   "statement": "Apart from malformed requests and internal server errors, every response the running server sends carries HTTP status 200, with success determined only by reading the response body.",
+   "about": "target",
+   "implied_by": 28,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 68,
+   "quote": "curl -H \"X-API-Key: <YOUR_API_KEY>\" \\\n-d '<shortlink>' http://localhost:4567/api/expand",
+   "lines": [
+    186,
+    187
+   ],
+   "statement": "When /api/expand is called with an API key and a shortlink, it returns information about that single short link.",
+   "about": "target",
+   "implied_by": 39,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 69,
+   "quote": "curl -H \"X-API-Key: <YOUR_API_KEY>\" http://localhost:4567/api/all",
+   "lines": [
+    220,
+    220
+   ],
+   "statement": "Calling /api/all with an API key returns a list of all the currently available links.",
+   "about": "target",
+   "implied_by": 43,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 70,
+   "quote": "curl -X DELETE -H \"X-API-Key: <YOUR_API_KEY>\" http://localhost:4567/api/del/<shortlink>",
+   "lines": [
+    256,
+    256
+   ],
+   "statement": "Calling DELETE /api/del/{shortlink} deletes the named link, so it is removed from the service.",
+   "about": "target",
+   "implied_by": 54,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 71,
+   "quote": "The server will output when the instance is accessed over API, when an incorrect API key is received, etc.",
+   "lines": [
+    262,
+    262
+   ],
+   "statement": "When the instance is accessed over the API, and when an incorrect API key is received, the server actually outputs messages, among other events.",
+   "about": "target",
+   "implied_by": 55,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 72,
+   "quote": "This if not recommended in actual use however, as it will allow anyone to create new links and delete\nold ones.",
+   "lines": [
+    280,
+    281
+   ],
+   "statement": "When authentication is disabled, anyone, without authenticating, can create new links and delete old ones.",
+   "about": "target",
+   "implied_by": 60,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  }
+ ]
+}

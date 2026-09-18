@@ -1,0 +1,25 @@
+{
+ "claim_source": "docs/SECURITY.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "If you believe you have found a vulnerability in Chhoto URL you can report it using one of the following ways:\n\n- Contact me at [mail@sayantansantra.com](mailto:mail@sayantansantra.com).\n- Create a [security advisory](https://github.com/SinTan1729/chhoto-url/security/advisories).",
+   "lines": [
+    3,
+    6
+   ],
+   "statement": "The seller maintains two vulnerability reporting channels: a contact email address and GitHub security advisories on the project's repository.",
+   "about": "seller"
+  },
+  {
+   "id": 2,
+   "quote": "Only the [latest version](https://github.com/SinTan1729/chhoto-url/releases/latest) is supported.",
+   "lines": [
+    12,
+    12
+   ],
+   "statement": "The seller supports only the latest release of Chhoto URL; no earlier version receives support.",
+   "about": "seller"
+  }
+ ]
+}
