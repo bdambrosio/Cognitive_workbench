@@ -1,0 +1,563 @@
+{
+ "engagement": "chhoto-sorted",
+ "at": "2026-09-17T17-19-56Z",
+ "model": "accounts/fireworks/models/glm-5p3-flash",
+ "target_rev": "6a1b51cdeafdaadd46560e30a7c1a36bd1f08388",
+ "intake_words": "",
+ "before": {
+  "claim_sources": [
+   "README.md"
+  ],
+  "evidence_excludes": [
+   "README.md"
+  ],
+  "excludes_explicit": false
+ },
+ "passed_over": {
+  ".yml": 10,
+  ".toml": 2,
+  ".lock": 1,
+  ".rs": 20,
+  ".yaml": 3,
+  ".svgz": 2,
+  ".webp": 4,
+  ".png": 5,
+  ".ico": 2,
+  ".svg": 2,
+  ".js": 2,
+  ".css": 2
+ },
+ "rows": [
+  {
+   "path": ".gitattributes",
+   "archive": null,
+   "words": 45,
+   "linked_from": [],
+   "kind": "instrument",
+   "parts": [],
+   "reason": "The file is a git configuration that itself establishes how repository files are handled — it marks images like 'screenshot-desktop.webp' and 'favicon.svgz' as stored in Git LFS with 'filter=lfs'. Like a CI workflow or container file, a claim such as 'assets are stored in LFS' is settled by reading this file, and nothing behind it could show otherwise.",
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "path": ".github/ISSUE_TEMPLATE/bug_report.md",
+   "archive": null,
+   "words": 154,
+   "linked_from": [],
+   "kind": "neither",
+   "parts": [],
+   "reason": "This is a GitHub issue template, a form for reporting bugs: it prompts the filer for 'a clear and concise description of what the bug is' and reproduction steps. It does not describe the software, settle any claim, or contain product-facing text, so it is neither.",
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "path": ".github/ISSUE_TEMPLATE/feature_request.md",
+   "archive": null,
+   "words": 91,
+   "linked_from": [],
+   "kind": "neither",
+   "parts": [],
+   "reason": "This is a feature request form: lines 9-19 are prompts like \"Describe the solution you'd like\" telling a would-be filer how to fill it in. It is a form for reporting requests, not the seller speaking about the software, so it is neither a claim source nor a fact a claim would rest on.",
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "path": ".github/pull_request_template.md",
+   "archive": null,
+   "words": 60,
+   "linked_from": [],
+   "kind": "neither",
+   "parts": [],
+   "reason": "This is a blank form that a contributor fills in when opening a pull request (\"Please include a summary of the change\", checkbox list), not text in which the seller describes the software or sets any term. Like a bug-report form, it is scaffolding for the development process rather than a claim, a fact a claim would be about, product text, or the seller speaking about the software.",
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "path": ".gitignore",
+   "archive": null,
+   "words": 24,
+   "linked_from": [],
+   "kind": "instrument",
+   "parts": [],
+   "reason": "The file is a .gitignore configuration: it does not describe the software but is itself the fact that a claim about version-control configuration would be settled by — its lines (\"backend/target\", \".env\", \"*.sqlite\") are directives, not statements for a reader deciding about the product.",
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "path": "LICENSE",
+   "archive": null,
+   "words": 169,
+   "linked_from": [],
+   "kind": "instrument",
+   "parts": [],
+   "reason": "The file is the MIT licence text itself — a claim such as 'the project is MIT licensed' is settled by reading this file, and nothing behind it could show otherwise. It states the grant ('Permission is hereby granted, free of charge...') and the warranty disclaimer ('THE SOFTWARE IS PROVIDED \"AS IS\"'), making it the fact itself rather than a report of a fact elsewhere.",
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "path": "Makefile",
+   "archive": null,
+   "words": 472,
+   "linked_from": [],
+   "kind": "instrument",
+   "parts": [],
+   "reason": "This is the project's build automation: recipes that define how the software is built, tested, containerised, version-tagged and deployed (e.g. `build`, `test`, `tag`, `deploy: minify`). Like a CI workflow, it is itself the fact that a claim about how the project is built and published would be about, rather than a description reporting facts that lie elsewhere.",
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "path": "README.md",
+   "archive": null,
+   "words": 932,
+   "linked_from": [],
+   "kind": "description",
+   "parts": [],
+   "reason": "This is a README in which the seller describes its software to prospective users: 'A simple selfhosted URL shortener with no unnecessary features', followed by a Features list, screenshots, and pointers to installation and CLI guides. The SPDX licence header lines and the badge block at the top are small mark-up, not parts of a different kind that make the file mixed.",
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "path": "deploy/Containerfile",
+   "archive": null,
+   "words": 106,
+   "linked_from": [],
+   "kind": "instrument",
+   "parts": [],
+   "reason": "This is a build recipe for the shipped container, not a report about it: a claim such as \"the image is built from scratch with the Rust binary and frontend only\" is settled by these instructions themselves, and nothing behind the file could show otherwise. SPDX lines 1–2 state licensing terms, which likewise are the fact rather than a description of it.",
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "path": "deploy/Containerfile.alpine",
+   "archive": null,
+   "words": 55,
+   "linked_from": [],
+   "kind": "instrument",
+   "parts": [],
+   "reason": "This is a container build recipe: it copies prebuilt binaries for several architectures into alpine base images, installs tzdata, and sets the entrypoint (lines 4–21). It is itself the fact that a claim about how the software is packaged or deployed would rest on, rather than a report of a fact lying elsewhere; the SPDX copyright and licence lines at the top do not make it mixed.",
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "path": "deploy/Containerfile.debug",
+   "archive": null,
+   "words": 27,
+   "linked_from": [],
+   "kind": "instrument",
+   "parts": [],
+   "reason": "The file is a container build recipe: it copies a debug binary of the software into an alpine image (\"COPY ./backend/target/x86_64-unknown-linux-musl/debug/chhoto-url\"), installs tzdata, and sets the entrypoint. It is itself the fact that claims about the debug deployment container would be about, such as a claim that a debug image builds on alpine, so it is an instrument, not a description of the software.",
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "path": "deploy/Containerfile.scratch",
+   "archive": null,
+   "words": 46,
+   "linked_from": [],
+   "kind": "instrument",
+   "parts": [],
+   "reason": "A container build file that defines how the software is packaged: it stages prebuilt binaries from scratch images, copies the frontend, and sets ENTRYPOINT [\"/chhoto-url\"]. It is itself the artifact a deployment claim would be about — a claim like \"the project ships a minimal container image\" is settled by reading this file, not by any prose elsewhere.",
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "path": "deploy/chhoto-url.container",
+   "archive": null,
+   "words": 130,
+   "linked_from": [
+    "docs/INSTALLATION.md"
+   ],
+   "kind": "instrument",
+   "parts": [],
+   "reason": "This is a quadlet container definition file: it is itself the deployment configuration a claim about how the software is deployed or configured would be settled by, with settings like `Image=docker.io/sintan1729/chhoto-url:latest` and environment variables such as `CHHOTO_PASSWORD`. Its comments point readers elsewhere (\"Take a look at README for the explanation of the configs\") rather than describing the software itself.",
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "path": "docs/CLI.md",
+   "archive": null,
+   "words": 1155,
+   "linked_from": [
+    "README.md"
+   ],
+   "kind": "description",
+   "parts": [],
+   "reason": "This is a usage guide written by the maintainer for people using the software: it says \"There's an official CLI app for Linux\" and \"The instructions below describe how to use all the features using `curl`\", then documents each API endpoint's requests, responses and authentication. It reports how the software behaves (e.g. \"These routes are accessible without any authentication\"), so its claims are to be tested against the code rather than settled by this file.",
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "path": "docs/CONTRIBUTING.md",
+   "archive": null,
+   "words": 227,
+   "linked_from": [],
+   "kind": "instrument",
+   "parts": [],
+   "reason": "The whole file sets the terms under which contributions to Chhoto URL are accepted — rules 1-7 ('No AI contribution is allowed...', 'Everything must remain backwards compatible') are themselves the conditions a contribution must satisfy, the very facts claims about contribution policy would be about, and no text behind them could show otherwise. Nothing in the file describes what the software is or does, so it is not mixed.",
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "path": "docs/INSTALLATION.md",
+   "archive": null,
+   "words": 2220,
+   "linked_from": [
+    "README.md",
+    "docs/CLI.md"
+   ],
+   "kind": "description",
+   "parts": [],
+   "reason": "The file is an installation and configuration guide for Chhoto URL: it walks the reader through deploying the software (\"Using docker compose (Recommended method)\", \"Building and running with docker\") and documents every environment variable such as CHHOTO_DB_URL and CHHOTO_PASSWORD. This is the seller describing how to install, configure and use the software, written for someone deploying it, so it is a description; the SPDX header lines are a licence notice too small to make the file mixed.",
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "path": "docs/SECURITY.md",
+   "archive": null,
+   "words": 56,
+   "linked_from": [],
+   "kind": "description",
+   "parts": [],
+   "reason": "The file is a security policy telling readers how vulnerability reports are handled ('How to Report a Vulnerability', 'Please do not report security vulnerabilities through public GitHub issues'), which the guide names as a description; it sets no terms or facts that a claim could be settled by, since the contact channels could be checked no further than the policy itself states them.",
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "path": "docs/TOOLS.md",
+   "archive": null,
+   "words": 178,
+   "linked_from": [
+    "README.md"
+   ],
+   "kind": "description",
+   "parts": [],
+   "reason": "The file is the seller's own documentation page, 'Software related to Chhoto URL', telling readers what tools exist for the software: an 'Official CLI application' maintained by the seller and third-party options such as a browser extension and a NixOS package. It speaks about the software's ecosystem to a reader learning to use it, so it is a description; none of its few lines are of a different kind.",
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "path": "frontend/index.html",
+   "archive": null,
+   "words": 70,
+   "linked_from": [],
+   "kind": "product_text",
+   "parts": [],
+   "reason": "The file is the running link-shortener's own interface: it shows a links table that is 'Loading links table...', column headers like '| # | Short URL | Long URL | Hits |' and form fields 'Short:', 'Long:', 'Hits:' — words the product displays to its own users. The title and one-line description in lines 1–3 are page metadata of this screen, not a separate passage describing the product to outsiders, so the file is not mixed.",
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "path": "frontend/static/404.html",
+   "archive": null,
+   "words": 26,
+   "linked_from": [],
+   "kind": "product_text",
+   "parts": [],
+   "reason": "The file is the text of a 404 error page — 'Error 404!' with a short verse — that the running software displays to users who reach a missing page, which makes it words the product shows on screen.",
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "path": "site/index.html",
+   "archive": null,
+   "words": 440,
+   "linked_from": [],
+   "kind": "description",
+   "parts": [
+    {
+     "lines": [
+      71,
+      75
+     ],
+     "kind": "neither",
+     "says": "A personal introduction to the maintainer, Sayantan Santra, describing his academic background and programming hobbies rather than the software."
+    }
+   ],
+   "reason": "This is a landing page presenting the product to people who do not yet use it: it introduces Chhoto URL as a 'lightweight URL shortener written in Rust', lists features like 'Link expiry' and 'Hit counting', and gives a getting-started guide for deployment. The About me section (lines 71-75) is a personal biography rather than text about the software, so it is listed as a separate part.",
+   "parse": "parsed",
+   "parse_error": null,
+   "dropped": "Chhoto URL Menu Features Screenshots Quick Start About Me Links / Features Screenshots Quick Start About Me Links / Chhoto URL - Blazingly fast self-hosted URL shortener. About Me Codeberg GitHub"
+  }
+ ],
+ "hosts": {
+  "github.com": {
+   "links": 32,
+   "in": [
+    ".github/pull_request_template.md",
+    "README.md",
+    "docs/CLI.md",
+    "docs/CONTRIBUTING.md",
+    "docs/INSTALLATION.md",
+    "docs/SECURITY.md",
+    "docs/TOOLS.md",
+    "frontend/index.html",
+    "site/index.html"
+   ]
+  },
+  "api.cloudflare.com": {
+   "links": 2,
+   "in": [
+    "Makefile"
+   ]
+  },
+  "img.shields.io": {
+   "links": 19,
+   "in": [
+    "README.md",
+    "site/index.html"
+   ]
+  },
+  "hub.docker.com": {
+   "links": 7,
+   "in": [
+    "README.md",
+    "docs/INSTALLATION.md",
+    "site/index.html"
+   ]
+  },
+  "ghcr.io": {
+   "links": 2,
+   "in": [
+    "README.md",
+    "site/index.html"
+   ]
+  },
+  "codeberg.org": {
+   "links": 6,
+   "in": [
+    "README.md",
+    "site/index.html"
+   ]
+  },
+  "spdx.org": {
+   "links": 2,
+   "in": [
+    "README.md",
+    "site/index.html"
+   ]
+  },
+  "chhoto.link": {
+   "links": 8,
+   "in": [
+    "README.md",
+    "site/index.html"
+   ]
+  },
+  "gitlab.com": {
+   "links": 1,
+   "in": [
+    "README.md"
+   ]
+  },
+  "en.wiktionary.org": {
+   "links": 2,
+   "in": [
+    "README.md",
+    "site/index.html"
+   ]
+  },
+  "demo.chhoto.link": {
+   "links": 2,
+   "in": [
+    "README.md",
+    "site/index.html"
+   ]
+  },
+  "actix.rs": {
+   "links": 2,
+   "in": [
+    "README.md",
+    "site/index.html"
+   ]
+  },
+  "purecss.io": {
+   "links": 1,
+   "in": [
+    "README.md"
+   ]
+  },
+  "caddyserver.com": {
+   "links": 1,
+   "in": [
+    "README.md"
+   ]
+  },
+  "www.example.com": {
+   "links": 1,
+   "in": [
+    "deploy/chhoto-url.container"
+   ]
+  },
+  "chhoto-url:4567": {
+   "links": 1,
+   "in": [
+    "deploy/chhoto-url.container"
+   ]
+  },
+  "localhost:4567": {
+   "links": 13,
+   "in": [
+    "docs/CLI.md"
+   ]
+  },
+  "sqlite.org": {
+   "links": 5,
+   "in": [
+    "docs/INSTALLATION.md",
+    "site/index.html"
+   ]
+  },
+  "www.slingacademy.com": {
+   "links": 1,
+   "in": [
+    "docs/INSTALLATION.md"
+   ]
+  },
+  "docs.rs": {
+   "links": 2,
+   "in": [
+    "docs/INSTALLATION.md"
+   ]
+  },
+  "datatracker.ietf.org": {
+   "links": 1,
+   "in": [
+    "docs/INSTALLATION.md"
+   ]
+  },
+  "cert-manager.io": {
+   "links": 1,
+   "in": [
+    "docs/INSTALLATION.md"
+   ]
+  },
+  "www.raycast.com": {
+   "links": 1,
+   "in": [
+    "docs/TOOLS.md"
+   ]
+  },
+  "tangled.sh": {
+   "links": 1,
+   "in": [
+    "docs/TOOLS.md"
+   ]
+  },
+  "search.nixos.org": {
+   "links": 1,
+   "in": [
+    "docs/TOOLS.md"
+   ]
+  },
+  "cdn.jsdelivr.net": {
+   "links": 4,
+   "in": [
+    "frontend/index.html"
+   ]
+  },
+  "fonts.googleapis.com": {
+   "links": 7,
+   "in": [
+    "frontend/index.html",
+    "frontend/static/404.html",
+    "site/index.html"
+   ]
+  },
+  "fonts.gstatic.com": {
+   "links": 3,
+   "in": [
+    "frontend/index.html",
+    "frontend/static/404.html",
+    "site/index.html"
+   ]
+  },
+  "svgicons.com": {
+   "links": 5,
+   "in": [
+    "frontend/index.html"
+   ]
+  },
+  "www.w3.org": {
+   "links": 5,
+   "in": [
+    "frontend/index.html"
+   ]
+  },
+  "mas.to": {
+   "links": 1,
+   "in": [
+    "site/index.html"
+   ]
+  }
+ },
+ "hosting": {
+  "repository": "SinTan1729/chhoto-url",
+  "description": "A simple, blazingly fast, selfhosted URL shortener with no unnecessary features; written in Rust",
+  "homepage": "https://chhoto.link",
+  "topics": [
+   "actix-web",
+   "compose",
+   "container",
+   "docker",
+   "link-shortener",
+   "podman",
+   "quadlets",
+   "rust",
+   "self-hosted",
+   "shortener",
+   "url-shortener",
+   "webapp"
+  ],
+  "wiki": false
+ },
+ "proposal": {
+  "claim_sources": [
+   "README.md",
+   "docs/CLI.md",
+   "docs/INSTALLATION.md",
+   "docs/SECURITY.md",
+   "docs/TOOLS.md",
+   "claim_sources/site_index_html.md"
+  ],
+  "evidence_excludes": [
+   "README.md",
+   "docs/CLI.md",
+   "docs/INSTALLATION.md",
+   "docs/SECURITY.md",
+   "docs/TOOLS.md",
+   "site/index.html",
+   "claim_sources/"
+  ]
+ },
+ "confirmed": {
+  "by": "claude-test",
+  "at": "2026-09-17T18-17-43Z",
+  "claim_sources": [
+   "README.md",
+   "docs/CLI.md",
+   "docs/SECURITY.md",
+   "docs/TOOLS.md",
+   "claim_sources/site_index_html.md"
+  ],
+  "evidence_excludes": [
+   "README.md",
+   "docs/CLI.md",
+   "docs/INSTALLATION.md",
+   "docs/SECURITY.md",
+   "docs/TOOLS.md",
+   "site/index.html",
+   "claim_sources/"
+  ],
+  "changes": [
+   "claim source removed: docs/INSTALLATION.md"
+  ],
+  "extracted": [
+   {
+    "source": "claim_sources/site_index_html.md",
+    "from": "site/index.html",
+    "words": 423,
+    "original_words": 423
+   }
+  ]
+ }
+}

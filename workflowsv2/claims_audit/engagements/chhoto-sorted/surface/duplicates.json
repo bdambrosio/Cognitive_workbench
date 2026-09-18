@@ -1,0 +1,525 @@
+{
+ "at": "2026-09-18T02-28-08Z",
+ "model": "accounts/fireworks/models/glm-5p3-flash",
+ "order": [
+  "README.md",
+  "docs/CLI.md",
+  "docs/SECURITY.md",
+  "docs/TOOLS.md",
+  "claim_sources/site_index_html.md"
+ ],
+ "runs": {
+  "README.md": "2026-09-17T20-22-14Z_enum_chhoto-sorted_readme_md_20260917T193725Z",
+  "docs/CLI.md": "2026-09-17T20-26-26Z_enum_chhoto-sorted_docs_cli_md_20260917T193725Z",
+  "docs/SECURITY.md": "2026-09-17T20-34-10Z_enum_chhoto-sorted_docs_security_md_20260917T193725Z",
+  "docs/TOOLS.md": "2026-09-17T20-34-37Z_enum_chhoto-sorted_docs_tools_md_20260917T193725Z",
+  "claim_sources/site_index_html.md": "2026-09-17T20-36-10Z_enum_chhoto-sorted_claim_sources_site_index_html_md_20260917T193725Z"
+ },
+ "skipped": [],
+ "emissions": [
+  {
+   "source": "README.md",
+   "claims": [
+    8,
+    10,
+    11,
+    12,
+    13,
+    18,
+    19,
+    21,
+    23,
+    24,
+    27,
+    28,
+    29,
+    30,
+    32,
+    33,
+    36,
+    40,
+    41,
+    42,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    55,
+    56,
+    57
+   ],
+   "proposed": 5,
+   "same": 0,
+   "within": 5,
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "source": "README.md",
+   "claims": [
+    59,
+    62,
+    63,
+    66
+   ],
+   "proposed": 0,
+   "same": 0,
+   "within": 0,
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "source": "docs/CLI.md",
+   "claims": [
+    1,
+    2,
+    3,
+    4,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    15,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    28,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35
+   ],
+   "proposed": 0,
+   "same": 0,
+   "within": 0,
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "source": "docs/CLI.md",
+   "claims": [
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    45,
+    46,
+    47,
+    50,
+    51,
+    52,
+    53,
+    54,
+    56,
+    57,
+    58,
+    59,
+    60,
+    65,
+    69,
+    71
+   ],
+   "proposed": 0,
+   "same": 0,
+   "within": 0,
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "source": "docs/SECURITY.md",
+   "claims": [
+    2
+   ],
+   "proposed": 0,
+   "same": 0,
+   "within": 0,
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "source": "docs/TOOLS.md",
+   "claims": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "proposed": 4,
+   "same": 2,
+   "within": 0,
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "claims": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    19,
+    20,
+    22,
+    23,
+    24
+   ],
+   "proposed": 20,
+   "same": 10,
+   "within": 9,
+   "parse": "parsed",
+   "parse_error": null
+  }
+ ],
+ "pairs": [
+  {
+   "source": "docs/TOOLS.md",
+   "id": 3,
+   "statement": "The official Chhoto URL CLI application is maintained by the seller.",
+   "similarity": 0.838,
+   "relation": "same",
+   "other": {
+    "source": "docs/CLI.md",
+    "id": 3,
+    "statement": "The official CLI app is maintained by the seller (the author)."
+   }
+  },
+  {
+   "source": "docs/TOOLS.md",
+   "id": 4,
+   "statement": "The seller does not promise to provide proper support for the official CLI application.",
+   "similarity": 0.958,
+   "relation": "same",
+   "other": {
+    "source": "docs/CLI.md",
+    "id": 4,
+    "statement": "The seller does not promise proper support for the CLI app."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 2,
+   "statement": "The target's implementation language is Rust.",
+   "similarity": 0.843,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 14,
+    "statement": "The product is a Rust rewrite of the simply-shorten project — a provenance and implementation-language claim"
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 3,
+   "statement": "Restatement of claim 3: the implementation language is Rust.",
+   "similarity": 0.868,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 14,
+    "statement": "The product is a Rust rewrite of the simply-shorten project — a provenance and implementation-language claim"
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 6,
+   "statement": "The data store for links is SQLite.",
+   "similarity": 0.967,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 42,
+    "statement": "Links are stored in an SQLite database."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 8,
+   "statement": "The service uses less than 10 MB of RAM under regular load.",
+   "similarity": 0.911,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 9,
+    "statement": "The service runs in under 10 MB of RAM in ordinary operation"
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 10,
+   "statement": "The project is maintained by SinTan1729.",
+   "similarity": 1.0,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 3,
+    "statement": "The project is maintained by SinTan1729."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 11,
+   "statement": "Claim of absence: the target performs no tracking of users.",
+   "similarity": 0.745,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 51,
+    "statement": "Under the heading 'Bloat that will not be implemented', the target performs no tracking or spying of any kind."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 13,
+   "statement": "The target contains code by which an operator can give a short link a duration after which it is set to expire.",
+   "similarity": 0.716,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 20,
+    "statement": "The tool contains expiry logic that deactivates or removes links after a user-chosen time."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 14,
+   "statement": "The target contains code that maintains a per-link hit count.",
+   "similarity": 0.861,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 25,
+    "statement": "The tool contains hit-counting code that keeps a per-link visit count."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 23,
+   "statement": "When the target runs, a short link with an expiry duration set actually stops working after that duration passes, without anyone intervening manually.",
+   "similarity": 0.771,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 62,
+    "statement": "Links stop working automatically once the chosen time has passed, without any manual action."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 24,
+   "statement": "When the target runs, each actual use of a short link is reflected in that link's hit count.",
+   "similarity": 0.853,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 64,
+    "statement": "Each visit to a short link is counted, so the recorded hit count reflects the link's actual traffic."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 5,
+   "statement": "The product is a self-hosted URL shortener — the core function of the category exists",
+   "similarity": 0.701,
+   "relation": "within",
+   "other": {
+    "source": "README.md",
+    "id": 18,
+    "statement": "The tool contains a shortening function that accepts a submitted URL and returns a short link, with no restriction on the URL's length."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 11,
+   "statement": "The maintainer does not plan to add new features to the product",
+   "similarity": 0.729,
+   "relation": "within",
+   "other": {
+    "source": "README.md",
+    "id": 10,
+    "statement": "The maintainer regards the project as finished and maintained rather than abandoned"
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 12,
+   "statement": "The maintainer intends to fix bugs reported to the project",
+   "similarity": 0.803,
+   "relation": "within",
+   "other": {
+    "source": "README.md",
+    "id": 10,
+    "statement": "The maintainer regards the project as finished and maintained rather than abandoned"
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 13,
+   "statement": "The maintainer intends to keep the product updated against security vulnerabilities",
+   "similarity": 0.732,
+   "relation": "within",
+   "other": {
+    "source": "README.md",
+    "id": 10,
+    "statement": "The maintainer regards the project as finished and maintained rather than abandoned"
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 21,
+   "statement": "Optionally, the user can choose a custom short URL instead of the randomly generated one.",
+   "similarity": 0.781,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 12,
+    "statement": "The target supports creating short URLs both with auto-generated slugs and with custom aliases."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 23,
+   "statement": "The Docker image is approximately 6MB.",
+   "similarity": 0.757,
+   "relation": "within",
+   "other": {
+    "source": "README.md",
+    "id": 45,
+    "statement": "The tool is available as a Docker container."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 27,
+   "statement": "Existing short links can be edited after they are created.",
+   "similarity": 0.731,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 1,
+    "statement": "The target contains the code needed to create and manage short links on infrastructure the operator controls."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 28,
+   "statement": "Custom notes can be attached to each short link.",
+   "similarity": 0.797,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 16,
+    "statement": "The target supports attaching notes to links and filtering links by note in the web UI."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 30,
+   "statement": "The tool can generate QR codes for short links.",
+   "similarity": 0.872,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 17,
+    "statement": "The target supports generating QR codes for short links and exposes a programmatic API."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 41,
+   "statement": "The URL of the user's website is configurable.",
+   "similarity": 0.714,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 20,
+    "statement": "The target is configured through environment variables covering the site URL, credentials and storage."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 45,
+   "statement": "The tool is available as a Docker container.",
+   "similarity": 0.767,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 19,
+    "statement": "The target is deployable as an OCI-compatible container, e.g. with Docker or Podman."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 4,
+   "statement": "The backend web framework is Actix Web.",
+   "similarity": 0.86,
+   "relation": "within",
+   "other": {
+    "source": "README.md",
+    "id": 47,
+    "statement": "The backend is written in Rust using the Actix Web framework."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 5,
+   "statement": "The frontend is implemented in HTML, CSS and vanilla JavaScript, with no frontend framework.",
+   "similarity": 0.797,
+   "relation": "within",
+   "other": {
+    "source": "README.md",
+    "id": 48,
+    "statement": "The frontend is written in plain HTML and vanilla JS, styled with Pure CSS."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 22,
+   "statement": "When the target runs, short links created on it actually work in operation: a visitor who follows a created short link is sent to its destination.",
+   "similarity": 0.701,
+   "relation": "within",
+   "other": {
+    "source": "README.md",
+    "id": 63,
+    "statement": "Opening a short URL in a browser sends the visitor directly to the correct long URL, with no intermediate redirection page."
+   }
+  }
+ ]
+}
