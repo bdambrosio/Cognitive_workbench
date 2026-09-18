@@ -30,7 +30,99 @@
    "value": "confirmed",
    "at": "2026-09-17T18-17-43Z",
    "by": "claude-test"
+  },
+  "surface": {
+   "value": "frozen",
+   "at": "2026-09-18T20-24-27Z",
+   "by": "smoke test 2026-09-18 (claude)"
+  },
+  "chain": {
+   "value": "done",
+   "at": "2026-09-18T22-27-13Z",
+   "by": "job"
   }
  },
- "jobs": []
+ "jobs": [
+  {
+   "id": "2026-09-18T20-24-27Z",
+   "kind": "chain",
+   "state": "failed",
+   "by": "smoke test 2026-09-18 (claude)",
+   "started": "2026-09-18T20-24-27Z",
+   "ended": "2026-09-18T20-25-36Z",
+   "exit": 1,
+   "error": "stopped by claude: the chain would fail at a source with nothing to test",
+   "log": "/home/bruce/Downloads/Cognitive_workbench/workflowsv2/claims_audit/engagements/chhoto-sorted/jobs/2026-09-18T20-24-27Z.log",
+   "steps": [
+    {
+     "label": "audit README.md",
+     "pid": 157322,
+     "exit": null
+    }
+   ]
+  },
+  {
+   "id": "2026-09-18T20-26-23Z",
+   "kind": "chain",
+   "state": "done",
+   "by": "smoke test 2026-09-18 (claude)",
+   "started": "2026-09-18T20-26-23Z",
+   "ended": "2026-09-18T22-27-13Z",
+   "exit": 0,
+   "error": null,
+   "log": "/home/bruce/Downloads/Cognitive_workbench/workflowsv2/claims_audit/engagements/chhoto-sorted/jobs/2026-09-18T20-26-23Z.log",
+   "steps": [
+    {
+     "label": "audit README.md",
+     "pid": 158123,
+     "exit": 0
+    },
+    {
+     "label": "review README.md",
+     "pid": 183308,
+     "exit": 0
+    },
+    {
+     "label": "audit docs/CLI.md",
+     "pid": 193048,
+     "exit": 0
+    },
+    {
+     "label": "review docs/CLI.md",
+     "pid": 193695,
+     "exit": 0
+    },
+    {
+     "label": "audit docs/TOOLS.md",
+     "pid": 202625,
+     "exit": 0
+    },
+    {
+     "label": "review docs/TOOLS.md",
+     "pid": 202777,
+     "exit": 0
+    },
+    {
+     "label": "audit claim_sources/site_index_html.md",
+     "pid": 202915,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site_index_html.md",
+     "pid": 203511,
+     "exit": 0
+    },
+    {
+     "label": "materiality",
+     "pid": 204063,
+     "exit": 0
+    },
+    {
+     "label": "report",
+     "pid": 204256,
+     "exit": 0
+    }
+   ]
+  }
+ ]
 }
