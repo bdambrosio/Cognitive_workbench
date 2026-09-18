@@ -1,0 +1,879 @@
+{
+ "claim_source": "README.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "<!-- SPDX-FileCopyrightText: 2023-2026 Sayantan Santra <sayantan.santra689@gmail.com> -->",
+   "lines": [
+    1,
+    1
+   ],
+   "statement": "The document is copyright 2023-2026 by Sayantan Santra (author and origin provenance).",
+   "about": "document",
+   "tier": 3,
+   "tier_basis": "The buyer relies on the warranted ownership of the code, not on the README's copyright line; a claim about a document is rated low unless the document is itself the licence or the ownership notice the buyer relies on, which this is not. Rated on the scale alone."
+  },
+  {
+   "id": 2,
+   "quote": "<!-- SPDX-License-Identifier: MIT -->",
+   "lines": [
+    2,
+    2
+   ],
+   "statement": "The document is licensed under the MIT licence.",
+   "about": "document",
+   "locations": [
+    {
+     "quote": "[![license-badge](https://img.shields.io/badge/License-MIT-green?logo=googledocs&label=license)](https://spdx.org/licenses/MIT.html)",
+     "lines": [
+      12,
+      12
+     ]
+    }
+   ],
+   "tier": 1,
+   "tier_basis": "The licence is the fact the buyer relies on: the code being MIT-licensed is what permits selling a hosted service built on it, and a different or restricted licence is a stated walk-away, so if this were false the buyer would not close. Rated against the buyer's stated threshold: \"a licence on the code or a dependency that stops the buyer selling a hosted service built on it\"."
+  },
+  {
+   "id": 3,
+   "quote": "[![maintainer-badge](https://img.shields.io/badge/maintainer-SinTan1729-blue?logo=github)](https://github.com/SinTan1729)",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The project is maintained by SinTan1729.",
+   "about": "seller",
+   "tier": 1,
+   "tier_basis": "The counterparty is contracted as the maintainer for the 40-hour handover that is part of the structure; if SinTan1729 does not maintain the project, the handover term is not deliverable as promised and the buyer would go back to reopen the terms. Rated on the scale alone."
+  },
+  {
+   "id": 4,
+   "quote": "[![latest-release-badge](https://img.shields.io/github/v/release/SinTan1729/chhoto-url?logo=github)](https://github.com/SinTan1729/chhoto-url/releases/latest)",
+   "lines": [
+    10,
+    10
+   ],
+   "statement": "The project has a latest GitHub release, whose version the badge reports.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The buyer takes the code at closing with contracted handover and does not rely on the release channel for anything in its plan; whether a latest release exists would not by itself change the price or the terms. Rated on the scale alone."
+  },
+  {
+   "id": 5,
+   "quote": "A simple selfhosted URL shortener",
+   "lines": [
+    20,
+    20
+   ],
+   "statement": "The product is a self-hosted URL shortener — the core function of the category exists",
+   "about": "target",
+   "within": {
+    "source": "README.md",
+    "id": 18,
+    "statement": "The tool contains a shortening function that accepts a submitted URL and returns a short link, with no restriction on the URL's length."
+   },
+   "tier": 1,
+   "tier_basis": "If the product is not a working self-hosted URL shortener, the branded add-on the buyer plans to sell does not exist and there is nothing to close over. Rated against the buyer's stated threshold: \"a link shortener\"."
+  },
+  {
+   "id": 6,
+   "quote": "with no unnecessary features",
+   "lines": [
+    20,
+    20
+   ],
+   "statement": "The product carries no features beyond the ones necessary to its function — a boundary on its feature set",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Extra features beyond the necessary ones would not, on their own, change the price, the terms or the buyer's plan; the privacy threshold concerns what is recorded about visitors, not how many features the product carries, and this claim is rated on its own. Rated on the scale alone."
+  },
+  {
+   "id": 7,
+   "quote": "The scratch docker image is <4.5 MB (compressed),",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "The docker image built from scratch is smaller than 4.5 MB compressed",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The buyer deploys one instance per customer and says the hosting cost is the margin, so a compressed image-size figure worse than stated is exactly the kind of figure it said would change the price. Rated against the buyer's stated threshold: \"memory, image-size or resource figures materially worse than stated, because at 900 instances the hosting cost is the margin\"."
+  },
+  {
+   "id": 8,
+   "quote": "the alpine one is <8.5 MB (compressed),",
+   "lines": [
+    21,
+    22
+   ],
+   "statement": "The docker image built from alpine is smaller than 8.5 MB compressed",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "As with the scratch image, the alpine image's compressed size is one of the footprint figures the add-on's profitability rests on at 900 instances, and the buyer named image-size figures as price movers. Rated against the buyer's stated threshold: \"memory, image-size or resource figures materially worse than stated, because at 900 instances the hosting cost is the margin\"."
+  },
+  {
+   "id": 9,
+   "quote": "it uses <10 MB of RAM under regular use.",
+   "lines": [
+    22,
+    22
+   ],
+   "statement": "The service runs in under 10 MB of RAM in ordinary operation",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The buyer runs one instance per 256 MB virtual machine and says that at 900 instances the hosting cost is the margin, so a memory figure materially worse than stated would make the add-on unprofitable and send it back to reopen the price. Rated against the buyer's stated threshold: \"memory, image-size or resource figures materially worse than stated, because at 900 instances the hosting cost is the margin\"."
+  },
+  {
+   "id": 10,
+   "quote": "I consider this project to be complete, not dead.",
+   "lines": [
+    24,
+    25
+   ],
+   "statement": "The maintainer regards the project as finished and maintained rather than abandoned",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "The buyer takes the code at closing with 40 hours of contracted handover and plans to maintain it itself; whether the maintainer regards the project as complete rather than dead would not by itself reopen the price or the terms, and no stated threshold names it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 11,
+   "quote": "I'm unlikely to add any new features,",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "The maintainer does not plan to add new features to the product",
+   "about": "seller",
+   "within": {
+    "source": "README.md",
+    "id": 10,
+    "statement": "The maintainer regards the project as finished and maintained rather than abandoned"
+   },
+   "tier": 3,
+   "tier_basis": "New features the maintainer might add cost the buyer nothing and change none of the four things it is paying for; nothing in the plan or the thresholds rests on the feature set staying frozen. Rated on the scale alone."
+  },
+  {
+   "id": 12,
+   "quote": "I will try and fix every bug you report.",
+   "lines": [
+    25,
+    26
+   ],
+   "statement": "The maintainer intends to fix bugs reported to the project",
+   "about": "seller",
+   "within": {
+    "source": "README.md",
+    "id": 10,
+    "statement": "The maintainer regards the project as finished and maintained rather than abandoned"
+   },
+   "tier": 3,
+   "tier_basis": "During the handover and holdback window the buyer cannot read the Rust, but it holds the code, has the handover contracted, and no stated threshold names the maintainer's bug-fixing intent; on its own this would not send the buyer back over price or terms. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 13,
+   "quote": "I will also try to keep it updated in terms of\nsecurity vulnerabilities.",
+   "lines": [
+    26,
+    27
+   ],
+   "statement": "The maintainer intends to keep the product updated against security vulnerabilities",
+   "about": "seller",
+   "within": {
+    "source": "README.md",
+    "id": 10,
+    "statement": "The maintainer regards the project as finished and maintained rather than abandoned"
+   },
+   "tier": 3,
+   "tier_basis": "The buyer's security threshold reaches documented hardening measures being absent or off, not the maintainer's intent to patch; it owns the code from closing and no stated threshold names update intent, so this alone would not change the price or the terms. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 14,
+   "quote": "I decided\nto rewrite it in Rust",
+   "lines": [
+    38,
+    39
+   ],
+   "statement": "The product is a Rust rewrite of the simply-shorten project — a provenance and implementation-language claim",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The buyer's plan, its price and its walk-away thresholds do not rest on the implementation language or on the project's descent from simply-shorten, and ownership is warranted separately; whether this provenance is accurate would not change the price or the terms. Rated on the scale alone."
+  },
+  {
+   "id": 15,
+   "quote": "add some features to it that I thought were essential (e.g. hit counting).",
+   "lines": [
+    39,
+    39
+   ],
+   "statement": "The product includes the features the maintainer added over simply-shorten, hit counting among them",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The buyer's privacy position and its reporting are built on hit counting existing as the only recorded data, and without it the add-on delivers less than the price set from the documentation assumed, so the buyer would go back to the seller over this alone. Rated on the scale alone."
+  },
+  {
+   "id": 16,
+   "quote": "Chhoto (ছোট, [pronunciation](https://en.wiktionary.org/wiki/ছোট)) is the Bangla word for small. URL means, well... URL. So the name simply means Small URL.",
+   "lines": [
+    43,
+    44
+   ],
+   "statement": "The product's name means Small URL: 'Chhoto' is the Bangla word for small.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The etymology of the product's name touches nothing the buyer is paying for, no stated threshold and no item of the buyer's plan. If it were false, neither the price nor the terms would change. Rated on the scale alone."
+  },
+  {
+   "id": 17,
+   "quote": "The database is cleared every 15 minutes",
+   "lines": [
+    53,
+    53
+   ],
+   "statement": "The seller's hosted demo instance clears its database every 15 minutes.",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "The claim concerns the seller's hosted demo instance, which the buyer's plan does not touch: the buyer will run its own instances and asked that claims about the project's public face not be tested. If the demo clears on a different schedule, nothing in the transaction changes. Rated on the scale alone."
+  },
+  {
+   "id": 18,
+   "quote": "Shortens URLs of any length",
+   "lines": [
+    58,
+    58
+   ],
+   "statement": "The tool contains a shortening function that accepts a submitted URL and returns a short link, with no restriction on the URL's length.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "Accepting a submitted URL and returning a short link is the function the buyer is buying; its failure leaves no add-on to sell and repair means Rust nobody at the buyer reads. Rated against the buyer's stated threshold: \"a link shortener\"."
+  },
+  {
+   "id": 19,
+   "quote": "to a randomly generated link",
+   "lines": [
+    58,
+    58
+   ],
+   "statement": "The short links produced by the tool are randomly generated.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The buyer's plan does not rest on the slugs being random: it names custom slugs as the feature it pays for, and random generation is marked on the practice's reading as something it uses without having said how much links per instance matter. If slugs were not random, nothing in the price or terms would change on its own. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 20,
+   "quote": "Automatic expiry of links after a chosen time.",
+   "lines": [
+    59,
+    59
+   ],
+   "statement": "The tool contains expiry logic that deactivates or removes links after a user-chosen time.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "Expiry is a documented feature the buyer named as a price mover if missing or partial, and the price was set from the documentation on the assumption it is accurate. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+  },
+  {
+   "id": 21,
+   "quote": "Allows you to specify the shortened URL instead of the generated one",
+   "lines": [
+    60,
+    61
+   ],
+   "statement": "Optionally, the user can choose a custom short URL instead of the randomly generated one.",
+   "about": "target",
+   "within": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 12,
+    "statement": "The target supports creating short URLs both with auto-generated slugs and with custom aliases."
+   },
+   "tier": 1,
+   "tier_basis": "Custom slugs are a documented feature the buyer named as a price mover if missing or partial, and the price assumed the documentation is accurate. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+  },
+  {
+   "id": 22,
+   "quote": "Opening the shortened URL in your browser will instantly redirect you to the correct long URL.",
+   "lines": [
+    62,
+    63
+   ],
+   "statement": "The server contains a redirect handler that maps each short URL to its stored long URL and issues a redirect response.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The redirect handler is the core of the add-on: every customer's visitors follow short links in emails, and without it there is no product to sell and no substitute the buyer's engineers could build around unread Rust. Rated against the buyer's stated threshold: \"a link shortener\"."
+  },
+  {
+   "id": 23,
+   "quote": "The docker image is only ~6MB",
+   "lines": [
+    64,
+    64
+   ],
+   "statement": "The Docker image is approximately 6MB.",
+   "about": "target",
+   "within": {
+    "source": "README.md",
+    "id": 45,
+    "statement": "The tool is available as a Docker container."
+   },
+   "tier": 1,
+   "tier_basis": "At 900 instances the hosting cost is the margin, and the buyer named image-size figures as something that would change the price if materially worse than stated. A materially larger image than ~6MB makes one-instance-per-customer unprofitable and the buyer cannot slim code it cannot read. Rated against the buyer's stated threshold: \"memory, image-size or resource figures materially worse than stated, because at 900 instances the hosting cost is the margin\"."
+  },
+  {
+   "id": 24,
+   "quote": "RAM uasge stays under 5MB under normal use.",
+   "lines": [
+    64,
+    65
+   ],
+   "statement": "RAM usage stays under 5MB under normal use.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The add-on is profitable at $4 a month only because one instance fits the buyer's 256 MB machines, and the buyer named memory figures as something that would change the price if materially worse than stated. Rated against the buyer's stated threshold: \"memory, image-size or resource figures materially worse than stated, because at 900 instances the hosting cost is the margin\"."
+  },
+  {
+   "id": 25,
+   "quote": "Counts number of hits for each short link",
+   "lines": [
+    66,
+    66
+   ],
+   "statement": "The tool contains hit-counting code that keeps a per-link visit count.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "Hit counting is the one thing the buyer said the product records about visitors, and the buyer's European offering rests on it; a counter that does not exist leaves the buyer selling a counter that does not count, in code it cannot read. Rated against the buyer's stated threshold: \"records nothing about the people who click a link beyond a count of hits, so the buyer can offer it to European customers without a new data-processing assessment\"."
+  },
+  {
+   "id": 26,
+   "quote": "only the hit is recorded, and nothing else",
+   "lines": [
+    66,
+    67
+   ],
+   "statement": "Only the hit count is recorded about each visit, and nothing else — no other data about the visitor or the visit is stored.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "This is a boundary claim: its failure admits stored or transmitted visitor data inside code the buyer cannot patch, which is what the buyer said would end the deal. Rated against the buyer's stated threshold: \"records nothing about the people who click a link beyond a count of hits, so the buyer can offer it to European customers without a new data-processing assessment\"."
+  },
+  {
+   "id": 27,
+   "quote": "Short links can be edited after creation.",
+   "lines": [
+    68,
+    68
+   ],
+   "statement": "Existing short links can be edited after they are created.",
+   "about": "target",
+   "within": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 1,
+    "statement": "The target contains the code needed to create and manage short links on infrastructure the operator controls."
+   },
+   "tier": 3,
+   "tier_basis": "Editing existing links is marked as used on the practice's inference, not named by the buyer among the price-moving features; if it failed, the engineers could delete and recreate links and keep their own records, which is cheap commodity work. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 28,
+   "quote": "Each short link may have custom notes attached to it.",
+   "lines": [
+    69,
+    69
+   ],
+   "statement": "Custom notes can be attached to each short link.",
+   "about": "target",
+   "within": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 16,
+    "statement": "The target supports attaching notes to links and filtering links by note in the web UI."
+   },
+   "tier": 3,
+   "tier_basis": "Notes on links sit under the same inference item as editing: the buyer did not name them among the features it pays for, and the engineers could keep records outside the tool if notes were absent. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 29,
+   "quote": "The UI features filtering for links, based on short link, long link, and notes.",
+   "lines": [
+    69,
+    70
+   ],
+   "statement": "The UI supports filtering links by short link, long link, and notes.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The web interface is an administration tool only the buyer's own engineers see, and filtering is a convenience within it; without it the engineers could find links through the API or a database client, which is commodity work for them. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 30,
+   "quote": "QR codes can be generated for easy sharing.",
+   "lines": [
+    71,
+    71
+   ],
+   "statement": "The tool can generate QR codes for short links.",
+   "about": "target",
+   "within": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 17,
+    "statement": "The target supports generating QR codes for short links and exposes a programmatic API."
+   },
+   "tier": 3,
+   "tier_basis": "QR generation is marked as used on the practice's inference, and the buyer's product could generate codes from the short link itself if the feature were absent, which is commodity work; the buyer has not said it needs the built-in generator, and a person should ask. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 31,
+   "quote": "Supports operation using API key",
+   "lines": [
+    72,
+    72
+   ],
+   "statement": "The tool supports operation using an API key.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the API key were not supported, the buyer's product would have to reach 900 instances some other way than the documented authentication, departing from the deployment the price assumes; the practice's reading of the reliance statement offers only a private-network workaround that departs from the documentation. Rated against the buyer's stated threshold: \"a security or hardening measure the documentation describes as present or on by default that is absent or off\"."
+  },
+  {
+   "id": 32,
+   "quote": "lets the user provide hashed password and API key",
+   "lines": [
+    72,
+    72
+   ],
+   "statement": "The user can supply the password and API key in hashed form.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Supplying the password and API key in hashed form is a configuration detail the two operations engineers would act on when provisioning secrets from the documentation; its absence alone would be absorbed by storing secrets unhashed inside the buyer's own machines. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\" — the threshold reaches the claim, but this failure alone is too small to reopen the price or the terms."
+  },
+  {
+   "id": 33,
+   "quote": "Has a robust JSON-RPC adjacent API.",
+   "lines": [
+    73,
+    73
+   ],
+   "statement": "The tool exposes an API resembling JSON-RPC.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The buyer's plan is to create and manage links through the service's API across roughly 900 customer instances; if the claim were false there would be no API to automate through, and no way to run the add-on without fragile manual work. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+  },
+  {
+   "id": 34,
+   "quote": "Has a mobile friendly UI",
+   "lines": [
+    74,
+    74
+   ],
+   "statement": "The frontend contains responsive, mobile-oriented layout and styling.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Responsive, mobile-oriented layout concerns the web interface's appearance, which the buyer has said does not matter and its customers will never see. Rated on the scale alone."
+  },
+  {
+   "id": 35,
+   "quote": "automatic dark mode",
+   "lines": [
+    74,
+    74
+   ],
+   "statement": "The UI has automatic dark mode.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Automatic dark mode is styling on the web interface, which the buyer has said does not matter and only its operations engineers would see. Rated on the scale alone."
+  },
+  {
+   "id": 36,
+   "quote": "Can serve a custom landing page, if needed.",
+   "lines": [
+    75,
+    75
+   ],
+   "statement": "The tool can serve a custom landing page.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "A custom landing page sits under branding, where the buyer's fallback is to carry branding in the domain name it controls; the buyer has not said it needs the landing page. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 37,
+   "quote": "Has a public mode, where anyone can add links without authentication.",
+   "lines": [
+    76,
+    77
+   ],
+   "statement": "A public mode exists in which anyone can add links without authenticating.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The buyer runs one authenticated private instance per customer and its plan never uses a public mode, so the mode's absence would admit nothing the buyer relies on keeping out. Rated on the scale alone."
+  },
+  {
+   "id": 38,
+   "quote": "Deleting or listing available links will need admin access using the password.",
+   "lines": [
+    77,
+    78
+   ],
+   "statement": "Deleting links and listing available links require admin access using the password.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "Admin-gated deletion and listing is the access control protecting every customer's links on 900 instances; if it were absent, links could be listed or deleted by anyone reaching an instance, and the buyer would go back to the seller over this alone. Rated against the buyer's stated threshold: \"a security or hardening measure the documentation describes as present or on by default that is absent or off\"."
+  },
+  {
+   "id": 39,
+   "quote": "It's also possible to completely disable the frontend.",
+   "lines": [
+    78,
+    78
+   ],
+   "statement": "The frontend can be completely disabled.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Disabling the frontend is a documented configuration capability the operations engineers would plan around when deciding what runs on each customer instance; if it were false they would simply leave the interface unused or wall it off, which changes nothing about the price or the terms. Rated on the scale alone."
+  },
+  {
+   "id": 40,
+   "quote": "It's also possible to force an expiry time for public instances",
+   "lines": [
+    78,
+    79
+   ],
+   "statement": "An expiry time can be forced for links on public instances.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Forced expiry on public instances concerns a mode the buyer's plan never uses, since every instance is private and authenticated. Rated on the scale alone."
+  },
+  {
+   "id": 41,
+   "quote": "Allows setting the URL of your website",
+   "lines": [
+    80,
+    81
+   ],
+   "statement": "The URL of the user's website is configurable.",
+   "about": "target",
+   "within": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 20,
+    "statement": "The target is configured through environment variables covering the site URL, credentials and storage."
+   },
+   "tier": 3,
+   "tier_basis": "The configurable site URL sits under branding, where the buyer's fallback is the domain name it controls in any case; the buyer has not said it needs this setting. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 42,
+   "quote": "Links are stored in an SQLite database",
+   "lines": [
+    82,
+    82
+   ],
+   "statement": "Links are stored in an SQLite database.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If links were not stored in an embedded SQLite database, the buyer would face an outside database beside each of 900 instances, eating the margin, and no engineering on its side substitutes for it. Rated against the buyer's stated threshold: \"a dependency on a database or outside service the buyer cannot run on its own machines\"."
+  },
+  {
+   "id": 43,
+   "quote": "which is configured to be ACID by default",
+   "lines": [
+    82,
+    82
+   ],
+   "statement": "The SQLite database is configured to be ACID by default.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the database were not ACID by default, the buyer's engineers could run with the settings that are available or rebuild an instance from a backup, which is cheap commodity work for one customer's links. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 44,
+   "quote": "Options are available for tuning the database to the user's liking.",
+   "lines": [
+    83,
+    83
+   ],
+   "statement": "Options are available for tuning the database.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If no tuning options existed, the buyer's engineers would simply run the defaults, which their plan does not depend on changing; nothing about the price or the terms would move. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 45,
+   "quote": "Available as a Docker container",
+   "lines": [
+    84,
+    84
+   ],
+   "statement": "The tool is available as a Docker container.",
+   "about": "target",
+   "within": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 19,
+    "statement": "The target is deployable as an OCI-compatible container, e.g. with Docker or Podman."
+   },
+   "tier": 1,
+   "tier_basis": "The buyer's deployment plan depends on the provided Docker image and Docker Compose; if the tool were not available as a container, two operations engineers working from the documentation alone would have to build and package code in Rust nobody at the buyer reads. Rated against the buyer's stated threshold: \"can be deployed and configured by two operations engineers working from the documentation alone\"."
+  },
+  {
+   "id": 46,
+   "quote": "with a provided compose file",
+   "lines": [
+    84,
+    84
+   ],
+   "statement": "A Docker Compose file is provided.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The buyer's plan is to deploy every instance with Docker Compose from the documentation alone, so the provided compose file is a detail its operations engineers would act on directly. The buyer's stated threshold reaches it, but the failure is too small to reopen the price over, since the reliance statement records that writing a compose file by hand is cheap commodity work for the engineers. Rated against the buyer's stated threshold: \"can be deployed and configured by two operations engineers working from the documentation alone\"."
+  },
+  {
+   "id": 47,
+   "quote": "Backend written in Rust using [Actix Web](https://actix.rs/)",
+   "lines": [
+    85,
+    85
+   ],
+   "statement": "The backend is written in Rust using the Actix Web framework.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The buyer pays for the shortener's behaviour, not its implementation language, and no stated threshold names the language or framework; since its engineers cannot read Rust in any case, a different backend language would change nothing about what it loses. The only item this touches is maintainability, which the buyer merely uses. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 48,
+   "quote": "frontend written in plain HTML and vanilla JS, using [Pure CSS](https://purecss.io/) for styling",
+   "lines": [
+    86,
+    87
+   ],
+   "statement": "The frontend is written in plain HTML and vanilla JS, styled with Pure CSS.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The web interface's appearance and styling are items the buyer does not use, as its customers never see the interface and its engineers manage links through the API. Nothing in the stated thresholds or the buyer's plan rests on the frontend technology. Rated on the scale alone."
+  },
+  {
+   "id": 49,
+   "quote": "Uses very basic authentication using a provided password.",
+   "lines": [
+    88,
+    88
+   ],
+   "statement": "Authentication uses a provided password.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The documentation describes password authentication as present; if it were false, the buyer would deploy an unauthenticated service believing it protected, which the buyer's security threshold reaches. The failure alone is too small to reopen the price, because the engineers can cheaply confine each instance to a private network as the reliance statement records. Rated against the buyer's stated threshold: \"a security or hardening measure the documentation describes as present or on by default that is absent or off\"."
+  },
+  {
+   "id": 50,
+   "quote": "It's not encrypted in transport.",
+   "lines": [
+    88,
+    88
+   ],
+   "statement": "The authentication is not encrypted in transport.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the claim were false, authentication would in fact be encrypted in transport and the buyer would only gain; no threshold names it and nothing the buyer pays for rests on the transport being unencrypted. The buyer's plan is unaffected either way. Rated on the scale alone."
+  },
+  {
+   "id": 51,
+   "quote": "**Tracking or spying of any kind.**",
+   "lines": [
+    94,
+    94
+   ],
+   "statement": "Under the heading 'Bloat that will not be implemented', the target performs no tracking or spying of any kind.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The buyer's entire privacy position rests on this claim: its falsity defeats the item the buyer depends on, cannot be patched by the buyer since the code is Rust it cannot read, and touches a stated walk-away about visitor data. The buyer said it is paying for a shortener that records nothing about the people who click a link, and its absence is what lets it offer the add-on in Europe without a new assessment. Rated against the buyer's stated threshold: \"records nothing about the people who click a link beyond a count of hits, so the buyer can offer it to European customers without a new data-processing assessment\"."
+  },
+  {
+   "id": 52,
+   "quote": "The only logs that still exist are some very simple ones, mostly meant for debugging.",
+   "lines": [
+    94,
+    95
+   ],
+   "statement": "The only logging the target performs is a small set of simple logs intended mostly for debugging; no other logging exists.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "This is a boundary claim whose falsity admits logging beyond the simple debug logs, which is precisely the kind of failure the buyer said would change the price or terms. The buyer depends on the privacy item this claim supports and cannot patch the code itself. Rated against the buyer's stated threshold: \"any logging or tracking of visitors beyond the hit count\"."
+  },
+  {
+   "id": 53,
+   "quote": "**User management.** If you need a shortener for your whole organization, either run separate containers for everyone or use something else.",
+   "lines": [
+    96,
+    97
+   ],
+   "statement": "The target has no user management feature; a buyer needing a shortener for a whole organization must run separate containers or use other software.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The buyer runs one instance per customer, so the absence of user management is an item its plan does not touch; its falsity would only admit a feature the buyer has no use for. No stated threshold reaches it. Rated on the scale alone."
+  },
+  {
+   "id": 54,
+   "quote": "**Cookies, newsletters**, \"we value your privacy\" popups or any of the multiple other ways modern web shows how anti-user it is. We all hate those, and they're not needed here.",
+   "lines": [
+    98,
+    100
+   ],
+   "statement": "The target does not use cookies, newsletters, or privacy-consent popups.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "Cookies are exactly the visitor data whose storage or sending the buyer named as ending the deal, and the buyer depends on the no-tracking item this claim supports. Its falsity would force a new data-processing assessment for the European customers and could not be patched by the buyer. Rated against the buyer's stated threshold: \"any logging or tracking of visitors beyond the hit count\"."
+  },
+  {
+   "id": 55,
+   "quote": "**Paywalls** or messages begging for donations.",
+   "lines": [
+    101,
+    101
+   ],
+   "statement": "The target contains no paywalls or donation-request messages.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Paywall and donation messages would appear only in the web interface, which the buyer's customers never see and whose appearance the buyer does not use. No threshold reaches it and nothing the buyer pays for rests on it. Rated on the scale alone."
+  },
+  {
+   "id": 56,
+   "quote": "The list of adjectives and names used for random short url generation is a modified version of [this list used by docker](https://github.com/moby/moby/blob/master/internal/namesgenerator/names-generator.go).",
+   "lines": [
+    124,
+    125
+   ],
+   "statement": "The word list used to generate random short URLs is a modified version of Docker's names-generator list.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The provenance of the word list behind random slugs changes nothing the buyer pays for; the slug-generation item the buyer uses concerns whether links keep working at scale, not where the word list came from. No threshold reaches it. Rated on the scale alone."
+  },
+  {
+   "id": 57,
+   "quote": "It is highly recommended that you [enable WAL mode](./docs/INSTALLATION.md#chhoto_sqlite_use_wal_mode).",
+   "lines": [
+    126,
+    126
+   ],
+   "statement": "The target's database can be run in WAL mode via a configuration option, and the seller recommends enabling it.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A person deploying from the documentation would set CHHOTO_SQLITE_USE_WAL_MODE on the buyer's word that documented configuration behaves as described, so the claim is detail the buyer's engineers would act on. The threshold reaches it, but the failure alone is too small to reopen the price, since running on defaults or rebuilding from a backup is cheap commodity work for the engineers. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 58,
+   "quote": "Although it's unlikely, it's possible that your database is mangled after some update.",
+   "lines": [
+    127,
+    128
+   ],
+   "statement": "Updating the target carries a risk that the database is mangled; the seller states this is unlikely but possible.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the claim were false, upgrades would never mangle the database and the buyer would only gain; the buyer has not said anything that rests on the risk existing. The database-behaviour item is one the buyer merely uses, and no threshold names it. Rated on the scale alone."
+  },
+  {
+   "id": 59,
+   "quote": "If you intend to have more than a few thousand short links, it's strongly recommended that you use the UID [`CHHOTO_SLUG_STYLE`](./docs/INSTALLATION.md#chhoto_slug_style) with a [`CHHOTO_SLUG_LENGTH`](./docs/INSTALLATION.md#chhoto_slug_length) of 16 or more. Otherwise, generating new links will start to fail after a while.",
+   "lines": [
+    129,
+    131
+   ],
+   "statement": "The target's link-creation path generates new short URLs by drawing random slugs from a finite set of words, with no setting in effect that ensures long unique slugs unless CHHOTO_SLUG_STYLE with a CHHOTO_SLUG_LENGTH of 16 or more is configured.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The claim drives a deployment action — setting CHHOTO_SLUG_STYLE with a CHHOTO_SLUG_LENGTH of 16 or more for instances expected to hold many links — so it is documented configuration the buyer's engineers would act on. The threshold reaches it, but the failure alone is too small to reopen the price, since the buyer has not said how many links a single customer's instance will hold. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 60,
+   "quote": "For safety, only `https`,`http`,`ftp`, and `magnet` links are allowed for long links by default.",
+   "lines": [
+    132,
+    132
+   ],
+   "statement": "By default, the target accepts long links using only the https, http, ftp and magnet protocols; other protocols require the CHHOTO_EXTRA_PROTOCOLS option.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The default protocol restriction is a hardening measure the documentation describes as on by default, and the buyer said exactly this kind of measure being absent would change the price or terms. Its falsity would also make the documentation inaccurate, which is what the $15,000 holdback exists against. Rated against the buyer's stated threshold: \"a security or hardening measure the documentation describes as present or on by default that is absent or off\"."
+  },
+  {
+   "id": 61,
+   "quote": "Shortens URLs of any length",
+   "lines": [
+    58,
+    58
+   ],
+   "statement": "URLs submitted to the tool are shortened to working short links regardless of how long they are.",
+   "about": "target",
+   "implied_by": 18,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "If the claim were false, links of some lengths would not shorten to working short links, and the add-on the buyer is buying would fail at its core task, which the buyer's plan depends on and which no engineering on the buyer's side substitutes for. Rated against the buyer's stated threshold: \"a link shortener\"."
+  },
+  {
+   "id": 62,
+   "quote": "Automatic expiry of links after a chosen time.",
+   "lines": [
+    59,
+    59
+   ],
+   "statement": "Links stop working automatically once the chosen time has passed, without any manual action.",
+   "about": "target",
+   "implied_by": 20,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "If the claim were false, link expiry would be missing or partial, and the buyer would go back to the seller over the price, which was set assuming this documented feature; the buyer could schedule deletions from its own product, but the price assumed the feature. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+  },
+  {
+   "id": 63,
+   "quote": "Opening the shortened URL in your browser will instantly redirect you to the correct long URL.",
+   "lines": [
+    62,
+    63
+   ],
+   "statement": "Opening a short URL in a browser sends the visitor directly to the correct long URL, with no intermediate redirection page.",
+   "about": "target",
+   "implied_by": 22,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "If the claim were false, visitors would not go straight to the destination URL, defeating the core function the buyer's plan depends on: an add-on that shortens links and redirects visitors. Rated against the buyer's stated threshold: \"a link shortener\"."
+  },
+  {
+   "id": 64,
+   "quote": "Counts number of hits for each short link",
+   "lines": [
+    66,
+    66
+   ],
+   "statement": "Each visit to a short link is counted, so the recorded hit count reflects the link's actual traffic.",
+   "about": "target",
+   "implied_by": 25,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "If the claim were false, the hit counts the buyer resells would not reflect each link's actual traffic, striking at the recording behaviour the buyer's plan depends on and would find costly to repair in code it cannot read. Rated against the buyer's stated threshold: \"records nothing about the people who click a link beyond a count of hits\"."
+  },
+  {
+   "id": 65,
+   "quote": "Has a mobile friendly UI",
+   "lines": [
+    74,
+    74
+   ],
+   "statement": "The UI renders and remains usable when accessed from a mobile device.",
+   "about": "target",
+   "implied_by": 34,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If the claim were false, nothing in the buyer's plan changes: the web interface is used only by the buyer's operations engineers, whose use of it is desktop work, and the interface's appearance and rendering are matters the buyer said it does not use. Rated on the scale alone."
+  },
+  {
+   "id": 66,
+   "quote": "If you intend to have more than a few thousand short links, it's strongly recommended that you use the UID [`CHHOTO_SLUG_STYLE`](./docs/INSTALLATION.md#chhoto_slug_style) with a [`CHHOTO_SLUG_LENGTH`](./docs/INSTALLATION.md#chhoto_slug_length) of 16 or more. Otherwise, generating new links will start to fail after a while.",
+   "lines": [
+    129,
+    131
+   ],
+   "statement": "When the target holds more than a few thousand short links under the default slug settings, attempts to generate new short links begin to fail.",
+   "about": "target",
+   "implied_by": 59,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If the claim were false, link generation would not begin to fail after a few thousand links, so the buyer loses nothing; a deployer might set a longer slug length than needed, which is harmless, and no stated threshold reaches documentation that understates a limitation. Rated on the scale alone."
+  }
+ ]
+}

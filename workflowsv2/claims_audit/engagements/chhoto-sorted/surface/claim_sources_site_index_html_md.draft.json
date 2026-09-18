@@ -1,0 +1,239 @@
+{
+ "claim_source": "claim_sources/site_index_html.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "Selfhosted URL Shortener",
+   "lines": [
+    1,
+    1
+   ],
+   "statement": "The target contains the code needed to create and manage short links on infrastructure the operator controls.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "selfhosted URL shortener",
+     "lines": [
+      3,
+      3
+     ]
+    },
+    {
+     "quote": "self-hosted URL shortener",
+     "lines": [
+      5,
+      5
+     ]
+    },
+    {
+     "quote": "a lightweight URL shortener",
+     "lines": [
+      9,
+      9
+     ]
+    },
+    {
+     "quote": "provides the core tools needed to create and manage short links on your own infrastructure",
+     "lines": [
+      9,
+      9
+     ]
+    }
+   ],
+   "tier": 1,
+   "tier_basis": "If the target did not contain working code to create and manage short links on the operator's own infrastructure, there is no add-on for the buyer to sell; nothing else in the deal survives. Rated against the buyer's stated threshold: \"a link shortener\"."
+  },
+  {
+   "id": 4,
+   "quote": "using Actix Web as the backend",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The backend web framework is Actix Web.",
+   "about": "target",
+   "within": {
+    "source": "README.md",
+    "id": 47,
+    "statement": "The backend is written in Rust using the Actix Web framework."
+   },
+   "tier": 3,
+   "tier_basis": "The buyer's engineers cannot read the backend either way and no stated threshold names the framework; a different framework changes nothing about deployment, footprint, privacy or operation. Rated on the scale alone."
+  },
+  {
+   "id": 5,
+   "quote": "The frontend is written in html, css, and vanilla javascript",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The frontend is implemented in HTML, CSS and vanilla JavaScript, with no frontend framework.",
+   "about": "target",
+   "within": {
+    "source": "README.md",
+    "id": 48,
+    "statement": "The frontend is written in plain HTML and vanilla JS, styled with Pure CSS."
+   },
+   "tier": 3,
+   "tier_basis": "The frontend stack matters only to whoever maintains it, and the buyer's plan does not touch the frontend code; no stated threshold reaches it. Rated on the scale alone."
+  },
+  {
+   "id": 7,
+   "quote": "distributed in a tiny container image (<4.5 MB for the scratch image and <8.5 MB for the alpine image, both compressed)",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The distributed container image is smaller than 4.5 MB compressed (scratch variant) and smaller than 8.5 MB compressed (alpine variant). A quantity claim naming two image variants.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The stated image sizes are figures the price was set on: at roughly 900 single-customer instances the hosting cost is the add-on's entire margin, and the buyer cannot slim code it cannot read, so figures materially worse than stated would send the buyer back to the seller over this claim alone. Rated against the buyer's stated threshold: \"memory, image-size or resource figures materially worse than stated, because at 900 instances the hosting cost is the margin\"."
+  },
+  {
+   "id": 9,
+   "quote": "It’s free and open source, released under the MIT license",
+   "lines": [
+    13,
+    13
+   ],
+   "statement": "The software is free and open source, released under the MIT licence.",
+   "about": "document",
+   "tier": 1,
+   "tier_basis": "The licence is the fact the buyer relies on for its walk-away right to sell a hosted service built on the code; if the code is not under the MIT licence, the buyer's permission to operate the add-on at all is in question and it would not close. Rated against the buyer's stated threshold: \"a licence on the code or a dependency that stops the buyer selling a hosted service built on it\"."
+  },
+  {
+   "id": 12,
+   "quote": "Create short URLs with generated slugs or custom aliases.",
+   "lines": [
+    29,
+    29
+   ],
+   "statement": "The target supports creating short URLs both with auto-generated slugs and with custom aliases.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "Custom slugs are one of the documented features the price was set on; if the claim were false the buyer could fall back to random slugs, but it would go back to the seller to reopen the price over the missing feature. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+  },
+  {
+   "id": 15,
+   "quote": "Update existing links and manage their metadata.",
+   "lines": [
+    41,
+    41
+   ],
+   "statement": "The target supports editing existing links and managing their metadata.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If editing links were absent, the buyer's engineers could delete and recreate links and keep records outside the tool, which is cheap commodity work; no stated threshold names editing, and the price-mover feature list does not include it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 16,
+   "quote": "Attach notes to links and filter them in the web UI.",
+   "lines": [
+    45,
+    45
+   ],
+   "statement": "The target supports attaching notes to links and filtering links by note in the web UI.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Notes and filtering are conveniences the engineers can replace with their own records; their absence would change nothing about the transaction. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 17,
+   "quote": "Generate QR codes and integrate with the service programmatically.",
+   "lines": [
+    49,
+    49
+   ],
+   "statement": "The target supports generating QR codes for short links and exposes a programmatic API.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Use the web interface to create, edit, and manage short URLs on your own instance.",
+     "lines": [
+      69,
+      69
+     ]
+    }
+   ],
+   "tier": 1,
+   "tier_basis": "The programmatic API is how the buyer's product manages roughly 900 customer instances; without it there is no workable add-on operation, and it is a named price mover. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+  },
+  {
+   "id": 18,
+   "quote": "Snappy WebUI",
+   "lines": [
+    53,
+    53
+   ],
+   "statement": "The target has a web UI (asserted by the Screenshots section heading; 'Snappy' is puffery and is not part of the claim).",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The web interface is only the engineers' administration tool; if it did not exist they would manage links through the API or a database client, which is cheap commodity work. Rated on the scale alone."
+  },
+  {
+   "id": 19,
+   "quote": "Run Chhoto URL with Docker, Podman, or another OCI-compatible container workflow.",
+   "lines": [
+    61,
+    61
+   ],
+   "statement": "The target is deployable as an OCI-compatible container, e.g. with Docker or Podman.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "Container deployment is the buyer's only planned deployment path; if the target were not deployable as an OCI container, the two engineers could not stand up any instance and the add-on could not be delivered as bought. Rated against the buyer's stated threshold: \"can be deployed and configured by two operations engineers working from the documentation alone\"."
+  },
+  {
+   "id": 20,
+   "quote": "Set the required environment variables for the site URL, credentials, and storage configuration.",
+   "lines": [
+    65,
+    65
+   ],
+   "statement": "The target is configured through environment variables covering the site URL, credentials and storage.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Use the web interface to create, edit, and manage short URLs on your own instance.",
+     "lines": [
+      69,
+      69
+     ]
+    }
+   ],
+   "tier": 1,
+   "tier_basis": "Configuration by environment variables is how the buyer plans to deploy every instance, and the holdback exists against exactly this documentation failing; if the variables did not exist or behave as described, the buyer would go back to the seller. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 21,
+   "quote": "I’m a Mathematics researcher and do some programming as a hobby.",
+   "lines": [
+    75,
+    75
+   ],
+   "statement": "About the seller: the seller is Sayantan Santra, a mathematics researcher who programs as a hobby.",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "The seller's biography has no bearing on what the buyer is paying for or on any stated threshold; nothing in the plan rests on it. Rated on the scale alone."
+  },
+  {
+   "id": 22,
+   "quote": "Selfhosted URL Shortener",
+   "lines": [
+    1,
+    1
+   ],
+   "statement": "When the target runs, short links created on it actually work in operation: a visitor who follows a created short link is sent to its destination.",
+   "about": "target",
+   "implied_by": 1,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "within": {
+    "source": "README.md",
+    "id": 63,
+    "statement": "Opening a short URL in a browser sends the visitor directly to the correct long URL, with no intermediate redirection page."
+   },
+   "tier": 1,
+   "tier_basis": "If created short links did not actually send visitors to their destinations, the product the buyer is buying does not function and there is no add-on to sell. Rated against the buyer's stated threshold: \"a link shortener\"."
+  }
+ ]
+}

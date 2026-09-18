@@ -1,0 +1,902 @@
+{
+ "claim_source": "docs/CLI.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "SPDX-License-Identifier: MIT",
+   "lines": [
+    2,
+    2
+   ],
+   "statement": "This document is licensed under the MIT licence.",
+   "about": "document",
+   "tier": 3,
+   "tier_basis": "The licence of a documentation file is not the ownership or code-licence fact this buyer is paying for; the walk-away names a licence 'on the code or a dependency', and the source code's licence is claimed elsewhere. Rated on the scale alone."
+  },
+  {
+   "id": 2,
+   "quote": "There's an official CLI app for Linux.",
+   "lines": [
+    6,
+    6
+   ],
+   "statement": "The project has an official CLI application that runs on Linux.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The command-line client is a feature the buyer uses, but its fallback (driving the API with curl or its own scripts) is cheap commodity work, so the failure of Linux support alone is too small to reopen the price or terms over. A person installing the CLI would act differently if this were false. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+  },
+  {
+   "id": 3,
+   "quote": "It's maintained by me",
+   "lines": [
+    6,
+    6
+   ],
+   "statement": "The official CLI app is maintained by the seller (the author).",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "If the seller did not maintain the CLI, the buyer could replace it with curl scripts or its own client at commodity cost; nothing in the buyer's plan rests on who maintains this thin client. Rated on the scale alone."
+  },
+  {
+   "id": 4,
+   "quote": "even though I cannot promise to provide proper support",
+   "lines": [
+    6,
+    6
+   ],
+   "statement": "The seller does not promise proper support for the CLI app.",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "This is a disclaimer by the seller; its being false would mean the seller promises more support than stated, which costs the buyer nothing and changes no term. Rated on the scale alone."
+  },
+  {
+   "id": 5,
+   "quote": "The instructions below describe how to use all the features using `curl`.",
+   "lines": [
+    7,
+    7
+   ],
+   "statement": "This document's instructions cover all of the product's features, usable via curl.",
+   "about": "document",
+   "tier": 3,
+   "tier_basis": "A claim about what this document covers is a claim about the document, not a fact the buyer relies on in itself such as a licence or notice of ownership; the buyer's engineers work through their own product against the API, and gaps in curl instructions cost them cheap commodity work. Rated on the scale alone."
+  },
+  {
+   "id": 6,
+   "quote": "The application can be used from the terminal using something like `curl`.",
+   "lines": [
+    11,
+    12
+   ],
+   "statement": "The service can be operated from a terminal using curl.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The buyer's product creates and manages links through the service across roughly 900 customer instances; if the service could not be operated from a terminal as described, that management path fails and the add-on cannot be sold as designed. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+  },
+  {
+   "id": 7,
+   "quote": "You can get the version of `chhoto-url` the server is running using `curl http://localhost:4567/api/version` and\nget the siteurl using `curl http://localhost:4567/api/siteurl`.",
+   "lines": [
+    14,
+    15
+   ],
+   "statement": "The server implements an /api/version route and an /api/siteurl route that respond to requests.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The version and siteurl routes are auxiliary; an engineer writing against the API would use them or skip them, and their absence is corrected in a runbook at commodity cost, too small alone to reopen the price. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 8,
+   "quote": "These routes are accessible without any authentication.",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "The /api/version and /api/siteurl routes require no authentication.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Whether two utility routes take an API key changes how scripts are written against them, but a mismatch is discovered on first use and corrected cheaply; the failure alone is too small to reopen the price or terms. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 9,
+   "quote": "**This is required for programs that rely on a JSON response from Chhoto URL.**",
+   "lines": [
+    19,
+    19
+   ],
+   "statement": "Programs that rely on JSON responses from the service must use API key validation.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A documented constraint on how JSON clients authenticate is a detail a person writing against the API acts on when choosing an authentication method; getting it wrong costs a small runbook correction, not a reopened price. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 10,
+   "quote": "In order to use API key validation, set the [`CHHOTO_API_KEY`](./INSTALLATION.md#chhoto_api_key) environment variable.",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "API key validation is enabled by setting the CHHOTO_API_KEY environment variable.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "CHHOTO_API_KEY is the documented way the buyer's product authenticates headlessly to each of roughly 900 instances; if it does not behave as documented, the integration design must be reworked around private networking, departing from the documented deployment the price assumed. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 11,
+   "quote": "If this is not set, the API will default to cookie validation (see section above).",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "When CHHOTO_API_KEY is not set, the API defaults to cookie validation.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The default when the key variable is unset is configuration detail the buyer's engineers act on when writing their Compose setup, but the buyer sets the key in every case, so the failure alone changes nothing material. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 12,
+   "quote": "If the API key is insecure, a warning will be outputted along with a generated\nAPI key which may be used.",
+   "lines": [
+    22,
+    23
+   ],
+   "statement": "The server checks whether the configured API key is insecure and, if so, generates a usable replacement key and emits a warning message.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The insecure-key warning is a hardening measure the documentation describes as present, but its absence alone is covered by the engineers choosing a strong key themselves, commodity work that is too small to reopen the price. Rated against the buyer's stated threshold: \"a security or hardening measure the documentation describes as present or on by default that is absent or off\"."
+  },
+  {
+   "id": 13,
+   "quote": "**All responses for requests using API key are JSON encoded.**",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "The server serializes its responses to API-key-authenticated requests as JSON.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The buyer's product parses the API's JSON responses to manage links across roughly 900 instances; if API-key-authenticated responses were not JSON, that integration fails and the failure sits in Rust nobody at the buyer can read. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+  },
+  {
+   "id": 14,
+   "quote": "For each response, the response code will be `200`, `401`, `400`, `500`, or `404`, depending on the context.",
+   "lines": [
+    29,
+    29
+   ],
+   "statement": "The server's request handlers and error paths are written to return only the status codes 200, 401, 400, 500 and 404, selecting among them by context.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The set of status codes is error-handling detail an API writer handles explicitly, and unexpected codes are absorbed in a runbook at commodity cost, too small alone to reopen the price. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 15,
+   "quote": "Some of the requests/responses use `shorturl` and `longurl`, while some use `shortlink` and `longlink`.",
+   "lines": [
+    33,
+    33
+   ],
+   "statement": "The API names the short and long URL fields inconsistently: some requests and responses use shorturl/longurl and others use shortlink/longlink.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Field names in requests and responses are exactly the detail a person writing against the API acts on, and whether the naming is inconsistent changes how their client code is written; the failure is corrected cheaply in the buyer's own parsing code. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 16,
+   "quote": "I don't want to change it since it might break compatibility, and the issue isn't big enough to make that worth it.",
+   "lines": [
+    34,
+    35
+   ],
+   "statement": "The seller does not intend to change the API's field naming, because changing it might break compatibility.",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "The buyer will own the source outright and controls which version it deploys, so the maintainer's future intentions about field naming affect nothing the buyer pays for. Even if the intent were not kept, the buyer need not adopt any change. Rated on the scale alone."
+  },
+  {
+   "id": 17,
+   "quote": "curl -X POST \\\n    -H \"X-API-Key: <YOUR_API_KEY>\" \\\n    -d '{ \\\n        \"shortlink\":\"<shortlink>\", \\\n        \"longlink\":\"<longlink>\", \\\n        \"expiry_delay\": <expiry_delay>, \\\n        \"notes\": \"<notes>\" \\\n        }' \\\n    http://localhost:4567/api/new",
+   "lines": [
+    42,
+    50
+   ],
+   "statement": "Links are added by sending a POST request to the /api/new endpoint.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "Link creation through the API is the core of the add-on: the buyer's product creates and manages every link for roughly 900 customer instances through the documented endpoints, with no substitute short of driving the web interface by hand. If links could not be added by POST to /api/new as documented, the API would be missing its central operation, which the buyer said would change the price or terms. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+  },
+  {
+   "id": 18,
+   "quote": "    -H \"X-API-Key: <YOUR_API_KEY>\" \\",
+   "lines": [
+    43,
+    43
+   ],
+   "statement": "Requests to the API are authenticated by an X-API-Key header carrying the caller's API key.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The buyer's product would send its API key in this header on every call, so a developer integrating against the documented API would act differently if the header were not honoured. The reliance statement marks authentication as a 'uses' item with a commodity fallback — confining each instance to a private network — so the failure alone would not send the buyer back to the seller over the price. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 19,
+   "quote": "    -d '{ \\\n        \"shortlink\":\"<shortlink>\", \\\n        \"longlink\":\"<longlink>\", \\\n        \"expiry_delay\": <expiry_delay>, \\\n        \"notes\": \"<notes>\" \\\n        }' \\",
+   "lines": [
+    44,
+    49
+   ],
+   "statement": "The link-creation request body accepts the fields shortlink, longlink, expiry_delay and notes.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The buyer's product would build creation requests from these field names, so a developer writing against the API would act differently if they differed. A wrong field name alone is corrected in one line and would not on its own reopen the price. Rated on the scale alone."
+  },
+  {
+   "id": 20,
+   "quote": "If `<shortlink>` is empty or omitted, one will be generated automatically.",
+   "lines": [
+    53,
+    53
+   ],
+   "statement": "If the shortlink field is empty or omitted, the server generates a short link automatically.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A developer deciding whether to supply a slug would rely on this behaviour, and if it were false the buyer's product could not omit the shortlink field as it might otherwise do. On its own the failure is absorbed by always sending a slug. Rated on the scale alone."
+  },
+  {
+   "id": 21,
+   "quote": "The `<expiry_delay>` is specified in seconds.",
+   "lines": [
+    54,
+    54
+   ],
+   "statement": "The expiry_delay parameter is interpreted as a number of seconds.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The buyer's product would set expiry_delay in the documented unit, and a developer writing the call would act differently if the unit differed; a wrong unit would also make links expire at the wrong times. On its own the failure is a documented parameter's format, corrected in one place in the buyer's own code. Rated on the scale alone."
+  },
+  {
+   "id": 22,
+   "quote": "It is capped to a maximum of 5 years.",
+   "lines": [
+    54,
+    54
+   ],
+   "statement": "The expiry_delay value is capped at a maximum of 5 years.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A developer choosing an expiry longer than five years would act differently if the cap were absent or different. On its own the failure touches no threshold the buyer stated and no item of the plan the reliance statement records. Rated on the scale alone."
+  },
+  {
+   "id": 23,
+   "quote": "A missing `<expiry_delay>` or a value of 0 will disable expiry.",
+   "lines": [
+    54,
+    55
+   ],
+   "statement": "Omitting expiry_delay or setting it to 0 disables expiry for the created link.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The buyer's product would rely on this to create permanent links, so a developer would act differently if omitting the field instead produced expiring links or an error. On its own the failure is absorbed by always sending an explicit value. Rated on the scale alone."
+  },
+  {
+   "id": 24,
+   "quote": "{\n    \"success\": true,\n    \"error\": false,\n    \"shorturl\": \"<shortlink>\",\n    \"expiry_time\": <expiry_time>\n}",
+   "lines": [
+    60,
+    65
+   ],
+   "statement": "A successful creation request is answered with a JSON object containing the fields success, error, shorturl and expiry_time.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The buyer's product would parse this response by these field names, so a developer writing against the API would act differently if they differed. A wrong field name alone would not send the buyer back to the seller over the price. Rated on the scale alone."
+  },
+  {
+   "id": 25,
+   "quote": "{\n  \"success\": false,\n  \"error\": true,\n  \"reason\": \"<reason>\"\n}",
+   "lines": [
+    71,
+    75
+   ],
+   "statement": "A failed request is answered with a JSON object containing the fields success, error and reason.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A developer writing error handling would branch on these field names, and would act differently if the failure body differed. On its own the failure is a documented detail corrected in the buyer's own parsing code. Rated on the scale alone."
+  },
+  {
+   "id": 26,
+   "quote": "Multiple links can be created in a single request by sending an array of objects like the example below.",
+   "lines": [
+    78,
+    78
+   ],
+   "statement": "The target's creation endpoint accepts a request body that is an array of link objects and contains code that creates a link for each object in the array.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "Batch creation is part of the API the buyer's product depends on to manage roughly 900 customer instances, and the buyer named a partial API among the things that change the price or terms. If the endpoint did not accept an array of link objects, the API would be partial against its documentation, even though per-link requests would still work. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+  },
+  {
+   "id": 27,
+   "quote": "In that case, the response is an array containing one result per input object (in order), each in one of the formats shown above.",
+   "lines": [
+    102,
+    103
+   ],
+   "statement": "For a batch creation request, the server responds with an array holding one result per input object, in the same order as the inputs, each in one of the documented response formats.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A developer parsing a batch response would read it as an array in input order, and would act differently if the shape or the ordering differed. On its own the failure is a response-format detail corrected in the buyer's own parsing code and would not reopen the price. Rated on the scale alone."
+  },
+  {
+   "id": 28,
+   "quote": "Except for malformed requests or internal server errors, the HTTP status code is always `200`.",
+   "lines": [
+    105,
+    105
+   ],
+   "statement": "The target's request handling returns HTTP status 200 for responses other than malformed-request rejections and internal server errors, indicating failure through the body's success field instead of the status code.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The buyer's product would detect failures through the body's success field rather than the status code, so a developer would write error handling differently if the convention differed. On its own the failure is absorbed in the buyer's own HTTP handling. Rated on the scale alone."
+  },
+  {
+   "id": 29,
+   "quote": "curl -H \"X-API-Key: <YOUR_API_KEY>\" \\\n-d '<shortlink>' http://localhost:4567/api/getconfig",
+   "lines": [
+    113,
+    114
+   ],
+   "statement": "The server exposes a `/api/getconfig` endpoint which, given a shortlink and an API key, returns the configuration for that backend.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A developer integrating the buyer's product would call this route as documented and would act differently if it did not exist or took different inputs. The route is peripheral to the plan the reliance statement records, which centres on creating, editing, listing, expanding and deleting links, so its failure alone would not send the buyer back to the seller. Rated on the scale alone."
+  },
+  {
+   "id": 30,
+   "quote": "(This would work without authentication in public mode.)",
+   "lines": [
+    117,
+    117
+   ],
+   "statement": "In public mode, the `/api/getconfig` endpoint works without authentication.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The buyer's plan authenticates every call with an API key and runs one private instance per customer, so public-mode behaviour touches nothing the buyer relies on. Nothing in the price or the stated thresholds rests on it. Rated on the scale alone."
+  },
+  {
+   "id": 31,
+   "quote": "{\n    \"version\": \"<version>\",\n    \"site_url\": \"<site_url>\",\n    \"allow_capital_letters\": true/false,\n    \"public_mode\": true/false,\n    \"public_mode_expiry_delay\": \"<delay>\",\n    \"slug_style\": \"<style>\",\n    \"slug_length\": \"<len>\",\n    \"try_longer_slug\": true/false\n}",
+   "lines": [
+    121,
+    130
+   ],
+   "statement": "A successful `/api/getconfig` reply is a JSON object with the fields version, site_url, allow_capital_letters, public_mode, public_mode_expiry_delay, slug_style, slug_length and try_longer_slug.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If the reply's field names or field set differed, the buyer's product reading configuration from each of its roughly 900 instances would need correcting, but this is field-level detail its engineers can absorb in their own client code cheaply. The failure alone is too small for the buyer to reopen the price or terms over, and it is exactly the documentation detail the holdback is set against. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 32,
+   "quote": "{\n  \"success\": false,\n  \"error\": true,\n  \"reason\": \"<reason>\"\n}",
+   "lines": [
+    134,
+    138
+   ],
+   "statement": "A failed `/api/getconfig` reply is a JSON object with success false, error true, and a reason field.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A differently shaped error reply is something a developer writing against the API would act on, but the buyer's engineers could correct for it in their own client with commodity work. Alone it is too small to send the buyer back to the seller over the price or terms. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 33,
+   "quote": "curl -H \"X-API-Key: <YOUR_API_KEY>\" http://localhost:4567/api/whoami",
+   "lines": [
+    146,
+    146
+   ],
+   "statement": "The server exposes a `/api/whoami` endpoint which, given an API key, returns the current user's role.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Nothing in the buyer's plan reaches this endpoint: its product acts as the sole administrator of each instance with an API key it set itself, and the authentication item is one the buyer merely uses. Its absence alone would not change the price, the terms or the decision to close, though a developer integrating against the API would act on it. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 34,
+   "quote": "The server will reply with `admin` if admin access is granted, `public` if admin access is not granted but public mode is enabled,\nand `nobody` if no access is granted.",
+   "lines": [
+    149,
+    150
+   ],
+   "statement": "The `/api/whoami` reply is `admin` when admin access is granted, `public` when admin access is not granted but public mode is enabled, and `nobody` when no access is granted.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The meaning of the returned role value is detail a developer writing against the API would act on, but the buyer's engineers deploy each instance with API keys and could read the actual behaviour in one test call. The failure alone is too small for the buyer to go back to the seller over, touching only the reliability of the documentation the holdback is set against. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 35,
+   "quote": "curl -X PUT \\\n-H \"X-API-Key: <YOUR_API_KEY>\" \\\n-d '{ \\\n    \"shortlink\":\"<shortlink>\", \\\n    \"longlink\":\"<longlink>\", \\\n    \"reset_hits\": <bool>, \\\n    \"expiry_time\": <time>, \\\n    \"notes\": <notes> \\\n    }' \\\nhttp://localhost:4567/api/edit",
+   "lines": [
+    157,
+    166
+   ],
+   "statement": "The server exposes a `/api/edit` endpoint which edits an existing short link, accepting shortlink, longlink, reset_hits, expiry_time and notes, and requiring an API key.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The buyer's product is to create and manage links across roughly 900 customer instances through the documented API, which the reliance statement records as an item the buyer depends on; if link editing through /api/edit were absent, that item fails in part and the buyer would go back to the seller, since the price was set from documentation that describes it. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+  },
+  {
+   "id": 36,
+   "quote": "The fields `expiry_time` and `notes` are optional.",
+   "lines": [
+    169,
+    169
+   ],
+   "statement": "In an `/api/edit` request, the expiry_time and notes fields are optional.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If the fields were not in fact optional, a developer writing against the API would send them explicitly, a correction the buyer's engineers can make cheaply in their own client. The failure alone is too small for the buyer to reopen the price or terms, though it bears on the documentation accuracy the holdback is set against. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 37,
+   "quote": "The existing values will be kept in the database if nothing is provided.",
+   "lines": [
+    169,
+    169
+   ],
+   "statement": "When optional `/api/edit` fields are not provided, the existing values for them are kept in the database.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If omitted fields were overwritten rather than kept, the buyer's client code would have to send every field on every edit, which a developer writing against the API would act on and which the engineers can absorb cheaply. Alone the failure is too small for the buyer to go back to the seller over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 38,
+   "quote": "{\n    \"success\": true/false,\n    \"error\": false/true,\n    \"reason\": \"<reason\"\n}",
+   "lines": [
+    174,
+    178
+   ],
+   "statement": "An `/api/edit` reply is a JSON object with success, error and reason fields.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A differently shaped reply is detail a developer writing against the API would act on, and the buyer's engineers could correct for it in their own client with commodity work. The failure alone is too small to change the price, the terms or the decision to close, resting only on the documentation accuracy the holdback covers. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 39,
+   "quote": "curl -H \"X-API-Key: <YOUR_API_KEY>\" \\\n-d '<shortlink>' http://localhost:4567/api/expand",
+   "lines": [
+    186,
+    187
+   ],
+   "statement": "The target exposes an /api/expand endpoint that accepts an API key header and a shortlink in the request body and contains a handler that looks up that shortlink and returns its stored information.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The reliance statement records the buyer as depending on the documented HTTP API, which it describes as creating, editing, listing, expanding and deleting links through the documented endpoints; if /api/expand were absent, that item fails in part and the buyer would go back to the seller, because the price was set from documentation describing it. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+  },
+  {
+   "id": 40,
+   "quote": "{\n    \"success\": true,\n    \"error\": false,\n    \"longurl\": \"<longurl>\",\n    \"hits\": \"<hits>\",\n    \"expiry_time\": <expiry_time>,\n    \"notes\": \"<notes>\"\n}",
+   "lines": [
+    193,
+    200
+   ],
+   "statement": "A successful /api/expand reply is JSON containing the fields success, error, longurl, hits, expiry_time and notes.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Field names and types in a reply are detail a developer writing against the API would act on, but the buyer's engineers could correct for any mismatch in their own client cheaply. The failure alone is too small for the buyer to reopen the price or terms over, bearing only on the documentation the holdback is set against. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 41,
+   "quote": "{\n  \"success\": false,\n  \"error\": true,\n  \"reason\": \"<reason>\"\n}",
+   "lines": [
+    206,
+    210
+   ],
+   "statement": "A failed /api/expand reply is JSON containing success set to false, error set to true, and a reason field.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The shape of an error reply is detail a developer writing against the API would act on, and the buyer's engineers could handle a mismatch in their own code with commodity work. Alone it is too small to change the price, the terms or the decision to close. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 42,
+   "quote": "(This route is not accessible using cookie validation.)",
+   "lines": [
+    213,
+    213
+   ],
+   "statement": "The /api/expand route cannot be accessed using cookie validation, only API key validation.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If the route also accepted cookie validation, or did not accept API keys, the buyer's product would have to authenticate differently, which a developer integrating against the API would act on; the buyer's engineers could adapt with commodity work. The failure alone is too small for the buyer to go back to the seller over, touching the security-adjacent documentation the holdback covers. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 43,
+   "quote": "curl -H \"X-API-Key: <YOUR_API_KEY>\" http://localhost:4567/api/all",
+   "lines": [
+    220,
+    220
+   ],
+   "statement": "The target exposes an /api/all endpoint that accepts an API key header and contains a handler that gathers the currently available links and returns them as a list.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The reliance statement records the buyer as depending on the documented HTTP API for creating, editing, listing, expanding and deleting links across roughly 900 instances; if /api/all were absent, that item fails in part and the buyer would go back to the seller, since the price was set from documentation that describes it. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+  },
+  {
+   "id": 44,
+   "quote": "`page_after`: An offset where to start pagination after. It should be a valid shortlink, or an empty response will be received.\n   This is faster, and the preferred way of doing pagination.",
+   "lines": [
+    225,
+    226
+   ],
+   "statement": "/api/all supports a page_after parameter that paginates starting after a given offset, which must be a valid shortlink or an empty response is returned; it is the faster, preferred pagination method.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A pagination parameter's behaviour is detail a developer writing against the API would act on, but with one instance per customer the link lists are modest and the buyer's engineers could work around a difference cheaply. The failure alone is too small for the buyer to reopen the price or terms over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 45,
+   "quote": "`page_size`: The size of a returned page in number of shortlinks. Default value is 10.",
+   "lines": [
+    227,
+    227
+   ],
+   "statement": "/api/all supports a page_size parameter giving the number of shortlinks per page, whose default value is 10.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A documented default value is detail a developer writing against the API would act on, and a different real default would be absorbed cheaply by the buyer's engineers in their own client. The failure alone is too small for the buyer to go back to the seller over, resting only on the documentation accuracy the holdback is set against. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 46,
+   "quote": "`page_no`: Alternative way of doing pagination. This is slower, and should be used only when using `page_after` isn't viable.",
+   "lines": [
+    228,
+    228
+   ],
+   "statement": "/api/all supports a page_no parameter as an alternative, slower pagination method, to be used only when page_after is not viable.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "An engineer paginating a large link list when page_after is not viable would choose this parameter and would otherwise have to rediscover it in code nobody at the buyer can read. The buyer's threshold on documented behaviour reaches this claim, but the failure of an alternative, slower pagination method alone is too small a defect to go back to the seller over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 47,
+   "quote": "`filter`: For filtering links. The filter is applied on `shorturl`, `longurl`, and `notes` fields.",
+   "lines": [
+    229,
+    229
+   ],
+   "statement": "/api/all supports a filter parameter, and the filter is applied on the shorturl, longurl and notes fields.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The buyer's product would use this filter when managing links across roughly 900 instances, and a failure would leave the engineers probing undocumented behaviour in code they cannot read. The buyer's threshold on documented behaviour reaches this claim, but one filter parameter failing alone is too small a defect to reopen the price or terms over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 48,
+   "quote": "Must be ASCII, and at least 3\n   characters long.",
+   "lines": [
+    229,
+    230
+   ],
+   "statement": "The filter parameter must be ASCII and at least 3 characters long.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A client sending a filter shorter than three characters or containing non-ASCII text would behave differently depending on whether this constraint holds, and the buyer's engineers would otherwise have to establish the real rule from code they cannot read. The buyer's threshold on documented behaviour reaches this claim, but a format constraint on one parameter failing alone is too small a defect to reopen the price or terms over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 49,
+   "quote": "Only alphanumeric characters are used for the filtering. Everything else is treated as a separator.",
+   "lines": [
+    230,
+    230
+   ],
+   "statement": "Only alphanumeric characters take part in filtering; every other character in the filter is treated as a separator.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A client constructing filter strings would write them differently depending on which characters act as separators, and a failure would leave the engineers deriving the real matching rule from code they cannot read. The buyer's threshold on documented behaviour reaches this claim, but the matching semantics of one filter failing alone is too small a defect to reopen the price or terms over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 50,
+   "quote": "None of the parameters are required. In absence of all of those, all shortlinks are returned.",
+   "lines": [
+    232,
+    232
+   ],
+   "statement": "None of the /api/all query parameters are required, and when none are given all shortlinks are returned.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A client that calls the listing endpoint without parameters and expects every link would act differently if a parameter turned out to be required or the reply were incomplete, and the buyer's engineers would otherwise have to establish the real behaviour from code they cannot read. The buyer's threshold on documented behaviour reaches this claim, but this default failing alone is too small a defect to reopen the price or terms over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 51,
+   "quote": "The entries should be positive integers.",
+   "lines": [
+    232,
+    232
+   ],
+   "statement": "The numeric /api/all parameter entries must be positive integers.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A client sending these numeric parameters would validate or format them differently depending on whether they must be positive integers, and a failure would send the engineers to code they cannot read to learn the real rule. The buyer's threshold on documented behaviour reaches this claim, but a value-format constraint failing alone is too small a defect to reopen the price or terms over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 52,
+   "quote": "If only `page_size` is provided, the first page is returned.",
+   "lines": [
+    233,
+    233
+   ],
+   "statement": "When only page_size is provided to /api/all, the first page is returned.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A client supplying only page_size would rely on getting the first page, and a failure would leave the engineers establishing the actual default from code they cannot read. The buyer's threshold on documented behaviour reaches this claim, but this default failing alone is too small a defect to reopen the price or terms over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 53,
+   "quote": "[\n    ...\n  {\n    \"shortlink\": \"<shortlink>\",\n    \"longlink\": \"<longlink>\",\n    \"hits\": <hits>,\n    \"expiry_time\": <expiry_time>,\n    \"notes\": \"<notes>\"\n  },\n    ...\n]",
+   "lines": [
+    238,
+    248
+   ],
+   "statement": "A successful /api/all reply is an array of entries, each containing the fields shortlink, longlink, hits, expiry_time and notes.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The buyer's product is to create and manage links through the service across roughly 900 customer instances, and this reply shape with these field names is the contract that integration is written against; if it is false the buyer's product cannot parse listing replies and the integration must be rewritten, and the buyer would return to the seller over a documentation inaccuracy of exactly the kind the holdback secures. The buyer's reliance statement lists the documented field names of the HTTP API as an item the plan depends on. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 54,
+   "quote": "curl -X DELETE -H \"X-API-Key: <YOUR_API_KEY>\" http://localhost:4567/api/del/<shortlink>",
+   "lines": [
+    256,
+    256
+   ],
+   "statement": "The target exposes a DELETE /api/del/{shortlink} endpoint that contains a handler which deletes the link named by the shortlink in the path (for example, `example` for `http://localhost:4567/example`).",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "Deleting links through the API is part of how the buyer's product would manage roughly 900 customer instances; if this endpoint is absent the documented API is partial, the buyer's reliance on the HTTP API for deleting links is defeated, and the buyer would go back to the seller before closing. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+  },
+  {
+   "id": 55,
+   "quote": "The server will output when the instance is accessed over API, when an incorrect API key is received, etc.",
+   "lines": [
+    262,
+    262
+   ],
+   "statement": "The target contains output/logging code that is wired to print messages when the instance is accessed over the API and when an incorrect API key is received, among other events.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns operator-facing console messages about API access and incorrect API keys, not visitor data and not a parameter, route or default the buyer's integration or setup acts on, so its falsity changes nothing in the buyer's plan; no stated threshold or reliance item reaches it. Rated on the scale alone."
+  },
+  {
+   "id": 56,
+   "quote": "curl -X POST -d \"<your-password>\" -c cookie.txt http://localhost:4567/api/login",
+   "lines": [
+    269,
+    269
+   ],
+   "statement": "When a password is set up, POSTing the password to /api/login returns an authentication cookie that can be stored and reused.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A client authenticating by password would write its login flow around this route and the reusable cookie, and a failure would leave the engineers deriving the real behaviour from code they cannot read. The buyer's threshold on documented behaviour reaches this claim, but this route failing alone is too small a defect because the buyer can fall back on the documented API key. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 57,
+   "quote": "You should receive \"Correct password!\" if the provided password was correct.",
+   "lines": [
+    272,
+    272
+   ],
+   "statement": "A correct password submitted to /api/login receives the response \"Correct password!\".",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A script or client checking the login response would look for this exact string, and a failure would leave the engineers discovering the real response from code they cannot read. The buyer's threshold on documented behaviour reaches this claim, but one response string failing alone is too small a defect to reopen the price or terms over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 58,
+   "quote": "For any subsequent\nrequest, please add `-b cookie.txt` to provide authentication. Unless specified, all API methods should work with cookies.",
+   "lines": [
+    272,
+    273
+   ],
+   "statement": "Subsequent requests authenticate by presenting the stored cookie, and, unless specified otherwise, all API methods work with cookie authentication.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A client built on cookie authentication would present the stored cookie on every call and rely on all methods accepting it, and a failure would leave the engineers finding the real rules in code they cannot read. The buyer's threshold on documented behaviour reaches this claim, but this failing alone is too small a defect because the buyer can fall back on the documented API-key header. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 59,
+   "quote": "If you do not define a [`CHHOTO_PASSWORD`](./INSTALLATION.md#chhoto_password) environment variable when starting the docker\nimage, authentication will be disabled.",
+   "lines": [
+    277,
+    278
+   ],
+   "statement": "If the CHHOTO_PASSWORD environment variable is not defined when starting the docker image, authentication is disabled.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The buyer's engineers decide from the documentation whether to set CHHOTO_PASSWORD when starting each of the 900 images, and a default that does not behave as described would be discovered at setup and corrected cheaply before sale. The buyer's threshold on documented behaviour reaches this claim, but this default failing alone is too small a defect to reopen the price or terms over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 60,
+   "quote": "This if not recommended in actual use however, as it will allow anyone to create new links and delete\nold ones.",
+   "lines": [
+    280,
+    281
+   ],
+   "statement": "With authentication disabled, the target's link-creation and link-deletion paths are coded to accept requests without requiring any credentials.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "This documented behaviour of the no-password default is what tells the buyer's engineers they must set a password on internet-facing instances, and a failure would send them to code they cannot read to establish what unauthenticated requests can actually do. The buyer's threshold on documented behaviour reaches this claim, but the failure alone is too small a defect because the buyer's production instances will run with a password set and any gap would surface at setup. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 61,
+   "quote": "Since there are no logs, it's impossible to prove that those links aren't created by you.",
+   "lines": [
+    282,
+    282
+   ],
+   "statement": "The service keeps no logs.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the claim were false, the service records accesses — at minimum an IP address and a timestamp per click — which is precisely visitor data beyond a hit count. That sits under a reliance item the buyer's plan depends on, and it touches the buyer's walk-away on personal data being stored or sent anywhere. Rated against the buyer's stated threshold: \"any logging or tracking of visitors beyond the hit count\"."
+  },
+  {
+   "id": 62,
+   "quote": "You can get the version of `chhoto-url` the server is running using `curl http://localhost:4567/api/version` and\nget the siteurl using `curl http://localhost:4567/api/siteurl`.",
+   "lines": [
+    14,
+    15
+   ],
+   "statement": "A request to /api/version returns the version of chhoto-url the server is running, and a request to /api/siteurl returns the site URL.",
+   "about": "target",
+   "implied_by": 7,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "The buyer's engineers would lose the documented behaviour of two diagnostic endpoints, whose actual behaviour they could discover from the running server in minutes. The failure alone is far too small to send the buyer back over price or terms, but a person integrating against the API would call these routes as documented. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 63,
+   "quote": "If the API key is insecure, a warning will be outputted along with a generated\nAPI key which may be used.",
+   "lines": [
+    22,
+    23
+   ],
+   "statement": "When the configured API key is insecure, the server outputs a warning together with a generated API key that can be used.",
+   "about": "target",
+   "implied_by": 12,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "The missing warning would leave an operator trusting an insecure key that the documentation told them the server would flag, so a person setting the service up would act differently — verifying key strength themselves. On its own the buyer would not reopen the price or terms over a warning message. Rated against the buyer's stated threshold: \"a security or hardening measure the documentation describes as present or on by default that is absent or off\"."
+  },
+  {
+   "id": 64,
+   "quote": "**All responses for requests using API key are JSON encoded.**",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "Every response the server sends to a request authenticated with an API key is JSON-encoded.",
+   "about": "target",
+   "implied_by": 13,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "The buyer's own product code consumes these responses, so a non-JSON response would surface in its integration work and be absorbed by adjusting a parser the buyer controls — cheap, commodity work. On its own nothing about price or terms changes, but response format is exactly the kind of detail a person writing against the API acts on, and with others of its kind it bears on whether the documentation behind the holdback can be relied on. Rated on the scale alone."
+  },
+  {
+   "id": 65,
+   "quote": "For each response, the response code will be `200`, `401`, `400`, `500`, or `404`, depending on the context.",
+   "lines": [
+    29,
+    29
+   ],
+   "statement": "The response code the server actually sends for any request is one of 200, 401, 400, 500 and 404, chosen according to the context of the request.",
+   "about": "target",
+   "implied_by": 14,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "A response code outside the documented set would be met by adding a case to the buyer's own error handling, which is work in code the buyer controls and cheap for it. Alone, that would not send the buyer back over price or terms, but a person writing against the API handles status codes as documented. Rated on the scale alone."
+  },
+  {
+   "id": 66,
+   "quote": "Multiple links can be created in a single request by sending an array of objects like the example below.",
+   "lines": [
+    78,
+    78
+   ],
+   "statement": "A single request sent to the creation endpoint with an array of link objects results in multiple links being created.",
+   "about": "target",
+   "implied_by": 26,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "If batching did not work, the buyer's product would create links one request at a time, which for the link volumes of a single customer's instance costs effectively nothing. The failure alone is too small to reopen the price or terms, but a person integrating against the creation endpoint would use the batch form as documented. Rated on the scale alone."
+  },
+  {
+   "id": 67,
+   "quote": "Except for malformed requests or internal server errors, the HTTP status code is always `200`.",
+   "lines": [
+    105,
+    105
+   ],
+   "statement": "Apart from malformed requests and internal server errors, every response the running server sends carries HTTP status 200, with success determined only by reading the response body.",
+   "about": "target",
+   "implied_by": 28,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "The buyer's client would be built to read success from the response body rather than the status code, so if the semantics differed it would add status-code handling in code it controls — cheap commodity work. On its own that does not change price or terms, but it is contract detail a person writing against the API would act on. Rated on the scale alone."
+  },
+  {
+   "id": 68,
+   "quote": "curl -H \"X-API-Key: <YOUR_API_KEY>\" \\\n-d '<shortlink>' http://localhost:4567/api/expand",
+   "lines": [
+    186,
+    187
+   ],
+   "statement": "When /api/expand is called with an API key and a shortlink, it returns information about that single short link.",
+   "about": "target",
+   "implied_by": 39,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "Without /api/expand the buyer's product could fetch the full link list and filter it, so the failure alone is too small to send the buyer back over price or terms. It remains a documented route a person integrating against the API would call as described. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 69,
+   "quote": "curl -H \"X-API-Key: <YOUR_API_KEY>\" http://localhost:4567/api/all",
+   "lines": [
+    220,
+    220
+   ],
+   "statement": "Calling /api/all with an API key returns a list of all the currently available links.",
+   "about": "target",
+   "implied_by": 43,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "The buyer's product creates every link itself and can hold its own records of them, so losing the list endpoint alone would be worked around cheaply on the buyer's side and would not by itself reopen the price or terms. It is nonetheless a documented route a person integrating against the API would call as described. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+  },
+  {
+   "id": 70,
+   "quote": "curl -X DELETE -H \"X-API-Key: <YOUR_API_KEY>\" http://localhost:4567/api/del/<shortlink>",
+   "lines": [
+    256,
+    256
+   ],
+   "statement": "Calling DELETE /api/del/{shortlink} deletes the named link, so it is removed from the service.",
+   "about": "target",
+   "implied_by": 54,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "Deletion through the API is how the buyer's product would remove links across roughly 900 per-customer instances; if it did not work, there is no substitute inside the documented interface — the web interface is for the two operations engineers only, and writing to the database directly bypasses the service. The buyer would go back to the seller over the documented API being partial. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+  },
+  {
+   "id": 71,
+   "quote": "The server will output when the instance is accessed over API, when an incorrect API key is received, etc.",
+   "lines": [
+    262,
+    262
+   ],
+   "statement": "When the instance is accessed over the API, and when an incorrect API key is received, the server actually outputs messages, among other events.",
+   "about": "target",
+   "implied_by": 55,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "The two operations engineers, deploying and running instances from the documentation alone, would use this output when debugging a failed API call or a rejected key, so they would act differently if it were absent. On its own, whether the server prints these messages changes nothing about price or terms. Rated on the scale alone."
+  },
+  {
+   "id": 72,
+   "quote": "This if not recommended in actual use however, as it will allow anyone to create new links and delete\nold ones.",
+   "lines": [
+    280,
+    281
+   ],
+   "statement": "When authentication is disabled, anyone, without authenticating, can create new links and delete old ones.",
+   "about": "target",
+   "implied_by": 60,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "The buyer's deployment always authenticates with an API key, and nothing in its plan runs the service with authentication disabled, so no function, property or commitment the buyer relies on rests on that mode's behaviour. Rated on the scale alone."
+  }
+ ]
+}

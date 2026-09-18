@@ -1,0 +1,89 @@
+{
+ "claim_source": "docs/TOOLS.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "SPDX-FileCopyrightText: 2023-2026 Sayantan Santra <sayantan.santra689@gmail.com>",
+   "lines": [
+    1,
+    1
+   ],
+   "statement": "The document carries a copyright notice attributing it to Sayantan Santra for the years 2023-2026.",
+   "about": "document",
+   "tier": 3,
+   "tier_basis": "If this copyright notice were absent or different, nothing in the buyer's plan changes: ownership of the code is covered by the seller's separate warranty, and the notice's presence in a source file is not something the buyer relies on. Rated on the scale alone."
+  },
+  {
+   "id": 2,
+   "quote": "SPDX-License-Identifier: MIT",
+   "lines": [
+    2,
+    2
+   ],
+   "statement": "The document states that it is licensed under the MIT licence.",
+   "about": "document",
+   "tier": 1,
+   "tier_basis": "The buyer relies on the licence: if this file is not under the MIT licence as stated, a licence restriction on the code could stop the buyer selling a hosted service built on it. Rated against the buyer's stated threshold: \"a licence on the code or a dependency that stops the buyer selling a hosted service built on it\"."
+  },
+  {
+   "id": 5,
+   "quote": "The following tools are 3rd party, and are not supported officially.",
+   "lines": [
+    13,
+    13
+   ],
+   "statement": "The tools listed in this document are third-party and are not officially supported by the seller.",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "The buyer does not use the third-party tools listed, and whether they are officially supported changes nothing about the price, the terms or the documentation it deploys from. Rated on the scale alone."
+  },
+  {
+   "id": 6,
+   "quote": "There's an unofficial browser extension maintained by [@SolninjaA](https://github.com/SolninjaA) for shortening URLs easily using Chhoto URL.",
+   "lines": [
+    18,
+    18
+   ],
+   "statement": "An unofficial browser extension for shortening URLs using Chhoto URL exists, maintained by @SolninjaA.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "An unofficial browser extension is community material the buyer's plan does not touch, as its reliance statement marks the project's ecosystem does_not_use. Rated on the scale alone."
+  },
+  {
+   "id": 7,
+   "quote": "There's an unofficial Raycast extension maintained by [@paranoidPhantom](https://github.com/paranoidPhantom) for shortening URLs efficiently using Chhoto URL.",
+   "lines": [
+    23,
+    23
+   ],
+   "statement": "An unofficial Raycast extension for shortening URLs using Chhoto URL exists, maintained by @paranoidPhantom.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "An unofficial Raycast extension is community material the buyer's plan does not touch, as its reliance statement marks the project's ecosystem does_not_use. Rated on the scale alone."
+  },
+  {
+   "id": 8,
+   "quote": "There's an unofficial FreeBSD port maintained by [@jcpsantiago](https://github.com/jcpsantiago) for installing Chhoto URL.",
+   "lines": [
+    28,
+    28
+   ],
+   "statement": "An unofficial FreeBSD port for installing Chhoto URL exists, maintained by @jcpsantiago.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "An unofficial FreeBSD port is community material the buyer's plan does not touch; the buyer deploys with Docker Compose only. Rated on the scale alone."
+  },
+  {
+   "id": 9,
+   "quote": "There's an unoffical NixOS package maintained by [@Defelo](https://github.com/Defelo) for Chhoto URL.",
+   "lines": [
+    34,
+    34
+   ],
+   "statement": "An unofficial NixOS package for Chhoto URL exists, maintained by @Defelo.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "An unofficial NixOS package is community material the buyer's plan does not touch; the buyer deploys with Docker Compose only. Rated on the scale alone."
+  }
+ ]
+}

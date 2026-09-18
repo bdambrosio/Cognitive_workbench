@@ -1,370 +1,856 @@
 {
  "sources": {
   "docs/CLI.md": {
-   "at": "2026-09-18T17-49-15Z",
+   "at": "2026-09-18T20-22-26Z",
    "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 72,
    "claims_from": "runs/2026-09-17T20-26-26Z_enum_chhoto-sorted_docs_cli_md_20260917T193725Z/claims.json",
    "reliance_statement": "2026-09-18T17-35-31Z",
    "tiers": [
     {
      "claim_id": 1,
      "tier": 3,
-     "basis": "The licence header of a documentation file is not the licence fact the buyer relies on; the warranty covers the code, and the walk-away names licences on the code or a dependency, not on the manual. If this were false nothing about the price, the terms or the operation of the software would change. Rated on the scale alone."
+     "basis": "The licence of a documentation file is not the ownership or code-licence fact this buyer is paying for; the walk-away names a licence 'on the code or a dependency', and the source code's licence is claimed elsewhere. Rated on the scale alone."
     },
     {
      "claim_id": 2,
-     "tier": 1,
-     "basis": "The buyer named the command-line client among the documented features it is paying for, and expects to operate the service from a terminal; if there is no official CLI, a price-mover feature is missing outright, not merely degraded. The buyer would go back to the seller over this alone. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+     "tier": 2,
+     "basis": "The command-line client is a feature the buyer uses, but its fallback (driving the API with curl or its own scripts) is cheap commodity work, so the failure of Linux support alone is too small to reopen the price or terms over. A person installing the CLI would act differently if this were false. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
     },
     {
      "claim_id": 3,
      "tier": 3,
-     "basis": "Who maintains the CLI matters only through the maintainability of code the buyer will own outright, and the CLI is a thin client the buyer's engineers could replace or discard with commodity work. Losing the seller's upkeep of it would not reopen the price or the terms. Rated on the practice's reading of the buyer's plan."
+     "basis": "If the seller did not maintain the CLI, the buyer could replace it with curl scripts or its own client at commodity cost; nothing in the buyer's plan rests on who maintains this thin client. Rated on the scale alone."
     },
     {
      "claim_id": 4,
      "tier": 3,
-     "basis": "This claim is a disclaimer in the seller's favour; if it were false the seller would be promising more support than the buyer assumed, which leaves the buyer better off, not worse. Nothing in the buyer's plan or thresholds rests on the absence of a support promise. Rated on the scale alone."
+     "basis": "This is a disclaimer by the seller; its being false would mean the seller promises more support than stated, which costs the buyer nothing and changes no term. Rated on the scale alone."
     },
     {
      "claim_id": 5,
-     "tier": 1,
-     "basis": "The price was set from the documentation on the assumption it is accurate, and the holdback exists against exactly that; if the instructions do not in fact cover every feature, the two engineers deploying and operating from documentation alone would hit gaps they cannot fill from Rust they cannot read. The buyer would go back to the seller over the documentation's accuracy. Rated against the buyer's stated threshold: \"can be deployed and configured by two operations engineers working from the documentation alone\"."
+     "tier": 3,
+     "basis": "A claim about what this document covers is a claim about the document, not a fact the buyer relies on in itself such as a licence or notice of ownership; the buyer's engineers work through their own product against the API, and gaps in curl instructions cost them cheap commodity work. Rated on the scale alone."
     },
     {
      "claim_id": 6,
      "tier": 1,
-     "basis": "The buyer's product must create and manage links on roughly 900 instances through the documented API; if the service cannot be operated from a terminal at all, that API is missing or partial and the add-on has no workable way to manage instances. The buyer would go back to the seller over this alone. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+     "basis": "The buyer's product creates and manages links through the service across roughly 900 customer instances; if the service could not be operated from a terminal as described, that management path fails and the add-on cannot be sold as designed. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
     },
     {
      "claim_id": 7,
      "tier": 2,
-     "basis": "The holdback threshold reaches API routes behaving as documented, but these two informational routes sit outside the buyer's plan, and their failure alone is too small to send the buyer back over the price. A person writing against the documented API would still call or avoid these routes based on this claim. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "The version and siteurl routes are auxiliary; an engineer writing against the API would use them or skip them, and their absence is corrected in a runbook at commodity cost, too small alone to reopen the price. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 8,
      "tier": 2,
-     "basis": "The holdback threshold reaches routes behaving as documented, but an authentication requirement on two peripheral informational routes alone is too small to reopen the price or terms. A program written against the documented API would send, or omit, credentials on these calls based on this claim. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "Whether two utility routes take an API key changes how scripts are written against them, but a mismatch is discovered on first use and corrected cheaply; the failure alone is too small to reopen the price or terms. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 9,
-     "tier": 3,
-     "basis": "The buyer's product will set an API key in any case, so being told that key validation is required for JSON responses changes nothing if the requirement turns out not to bind; no plan, threshold or configuration choice rests on it. Rated on the scale alone."
+     "tier": 2,
+     "basis": "A documented constraint on how JSON clients authenticate is a detail a person writing against the API acts on when choosing an authentication method; getting it wrong costs a small runbook correction, not a reopened price. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 10,
      "tier": 1,
-     "basis": "CHHOTO_API_KEY is the mechanism by which the buyer's product would authenticate to each of about 900 instances; if setting it does not enable API-key validation as documented, the deployment and the integration differ from what the price assumed, and the holdback exists against exactly this failure. The buyer would go back to the seller over this alone. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "CHHOTO_API_KEY is the documented way the buyer's product authenticates headlessly to each of roughly 900 instances; if it does not behave as documented, the integration design must be reworked around private networking, departing from the documented deployment the price assumed. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 11,
      "tier": 2,
-     "basis": "The holdback threshold reaches defaults behaving as documented, but the buyer will set CHHOTO_API_KEY in every deployment, so the fallback default's failure alone is too small to reopen the price. A person configuring an instance without a key would rely on cookie auth being the default and would act differently if it were not. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "The default when the key variable is unset is configuration detail the buyer's engineers act on when writing their Compose setup, but the buyer sets the key in every case, so the failure alone changes nothing material. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 12,
      "tier": 2,
-     "basis": "The buyer's threshold reaches security measures the documentation describes as present, but the insecure-key warning is one the buyer can substitute for itself by choosing a strong key, so this failure alone is too small to reopen the price. A person configuring the service would rely on the warning to learn their key is weak and would act differently without it. Rated against the buyer's stated threshold: \"a security or hardening measure the documentation describes as present or on by default that is absent or off\"."
+     "basis": "The insecure-key warning is a hardening measure the documentation describes as present, but its absence alone is covered by the engineers choosing a strong key themselves, commodity work that is too small to reopen the price. Rated against the buyer's stated threshold: \"a security or hardening measure the documentation describes as present or on by default that is absent or off\"."
     },
     {
      "claim_id": 13,
      "tier": 1,
-     "basis": "The buyer's product manages roughly 900 customer instances through the API and cannot repair serialisation inside Rust it cannot read; if key-authenticated responses are not JSON, the documented API is partial in the one form the buyer's integration uses. The buyer would go back to the seller over this alone. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+     "basis": "The buyer's product parses the API's JSON responses to manage links across roughly 900 instances; if API-key-authenticated responses were not JSON, that integration fails and the failure sits in Rust nobody at the buyer can read. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
     },
     {
      "claim_id": 14,
      "tier": 2,
-     "basis": "The holdback threshold reaches the API behaving as documented, but the exact set of status codes, if broader than stated, is a detail too small on its own to reopen the price. A person writing error handling against this API would branch on precisely these codes and would act differently if others could appear. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "The set of status codes is error-handling detail an API writer handles explicitly, and unexpected codes are absorbed in a runbook at commodity cost, too small alone to reopen the price. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 15,
      "tier": 2,
-     "basis": "The holdback threshold reaches the API behaving as documented, and field naming is exactly the detail the buyer's engineers would code against, but a naming mismatch alone is correctable in the buyer's own client code and too small to reopen the price. A person writing against the documented API would use the stated field names and would act differently if they did not match. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "Field names in requests and responses are exactly the detail a person writing against the API acts on, and whether the naming is inconsistent changes how their client code is written; the failure is corrected cheaply in the buyer's own parsing code. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 16,
-     "tier": 1,
-     "basis": "The buyer's product will create and manage every link through the documented API across roughly 900 instances, so if the seller does not keep this assurance and the API's field naming changes, that integration and the documentation the price was set on break during or after handover. Rated against the buyer's stated threshold: 'a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial'."
+     "tier": 3,
+     "basis": "The buyer will own the source outright and controls which version it deploys, so the maintainer's future intentions about field naming affect nothing the buyer pays for. Even if the intent were not kept, the buyer need not adopt any change. Rated on the scale alone."
     },
     {
      "claim_id": 17,
      "tier": 1,
-     "basis": "The buyer's product creates and manages links through the documented API, so if /api/new did not exist or did not create links there is no way to run the add-on and no cheap substitute, since the API sits in Rust nobody at the buyer reads. Rated against the buyer's stated threshold: 'a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial'."
+     "basis": "Link creation through the API is the core of the add-on: the buyer's product creates and manages every link for roughly 900 customer instances through the documented endpoints, with no substitute short of driving the web interface by hand. If links could not be added by POST to /api/new as documented, the API would be missing its central operation, which the buyer said would change the price or terms. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
     },
     {
      "claim_id": 18,
      "tier": 2,
-     "basis": "If the documented header were wrong, the buyer's product could not authenticate until its engineers found the real mechanism, which the reliance statement treats as cheap commodity work with a private-network fallback under a 'uses' item. A person writing against the API would send the key differently if this were false. Rated on the practice's reading of the buyer's plan."
+     "basis": "The buyer's product would send its API key in this header on every call, so a developer integrating against the documented API would act differently if the header were not honoured. The reliance statement marks authentication as a 'uses' item with a commodity fallback — confining each instance to a private network — so the failure alone would not send the buyer back to the seller over the price. Rated on the practice's reading of the buyer's plan."
     },
     {
      "claim_id": 19,
      "tier": 2,
-     "basis": "The buyer's product will send these fields on every link creation, but a wrong field name is corrected in the buyer's own code once the API is exercised, and the holdback is held against exactly this kind of documentation inaccuracy. A person writing against the API would use different field names if this were false. Rated on the practice's reading of the buyer's plan."
+     "basis": "The buyer's product would build creation requests from these field names, so a developer writing against the API would act differently if they differed. A wrong field name alone is corrected in one line and would not on its own reopen the price. Rated on the scale alone."
     },
     {
      "claim_id": 20,
      "tier": 2,
-     "basis": "This is default behaviour the buyer's product would rely on when creating links without a chosen slug; if it were false the correction sits in the buyer's own product code, which is cheap. A person writing against the API would handle slug generation differently if this were false. Rated on the practice's reading of the buyer's plan."
+     "basis": "A developer deciding whether to supply a slug would rely on this behaviour, and if it were false the buyer's product could not omit the shortlink field as it might otherwise do. On its own the failure is absorbed by always sending a slug. Rated on the scale alone."
     },
     {
      "claim_id": 21,
      "tier": 2,
-     "basis": "The buyer's product sets expiry delays, and a wrong unit would produce wrongly timed expiries that its own code can correct by scaling the value once discovered. A person writing against the API would convert the value differently if this were false. Rated on the practice's reading of the buyer's plan."
+     "basis": "The buyer's product would set expiry_delay in the documented unit, and a developer writing the call would act differently if the unit differed; a wrong unit would also make links expire at the wrong times. On its own the failure is a documented parameter's format, corrected in one place in the buyer's own code. Rated on the scale alone."
     },
     {
      "claim_id": 22,
      "tier": 2,
-     "basis": "A parameter's range: the buyer's product needs the cap to avoid rejected requests, and a discrepancy is corrected in its own code cheaply. A person writing against the API would clamp the value differently if this were false. Rated on the practice's reading of the buyer's plan."
+     "basis": "A developer choosing an expiry longer than five years would act differently if the cap were absent or different. On its own the failure touches no threshold the buyer stated and no item of the plan the reliance statement records. Rated on the scale alone."
     },
     {
      "claim_id": 23,
      "tier": 2,
-     "basis": "A documented default the buyer's product would rely on for permanent links; a discrepancy is handled in the buyer's own code. A person writing against the API would set the field differently for non-expiring links if this were false. Rated on the practice's reading of the buyer's plan."
+     "basis": "The buyer's product would rely on this to create permanent links, so a developer would act differently if omitting the field instead produced expiring links or an error. On its own the failure is absorbed by always sending an explicit value. Rated on the scale alone."
     },
     {
      "claim_id": 24,
      "tier": 2,
-     "basis": "Response field names the buyer's product parses on every creation; a discrepancy is corrected in its own code cheaply, though it bears on the documentation's accuracy against the holdback. A person writing against the API would parse different fields if this were false. Rated on the practice's reading of the buyer's plan."
+     "basis": "The buyer's product would parse this response by these field names, so a developer writing against the API would act differently if they differed. A wrong field name alone would not send the buyer back to the seller over the price. Rated on the scale alone."
     },
     {
      "claim_id": 25,
      "tier": 2,
-     "basis": "Error-response field names the buyer's product parses; a discrepancy is corrected in its own code cheaply. A person writing against the API would parse the failure reply differently if this were false. Rated on the practice's reading of the buyer's plan."
+     "basis": "A developer writing error handling would branch on these field names, and would act differently if the failure body differed. On its own the failure is a documented detail corrected in the buyer's own parsing code. Rated on the scale alone."
     },
     {
      "claim_id": 26,
-     "tier": 2,
-     "basis": "The threshold reaches this, since batching is part of the documented API the price assumed, but its absence alone is too small to reopen the price because the buyer's product can send link creations one at a time at negligible cost. A person writing against the API would loop requests instead of batching if this were false. Rated against the buyer's stated threshold: 'a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial'."
+     "tier": 1,
+     "basis": "Batch creation is part of the API the buyer's product depends on to manage roughly 900 customer instances, and the buyer named a partial API among the things that change the price or terms. If the endpoint did not accept an array of link objects, the API would be partial against its documentation, even though per-link requests would still work. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
     },
     {
      "claim_id": 27,
      "tier": 2,
-     "basis": "This matters only for batch creation, which the buyer's product can do without, and a discrepancy is handled in its own response parsing. A person writing against the API would parse the batch reply differently if this were false. Rated on the practice's reading of the buyer's plan."
+     "basis": "A developer parsing a batch response would read it as an array in input order, and would act differently if the shape or the ordering differed. On its own the failure is a response-format detail corrected in the buyer's own parsing code and would not reopen the price. Rated on the scale alone."
     },
     {
      "claim_id": 28,
      "tier": 2,
-     "basis": "The buyer's product's error handling rests on this convention, but if it were false the correction sits in its own code once the real behaviour is known, which is cheap. A person writing against the API would check responses differently if this were false. Rated on the practice's reading of the buyer's plan."
+     "basis": "The buyer's product would detect failures through the body's success field rather than the status code, so a developer would write error handling differently if the convention differed. On its own the failure is absorbed in the buyer's own HTTP handling. Rated on the scale alone."
     },
     {
      "claim_id": 29,
      "tier": 2,
-     "basis": "The buyer's plan does not name this endpoint, but the buyer operates from the documentation alone and the holdback is held against the documentation proving accurate, so a documented route that does not exist is exactly the kind of detail the holdback prices. A person writing against the API would call this endpoint if it behaved as documented. Rated on the practice's reading of the buyer's plan."
+     "basis": "A developer integrating the buyer's product would call this route as documented and would act differently if it did not exist or took different inputs. The route is peripheral to the plan the reliance statement records, which centres on creating, editing, listing, expanding and deleting links, so its failure alone would not send the buyer back to the seller. Rated on the scale alone."
     },
     {
      "claim_id": 30,
-     "tier": 2,
-     "basis": "Whether configuration is retrievable without authentication in public mode is something the buyer, running about 900 public-facing instances, needs to know to decide on network isolation, which the reliance statement calls commodity work; if the claim were false and the endpoint always required a key, nothing in the buyer's plan changes. A person deploying from the documentation would configure access control differently if this were false. Rated on the practice's reading of the buyer's plan."
+     "tier": 3,
+     "basis": "The buyer's plan authenticates every call with an API key and runs one private instance per customer, so public-mode behaviour touches nothing the buyer relies on. Nothing in the price or the stated thresholds rests on it. Rated on the scale alone."
     },
     {
      "claim_id": 31,
      "tier": 2,
-     "basis": "A developer wiring the buyer's product to an instance would parse this reply, so a wrong or missing field name changes what they build, and the buyer's threshold reaches documentation detail because the holdback is against it. But one misdescribed field in a configuration endpoint would not on its own send the buyer back to the seller to reopen the price. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "If the reply's field names or field set differed, the buyer's product reading configuration from each of its roughly 900 instances would need correcting, but this is field-level detail its engineers can absorb in their own client code cheaply. The failure alone is too small for the buyer to reopen the price or terms over, and it is exactly the documentation detail the holdback is set against. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 32,
      "tier": 2,
-     "basis": "The shape of an error reply is what a developer writes handling code against, so a mismatch would change how the integration is built, and the holdback exists against exactly this kind of inaccuracy. Alone, an error-reply shape on a minor endpoint is too small a failure for the buyer to reopen the price over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "A differently shaped error reply is something a developer writing against the API would act on, but the buyer's engineers could correct for it in their own client with commodity work. Alone it is too small to send the buyer back to the seller over the price or terms. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 33,
      "tier": 2,
-     "basis": "The buyer's product creates and manages links through the documented API with a single set of credentials per instance, so a missing whoami endpoint would not defeat any item it depends on; it is a documented route a developer integrating against the API might call. Its absence is too small a failure on its own to reopen the price. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "Nothing in the buyer's plan reaches this endpoint: its product acts as the sole administrator of each instance with an API key it set itself, and the authentication item is one the buyer merely uses. Its absence alone would not change the price, the terms or the decision to close, though a developer integrating against the API would act on it. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 34,
      "tier": 2,
-     "basis": "The reply values of a diagnostic endpoint are detail a developer writing against the API would act on, but the buyer operates one credential set per instance and depends on no role distinction, so nothing in the plan rests on it. A wrong value here would not send the buyer back to the seller on its own. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "The meaning of the returned role value is detail a developer writing against the API would act on, but the buyer's engineers deploy each instance with API keys and could read the actual behaviour in one test call. The failure alone is too small for the buyer to go back to the seller over, touching only the reliability of the documentation the holdback is set against. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 35,
      "tier": 1,
-     "basis": "The buyer's product depends on the documented HTTP API for creating, editing, listing, expanding and deleting links across roughly 900 customer instances, and the price was set on the API as a documented feature, so an /api/edit endpoint that does not exist or does not edit makes the API partial and is the kind of failure the buyer said would change the price or terms. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+     "basis": "The buyer's product is to create and manage links across roughly 900 customer instances through the documented API, which the reliance statement records as an item the buyer depends on; if link editing through /api/edit were absent, that item fails in part and the buyer would go back to the seller, since the price was set from documentation that describes it. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
     },
     {
      "claim_id": 36,
      "tier": 2,
-     "basis": "Whether fields are optional is detail a developer building the edit calls would act on, since it decides what the buyer's product must send on every request, and the holdback is held against exactly such documentation. A wrongly documented optional field alone is too small a failure for the buyer to reopen the price over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "If the fields were not in fact optional, a developer writing against the API would send them explicitly, a correction the buyer's engineers can make cheaply in their own client. The failure alone is too small for the buyer to reopen the price or terms, though it bears on the documentation accuracy the holdback is set against. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 37,
      "tier": 2,
-     "basis": "A developer integrating against /api/edit would behave differently if omitted fields were wiped rather than kept, so this is documentation a reader of the API reference acts on, and it is the kind of behaviour the holdback is held against. On its own the failure is too small to send the buyer back to the seller. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "If omitted fields were overwritten rather than kept, the buyer's client code would have to send every field on every edit, which a developer writing against the API would act on and which the engineers can absorb cheaply. Alone the failure is too small for the buyer to go back to the seller over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 38,
      "tier": 2,
-     "basis": "The reply shape of an endpoint the buyer's product calls is field-level detail a developer writes parsing code against, so it would change the integration if false, and the holdback exists against this kind of documentation inaccuracy. Alone it is too small a failure to reopen the price. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "A differently shaped reply is detail a developer writing against the API would act on, and the buyer's engineers could correct for it in their own client with commodity work. The failure alone is too small to change the price, the terms or the decision to close, resting only on the documentation accuracy the holdback covers. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 39,
      "tier": 1,
-     "basis": "The buyer's product depends on the documented HTTP API, with expanding among the operations it relies on, so a missing or non-functional /api/expand endpoint makes the API partial and defeats an item the buyer depends on; the buyer's own engineers cannot read the Rust to restore it. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+     "basis": "The reliance statement records the buyer as depending on the documented HTTP API, which it describes as creating, editing, listing, expanding and deleting links through the documented endpoints; if /api/expand were absent, that item fails in part and the buyer would go back to the seller, because the price was set from documentation describing it. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
     },
     {
      "claim_id": 40,
      "tier": 2,
-     "basis": "The field names of a successful reply are what a developer writes parsing code against, so the buyer's engineers would act differently if they were wrong, and the holdback is held against documentation inaccuracy of exactly this kind. On its own the failure is too small for the buyer to reopen the price over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "Field names and types in a reply are detail a developer writing against the API would act on, but the buyer's engineers could correct for any mismatch in their own client cheaply. The failure alone is too small for the buyer to reopen the price or terms over, bearing only on the documentation the holdback is set against. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 41,
      "tier": 2,
-     "basis": "An error-reply shape is detail a developer writing against the API would handle differently if false, and the holdback exists against exactly this kind of documented behaviour. The failure alone is too small to send the buyer back to the seller. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "The shape of an error reply is detail a developer writing against the API would act on, and the buyer's engineers could handle a mismatch in their own code with commodity work. Alone it is too small to change the price, the terms or the decision to close. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 42,
      "tier": 2,
-     "basis": "A developer deciding how to authenticate calls to /api/expand would act on whether cookie validation works, so this changes what they build if false, and the holdback is held against documented behaviour that does not hold. Alone it is too small a failure to reopen the price. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "If the route also accepted cookie validation, or did not accept API keys, the buyer's product would have to authenticate differently, which a developer integrating against the API would act on; the buyer's engineers could adapt with commodity work. The failure alone is too small for the buyer to go back to the seller over, touching the security-adjacent documentation the holdback covers. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 43,
      "tier": 1,
-     "basis": "The buyer's product depends on the documented HTTP API for listing links across roughly 900 customer instances and could not manage them by hand, so a missing or non-functional /api/all endpoint defeats an item the buyer depends on and makes the API partial, the kind of failure the buyer said changes the price or terms. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+     "basis": "The reliance statement records the buyer as depending on the documented HTTP API for creating, editing, listing, expanding and deleting links across roughly 900 instances; if /api/all were absent, that item fails in part and the buyer would go back to the seller, since the price was set from documentation that describes it. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
     },
     {
      "claim_id": 44,
      "tier": 2,
-     "basis": "A developer paginating the link list would use page_after differently if its behaviour or its being the preferred method were misdescribed, and the holdback is held against exactly such documentation detail. On its own the failure is too small to send the buyer back to the seller. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "A pagination parameter's behaviour is detail a developer writing against the API would act on, but with one instance per customer the link lists are modest and the buyer's engineers could work around a difference cheaply. The failure alone is too small for the buyer to reopen the price or terms over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 45,
      "tier": 2,
-     "basis": "A documented default value is the kind of detail a developer writing against /api/all relies on and plans around, and the holdback is held against exactly this kind of inaccuracy. The failure alone is too small a matter for the buyer to reopen the price over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "A documented default value is detail a developer writing against the API would act on, and a different real default would be absorbed cheaply by the buyer's engineers in their own client. The failure alone is too small for the buyer to go back to the seller over, resting only on the documentation accuracy the holdback is set against. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 46,
      "tier": 2,
-     "basis": "A wrong description of the alternative pagination method would cost the buyer's engineers a runbook correction, not the price, since page_no is a fallback their product need not use. A person writing against the API would act differently if this were false, and the holdback threshold reaches this kind of claim but this failure alone is too small to reopen the price. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "An engineer paginating a large link list when page_after is not viable would choose this parameter and would otherwise have to rediscover it in code nobody at the buyer can read. The buyer's threshold on documented behaviour reaches this claim, but the failure of an alternative, slower pagination method alone is too small a defect to go back to the seller over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 47,
      "tier": 2,
-     "basis": "The filter parameter's behaviour is detail a developer building the buyer's management client would act on directly, but a mis-statement of which fields it searches would be corrected cheaply in the buyer's own code. The holdback threshold reaches this kind of claim, yet this failure alone is too small to send the buyer back to the seller. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "The buyer's product would use this filter when managing links across roughly 900 instances, and a failure would leave the engineers probing undocumented behaviour in code they cannot read. The buyer's threshold on documented behaviour reaches this claim, but one filter parameter failing alone is too small a defect to reopen the price or terms over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 48,
      "tier": 2,
-     "basis": "A constraint on the filter's length and character set is exactly the parameter format detail a developer would code against, and getting it wrong would surface in the buyer's first test call. The failure alone is too small to reopen the price or terms, though the holdback threshold reaches the kind of claim. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "A client sending a filter shorter than three characters or containing non-ASCII text would behave differently depending on whether this constraint holds, and the buyer's engineers would otherwise have to establish the real rule from code they cannot read. The buyer's threshold on documented behaviour reaches this claim, but a format constraint on one parameter failing alone is too small a defect to reopen the price or terms over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 49,
      "tier": 2,
-     "basis": "How the filter treats separators changes what a developer must send to get the results they expect, but a buyer's engineer could adjust the query in their own client at negligible cost. The holdback threshold reaches the kind of claim and the failure alone is too small to reopen the deal over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "A client constructing filter strings would write them differently depending on which characters act as separators, and a failure would leave the engineers deriving the real matching rule from code they cannot read. The buyer's threshold on documented behaviour reaches this claim, but the matching semantics of one filter failing alone is too small a defect to reopen the price or terms over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 50,
      "tier": 2,
-     "basis": "Whether the parameters are optional changes how a developer writes the listing call, which is detail the buyer's engineers working from the documentation alone would act on. The failure alone would be a correction in the buyer's client rather than a price conversation, though the holdback threshold reaches this kind of claim. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "A client that calls the listing endpoint without parameters and expects every link would act differently if a parameter turned out to be required or the reply were incomplete, and the buyer's engineers would otherwise have to establish the real behaviour from code they cannot read. The buyer's threshold on documented behaviour reaches this claim, but this default failing alone is too small a defect to reopen the price or terms over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 51,
      "tier": 2,
-     "basis": "The format of the numeric parameters is a constraint a developer would encode in the buyer's product, and a mis-stated one would show up immediately in testing. The failure alone is too small to reopen the price, though the holdback threshold reaches the kind of claim. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "A client sending these numeric parameters would validate or format them differently depending on whether they must be positive integers, and a failure would send the engineers to code they cannot read to learn the real rule. The buyer's threshold on documented behaviour reaches this claim, but a value-format constraint failing alone is too small a defect to reopen the price or terms over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 52,
      "tier": 2,
-     "basis": "This is a documented default — what is returned when only page_size is given — that a developer building the buyer's management client would rely on. The failure alone would cost a small correction in the buyer's own code, not a return to the seller, though the holdback threshold reaches the kind of claim. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "A client supplying only page_size would rely on getting the first page, and a failure would leave the engineers establishing the actual default from code they cannot read. The buyer's threshold on documented behaviour reaches this claim, but this default failing alone is too small a defect to reopen the price or terms over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 53,
-     "tier": 2,
-     "basis": "The reply's field names are what the buyer's product will parse on every listing call, and a developer would write the parser directly against them, but a wrong name is a one-line fix in the buyer's own code. The failure alone is too small to reopen the price, though the holdback threshold reaches the kind of claim. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "tier": 1,
+     "basis": "The buyer's product is to create and manage links through the service across roughly 900 customer instances, and this reply shape with these field names is the contract that integration is written against; if it is false the buyer's product cannot parse listing replies and the integration must be rewritten, and the buyer would return to the seller over a documentation inaccuracy of exactly the kind the holdback secures. The buyer's reliance statement lists the documented field names of the HTTP API as an item the plan depends on. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 54,
      "tier": 1,
-     "basis": "The buyer's product is to create and manage roughly 900 customer instances through the documented API, and deletion is one of the operations the buyer is paying for; if this endpoint does not exist as documented, the API is partial in a way the buyer named as a price mover and no cheap substitution exists inside code the buyer cannot read. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+     "basis": "Deleting links through the API is part of how the buyer's product would manage roughly 900 customer instances; if this endpoint is absent the documented API is partial, the buyer's reliance on the HTTP API for deleting links is defeated, and the buyer would go back to the seller before closing. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
     },
     {
      "claim_id": 55,
      "tier": 3,
-     "basis": "This claim concerns diagnostic console output about API access and failed keys, not the recording of anything about the visitors who follow short links, so the buyer's privacy threshold does not reach it, and nothing the buyer pays for rests on whether these log lines exist. Rated on the scale alone."
+     "basis": "The claim concerns operator-facing console messages about API access and incorrect API keys, not visitor data and not a parameter, route or default the buyer's integration or setup acts on, so its falsity changes nothing in the buyer's plan; no stated threshold or reliance item reaches it. Rated on the scale alone."
     },
     {
      "claim_id": 56,
-     "tier": 1,
-     "basis": "The buyer's product must authenticate to manage links on hundreds of instances, and if the documented login route does not return a usable cookie as described, the product as designed cannot manage the service and the price, set from the documentation, assumed it works. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "tier": 2,
+     "basis": "A client authenticating by password would write its login flow around this route and the reusable cookie, and a failure would leave the engineers deriving the real behaviour from code they cannot read. The buyer's threshold on documented behaviour reaches this claim, but this route failing alone is too small a defect because the buyer can fall back on the documented API key. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 57,
      "tier": 2,
-     "basis": "The exact response string is detail a developer building the buyer's client might match on, but a differing string is a trivial fix in the buyer's own code and no commercial term rests on it. The failure alone is too small to reopen the price, though the holdback threshold reaches the kind of claim. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "A script or client checking the login response would look for this exact string, and a failure would leave the engineers discovering the real response from code they cannot read. The buyer's threshold on documented behaviour reaches this claim, but one response string failing alone is too small a defect to reopen the price or terms over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 58,
-     "tier": 1,
-     "basis": "Every authenticated call the buyer's product makes to hundreds of instances relies on cookie authentication working across the API methods as documented; if it does not, the documented API fails for the buyer's automation at scale, and the price and the holdback were set against the documentation being accurate. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "tier": 2,
+     "basis": "A client built on cookie authentication would present the stored cookie on every call and rely on all methods accepting it, and a failure would leave the engineers finding the real rules in code they cannot read. The buyer's threshold on documented behaviour reaches this claim, but this failing alone is too small a defect because the buyer can fall back on the documented API-key header. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 59,
      "tier": 2,
-     "basis": "This is a documented environment-variable default that decides whether an instance starts with authentication off, so a person configuring the image would act on it; the buyer will set a password in its own deployments, which makes the failure alone too small to reopen the price. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "The buyer's engineers decide from the documentation whether to set CHHOTO_PASSWORD when starting each of the 900 images, and a default that does not behave as described would be discovered at setup and corrected cheaply before sale. The buyer's threshold on documented behaviour reaches this claim, but this default failing alone is too small a defect to reopen the price or terms over. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 60,
      "tier": 2,
-     "basis": "The behaviour of the unauthenticated mode matters to a person deciding how to configure an instance, but the buyer will always set CHHOTO_PASSWORD on its hosted instances, so a failure here would cost a configuration note, not the price. The failure alone is too small to reopen the deal, though the holdback threshold reaches the kind of claim. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "This documented behaviour of the no-password default is what tells the buyer's engineers they must set a password on internet-facing instances, and a failure would send them to code they cannot read to establish what unauthenticated requests can actually do. The buyer's threshold on documented behaviour reaches this claim, but the failure alone is too small a defect because the buyer's production instances will run with a password set and any gap would surface at setup. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 61,
      "tier": 1,
-     "basis": "The buyer's plan depends on the service recording nothing about visitors beyond a hit count, and this is a boundary claim whose failure would admit server-side logs that may capture visitor data, which the buyer named as ending the deal. The reliance item 'Recording nothing about visitors beyond a per-link hit count' is marked depends. Rated against the buyer's stated threshold: \"personal data of visitors stored or sent anywhere\"."
+     "basis": "If the claim were false, the service records accesses — at minimum an IP address and a timestamp per click — which is precisely visitor data beyond a hit count. That sits under a reliance item the buyer's plan depends on, and it touches the buyer's walk-away on personal data being stored or sent anywhere. Rated against the buyer's stated threshold: \"any logging or tracking of visitors beyond the hit count\"."
     },
     {
      "claim_id": 62,
      "tier": 2,
-     "basis": "Neither endpoint is among the creating, editing, listing, expanding or deleting calls the buyer's product depends on, so a failure here alone would not send the buyer back to the seller over the price. The buyer's stated threshold on documented routes still reaches it, and a developer writing against the API would act on these routes, which is what tier 2 covers. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+     "basis": "The buyer's engineers would lose the documented behaviour of two diagnostic endpoints, whose actual behaviour they could discover from the running server in minutes. The failure alone is far too small to send the buyer back over price or terms, but a person integrating against the API would call these routes as documented. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 63,
-     "tier": 1,
-     "basis": "The buyer relies on the documented insecure-key warning and would run roughly 900 customer-facing instances on API keys, so a warning described as present but absent is a hardening gap the buyer said would change the price or terms. Rated against the buyer's stated threshold: \"a security or hardening measure the documentation describes as present or on by default that is absent or off\"."
+     "tier": 2,
+     "basis": "The missing warning would leave an operator trusting an insecure key that the documentation told them the server would flag, so a person setting the service up would act differently — verifying key strength themselves. On its own the buyer would not reopen the price or terms over a warning message. Rated against the buyer's stated threshold: \"a security or hardening measure the documentation describes as present or on by default that is absent or off\"."
     },
     {
      "claim_id": 64,
-     "tier": 1,
-     "basis": "The buyer's product creates and manages links through the API and depends on the HTTP API as documented, with JSON responses named in that item; if responses are not JSON-encoded as documented, the buyer's integration fails at scale and the price assumed otherwise. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+     "tier": 2,
+     "basis": "The buyer's own product code consumes these responses, so a non-JSON response would surface in its integration work and be absorbed by adjusting a parser the buyer controls — cheap, commodity work. On its own nothing about price or terms changes, but response format is exactly the kind of detail a person writing against the API acts on, and with others of its kind it bears on whether the documentation behind the holdback can be relied on. Rated on the scale alone."
     },
     {
      "claim_id": 65,
-     "tier": 1,
-     "basis": "The buyer's product must handle the documented response codes when managing about 900 instances through the API, and a code outside the documented set would break that error handling, defeating an item marked depends. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+     "tier": 2,
+     "basis": "A response code outside the documented set would be met by adding a case to the buyer's own error handling, which is work in code the buyer controls and cheap for it. Alone, that would not send the buyer back over price or terms, but a person writing against the API handles status codes as documented. Rated on the scale alone."
     },
     {
      "claim_id": 66,
-     "tier": 1,
-     "basis": "Batch creation is part of the documented API the buyer's product depends on for managing links across its instances, and a missing or partial batching behaviour is exactly the kind of documented shortfall the holdback was set against. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+     "tier": 2,
+     "basis": "If batching did not work, the buyer's product would create links one request at a time, which for the link volumes of a single customer's instance costs effectively nothing. The failure alone is too small to reopen the price or terms, but a person integrating against the creation endpoint would use the batch form as documented. Rated on the scale alone."
     },
     {
      "claim_id": 67,
-     "tier": 1,
-     "basis": "The buyer's product will be written to this response contract, and if success cannot be read from the body or the status behaviour differs, the integration managing 900 instances breaks in a way the engineers cannot fix in Rust they cannot read. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+     "tier": 2,
+     "basis": "The buyer's client would be built to read success from the response body rather than the status code, so if the semantics differed it would add status-code handling in code it controls — cheap commodity work. On its own that does not change price or terms, but it is contract detail a person writing against the API would act on. Rated on the scale alone."
     },
     {
      "claim_id": 68,
-     "tier": 1,
-     "basis": "Expanding a single short link through the documented endpoint is part of the API the buyer's product depends on to create and manage links, and its failure would defeat that depended-on item. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+     "tier": 2,
+     "basis": "Without /api/expand the buyer's product could fetch the full link list and filter it, so the failure alone is too small to send the buyer back over price or terms. It remains a documented route a person integrating against the API would call as described. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 69,
-     "tier": 1,
-     "basis": "Listing all links is part of the documented API the buyer's product depends on for managing links, and a failure here would defeat that depended-on item. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+     "tier": 2,
+     "basis": "The buyer's product creates every link itself and can hold its own records of them, so losing the list endpoint alone would be worked around cheaply on the buyer's side and would not by itself reopen the price or terms. It is nonetheless a documented route a person integrating against the API would call as described. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
     },
     {
      "claim_id": 70,
-     "tier": 1,
-     "basis": "Deleting a link through the documented endpoint is part of the API the buyer's product depends on for managing links, and its failure would defeat that depended-on item. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+     "tier": 2,
+     "basis": "Deletion through the API is how the buyer's product would remove links across roughly 900 per-customer instances; if it did not work, there is no substitute inside the documented interface — the web interface is for the two operations engineers only, and writing to the database directly bypasses the service. The buyer would go back to the seller over the documented API being partial. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
     },
     {
      "claim_id": 71,
-     "tier": 3,
-     "basis": "The claim concerns the server's own operational output about API access and incorrect keys, which is traffic from the buyer's product and engineers, not recording about visitors, so its failure touches no threshold the buyer stated and no item marked depends; less output would if anything ease the privacy concern. Rated on the scale alone."
+     "tier": 2,
+     "basis": "The two operations engineers, deploying and running instances from the documentation alone, would use this output when debugging a failed API call or a rejected key, so they would act differently if it were absent. On its own, whether the server prints these messages changes nothing about price or terms. Rated on the scale alone."
     },
     {
      "claim_id": 72,
      "tier": 3,
-     "basis": "The buyer runs every instance with API-key authentication and the reliance statement marks authentication as used rather than depended on, so the behaviour of the authentication-disabled mode touches no stated threshold and no item the buyer depends on. Rated on the scale alone."
+     "basis": "The buyer's deployment always authenticates with an API key, and nothing in its plan runs the service with authentication disabled, so no function, property or commitment the buyer relies on rests on that mode's behaviour. Rated on the scale alone."
+    }
+   ],
+   "unrated": []
+  },
+  "README.md": {
+   "at": "2026-09-18T20-14-36Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 66,
+   "claims_from": "runs/2026-09-17T20-22-14Z_enum_chhoto-sorted_readme_md_20260917T193725Z/claims.json",
+   "reliance_statement": "2026-09-18T17-35-31Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 3,
+     "basis": "The buyer relies on the warranted ownership of the code, not on the README's copyright line; a claim about a document is rated low unless the document is itself the licence or the ownership notice the buyer relies on, which this is not. Rated on the scale alone."
+    },
+    {
+     "claim_id": 2,
+     "tier": 1,
+     "basis": "The licence is the fact the buyer relies on: the code being MIT-licensed is what permits selling a hosted service built on it, and a different or restricted licence is a stated walk-away, so if this were false the buyer would not close. Rated against the buyer's stated threshold: \"a licence on the code or a dependency that stops the buyer selling a hosted service built on it\"."
+    },
+    {
+     "claim_id": 3,
+     "tier": 1,
+     "basis": "The counterparty is contracted as the maintainer for the 40-hour handover that is part of the structure; if SinTan1729 does not maintain the project, the handover term is not deliverable as promised and the buyer would go back to reopen the terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 4,
+     "tier": 3,
+     "basis": "The buyer takes the code at closing with contracted handover and does not rely on the release channel for anything in its plan; whether a latest release exists would not by itself change the price or the terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 5,
+     "tier": 1,
+     "basis": "If the product is not a working self-hosted URL shortener, the branded add-on the buyer plans to sell does not exist and there is nothing to close over. Rated against the buyer's stated threshold: \"a link shortener\"."
+    },
+    {
+     "claim_id": 6,
+     "tier": 3,
+     "basis": "Extra features beyond the necessary ones would not, on their own, change the price, the terms or the buyer's plan; the privacy threshold concerns what is recorded about visitors, not how many features the product carries, and this claim is rated on its own. Rated on the scale alone."
+    },
+    {
+     "claim_id": 7,
+     "tier": 1,
+     "basis": "The buyer deploys one instance per customer and says the hosting cost is the margin, so a compressed image-size figure worse than stated is exactly the kind of figure it said would change the price. Rated against the buyer's stated threshold: \"memory, image-size or resource figures materially worse than stated, because at 900 instances the hosting cost is the margin\"."
+    },
+    {
+     "claim_id": 8,
+     "tier": 1,
+     "basis": "As with the scratch image, the alpine image's compressed size is one of the footprint figures the add-on's profitability rests on at 900 instances, and the buyer named image-size figures as price movers. Rated against the buyer's stated threshold: \"memory, image-size or resource figures materially worse than stated, because at 900 instances the hosting cost is the margin\"."
+    },
+    {
+     "claim_id": 9,
+     "tier": 1,
+     "basis": "The buyer runs one instance per 256 MB virtual machine and says that at 900 instances the hosting cost is the margin, so a memory figure materially worse than stated would make the add-on unprofitable and send it back to reopen the price. Rated against the buyer's stated threshold: \"memory, image-size or resource figures materially worse than stated, because at 900 instances the hosting cost is the margin\"."
+    },
+    {
+     "claim_id": 10,
+     "tier": 3,
+     "basis": "The buyer takes the code at closing with 40 hours of contracted handover and plans to maintain it itself; whether the maintainer regards the project as complete rather than dead would not by itself reopen the price or the terms, and no stated threshold names it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 11,
+     "tier": 3,
+     "basis": "New features the maintainer might add cost the buyer nothing and change none of the four things it is paying for; nothing in the plan or the thresholds rests on the feature set staying frozen. Rated on the scale alone."
+    },
+    {
+     "claim_id": 12,
+     "tier": 3,
+     "basis": "During the handover and holdback window the buyer cannot read the Rust, but it holds the code, has the handover contracted, and no stated threshold names the maintainer's bug-fixing intent; on its own this would not send the buyer back over price or terms. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 13,
+     "tier": 3,
+     "basis": "The buyer's security threshold reaches documented hardening measures being absent or off, not the maintainer's intent to patch; it owns the code from closing and no stated threshold names update intent, so this alone would not change the price or the terms. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 14,
+     "tier": 3,
+     "basis": "The buyer's plan, its price and its walk-away thresholds do not rest on the implementation language or on the project's descent from simply-shorten, and ownership is warranted separately; whether this provenance is accurate would not change the price or the terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 15,
+     "tier": 1,
+     "basis": "The buyer's privacy position and its reporting are built on hit counting existing as the only recorded data, and without it the add-on delivers less than the price set from the documentation assumed, so the buyer would go back to the seller over this alone. Rated on the scale alone."
+    },
+    {
+     "claim_id": 16,
+     "tier": 3,
+     "basis": "The etymology of the product's name touches nothing the buyer is paying for, no stated threshold and no item of the buyer's plan. If it were false, neither the price nor the terms would change. Rated on the scale alone."
+    },
+    {
+     "claim_id": 17,
+     "tier": 3,
+     "basis": "The claim concerns the seller's hosted demo instance, which the buyer's plan does not touch: the buyer will run its own instances and asked that claims about the project's public face not be tested. If the demo clears on a different schedule, nothing in the transaction changes. Rated on the scale alone."
+    },
+    {
+     "claim_id": 18,
+     "tier": 1,
+     "basis": "Accepting a submitted URL and returning a short link is the function the buyer is buying; its failure leaves no add-on to sell and repair means Rust nobody at the buyer reads. Rated against the buyer's stated threshold: \"a link shortener\"."
+    },
+    {
+     "claim_id": 19,
+     "tier": 3,
+     "basis": "The buyer's plan does not rest on the slugs being random: it names custom slugs as the feature it pays for, and random generation is marked on the practice's reading as something it uses without having said how much links per instance matter. If slugs were not random, nothing in the price or terms would change on its own. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 20,
+     "tier": 1,
+     "basis": "Expiry is a documented feature the buyer named as a price mover if missing or partial, and the price was set from the documentation on the assumption it is accurate. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+    },
+    {
+     "claim_id": 21,
+     "tier": 1,
+     "basis": "Custom slugs are a documented feature the buyer named as a price mover if missing or partial, and the price assumed the documentation is accurate. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+    },
+    {
+     "claim_id": 22,
+     "tier": 1,
+     "basis": "The redirect handler is the core of the add-on: every customer's visitors follow short links in emails, and without it there is no product to sell and no substitute the buyer's engineers could build around unread Rust. Rated against the buyer's stated threshold: \"a link shortener\"."
+    },
+    {
+     "claim_id": 23,
+     "tier": 1,
+     "basis": "At 900 instances the hosting cost is the margin, and the buyer named image-size figures as something that would change the price if materially worse than stated. A materially larger image than ~6MB makes one-instance-per-customer unprofitable and the buyer cannot slim code it cannot read. Rated against the buyer's stated threshold: \"memory, image-size or resource figures materially worse than stated, because at 900 instances the hosting cost is the margin\"."
+    },
+    {
+     "claim_id": 24,
+     "tier": 1,
+     "basis": "The add-on is profitable at $4 a month only because one instance fits the buyer's 256 MB machines, and the buyer named memory figures as something that would change the price if materially worse than stated. Rated against the buyer's stated threshold: \"memory, image-size or resource figures materially worse than stated, because at 900 instances the hosting cost is the margin\"."
+    },
+    {
+     "claim_id": 25,
+     "tier": 1,
+     "basis": "Hit counting is the one thing the buyer said the product records about visitors, and the buyer's European offering rests on it; a counter that does not exist leaves the buyer selling a counter that does not count, in code it cannot read. Rated against the buyer's stated threshold: \"records nothing about the people who click a link beyond a count of hits, so the buyer can offer it to European customers without a new data-processing assessment\"."
+    },
+    {
+     "claim_id": 26,
+     "tier": 1,
+     "basis": "This is a boundary claim: its failure admits stored or transmitted visitor data inside code the buyer cannot patch, which is what the buyer said would end the deal. Rated against the buyer's stated threshold: \"records nothing about the people who click a link beyond a count of hits, so the buyer can offer it to European customers without a new data-processing assessment\"."
+    },
+    {
+     "claim_id": 27,
+     "tier": 3,
+     "basis": "Editing existing links is marked as used on the practice's inference, not named by the buyer among the price-moving features; if it failed, the engineers could delete and recreate links and keep their own records, which is cheap commodity work. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 28,
+     "tier": 3,
+     "basis": "Notes on links sit under the same inference item as editing: the buyer did not name them among the features it pays for, and the engineers could keep records outside the tool if notes were absent. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 29,
+     "tier": 3,
+     "basis": "The web interface is an administration tool only the buyer's own engineers see, and filtering is a convenience within it; without it the engineers could find links through the API or a database client, which is commodity work for them. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 30,
+     "tier": 3,
+     "basis": "QR generation is marked as used on the practice's inference, and the buyer's product could generate codes from the short link itself if the feature were absent, which is commodity work; the buyer has not said it needs the built-in generator, and a person should ask. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 31,
+     "tier": 1,
+     "basis": "If the API key were not supported, the buyer's product would have to reach 900 instances some other way than the documented authentication, departing from the deployment the price assumes; the practice's reading of the reliance statement offers only a private-network workaround that departs from the documentation. Rated against the buyer's stated threshold: \"a security or hardening measure the documentation describes as present or on by default that is absent or off\"."
+    },
+    {
+     "claim_id": 32,
+     "tier": 2,
+     "basis": "Supplying the password and API key in hashed form is a configuration detail the two operations engineers would act on when provisioning secrets from the documentation; its absence alone would be absorbed by storing secrets unhashed inside the buyer's own machines. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\" — the threshold reaches the claim, but this failure alone is too small to reopen the price or the terms."
+    },
+    {
+     "claim_id": 33,
+     "tier": 1,
+     "basis": "The buyer's plan is to create and manage links through the service's API across roughly 900 customer instances; if the claim were false there would be no API to automate through, and no way to run the add-on without fragile manual work. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+    },
+    {
+     "claim_id": 34,
+     "tier": 3,
+     "basis": "Responsive, mobile-oriented layout concerns the web interface's appearance, which the buyer has said does not matter and its customers will never see. Rated on the scale alone."
+    },
+    {
+     "claim_id": 35,
+     "tier": 3,
+     "basis": "Automatic dark mode is styling on the web interface, which the buyer has said does not matter and only its operations engineers would see. Rated on the scale alone."
+    },
+    {
+     "claim_id": 36,
+     "tier": 3,
+     "basis": "A custom landing page sits under branding, where the buyer's fallback is to carry branding in the domain name it controls; the buyer has not said it needs the landing page. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 37,
+     "tier": 3,
+     "basis": "The buyer runs one authenticated private instance per customer and its plan never uses a public mode, so the mode's absence would admit nothing the buyer relies on keeping out. Rated on the scale alone."
+    },
+    {
+     "claim_id": 38,
+     "tier": 1,
+     "basis": "Admin-gated deletion and listing is the access control protecting every customer's links on 900 instances; if it were absent, links could be listed or deleted by anyone reaching an instance, and the buyer would go back to the seller over this alone. Rated against the buyer's stated threshold: \"a security or hardening measure the documentation describes as present or on by default that is absent or off\"."
+    },
+    {
+     "claim_id": 39,
+     "tier": 3,
+     "basis": "Disabling the frontend is a documented configuration capability the operations engineers would plan around when deciding what runs on each customer instance; if it were false they would simply leave the interface unused or wall it off, which changes nothing about the price or the terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 40,
+     "tier": 3,
+     "basis": "Forced expiry on public instances concerns a mode the buyer's plan never uses, since every instance is private and authenticated. Rated on the scale alone."
+    },
+    {
+     "claim_id": 41,
+     "tier": 3,
+     "basis": "The configurable site URL sits under branding, where the buyer's fallback is the domain name it controls in any case; the buyer has not said it needs this setting. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 42,
+     "tier": 1,
+     "basis": "If links were not stored in an embedded SQLite database, the buyer would face an outside database beside each of 900 instances, eating the margin, and no engineering on its side substitutes for it. Rated against the buyer's stated threshold: \"a dependency on a database or outside service the buyer cannot run on its own machines\"."
+    },
+    {
+     "claim_id": 43,
+     "tier": 3,
+     "basis": "If the database were not ACID by default, the buyer's engineers could run with the settings that are available or rebuild an instance from a backup, which is cheap commodity work for one customer's links. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 44,
+     "tier": 3,
+     "basis": "If no tuning options existed, the buyer's engineers would simply run the defaults, which their plan does not depend on changing; nothing about the price or the terms would move. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 45,
+     "tier": 1,
+     "basis": "The buyer's deployment plan depends on the provided Docker image and Docker Compose; if the tool were not available as a container, two operations engineers working from the documentation alone would have to build and package code in Rust nobody at the buyer reads. Rated against the buyer's stated threshold: \"can be deployed and configured by two operations engineers working from the documentation alone\"."
+    },
+    {
+     "claim_id": 46,
+     "tier": 2,
+     "basis": "The buyer's plan is to deploy every instance with Docker Compose from the documentation alone, so the provided compose file is a detail its operations engineers would act on directly. The buyer's stated threshold reaches it, but the failure is too small to reopen the price over, since the reliance statement records that writing a compose file by hand is cheap commodity work for the engineers. Rated against the buyer's stated threshold: \"can be deployed and configured by two operations engineers working from the documentation alone\"."
+    },
+    {
+     "claim_id": 47,
+     "tier": 3,
+     "basis": "The buyer pays for the shortener's behaviour, not its implementation language, and no stated threshold names the language or framework; since its engineers cannot read Rust in any case, a different backend language would change nothing about what it loses. The only item this touches is maintainability, which the buyer merely uses. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 48,
+     "tier": 3,
+     "basis": "The web interface's appearance and styling are items the buyer does not use, as its customers never see the interface and its engineers manage links through the API. Nothing in the stated thresholds or the buyer's plan rests on the frontend technology. Rated on the scale alone."
+    },
+    {
+     "claim_id": 49,
+     "tier": 2,
+     "basis": "The documentation describes password authentication as present; if it were false, the buyer would deploy an unauthenticated service believing it protected, which the buyer's security threshold reaches. The failure alone is too small to reopen the price, because the engineers can cheaply confine each instance to a private network as the reliance statement records. Rated against the buyer's stated threshold: \"a security or hardening measure the documentation describes as present or on by default that is absent or off\"."
+    },
+    {
+     "claim_id": 50,
+     "tier": 3,
+     "basis": "If the claim were false, authentication would in fact be encrypted in transport and the buyer would only gain; no threshold names it and nothing the buyer pays for rests on the transport being unencrypted. The buyer's plan is unaffected either way. Rated on the scale alone."
+    },
+    {
+     "claim_id": 51,
+     "tier": 1,
+     "basis": "The buyer's entire privacy position rests on this claim: its falsity defeats the item the buyer depends on, cannot be patched by the buyer since the code is Rust it cannot read, and touches a stated walk-away about visitor data. The buyer said it is paying for a shortener that records nothing about the people who click a link, and its absence is what lets it offer the add-on in Europe without a new assessment. Rated against the buyer's stated threshold: \"records nothing about the people who click a link beyond a count of hits, so the buyer can offer it to European customers without a new data-processing assessment\"."
+    },
+    {
+     "claim_id": 52,
+     "tier": 1,
+     "basis": "This is a boundary claim whose falsity admits logging beyond the simple debug logs, which is precisely the kind of failure the buyer said would change the price or terms. The buyer depends on the privacy item this claim supports and cannot patch the code itself. Rated against the buyer's stated threshold: \"any logging or tracking of visitors beyond the hit count\"."
+    },
+    {
+     "claim_id": 53,
+     "tier": 3,
+     "basis": "The buyer runs one instance per customer, so the absence of user management is an item its plan does not touch; its falsity would only admit a feature the buyer has no use for. No stated threshold reaches it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 54,
+     "tier": 1,
+     "basis": "Cookies are exactly the visitor data whose storage or sending the buyer named as ending the deal, and the buyer depends on the no-tracking item this claim supports. Its falsity would force a new data-processing assessment for the European customers and could not be patched by the buyer. Rated against the buyer's stated threshold: \"any logging or tracking of visitors beyond the hit count\"."
+    },
+    {
+     "claim_id": 55,
+     "tier": 3,
+     "basis": "Paywall and donation messages would appear only in the web interface, which the buyer's customers never see and whose appearance the buyer does not use. No threshold reaches it and nothing the buyer pays for rests on it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 56,
+     "tier": 3,
+     "basis": "The provenance of the word list behind random slugs changes nothing the buyer pays for; the slug-generation item the buyer uses concerns whether links keep working at scale, not where the word list came from. No threshold reaches it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 57,
+     "tier": 2,
+     "basis": "A person deploying from the documentation would set CHHOTO_SQLITE_USE_WAL_MODE on the buyer's word that documented configuration behaves as described, so the claim is detail the buyer's engineers would act on. The threshold reaches it, but the failure alone is too small to reopen the price, since running on defaults or rebuilding from a backup is cheap commodity work for the engineers. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+    },
+    {
+     "claim_id": 58,
+     "tier": 3,
+     "basis": "If the claim were false, upgrades would never mangle the database and the buyer would only gain; the buyer has not said anything that rests on the risk existing. The database-behaviour item is one the buyer merely uses, and no threshold names it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 59,
+     "tier": 2,
+     "basis": "The claim drives a deployment action — setting CHHOTO_SLUG_STYLE with a CHHOTO_SLUG_LENGTH of 16 or more for instances expected to hold many links — so it is documented configuration the buyer's engineers would act on. The threshold reaches it, but the failure alone is too small to reopen the price, since the buyer has not said how many links a single customer's instance will hold. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+    },
+    {
+     "claim_id": 60,
+     "tier": 1,
+     "basis": "The default protocol restriction is a hardening measure the documentation describes as on by default, and the buyer said exactly this kind of measure being absent would change the price or terms. Its falsity would also make the documentation inaccurate, which is what the $15,000 holdback exists against. Rated against the buyer's stated threshold: \"a security or hardening measure the documentation describes as present or on by default that is absent or off\"."
+    },
+    {
+     "claim_id": 61,
+     "tier": 1,
+     "basis": "If the claim were false, links of some lengths would not shorten to working short links, and the add-on the buyer is buying would fail at its core task, which the buyer's plan depends on and which no engineering on the buyer's side substitutes for. Rated against the buyer's stated threshold: \"a link shortener\"."
+    },
+    {
+     "claim_id": 62,
+     "tier": 1,
+     "basis": "If the claim were false, link expiry would be missing or partial, and the buyer would go back to the seller over the price, which was set assuming this documented feature; the buyer could schedule deletions from its own product, but the price assumed the feature. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+    },
+    {
+     "claim_id": 63,
+     "tier": 1,
+     "basis": "If the claim were false, visitors would not go straight to the destination URL, defeating the core function the buyer's plan depends on: an add-on that shortens links and redirects visitors. Rated against the buyer's stated threshold: \"a link shortener\"."
+    },
+    {
+     "claim_id": 64,
+     "tier": 1,
+     "basis": "If the claim were false, the hit counts the buyer resells would not reflect each link's actual traffic, striking at the recording behaviour the buyer's plan depends on and would find costly to repair in code it cannot read. Rated against the buyer's stated threshold: \"records nothing about the people who click a link beyond a count of hits\"."
+    },
+    {
+     "claim_id": 65,
+     "tier": 3,
+     "basis": "If the claim were false, nothing in the buyer's plan changes: the web interface is used only by the buyer's operations engineers, whose use of it is desktop work, and the interface's appearance and rendering are matters the buyer said it does not use. Rated on the scale alone."
+    },
+    {
+     "claim_id": 66,
+     "tier": 3,
+     "basis": "If the claim were false, link generation would not begin to fail after a few thousand links, so the buyer loses nothing; a deployer might set a longer slug length than needed, which is harmless, and no stated threshold reaches documentation that understates a limitation. Rated on the scale alone."
+    }
+   ],
+   "unrated": []
+  },
+  "docs/SECURITY.md": {
+   "at": "2026-09-18T20-22-41Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 2,
+   "claims_from": "runs/2026-09-17T20-34-10Z_enum_chhoto-sorted_docs_security_md_20260917T193725Z/claims.json",
+   "reliance_statement": "2026-09-18T17-35-31Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 3,
+     "basis": "The reporting channels sit under an item the buyer merely uses, and the buyer will own the code outright, so if the channels were unusable it could fall back on its own review and fixes; no stated threshold reaches vulnerability reporting and the failure alone would not send the buyer back to reopen the price or terms. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 2,
+     "tier": 3,
+     "basis": "Support-for-latest sits under the maintainability item marked as the practice's inference; if the policy as stated were untrue the buyer's loss during the six-month handover and holdback window is limited, since the claim itself promises no fixes and the buyer must take over maintenance of Rust it cannot read in any case. No stated threshold names support policy, and the failure alone would not change the price or terms. Rated on the practice's reading of the buyer's plan."
+    }
+   ],
+   "unrated": []
+  },
+  "docs/TOOLS.md": {
+   "at": "2026-09-18T20-22-53Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 7,
+   "claims_from": "runs/2026-09-17T20-34-37Z_enum_chhoto-sorted_docs_tools_md_20260917T193725Z/claims.json",
+   "reliance_statement": "2026-09-18T17-35-31Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 3,
+     "basis": "If this copyright notice were absent or different, nothing in the buyer's plan changes: ownership of the code is covered by the seller's separate warranty, and the notice's presence in a source file is not something the buyer relies on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 2,
+     "tier": 1,
+     "basis": "The buyer relies on the licence: if this file is not under the MIT licence as stated, a licence restriction on the code could stop the buyer selling a hosted service built on it. Rated against the buyer's stated threshold: \"a licence on the code or a dependency that stops the buyer selling a hosted service built on it\"."
+    },
+    {
+     "claim_id": 5,
+     "tier": 3,
+     "basis": "The buyer does not use the third-party tools listed, and whether they are officially supported changes nothing about the price, the terms or the documentation it deploys from. Rated on the scale alone."
+    },
+    {
+     "claim_id": 6,
+     "tier": 3,
+     "basis": "An unofficial browser extension is community material the buyer's plan does not touch, as its reliance statement marks the project's ecosystem does_not_use. Rated on the scale alone."
+    },
+    {
+     "claim_id": 7,
+     "tier": 3,
+     "basis": "An unofficial Raycast extension is community material the buyer's plan does not touch, as its reliance statement marks the project's ecosystem does_not_use. Rated on the scale alone."
+    },
+    {
+     "claim_id": 8,
+     "tier": 3,
+     "basis": "An unofficial FreeBSD port is community material the buyer's plan does not touch; the buyer deploys with Docker Compose only. Rated on the scale alone."
+    },
+    {
+     "claim_id": 9,
+     "tier": 3,
+     "basis": "An unofficial NixOS package is community material the buyer's plan does not touch; the buyer deploys with Docker Compose only. Rated on the scale alone."
+    }
+   ],
+   "unrated": []
+  },
+  "claim_sources/site_index_html.md": {
+   "at": "2026-09-18T20-23-34Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 14,
+   "claims_from": "runs/2026-09-17T20-36-10Z_enum_chhoto-sorted_claim_sources_site_index_html_md_20260917T193725Z/claims.json",
+   "reliance_statement": "2026-09-18T17-35-31Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 1,
+     "basis": "If the target did not contain working code to create and manage short links on the operator's own infrastructure, there is no add-on for the buyer to sell; nothing else in the deal survives. Rated against the buyer's stated threshold: \"a link shortener\"."
+    },
+    {
+     "claim_id": 4,
+     "tier": 3,
+     "basis": "The buyer's engineers cannot read the backend either way and no stated threshold names the framework; a different framework changes nothing about deployment, footprint, privacy or operation. Rated on the scale alone."
+    },
+    {
+     "claim_id": 5,
+     "tier": 3,
+     "basis": "The frontend stack matters only to whoever maintains it, and the buyer's plan does not touch the frontend code; no stated threshold reaches it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 7,
+     "tier": 1,
+     "basis": "The stated image sizes are figures the price was set on: at roughly 900 single-customer instances the hosting cost is the add-on's entire margin, and the buyer cannot slim code it cannot read, so figures materially worse than stated would send the buyer back to the seller over this claim alone. Rated against the buyer's stated threshold: \"memory, image-size or resource figures materially worse than stated, because at 900 instances the hosting cost is the margin\"."
+    },
+    {
+     "claim_id": 9,
+     "tier": 1,
+     "basis": "The licence is the fact the buyer relies on for its walk-away right to sell a hosted service built on the code; if the code is not under the MIT licence, the buyer's permission to operate the add-on at all is in question and it would not close. Rated against the buyer's stated threshold: \"a licence on the code or a dependency that stops the buyer selling a hosted service built on it\"."
+    },
+    {
+     "claim_id": 12,
+     "tier": 1,
+     "basis": "Custom slugs are one of the documented features the price was set on; if the claim were false the buyer could fall back to random slugs, but it would go back to the seller to reopen the price over the missing feature. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+    },
+    {
+     "claim_id": 15,
+     "tier": 3,
+     "basis": "If editing links were absent, the buyer's engineers could delete and recreate links and keep records outside the tool, which is cheap commodity work; no stated threshold names editing, and the price-mover feature list does not include it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 16,
+     "tier": 3,
+     "basis": "Notes and filtering are conveniences the engineers can replace with their own records; their absence would change nothing about the transaction. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 17,
+     "tier": 1,
+     "basis": "The programmatic API is how the buyer's product manages roughly 900 customer instances; without it there is no workable add-on operation, and it is a named price mover. Rated against the buyer's stated threshold: \"a documented feature (custom slugs, expiry, the command-line client, the API) that is missing or partial\"."
+    },
+    {
+     "claim_id": 18,
+     "tier": 3,
+     "basis": "The web interface is only the engineers' administration tool; if it did not exist they would manage links through the API or a database client, which is cheap commodity work. Rated on the scale alone."
+    },
+    {
+     "claim_id": 19,
+     "tier": 1,
+     "basis": "Container deployment is the buyer's only planned deployment path; if the target were not deployable as an OCI container, the two engineers could not stand up any instance and the add-on could not be delivered as bought. Rated against the buyer's stated threshold: \"can be deployed and configured by two operations engineers working from the documentation alone\"."
+    },
+    {
+     "claim_id": 20,
+     "tier": 1,
+     "basis": "Configuration by environment variables is how the buyer plans to deploy every instance, and the holdback exists against exactly this documentation failing; if the variables did not exist or behave as described, the buyer would go back to the seller. Rated against the buyer's stated threshold: \"environment variables, defaults, command-line options or API routes that do not behave as documented, because the holdback is against exactly that\"."
+    },
+    {
+     "claim_id": 21,
+     "tier": 3,
+     "basis": "The seller's biography has no bearing on what the buyer is paying for or on any stated threshold; nothing in the plan rests on it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 22,
+     "tier": 1,
+     "basis": "If created short links did not actually send visitors to their destinations, the product the buyer is buying does not function and there is no add-on to sell. Rated against the buyer's stated threshold: \"a link shortener\"."
     }
    ],
    "unrated": []

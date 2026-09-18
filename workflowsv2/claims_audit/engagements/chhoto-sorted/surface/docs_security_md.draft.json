@@ -1,0 +1,29 @@
+{
+ "claim_source": "docs/SECURITY.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "If you believe you have found a vulnerability in Chhoto URL you can report it using one of the following ways:\n\n- Contact me at [mail@sayantansantra.com](mailto:mail@sayantansantra.com).\n- Create a [security advisory](https://github.com/SinTan1729/chhoto-url/security/advisories).",
+   "lines": [
+    3,
+    6
+   ],
+   "statement": "The seller maintains two vulnerability reporting channels: a contact email address and GitHub security advisories on the project's repository.",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "The reporting channels sit under an item the buyer merely uses, and the buyer will own the code outright, so if the channels were unusable it could fall back on its own review and fixes; no stated threshold reaches vulnerability reporting and the failure alone would not send the buyer back to reopen the price or terms. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 2,
+   "quote": "Only the [latest version](https://github.com/SinTan1729/chhoto-url/releases/latest) is supported.",
+   "lines": [
+    12,
+    12
+   ],
+   "statement": "The seller supports only the latest release of Chhoto URL; no earlier version receives support.",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "Support-for-latest sits under the maintainability item marked as the practice's inference; if the policy as stated were untrue the buyer's loss during the six-month handover and holdback window is limited, since the claim itself promises no fixes and the buyer must take over maintenance of Rust it cannot read in any case. No stated threshold names support policy, and the failure alone would not change the price or terms. Rated on the practice's reading of the buyer's plan."
+  }
+ ]
+}
