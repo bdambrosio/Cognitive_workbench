@@ -1,0 +1,21 @@
+{
+ "current_intake": null,
+ "current_run": {},
+ "cancelled": {
+  "intakes": [],
+  "runs": []
+ },
+ "stages": {
+  "created": {
+   "value": "done",
+   "at": "2026-09-17T15-52-46Z",
+   "by": null
+  },
+  "sorting": {
+   "value": "confirmed",
+   "at": "2026-09-17T17-15-24Z",
+   "by": "cli"
+  }
+ },
+ "jobs": []
+}

@@ -56,7 +56,7 @@
       + (r.cancelled ? "" : '<button class="quiet" data-act="run/cancel" data-id="' + esc(r.name) + '">cancel</button>')
       + "</td></tr>").join("");
   }
-  const STAGE_LABELS = {created: "opened", letter: "letter accepted", intake: "intake finished", materials: "materials",
+  const STAGE_LABELS = {created: "opened", letter: "letter accepted", intake: "intake finished", materials: "materials", sorting: "materials sorted",
     enumeration: "claims enumerated", surface: "surface frozen", chain: "review run", release: "report released", closed: "closed"};
   function stagePanel(e) {
     const v = (st) => (e.stages[st] || {}).value;
@@ -69,7 +69,7 @@
       : n.who === "practice" ? "the practice's move" : "finished";
     let h = "<h3>Stages</h3><div class=\"next\"><span class=\"muted\">" + esc(who) + "</span> · " + esc(n.text) + "</div>";
     h += "<table class=\"stages\">";
-    for (const st of ["created", "letter", "intake", "materials", "enumeration", "surface", "chain", "release", "closed"]) {
+    for (const st of ["created", "letter", "intake", "materials", "sorting", "enumeration", "surface", "chain", "release", "closed"]) {
       const m = e.stages[st];
       h += "<tr><td class=\"id\">" + esc(STAGE_LABELS[st]) + "</td><td>" + (m ? esc(m.value) + ' <span class="muted">' + esc((m.at || "").replace("T", " ")) + " " + esc(m.by || "") + "</span>" : '<span class="muted">—</span>') + "</td></tr>";
     }
@@ -80,7 +80,8 @@
     h += '<div class="buttons">';
     const btn = (act, label, on) => on ? '<button data-site="' + act + '">' + esc(label) + "</button>" : "";
     h += btn("stage:materials:ready", "Materials ready", v("intake") === "done" && v("materials") !== "ready");
-    h += btn("job:enumerate", "Run enumeration", v("materials") === "ready" && !job && v("surface") !== "frozen");
+    h += btn("job:sort", "Sort the materials", v("materials") === "ready" && !job && v("sorting") !== "confirmed" && v("enumeration") !== "done");
+    h += btn("job:enumerate", "Run enumeration", v("materials") === "ready" && v("sorting") === "confirmed" && !job && v("surface") !== "frozen");
     h += btn("job:chain", "Run the review", v("surface") === "frozen" && !job && v("chain") !== "done");
     h += btn("stage:release:released", "Release to the client", v("chain") === "done" && e.report_exists && v("release") !== "released");
     h += btn("stage:closed:closed", "Close the engagement", v("release") === "released" && v("closed") !== "closed");
@@ -89,6 +90,7 @@
     h += '<a href="' + q("/e/" + encodeURIComponent(e.name) + "/") + '">client home</a>';
     h += ' · <a href="' + q("/e/" + encodeURIComponent(e.name) + "/intake/") + '">intake</a>';
     h += ' · <a href="' + q("/e/" + encodeURIComponent(e.name) + "/materials/") + '">materials</a>';
+    if (v("sorting")) h += ' · <a href="' + q("/p/sorting/" + encodeURIComponent(e.name) + "/") + '">sorting</a>';
     h += ' · <a href="' + q("/p/surface/" + encodeURIComponent(e.name) + "/") + '">surface editor</a>';
     if (e.report_exists) h += ' · <a href="' + q("/e/" + encodeURIComponent(e.name) + "/report/") + '">report</a>';
     h += "</div>";
@@ -129,7 +131,7 @@
     }
     h += "<h3>Commands</h3><div class=\"muted\" style=\"margin-bottom:8px\">Click a command to copy it. "
       + (e.site ? "The buttons above start the jobs; these are the same steps for a terminal." : "Nothing runs from this page.") + "</div><div class=\"cmd\">";
-    const labels = {intake: "intake", intake_new: "new intake", finish: "finish intake", audit: "audit", review: "review", materiality: "materiality", report: "report", post: "post-delivery page"};
+    const labels = {sort: "sort the materials", sort_confirm: "confirm the sorting", duplicates: "mark repeated claims", intake: "intake", intake_new: "new intake", finish: "finish intake", audit: "audit", review: "review", materiality: "materiality", report: "report", post: "post-delivery page"};
     for (const [k, v] of Object.entries(e.commands)) h += '<div class="k">' + esc(labels[k] || k) + "</div><code>" + esc(v) + "</code>";
     h += "</div>";
     $("detail").innerHTML = h;

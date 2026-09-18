@@ -1,5 +1,5 @@
 // A small markdown renderer shared by the client pages: paragraphs, headings,
-// bullet and numbered lists, fenced code, inline code, bold and italic.
+// bullet and numbered lists, tables, fenced code, inline code, bold and italic.
 // Everything is escaped first; nothing else is HTML.
 (function () {
   function esc(s) {
@@ -33,6 +33,14 @@
         const items = [];
         while (i < lines.length && /^\s*\d+[.)]\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*\d+[.)]\s+/, ""));
         out.push("<ol>" + items.map((t) => "<li>" + inline(t) + "</li>").join("") + "</ol>"); continue;
+      }
+      // A table: a row of cells, then the |---| row, then the body rows.
+      if (/^\s*\|/.test(l) && i + 1 < lines.length && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1])) {
+        const cells = (row) => row.trim().replace(/^\||\|$/g, "").split(/(?<!\\)\|/).map((c) => inline(c.trim().replace(/\\\|/g, "|")));
+        let t = "<table><tr>" + cells(l).map((c) => "<th>" + c + "</th>").join("") + "</tr>";
+        i += 2;
+        while (i < lines.length && /^\s*\|/.test(lines[i])) t += "<tr>" + cells(lines[i++]).map((c) => "<td>" + c + "</td>").join("") + "</tr>";
+        out.push(t + "</table>"); continue;
       }
       if (!l.trim()) { i++; continue; }
       const buf = [];

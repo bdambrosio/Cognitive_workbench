@@ -97,7 +97,7 @@ BLOCKS_FILE = "blocks.yaml"
 #: The stages of an engagement, in the order the site walks them. The value
 #: of a mark is a short word: "accepted", "done", "ready", "running",
 #: "failed", "frozen", "released", "closed".
-STAGES = ("created", "letter", "intake", "materials", "enumeration",
+STAGES = ("created", "letter", "intake", "materials", "sorting", "enumeration",
           "surface", "chain", "release", "closed")
 
 #: Where the frozen claim surfaces and the client's comments live.

@@ -100,7 +100,9 @@ def test_real_step_lists_name_the_runners(tmp_path):
     (eng / "engagement.yaml").write_text(
         "target: target\nclaim_sources: [README.md, docs/llms.txt]\nclient_emails: []\n")
     steps = jobs.enumerate_steps(eng, "m.yaml", "T")
-    assert [s[0] for s in steps] == ["enumerate README.md", "enumerate docs/llms.txt"]
+    assert [s[0] for s in steps] == ["enumerate README.md", "enumerate docs/llms.txt",
+                                     "mark repeated claims"]
+    assert steps[2][1][1].endswith("workflowsv2/claims_audit/duplicates.py")
     argv = steps[1][1]
     assert argv[1].endswith("workflowsv2/claims_audit/runner.py")
     assert "--enumerate-only" in argv and "enum_e_docs_llms_txt_T" in argv

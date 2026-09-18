@@ -256,12 +256,12 @@ def test_next_step_order(tmp_path, monkeypatch):
     eng = st.new_engagement(tmp_path / "e")
     seq = []
     for stage, value in [("letter", "accepted"), ("intake", "done"), ("materials", "supplied"), ("materials", "ready"),
-                         ("enumeration", "running"), ("enumeration", "done"), ("surface", "frozen"),
+                         ("sorting", "proposed"), ("sorting", "confirmed"), ("enumeration", "running"), ("enumeration", "done"), ("surface", "frozen"),
                          ("chain", "running"), ("chain", "done"), ("release", "released"), ("closed", "closed")]:
         seq.append(site.next_step(eng)["stage"])
         st.set_stage(eng, stage, value)
     seq.append(site.next_step(eng)["stage"])
-    assert seq == ["letter", "intake", "materials", "materials", "enumeration", "enumeration", "surface",
+    assert seq == ["letter", "intake", "materials", "materials", "sorting", "sorting", "enumeration", "enumeration", "surface",
                    "chain", "chain", "release", "report", "closed"]
 
 

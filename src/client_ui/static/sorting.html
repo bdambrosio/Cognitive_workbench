@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Materials sorting</title>
+<link rel="stylesheet" href="/static/client.css">
+<link rel="stylesheet" href="/static/site.css">
+</head>
+<body>
+<header>
+  <div class="title">Materials sorting <span class="mode">practice</span></div>
+  <div class="state"><span id="msg"></span> <a id="back" href="">back</a></div>
+</header>
+<main class="site one">
+  <section class="doc">
+  <div id="record"></div>
+  <div id="confirmBox">
+    <h2>Confirm</h2>
+    <p>These two lists are written to engagement.yaml when you confirm. Edit them first if the proposal is wrong; the record keeps what you changed.</p>
+    <label>claim sources, one per line, by path from the target root<textarea id="sources" rows="8" style="width:100%"></textarea></label>
+    <label>excluded from evidence, one per line<textarea id="excludes" rows="8" style="width:100%"></textarea></label>
+    <p><button id="confirm">Confirm the sorting</button></p>
+  </div>
+  </section>
+</main>
+<script src="/static/md.js"></script>
+<script src="/static/sorting.js"></script>
+</body>
+</html>

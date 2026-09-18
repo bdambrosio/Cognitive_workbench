@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""The two jobs the site's buttons start, run as subprocesses of the
+"""The three jobs the site's buttons start, run as subprocesses of the
 existing runners and watched to their end.
 
-    enumerate   one claims_audit run per claim source with --enumerate-only;
-                leaves a claims.json per source for the surface page
+    sort        the materials-sorting runner: reads every prose file in the
+                target and proposes the claim sources and evidence excludes;
+                a person confirms them on the sorting page before enumeration
+    enumerate   one claims_audit run per claim source with --enumerate-only,
+                then the duplicates pass over all of them; leaves a claims.json
+                per source for the surface page
     chain       per claim source: the audit on the frozen surface, then its
                 review; then materiality over every run, against the current
                 intake; then the report
@@ -44,7 +48,13 @@ from client_ui import mail                                      # noqa: E402
 logger = logging.getLogger("client_ui.jobs")
 
 MODEL = "measure/models/fw_glm53flash.yaml"
-KINDS = ("enumerate", "chain")
+#: The duplicates step judges many short pairs; the same model at low
+#: reasoning marked no worse by hand review and ran four times faster
+#: (2026-09-17: 84 s against 331 s on 304 claims). Bruce, 2026-09-17.
+DUPLICATES_MODEL = "measure/models/fw_glm53flash_low.yaml"
+KINDS = ("sort", "enumerate", "chain")
+#: The stage each kind of job marks as running, then done or failed.
+STAGE_OF = {"sort": "sorting", "enumerate": "enumeration", "chain": "chain"}
 
 Step = Tuple[str, List[str]]
 
@@ -71,6 +81,9 @@ def commands(name: str, s: Dict[str, Any]) -> Dict[str, str]:
         "intake": f"python3 src/client_ui/app.py intake --engagement {name} --model {MODEL} --port 8800",
         "intake_new": f"python3 src/client_ui/app.py intake --engagement {name} --new --model {MODEL} --port 8800",
         "finish": f"python3 workflowsv2/intake/runner.py --engagement {name} --finish",
+        "sort": f"python3 workflowsv2/materials_sorting/runner.py --engagement {name} --model {MODEL}",
+        "sort_confirm": f"python3 workflowsv2/materials_sorting/runner.py --engagement {name} --confirm --by <email>",
+        "duplicates": f"python3 workflowsv2/claims_audit/duplicates.py --engagement {name} --model {DUPLICATES_MODEL}",
         "audit": f"python3 workflowsv2/claims_audit/runner.py --engagement {name} --world <fresh world> --claim-source <one of claim_sources> --model {MODEL}",
         "review": f"python3 workflowsv2/audit_review/runner.py --run {eng}/runs/<run dir> --model {MODEL}",
         "materiality": f"python3 workflowsv2/audit_materiality/runner.py --engagement {name} --run {eng}/runs/<run dir> [--run ...] --model {MODEL} --label <label>",
@@ -111,6 +124,12 @@ def latest_enumeration_run(eng_dir: Path, claim_source: str) -> Optional[Path]:
     return hits[-1] if hits else None
 
 
+def sort_steps(eng_dir: Path, model: str) -> List[Step]:
+    return [("sort the materials", _py(
+        "workflowsv2/materials_sorting/runner.py", "--engagement", eng_dir.name,
+        "--model", model))]
+
+
 def enumerate_steps(eng_dir: Path, model: str, ts: str) -> List[Step]:
     steps: List[Step] = []
     for src in state.claim_sources(eng_dir):
@@ -119,6 +138,11 @@ def enumerate_steps(eng_dir: Path, model: str, ts: str) -> List[Step]:
             "workflowsv2/claims_audit/runner.py", "--engagement", eng_dir.name,
             "--world", world, "--claim-source", src, "--enumerate-only",
             "--model", model)))
+    # Each source is enumerated alone, so a claim made in two documents is
+    # listed twice; this pass marks the repeats before anyone reads the surface.
+    steps.append(("mark repeated claims", _py(
+        "workflowsv2/claims_audit/duplicates.py", "--engagement", eng_dir.name,
+        "--model", DUPLICATES_MODEL)))
     return steps
 
 
@@ -178,6 +202,8 @@ _steps_for: Optional[Callable[[Path, str, str, str], Any]] = None
 def _iter_steps(eng_dir: Path, kind: str, model: str, ts: str):
     if _steps_for is not None:
         return _steps_for(eng_dir, kind, model, ts)
+    if kind == "sort":
+        return iter(sort_steps(eng_dir, model))
     if kind == "enumerate":
         return iter(enumerate_steps(eng_dir, model, ts))
     return Chain(eng_dir, model, ts).steps()
@@ -186,7 +212,13 @@ def _iter_steps(eng_dir: Path, kind: str, model: str, ts: str):
 def _precheck(eng_dir: Path, kind: str, model: str, ts: str) -> Optional[str]:
     if _steps_for is not None:
         return None
+    if kind == "sort":
+        return None if state.target_dir(eng_dir).is_dir() else "the engagement has no materials"
     if kind == "enumerate":
+        # The claim sources and the evidence excludes are confirmed by a
+        # person before anything is enumerated from them.
+        if state.stage_value(eng_dir, "sorting") != "confirmed":
+            return "the materials sorting is not confirmed"
         return None if state.claim_sources(eng_dir) else "engagement.yaml names no claim_sources"
     return Chain(eng_dir, model, ts).check()
 
@@ -223,7 +255,7 @@ def start(eng_dir: Path, kind: str, by: Optional[str] = None,
         raise JobRunning(str(e))
     log = eng_dir / state.JOBS / f"{record['id']}.log"
     state.update_job(eng_dir, record["id"], log=str(log))
-    state.set_stage(eng_dir, "enumeration" if kind == "enumerate" else "chain", "running", by)
+    state.set_stage(eng_dir, STAGE_OF[kind], "running", by)
     t = threading.Thread(target=_run, args=(eng_dir, kind, record["id"], model, ts, log),
                          name=f"job-{eng_dir.name}-{record['id']}", daemon=True)
     t.start()
@@ -232,7 +264,7 @@ def start(eng_dir: Path, kind: str, by: Optional[str] = None,
 
 
 def _run(eng_dir: Path, kind: str, job_id: str, model: str, ts: str, log: Path) -> None:
-    stage_name = "enumeration" if kind == "enumerate" else "chain"
+    stage_name = STAGE_OF[kind]
     steps_done: List[Dict[str, Any]] = []
     error: Optional[str] = None
     code = 0
@@ -256,7 +288,10 @@ def _run(eng_dir: Path, kind: str, job_id: str, model: str, ts: str, log: Path) 
             logger.exception("job %s failed", job_id)
         out.write(f"\n=== {'failed: ' + error if error else 'done'} — {state.stamp()}\n")
     state.finish_job(eng_dir, job_id, code, error)
-    state.set_stage(eng_dir, stage_name, "failed" if error else "done", "job")
+    # A sorting job that succeeds leaves the runner's own mark, "proposed":
+    # the stage is done only when a person confirms.
+    if error or kind != "sort":
+        state.set_stage(eng_dir, stage_name, "failed" if error else "done", "job")
     link = f"{mail.site_url()}/p/#{eng_dir.name}"
     if error:
         mail.send(mail.practice_emails(), f"Tuuyi: {kind} failed for {eng_dir.name}",
@@ -265,8 +300,10 @@ def _run(eng_dir: Path, kind: str, job_id: str, model: str, ts: str, log: Path) 
     else:
         mail.send(mail.practice_emails(), f"Tuuyi: {kind} finished for {eng_dir.name}",
                   f"The {kind} job for {eng_dir.name} finished. "
-                  + ("The claim surface is ready to review and freeze."
-                     if kind == "enumerate" else
-                     "The report is rendered and waits for your sign-off before release."),
+                  + {"sort": "The proposed claim sources and evidence excludes wait "
+                             "for your confirmation on the sorting page.",
+                     "enumerate": "The claim surface is ready to review and freeze.",
+                     "chain": "The report is rendered and waits for your sign-off "
+                              "before release."}[kind],
                   link)
     logger.info("job %s (%s) %s", job_id, kind, "failed: " + error if error else "done")

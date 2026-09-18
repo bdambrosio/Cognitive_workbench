@@ -1,0 +1,63 @@
+# claims-audit engagement: cw-site
+#
+# Created 2026-09-17T15-52-46Z. A self-review: the target is this repository at
+# commit 3b57e91d, cloned locally, and the claim sources are the pages of the
+# practice's public website (site/*.html, identical to https://tuuyi.com on
+# 2026-09-17). Each page's text was extracted with
+# utils.doc_extract.extract_to_markdown into target/claim_sources/site/, one
+# file per page, by extract_sources.py in this directory; each file opens with
+# the page's title and meta description; the introduction page is split into
+# the page text and the video transcript printed on it. What was selected and
+# left out, and who confirmed it: sorting/SELECTION.md. The practice wrote the site and the buyer
+# below; nothing here describes a real deal.
+
+target: target
+
+claim_sources:
+  - claim_sources/site/how-it-works.md
+  - claim_sources/site/index.md
+  - claim_sources/site/introduction-transcript.md
+  - claim_sources/site/introduction.md
+  - claim_sources/site/pricing.md
+  - claim_sources/site/demo.md
+  - claim_sources/site/about.md
+  - claim_sources/site/privacy.md
+  - claim_sources/site/contact.md
+
+retention: keep
+
+# THE BUYER IS ILLUSTRATIVE. Written by the practice so the ratings read
+# against stated thresholds the way a real engagement's do.
+transaction: |
+  Client: an illustrative buyer of software deciding whether to commission a claims review from Tuuyi, written by the practice
+  Acting for the client: the practice
+  Counterparty: Tuuyi, as the seller of the service
+  Subject: the claims-review service as the public website describes it, carried out by the pipeline under workflowsv2/ and the client site under src/client_ui/
+  Price and basis: the fee for one review; the buyer assumes the website describes the service accurately
+  Structure: a service engagement
+  Timetable: none; illustrative
+
+thresholds: |
+  Paying for: a review in which every seller claim is enumerated and frozen before testing, each finding cites evidence that resolves, every finding is checked independently, gaps are rated against the buyer's stated thresholds, and the seller's materials are never shown to the buyer, as the website describes
+  Would change the price or the terms: a control the website describes that the code does not enforce; an independent check that is less independent than stated; a step described as done by the tooling that is done by hand, or the reverse; handling of the seller's materials looser than stated
+  Would end the deal: the seller's code or documents reaching a party or a service the website says they never reach
+
+client_emails:
+  - sales@tuuyi.com
+seller_emails: []
+
+# Documentation is not evidence. The method documents under workflowsv2/*/method/
+# are the text the agents execute and stay in. The website under site/ and the
+# text extracted from it are the seller's own marketing and stay out. Past
+# engagements hold delivered reports and earlier claim surfaces of this same
+# target; run records are not an evidence class in this version.
+evidence_excludes:
+  - docs/
+  - README.md
+  - AGENTS.md
+  - BACKGROUND.md
+  - CLAUDE.md
+  - test_primitives.md
+  - site/
+  - claim_sources/
+  - workflowsv2/claims_audit/engagements/

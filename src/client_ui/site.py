@@ -65,6 +65,7 @@ from pydantic import BaseModel                                                  
 
 from workflowsv2 import engagement_state as state               # noqa: E402
 from client_ui import cf_access, jobs, mail, materials          # noqa: E402
+from workflowsv2.materials_sorting import runner as sorting     # noqa: E402
 from client_ui.access import Access, LOCAL_COOKIE               # noqa: E402
 from client_ui.app import _announce, _SAFE                      # noqa: E402
 from client_ui.registry import Registry                         # noqa: E402
@@ -110,6 +111,16 @@ def next_step(eng_dir: Path) -> Dict[str, str]:
         return {"stage": "materials", "who": "seller",
                 "text": "The seller is supplying the materials on the materials page, "
                         "or the practice is obtaining them."}
+    # Engagements enumerated before the sorting stage existed carry no
+    # sorting mark and are not sent back to it.
+    if v("enumeration") not in ("running", "done") and v("sorting") != "confirmed":
+        if v("sorting") == "running":
+            text = "The practice is sorting the materials: which documents carry claims, and which may not be cited as evidence."
+        elif v("sorting") == "proposed":
+            text = "The practice is confirming the claim sources and the evidence excludes proposed by the sorting."
+        else:
+            text = "The practice will sort the materials next."
+        return {"stage": "sorting", "who": "practice", "text": text}
     if v("enumeration") == "running":
         return {"stage": "enumeration", "who": "practice",
                 "text": "The claims are being enumerated from the documents you named."}
@@ -280,6 +291,11 @@ class Decompose(BaseModel):
     source: str
     claim_id: int
     claims: List[Dict[str, Any]]        # the draft as the page holds it, so the proposal sees unsaved edits
+
+
+class SortingConfirm(BaseModel):
+    claim_sources: List[str]
+    evidence_excludes: List[str]
 
 
 class MaterialsPath(BaseModel):
@@ -868,6 +884,35 @@ def make_site_app(access: Access, model: Optional[Path] = None,
     async def practice_guidance_text(request: Request):
         _practice(request)
         return PlainTextResponse(SCRUB_GUIDANCE.read_text(encoding="utf-8"))
+
+    @app.get("/p/sorting/{name}/")
+    async def practice_sorting_page(name: str, request: Request):
+        _practice(request)
+        _eng(name)
+        return _page(request, STATIC / "sorting.html")
+
+    @app.get("/p/sorting/{name}/api")
+    async def practice_sorting_get(name: str, request: Request):
+        _practice(request)
+        eng_dir = _eng(name)
+        sel = sorting.load(eng_dir)
+        if sel is None:
+            raise HTTPException(status_code=404, detail="the materials have not been sorted yet")
+        return JSONResponse({"name": name, "record": sorting.render(sel),
+                             "proposal": sel["proposal"], "confirmed": sel.get("confirmed")})
+
+    @app.post("/p/sorting/{name}/api/confirm")
+    async def practice_sorting_confirm(name: str, body: SortingConfirm, request: Request):
+        """The practice confirms the claim sources and the evidence excludes,
+        as proposed or as changed on the page. Writes them to engagement.yaml,
+        extracts the sources that are not plain text, marks the stage."""
+        email = _practice(request)
+        eng_dir = _eng(name)
+        if state.running_job(eng_dir):
+            raise HTTPException(status_code=409, detail="a job is running for this engagement")
+        sel = _act(sorting.confirm, eng_dir, email, body.claim_sources, body.evidence_excludes)
+        return JSONResponse({"name": name, "record": sorting.render(sel),
+                             "proposal": sel["proposal"], "confirmed": sel["confirmed"]})
 
     @app.get("/p/surface/{name}/")
     async def practice_surface_page(name: str, request: Request):
