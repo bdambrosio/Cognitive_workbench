@@ -6,8 +6,9 @@ existing runners and watched to their end.
                 target and proposes the claim sources and evidence excludes;
                 a person confirms them on the sorting page before enumeration
     enumerate   one claims_audit run per claim source with --enumerate-only,
-                then the duplicates pass over all of them; leaves a claims.json
-                per source for the surface page
+                then the duplicates pass over all of them, then the reliance
+                statement and the tiers; leaves a claims.json per source, with
+                its marks, for the surface page
     chain       per claim source: the audit on the frozen surface, then its
                 review; then materiality over every run, against the current
                 intake; then the report
@@ -84,6 +85,8 @@ def commands(name: str, s: Dict[str, Any]) -> Dict[str, str]:
         "sort": f"python3 workflowsv2/materials_sorting/runner.py --engagement {name} --model {MODEL}",
         "sort_confirm": f"python3 workflowsv2/materials_sorting/runner.py --engagement {name} --confirm --by <email>",
         "duplicates": f"python3 workflowsv2/claims_audit/duplicates.py --engagement {name} --model {DUPLICATES_MODEL}",
+        "reliance": f"python3 workflowsv2/claims_audit/reliance.py --engagement {name} --model {MODEL}",
+        "tiers": f"python3 workflowsv2/claims_audit/tiers.py --engagement {name} --model {MODEL}",
         "audit": f"python3 workflowsv2/claims_audit/runner.py --engagement {name} --world <fresh world> --claim-source <one of claim_sources> --model {MODEL}",
         "review": f"python3 workflowsv2/audit_review/runner.py --run {eng}/runs/<run dir> --model {MODEL}",
         "materiality": f"python3 workflowsv2/audit_materiality/runner.py --engagement {name} --run {eng}/runs/<run dir> [--run ...] --model {MODEL} --label <label>",
@@ -143,6 +146,15 @@ def enumerate_steps(eng_dir: Path, model: str, ts: str) -> List[Step]:
     steps.append(("mark repeated claims", _py(
         "workflowsv2/claims_audit/duplicates.py", "--engagement", eng_dir.name,
         "--model", DUPLICATES_MODEL)))
+    # What the buyer relies on is written once, from the intake and every
+    # claim; then each claim is rated against it. A person corrects the
+    # statement and any tier on the surface page before the freeze.
+    steps.append(("state what the buyer relies on", _py(
+        "workflowsv2/claims_audit/reliance.py", "--engagement", eng_dir.name,
+        "--model", model)))
+    steps.append(("rate the claims into tiers", _py(
+        "workflowsv2/claims_audit/tiers.py", "--engagement", eng_dir.name,
+        "--model", model)))
     return steps
 
 
@@ -161,10 +173,26 @@ class Chain:
         missing = [s for s in self.sources if not surface_file(self.eng_dir, s).is_file()]
         if missing:
             return "no frozen surface for " + ", ".join(missing)
+        if not any(self.tested(s) for s in self.sources):
+            return "no frozen claim is in tier 1: there is nothing to test"
         return None
+
+    def tested(self, src: str) -> int:
+        """How many claims of this source's frozen surface the audit would
+        test: tier 1 and any not rated (TIERS.md §1)."""
+        import json
+        from workflowsv2.claims_audit.schemas import split_by_tier
+        doc = json.loads(surface_file(self.eng_dir, src).read_text(encoding="utf-8"))
+        return len(split_by_tier(doc.get("claims") or [])[0])
 
     def steps(self) -> "Iterator[Step]":                       # noqa: F821
         for src in self.sources:
+            if not self.tested(src):
+                # Every claim of this source was rated tier 2 or 3. An audit
+                # of nothing writes no findings and the review of it fails;
+                # the report lists these claims from the frozen surface.
+                logger.info("%s has no claim to test; no audit and no review", src)
+                continue
             world = f"audit_{self.eng_dir.name}_{slug(src)}_{self.ts}"
             yield (f"audit {src}", _py(
                 "workflowsv2/claims_audit/runner.py", "--engagement", self.eng_dir.name,

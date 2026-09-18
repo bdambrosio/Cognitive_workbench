@@ -284,3 +284,20 @@ def test_contested_finds_disagreements_and_one_sided_ratings():
          {"claim_source": "d", "claim_id": 2, "exposure": "material"},
          {"claim_source": "d", "claim_id": 3, "exposure": "material"}]
     assert ms.contested("exposure", a, b) == ["d#2", "d#3"]
+
+
+def test_the_rating_call_is_given_the_reliance_statement_when_there_is_one(monkeypatch):
+    from workflowsv2.audit_materiality import runner
+    seen = []
+    def fake_emit(loop, system, user, schema, max_tokens, salvage=None):
+        seen.append(user)
+        return {"obj": {"ratings": [], "exposures": []}, "raw": "{}", "parse": "parsed",
+                "parse_error": None, "finish": "stop", "attempts": [], "response_format_dropped": []}
+    monkeypatch.setattr(runner, "emit", fake_emit)
+    monkeypatch.setattr(runner, "_rating_text", lambda f: "finding text")
+    f = {"claim_source": "README.md", "claim_id": 1}
+    runner.rate(object(), "method", "Client: a buyer", [f], [], 100, 0,
+                thresholds="Paying for: privacy", reliance="- Hit count only — depends")
+    runner.rate(object(), "method", "Client: a buyer", [f], [], 100, 0, thresholds="Paying for: privacy")
+    assert "The reliance statement:\n\n- Hit count only — depends\n\nRate these 1 findings" in seen[0]
+    assert "Paying for: privacy" in seen[0] and "The reliance statement" not in seen[1]

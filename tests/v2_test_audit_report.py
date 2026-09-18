@@ -250,3 +250,20 @@ def test_a_covered_claim_names_the_wider_claim_and_keeps_its_own_verdict(tmp_pat
     assert "| README.md | 2 | 2 | claim 2 text | real |  |  |" in text
     assert "marked *covered by* names a wider claim" in text
     assert render.covered_by(tmp_path / "nowhere" / "merged" / "m") == {}
+
+
+def test_claims_listed_and_not_tested_are_counted_and_given_their_own_appendix(tmp_path):
+    rec = _record()
+    assert "Every claim received one finding." in render.assemble(rec)
+    surface = tmp_path / "e" / "surface"
+    surface.mkdir(parents=True)
+    (surface / "docs_cli_md.surface.json").write_text(json.dumps({"claim_source": "docs/CLI.md", "claims": [
+        {"id": 8, "lines": [39, 39], "quote": "POST /api/new", "tier": 1, "tier_basis": "x"},
+        {"id": 9, "lines": [40, 40], "quote": "page_size defaults to 10", "tier": 2,
+         "tier_basis": "A default a developer codes against. Rated on the scale alone."}]}))
+    rec["not_tested"] = render.not_tested(tmp_path / "e" / "merged" / "m1")
+    assert [c["id"] for c in rec["not_tested"]] == [9]
+    text = render.assemble(rec)
+    assert "Every claim that was tested received one finding. 1 further claim(s)" in text
+    assert "## Appendix — claims listed, not tested" in text
+    assert "| docs/CLI.md | 9 | 40 | page_size defaults to 10 | 2 | A default a developer codes against." in text

@@ -1389,6 +1389,16 @@ def main() -> int:
         if args.surface:
             assembled = json.loads(Path(args.surface).read_text(encoding="utf-8"))
             assembled["claim_source"] = claim_source
+            # TIER 1 IS TESTED (TIERS.md §1). A claim rated tier 2 or 3 stays
+            # in this run's claims.json under `not_tested`, with its tier and
+            # the reason, so the report lists it; it is not among `claims`,
+            # so no leg, no finding and no later stage is asked about it. A
+            # claim with no tier was never rated and is tested.
+            assembled["claims"], assembled["not_tested"] = schemas.split_by_tier(
+                assembled.get("claims") or [])
+            if assembled["not_tested"]:
+                logger.info("%d claim(s) rated tier 2 or 3 are listed, not tested",
+                            len(assembled["not_tested"]))
             parts = [assembled]
         for n, sec in enumerate(sections, 1):
             part = emit_surface(loop, method_text, src_doc, sec, n,

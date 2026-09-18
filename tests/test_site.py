@@ -180,6 +180,31 @@ def test_surface_comment_edit_and_freeze(env):
     assert c.post("/p/surface/e1/api/freeze" + _as(PRACTICE), json={"source": "README.md"}).status_code == 200
 
 
+def test_surface_carries_the_reliance_statement_and_the_practice_corrects_it(env):
+    c, root = env
+    _new(c)
+    _enumerated(root, "e1", "README.md", [{"id": 1, "lines": [1, 1], "quote": "q", "statement": "s",
+                                           "about": "target", "tier": 2, "tier_basis": "A default."}])
+    assert c.get("/p/surface/e1/api" + _as(PRACTICE)).json()["reliance"] == {}
+    (root / "e1" / st.SURFACE).mkdir(exist_ok=True)
+    (root / "e1" / st.SURFACE / "reliance.json").write_text(json.dumps(
+        {"at": "T", "model": "m", "use": "Hosts it.", "items": [
+            {"item": "The API", "reliance": "uses", "if_it_failed": "x", "source": "inference", "buyer_words": ""}]}))
+    for who, path in ((CLIENT, "/e/e1/surface/api"), (PRACTICE, "/p/surface/e1/api")):
+        got = c.get(path + _as(who)).json()
+        assert got["reliance"]["items"][0]["item"] == "The API" and got["sources"][0]["claims"][0]["tier"] == 2
+    fixed = {"use": "Hosts it for customers.", "items": [
+        {"item": "The API", "reliance": "depends", "if_it_failed": "Costly.", "source": "buyer", "buyer_words": "the API"},
+        {"item": "", "reliance": "uses", "if_it_failed": "", "source": "inference", "buyer_words": ""}]}
+    assert c.post("/p/surface/e1/api/reliance" + _as(CLIENT), json=fixed).status_code == 403
+    r = c.post("/p/surface/e1/api/reliance" + _as(PRACTICE), json=fixed)
+    assert r.status_code == 200 and r.json()["corrected_by"] == PRACTICE and r.json()["at"] == "T"
+    saved = json.loads((root / "e1" / st.SURFACE / "reliance.json").read_text())
+    assert [x["reliance"] for x in saved["items"]] == ["depends"] and saved["use"] == "Hosts it for customers."
+    fixed["items"][0]["reliance"] = "sometimes"
+    assert c.post("/p/surface/e1/api/reliance" + _as(PRACTICE), json=fixed).status_code == 400
+
+
 def test_scrub_guidance_is_the_practice_s(env):
     c, root = env
     assert c.get("/p/guidance/" + _as(CLIENT)).status_code == 403

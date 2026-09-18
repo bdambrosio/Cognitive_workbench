@@ -131,7 +131,7 @@
     }
     h += "<h3>Commands</h3><div class=\"muted\" style=\"margin-bottom:8px\">Click a command to copy it. "
       + (e.site ? "The buttons above start the jobs; these are the same steps for a terminal." : "Nothing runs from this page.") + "</div><div class=\"cmd\">";
-    const labels = {sort: "sort the materials", sort_confirm: "confirm the sorting", duplicates: "mark repeated claims", intake: "intake", intake_new: "new intake", finish: "finish intake", audit: "audit", review: "review", materiality: "materiality", report: "report", post: "post-delivery page"};
+    const labels = {sort: "sort the materials", sort_confirm: "confirm the sorting", duplicates: "mark repeated claims", reliance: "state what the buyer relies on", tiers: "rate the claims into tiers", intake: "intake", intake_new: "new intake", finish: "finish intake", audit: "audit", review: "review", materiality: "materiality", report: "report", post: "post-delivery page"};
     for (const [k, v] of Object.entries(e.commands)) h += '<div class="k">' + esc(labels[k] || k) + "</div><code>" + esc(v) + "</code>";
     h += "</div>";
     $("detail").innerHTML = h;

@@ -115,7 +115,8 @@ def rate(loop, method_text: str, transaction: Optional[str],
          rateable: List[Dict[str, Any]], exposable: List[Dict[str, Any]],
          max_tokens: int, batch: int,
          thresholds: Optional[str] = None,
-         seed: Optional[int] = None) -> Dict[str, Any]:
+         seed: Optional[int] = None,
+         reliance: Optional[str] = None) -> Dict[str, Any]:
     """The ratings, in batches. Same runner-decides-the-batch pattern as the
     review's emit_parts: one schema per part, concatenated by merge_parts.
 
@@ -138,6 +139,9 @@ def rate(loop, method_text: str, transaction: Optional[str],
             + (thresholds.strip() if thresholds else
                "(The engagement records no thresholds. Rate as MATERIALITY "
                "\u00a73 defines the values.)")
+            # The same account of the buyer the claims were rated into tiers
+            # against (claims_audit/reliance.py), where the engagement has one.
+            + ("\n\nThe reliance statement:\n\n" + reliance.strip() if reliance else "")
             + "\n\n")
 
     def groups_of(xs):
@@ -278,7 +282,8 @@ def replicate(loop, method_text: str, eng: Dict[str, Any],
     take(first["obj"], "exposure", "exposures")
     calls = list(first["calls"])
     second = rate(loop, method_text, eng.get("transaction"), rateable, exposable,
-                  max_tokens, batch, thresholds=eng.get("thresholds"), seed=seeds[0])
+                  max_tokens, batch, thresholds=eng.get("thresholds"), seed=seeds[0],
+                  reliance=eng.get("reliance"))
     calls += second["calls"]; log["passes"] = 2; log["seeds"].append(seeds[0])
     take(second["obj"], "materiality", "ratings")
     take(second["obj"], "exposure", "exposures")
@@ -295,7 +300,8 @@ def replicate(loop, method_text: str, eng: Dict[str, Any],
         e_sub = [by_key[k] for k in ce if k in by_key]
         for seed in seeds[1:]:
             more = rate(loop, method_text, eng.get("transaction"), r_sub, e_sub,
-                        max_tokens, batch, thresholds=eng.get("thresholds"), seed=seed)
+                        max_tokens, batch, thresholds=eng.get("thresholds"), seed=seed,
+                        reliance=eng.get("reliance"))
             calls += more["calls"]; log["passes"] += 1; log["seeds"].append(seed)
             take(more["obj"], "materiality", "ratings")
             take(more["obj"], "exposure", "exposures")
@@ -342,6 +348,9 @@ def main() -> int:
     args = ap.parse_args()
 
     eng = load_engagement(args.engagement, intake=args.intake)
+    from workflowsv2.claims_audit import reliance as reliance_statement
+    statement = reliance_statement.load(eng["dir"])
+    eng["reliance"] = reliance_statement.render(statement) if statement else None
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
     label = args.label or (args.model.stem if args.model else "default")
     out = eng["dir"] / "merged" / f"{ts}_{label}"
@@ -400,7 +409,8 @@ def main() -> int:
     try:
         result = rate(loop, method_text, eng.get("transaction"), rateable,
                       exposable, max_tokens, args.batch,
-                      thresholds=eng.get("thresholds"))
+                      thresholds=eng.get("thresholds"),
+                      reliance=eng.get("reliance"))
         replicates["passes"] = 1
         if not args.single:
             result = replicate(loop, method_text, eng, rateable, exposable,
@@ -476,6 +486,7 @@ def main() -> int:
         "thresholds_recorded": bool(eng.get("thresholds")),
         "thresholds_sha256": _sha(eng.get("thresholds")),
         "transaction_sha256": _sha(eng.get("transaction")),
+        "reliance_sha256": _sha(eng.get("reliance")),
         "exposable": len(exposable),
         "calls": result["calls"], "ratings_check": check,
         "wall_clock_s": wall, "error": error,

@@ -188,6 +188,14 @@ def split_sections(text: str, minimum: int = SECTION_MIN,
     return out
 
 
+def split_by_tier(claims: Sequence[Dict[str, Any]]
+                  ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """(tested, not tested): a claim rated tier 2 or 3 is not tested
+    (TIERS.md §1); tier 1, or no tier at all, is."""
+    tested = [c for c in claims if c.get("tier") not in (2, 3)]
+    return tested, [c for c in claims if c.get("tier") in (2, 3)]
+
+
 def assemble_surface(claim_source: str, sections: Sequence[Dict[str, Any]]
                      ) -> Dict[str, Any]:
     """The frozen surface from per-section emissions, ids in document order.

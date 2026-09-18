@@ -62,7 +62,26 @@ def load(merged_dir: Path) -> Dict[str, Any]:
     merged = json.loads((merged_dir / "merged.json").read_text(encoding="utf-8"))
     ratings = json.loads((merged_dir / "materiality.json").read_text(encoding="utf-8"))
     return {"merged": merged, "ratings": ratings, "dir": merged_dir,
-            "covered": covered_by(merged_dir)}
+            "covered": covered_by(merged_dir), "not_tested": not_tested(merged_dir)}
+
+
+def not_tested(merged_dir: Path) -> List[Dict[str, Any]]:
+    """The claims listed and not tested: rated tier 2 or 3 before the freeze
+    (TIERS.md §1). Read from the engagement's frozen surfaces, where
+    covered_by reads the duplicates record, because a claim source whose
+    every claim is tier 2 or 3 has no run to read them from. Each row
+    carries its claim source."""
+    from workflowsv2.claims_audit.schemas import split_by_tier
+    rows: List[Dict[str, Any]] = []
+    for f in sorted((Path(merged_dir).resolve().parents[1] / "surface").glob("*.surface.json")):
+        try:
+            doc = json.loads(f.read_text(encoding="utf-8"))
+        except Exception as e:                                 # noqa: BLE001
+            logger.warning("frozen surface %s not read: %s", f, e)
+            continue
+        rows += [dict(c, claim_source=doc.get("claim_source"))
+                 for c in split_by_tier(doc.get("claims") or [])[1]]
+    return rows
 
 
 def covered_by(merged_dir: Path) -> Dict[str, Dict[str, Any]]:
@@ -586,8 +605,13 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
             out += ["  " + x for x in _evidence([u.get("evidence") or {}])]
         out.append("")
 
-    out += ["## Coverage", "", "Every claim received one finding. By verdict "
-            "and class:", "", "| verdict | class | claims |", "|---|---|---|"]
+    untested = record.get("not_tested") or []
+    out += ["## Coverage", "", ("Every claim received one finding. " if not untested else
+            f"Every claim that was tested received one finding. {len(untested)} further "
+            f"claim(s) were rated before testing as ones whose being false would not "
+            f"lead the buyer to reopen the price or the terms; they are listed in the "
+            f"second appendix, each with the reason, and were not tested. ")
+            + "By verdict and class:", "", "| verdict | class | claims |", "|---|---|---|"]
     counts = {"contradicted": 0, "partial": 0, "real_with_caveat": 0,
               "unverifiable": 0, "real": 0}
     for f in merged.get("findings") or []:
@@ -634,6 +658,19 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
                    f"{_lines_bare(f.get('lines'))} | {q[:120]} | "
                    f"{(f.get('adjudication') or {}).get('verdict')} | {rating} | "
                    f"{(c.get('source') + ' ' + str(c.get('id'))) if c else ''} |")
+    if untested:
+        out += ["", "## Appendix — claims listed, not tested", "",
+                "Rated before testing, against the transaction and the buyer's "
+                "thresholds, and not tested. Tier 2: a documented detail that a "
+                "person operating the software would act on, which on its own "
+                "changes nothing. Tier 3: nothing rests on it. The buyer may ask "
+                "for any of them to be tested.", "",
+                "| source | id | lines | claim | tier | reason |",
+                "|---|---|---|---|---|---|"]
+        for c in sorted(untested, key=lambda x: (x.get("claim_source") or "", x.get("id") or 0)):
+            out.append(f"| {c.get('claim_source')} | {c.get('id')} | "
+                       f"{_lines_bare(c.get('lines'))} | {_md_safe(c.get('quote'))[:120]} | "
+                       f"{c.get('tier')} | {_md_safe(c.get('tier_basis'))} |")
     return "\n".join(out).rstrip() + "\n"
 
 

@@ -63,3 +63,23 @@ def test_reliance_propose_drops_items_outside_the_schema(monkeypatch):
     res = reliance.propose(object(), "The intake form:\n\n{}", "README.md (1 claims):\n  - It shortens links.")
     assert res["use"] == "The buyer hosts it." and [x["item"] for x in res["items"]] == ["The API"]
     assert "Reliance statement" in seen["system"] and "It shortens links." in seen["user"]
+
+
+def test_mark_writes_tiers_onto_a_claim_file_and_leaves_a_persons_tier_alone(tmp_path):
+    import json
+    f = tmp_path / "readme_md.draft.json"
+    f.write_text(json.dumps({"claim_source": "README.md", "claims": [
+        {"id": 1, "statement": "a"}, {"id": 2, "statement": "b", "tier": 1, "tier_by": "practice"},
+        {"id": 3, "statement": "c"}]}))
+    n = tiers.mark(f, [{"claim_id": 1, "tier": 3, "basis": "Nothing rests on it."},
+                       {"claim_id": 2, "tier": 3, "basis": "overruled"}])
+    claims = json.loads(f.read_text())["claims"]
+    assert n == 1 and (claims[0]["tier"], claims[0]["tier_basis"]) == (3, "Nothing rests on it.")
+    assert claims[1]["tier"] == 1 and "tier" not in claims[2]
+
+
+def test_the_audit_tests_tier_1_and_unrated_claims_only():
+    from workflowsv2.claims_audit import schemas
+    tested, rest = schemas.split_by_tier([{"id": 1, "tier": 1}, {"id": 2, "tier": 2},
+                                          {"id": 3}, {"id": 4, "tier": 3}])
+    assert [c["id"] for c in tested] == [1, 3] and [c["id"] for c in rest] == [2, 4]

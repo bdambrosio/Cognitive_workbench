@@ -254,6 +254,42 @@ def unfreeze(eng_dir: Path, source: str, by: str) -> None:
         state.set_stage(eng_dir, "chain", "superseded", by)
 
 
+def save_reliance(eng_dir: Path, use: str, items: List[Dict[str, Any]], by: str) -> Dict[str, Any]:
+    """The reliance statement as a person corrected it on the surface page.
+    It replaces surface/reliance.json and keeps when and by which model the
+    statement was first written. The tiers already on the claims do not
+    change; the practice rates again with tiers.py, which leaves alone any
+    tier a person set."""
+    from workflowsv2.claims_audit import reliance
+    kept = []
+    for x in items:
+        name = str(x.get("item") or "").strip()
+        if not name:
+            continue
+        if x.get("reliance") not in reliance.RELIANCE or x.get("source") not in reliance.SOURCES:
+            raise SystemExit(f"'{name}': reliance is one of {', '.join(reliance.RELIANCE)} "
+                             f"and source one of {', '.join(reliance.SOURCES)}")
+        kept.append({"item": name, "reliance": x["reliance"],
+                     "if_it_failed": str(x.get("if_it_failed") or "").strip(),
+                     "source": x["source"], "buyer_words": str(x.get("buyer_words") or "").strip()})
+    if not kept:
+        raise SystemExit("a reliance statement needs at least one item")
+    was = reliance.load(eng_dir)
+    record = {"at": was.get("at"), "model": was.get("model"),
+              "corrected_at": state.stamp(), "corrected_by": by,
+              "use": use.strip(), "items": kept}
+    d = eng_dir / state.SURFACE
+    d.mkdir(exist_ok=True)
+    (d / reliance.RECORD).write_text(json.dumps(record, indent=1, ensure_ascii=False) + "\n",
+                                     encoding="utf-8")
+    return record
+
+
+def _reliance(eng_dir: Path) -> Dict[str, Any]:
+    from workflowsv2.claims_audit import reliance
+    return reliance.load(eng_dir)
+
+
 # ---- request bodies -----------------------------------------------------------
 
 class NewEngagement(BaseModel):
@@ -285,6 +321,11 @@ class Draft(BaseModel):
 
 class Source(BaseModel):
     source: str
+
+
+class Reliance(BaseModel):
+    use: str
+    items: List[Dict[str, Any]]
 
 
 class Decompose(BaseModel):
@@ -462,6 +503,7 @@ def make_site_app(access: Access, model: Optional[Path] = None,
     async def surface_get(name: str, request: Request):
         _, role, eng_dir = _require(request, name, ("client", "practice"))
         return JSONResponse({"name": name, "role": role, "editable": False,
+                             "reliance": _reliance(eng_dir),
                              "sources": [surface_for(eng_dir, s) for s in state.claim_sources(eng_dir)]})
 
     @app.post("/e/{name}/surface/api/comment")
@@ -925,6 +967,7 @@ def make_site_app(access: Access, model: Optional[Path] = None,
         _practice(request)
         eng_dir = _eng(name)
         return JSONResponse({"name": name, "role": "practice", "editable": True,
+                             "reliance": _reliance(eng_dir),
                              "sources": [surface_for(eng_dir, s) for s in state.claim_sources(eng_dir)]})
 
     @app.post("/p/surface/{name}/api/comment")
@@ -944,6 +987,12 @@ def make_site_app(access: Access, model: Optional[Path] = None,
             raise HTTPException(status_code=400, detail="no such claim source")
         _act(save_draft, eng_dir, body.source, body.claims)
         return JSONResponse(surface_for(eng_dir, body.source))
+
+    @app.post("/p/surface/{name}/api/reliance")
+    async def practice_surface_reliance(name: str, body: Reliance, request: Request):
+        email = _practice(request)
+        eng_dir = _eng(name)
+        return JSONResponse(_act(save_reliance, eng_dir, body.use, body.items, email))
 
     @app.post("/p/surface/{name}/api/decompose")
     async def practice_surface_decompose(name: str, body: Decompose, request: Request):

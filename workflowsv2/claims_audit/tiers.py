@@ -14,10 +14,15 @@ the draft, else the latest enumeration run's claims.json. A claim marked
 `same_as` an earlier one is not rated (TIERS.md §2); a claim marked `within`
 a wider one is.
 
-WHAT IS WRITTEN. `surface/tiers.json` in the engagement: per claim source, one
-{claim_id, tier, basis} per claim rated, and the ids the call did not rate.
-No claim file is changed. A claim the call did not rate has no tier; it is
-never given one by default, because a missing answer is not tier 3.
+WHAT IS WRITTEN. Each rated claim gets `tier` and `tier_basis` in the file it
+was read from, the way the duplicates pass marks `same_as`: the surface page
+shows them, a person changes any tier before the freeze, the freeze carries
+them, and the audit tests tier 1 only. Two things are left as they are: a
+frozen surface, which only a person unfreezes, and a claim whose tier a
+person set (`tier_by`). `surface/tiers.json` is the record: per claim source,
+every rating, and the ids the call did not rate. A claim the call did not
+rate has no tier and is tested; it is never given a tier by default, because
+a missing answer is not tier 3.
 """
 from __future__ import annotations
 
@@ -106,6 +111,23 @@ def propose(backend, transaction: str, thresholds: str, source: str,
             "raw": out.get("raw")}
 
 
+def mark(claims_path: Path, tiers: Sequence[Dict[str, Any]]) -> int:
+    """Write `tier` and `tier_basis` onto the claims of one draft or
+    enumeration file. A claim whose tier a person set is left alone. Returns
+    how many claims were marked."""
+    by_id = {t["claim_id"]: t for t in tiers}
+    doc = json.loads(claims_path.read_text(encoding="utf-8"))
+    n = 0
+    for c in doc.get("claims") or []:
+        t = by_id.get(c.get("id"))
+        if t is None or c.get("tier_by"):
+            continue
+        c["tier"], c["tier_basis"] = t["tier"], t["basis"]
+        n += 1
+    atomic_write_text(claims_path, json.dumps(doc, indent=1, ensure_ascii=False) + "\n")
+    return n
+
+
 def run(eng_name: str, model_yaml: Path, only: Optional[str] = None) -> Dict[str, Any]:
     from workflowsv2.claims_audit.runner import load_engagement
     eng = load_engagement(eng_name)
@@ -141,7 +163,11 @@ def run(eng_name: str, model_yaml: Path, only: Optional[str] = None) -> Dict[str
             unrated += got["unrated"]
             logger.info("%s claims %s-%s: %d rated, %d unrated", src, batch[0]["id"],
                         batch[-1]["id"], len(got["tiers"]), len(got["unrated"]))
+        marked = mark(f, tiers) if not f.name.endswith(".surface.json") else 0
+        if f.name.endswith(".surface.json"):
+            logger.info("%s is frozen; its claims are left as they are", src)
         record["sources"][src] = {"at": state.stamp(), "model": backend.resolved_model(),
+                                  "marked": marked,
                                   "claims_from": str(f.relative_to(eng_dir)),
                                   "reliance_statement": statement.get("at"),
                                   "tiers": tiers, "unrated": unrated}

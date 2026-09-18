@@ -1,6 +1,7 @@
 """The site's job runner: steps run in order as subprocesses, the job record
 and the stage follow the exit, the practice is mailed, and a second job is
 refused while one runs. Real runners are replaced by shell commands."""
+import json
 import os
 import sys
 import threading
@@ -101,8 +102,12 @@ def test_real_step_lists_name_the_runners(tmp_path):
         "target: target\nclaim_sources: [README.md, docs/llms.txt]\nclient_emails: []\n")
     steps = jobs.enumerate_steps(eng, "m.yaml", "T")
     assert [s[0] for s in steps] == ["enumerate README.md", "enumerate docs/llms.txt",
-                                     "mark repeated claims"]
+                                     "mark repeated claims",
+                                     "state what the buyer relies on",
+                                     "rate the claims into tiers"]
     assert steps[2][1][1].endswith("workflowsv2/claims_audit/duplicates.py")
+    assert steps[3][1][1].endswith("workflowsv2/claims_audit/reliance.py")
+    assert steps[4][1][1].endswith("workflowsv2/claims_audit/tiers.py") and "m.yaml" in steps[4][1]
     argv = steps[1][1]
     assert argv[1].endswith("workflowsv2/claims_audit/runner.py")
     assert "--enumerate-only" in argv and "enum_e_docs_llms_txt_T" in argv
@@ -110,7 +115,21 @@ def test_real_step_lists_name_the_runners(tmp_path):
     assert chain.check() == "no frozen surface for README.md, docs/llms.txt"
     (eng / "surface").mkdir()
     for s in ("readme_md", "docs_llms_txt"):
-        (eng / "surface" / f"{s}.surface.json").write_text("{}")
+        (eng / "surface" / f"{s}.surface.json").write_text('{"claims": [{"id": 1}]}')
     assert chain.check() is None
     first = next(chain.steps())
     assert first[0] == "audit README.md" and "--surface" in first[1]
+
+
+def test_the_chain_skips_a_source_with_nothing_to_test(tmp_path):
+    eng = _eng(tmp_path)
+    (eng / "engagement.yaml").write_text(
+        "target: target\nclaim_sources: [README.md, docs/SECURITY.md]\nclient_emails: []\n")
+    (eng / "surface").mkdir(exist_ok=True)
+    jobs.surface_file(eng, "README.md").write_text(json.dumps({"claims": [{"id": 1, "tier": 1}, {"id": 2, "tier": 3}]}))
+    jobs.surface_file(eng, "docs/SECURITY.md").write_text(json.dumps({"claims": [{"id": 1, "tier": 3}]}))
+    chain = jobs.Chain(eng, "m.yaml", "T")
+    assert chain.check() is None and chain.tested("README.md") == 1 and chain.tested("docs/SECURITY.md") == 0
+    assert next(chain.steps())[0] == "audit README.md"
+    jobs.surface_file(eng, "README.md").write_text(json.dumps({"claims": [{"id": 2, "tier": 3}]}))
+    assert "nothing to test" in jobs.Chain(eng, "m.yaml", "T").check()

@@ -36,6 +36,10 @@ header a, .site a { color: #6ea0ff; }
 table.claims td[contenteditable] { outline: 1px dashed var(--rule); }
 table.claims td[contenteditable]:focus { outline: 1px solid var(--accent2); }
 table.claims tr.dropped td { text-decoration: line-through; opacity: .5; }
+table.claims tr.untested td.quote, table.claims tr.untested td.statement, table.claims tr.untested td.lines { opacity: .6; }
+table.claims td.tier { min-width: 200px; max-width: 340px; font-size: 13px; }
+table.claims td.quote { min-width: 150px; }
+table.claims td.tier .basis { font-size: 12px; margin-top: 4px; }
 /* The statement a duplicate was matched with is read, not struck. */
 table.claims tr.dropped .declined { display: inline-block; text-decoration: none; }
 table.claims td.comments { min-width: 220px; }
@@ -63,3 +67,5 @@ table.files tr.excluded td:first-child { color: var(--muted); }
 table.files td button { padding: 2px 8px; font-size: 12px; }
 #actions { align-items: center; gap: 16px; }
 #marks { margin-top: 28px; }
+#relItems td.words { min-width: 240px; }
+#relItems td.item { min-width: 260px; }
