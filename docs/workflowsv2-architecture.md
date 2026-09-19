@@ -207,9 +207,9 @@ enumeration. It never writes to a frozen surface, skips claims marked
 `same_as`, and leaves a claim with `tier_by` alone. A frozen surface is still
 rated and the ratings go to `tiers.json` only. A claim the call did not rate
 keeps no tier and is therefore tested. If a batch does not parse the program
-stops: that source's claims are not marked and `tiers.json`, which is written
-once at the end, is not written; sources rated earlier in the same invocation
-keep their marks.
+stops and that source's claims are not marked; `tiers.json` is written after
+each source, so sources rated earlier in the same invocation keep their marks
+and their record.
 
 ## Review
 
@@ -360,9 +360,8 @@ browser. The public site is the static folder `site/`.
   documents are not in its list.
 - **World sweep.** `sweep_worlds.py` lists, and with `--delete` removes,
   worlds under `scenarios/` older than `--days` (default 30), keeping names
-  that start `jill_`, `post_`, `intake_` or `demo_`. It never touches run or
-  merged directories. The intake world is named `client_<engagement>`, which
-  none of those prefixes matches.
+  that start `jill_`, `post_`, `client_` (the intake worlds), `intake_` or
+  `demo_`. It never touches run or merged directories.
 
 ## Routes
 

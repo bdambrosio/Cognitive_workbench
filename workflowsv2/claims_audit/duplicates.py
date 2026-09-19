@@ -20,9 +20,9 @@ the wider one (DUPLICATES.md §3, approved 2026-09-17). The whole result is
 written to `<engagement>/surface/duplicates.json`. Nothing is removed. The
 surface page shows a `same_as` claim struck out beside the earlier statement,
 left out unless the practice keeps it, and a `within` claim with the wider
-statement beside it, still in: its verdict can be read from the wider claim's
-finding only once the report derives it (not built), so until then it is
-audited like any other and the mark is information.
+statement beside it, still in: it is audited like any other claim, its
+verdict is never derived from the wider claim's (Bruce, 2026-09-17), and the
+report names the wider claim beside it as "covered by".
 
 ONLY CLOSE PAIRS ARE JUDGED (Bruce, 2026-09-17). Comparing each new claim
 with every earlier one had the model reason through thousands of pairs, about
@@ -38,8 +38,12 @@ judgement under DUPLICATES.md, never a similarity figure.
 THE SETTING LEANS TOWARDS MISSING A REPEAT (Bruce). A missed repeat stays on
 the surface as its own claim and is tested twice: extra work, nothing lost.
 A false merge removes a claim from the review unless the practice notices it
-on the surface page. Measured against the pairs the every-pair pass found, at
-0.75 and three: 337 pairs judged in place of about 45,000 on tuuyi.com and 167
+on the surface page. THE SETTING IN USE IS FLOOR 0.70 AND NEAREST 5: measured
+against a hand-marked reference on chhoto (measure/duplicates_reference, 15
+repeats), 11 of 15 found and no wrong merge. The figures that follow were
+measured earlier the same day at 0.75 and three, against the pairs the
+every-pair pass found, and are kept as the record of that comparison: 337
+pairs judged in place of about 45,000 on tuuyi.com and 167
 in place of about 15,000 on chhoto, with 49 of 70 and 22 of 25 of the known
 pairs among those judged. The repeats not shown are worded differently ("the
 review includes an independent check" / "a checking process separate from the

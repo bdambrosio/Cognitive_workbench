@@ -18,7 +18,9 @@ WHAT IS KEPT, by name, whatever its age:
   jill_*            the companion worlds (jill_chat and its archives, jill_factorio),
                     not workflow artefacts
   post_*            post-delivery conversations, resumed by design
-  intake_*          intake conversations, same
+  client_*          intake conversations, same (intake/session.py names the
+                    world client_<engagement>)
+  intake_*          intake worlds under an earlier name
   demo_*            the public demo's visitor worlds; src/demo/app.py sweeps
                     these on its own schedule (demo.yaml keep_days)
 
@@ -36,7 +38,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 SCENARIOS = REPO / "scenarios"
-KEEP_PREFIXES = ("jill_", "post_", "intake_", "demo_")
+KEEP_PREFIXES = ("jill_", "post_", "client_", "intake_", "demo_")
 
 
 def candidates(days: int) -> list[tuple[Path, float]]:

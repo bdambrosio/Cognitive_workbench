@@ -171,8 +171,10 @@ def run(eng_name: str, model_yaml: Path, only: Optional[str] = None) -> Dict[str
                                   "claims_from": str(f.relative_to(eng_dir)),
                                   "reliance_statement": statement.get("at"),
                                   "tiers": tiers, "unrated": unrated}
-    (eng_dir / state.SURFACE).mkdir(exist_ok=True)
-    atomic_write_text(out_path, json.dumps(record, indent=1, ensure_ascii=False) + "\n")
+        # Written after each source: a later source that fails stops the
+        # program, and the sources already marked keep their record.
+        (eng_dir / state.SURFACE).mkdir(exist_ok=True)
+        atomic_write_text(out_path, json.dumps(record, indent=1, ensure_ascii=False) + "\n")
     return record
 
 
