@@ -133,3 +133,9 @@ def test_the_chain_skips_a_source_with_nothing_to_test(tmp_path):
     assert next(chain.steps())[0] == "audit README.md"
     jobs.surface_file(eng, "README.md").write_text(json.dumps({"claims": [{"id": 2, "tier": 3}]}))
     assert "nothing to test" in jobs.Chain(eng, "m.yaml", "T").check()
+
+
+def test_commands_fill_in_the_current_run():
+    s = {"current_intake": "I1", "intakes": [{"id": "I1", "runs": [
+        {"name": "2026_x", "current": False}, {"name": "2026_y", "current": True}]}]}
+    assert "merged/2026_y" in jobs.commands("e", s)["report"]

@@ -318,9 +318,9 @@ and the client a notice on release; without `SMTP_PASS`, or with
 thread each, evicts the least recently used, and limits turns in flight.
 
 `src/client_ui/app.py` (one client, a token on the URL, ports 8800 and 8801)
-and `practice.py` (port 8802, shows commands and starts nothing) are the
-earlier single-session pages. They still run; `site.py` imports two helpers
-from `app.py`; `practice.py` is imported only by its test.
+holds the earlier single-session client pages. They still run, and `site.py`
+imports two helpers from it. The single-session practice page, `practice.py`,
+was deleted on 2026-09-19; its static files are the ones `/p/` serves.
 
 ## Post-delivery conversation and the demo
 

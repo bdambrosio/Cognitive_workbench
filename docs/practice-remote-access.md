@@ -34,10 +34,13 @@ Where things are on the desk machine:
 
 ## The older route: SSH tunnels through the droplet
 
-The single-session pages (`src/client_ui/practice.py`, port 8802;
-`src/client_ui/app.py`, ports 8800 and 8801) still run only on the desk
-machine and are not on tuuyi.com. To use them from elsewhere, go through
-the droplet with two SSH tunnels. Nothing is opened to the internet.
+The single-session client pages (`src/client_ui/app.py`, ports 8800 and
+8801) still run only on the desk machine and are not on tuuyi.com. The
+single-session practice page, `practice.py` on port 8802, was deleted on
+2026-09-19; the practice pages are the site's `/p/`, and `site.py
+--no-access --port 8802` serves them on loopback with no login, which is
+what the commands below now start. To use these pages from elsewhere, go
+through the droplet with two SSH tunnels. Nothing is opened to the internet.
 
 ## Once, on the desk machine, leave it running
 
@@ -50,15 +53,15 @@ only someone logged in to the droplet can reach them.
 
 Start the page itself as usual:
 
-    python3 src/client_ui/practice.py --port 8802
+    python3 src/client_ui/site.py --no-access --port 8802
 
 ## From the laptop, wherever it is
 
     ssh -L 8802:127.0.0.1:8802 root@165.227.60.233
 
-Then open, in the laptop's browser, the URL the practice page printed when
-it started, which is `http://127.0.0.1:8802/?token=...`. The token is the
-only login, so treat that URL as a password.
+Then open `http://127.0.0.1:8802/p/?as=<a practice email>` in the laptop's
+browser. With `--no-access` there is no login: whoever can reach the port is
+whoever `?as=` says, so keep the port on loopback and behind the tunnel.
 
 ## When it stops working
 
