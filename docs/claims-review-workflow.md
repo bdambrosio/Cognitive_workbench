@@ -6,8 +6,7 @@ level at a time, each term defined where it first appears. Written
 brought up to date on 2026-09-18 for the stages added since: the seller's
 materials page, the sorting of the materials, the pass that marks repeated
 claims, the reliance statement, the tiers, and hand-back. The architecture
-of the runners is in `workflowsv2-architecture.md`, which predates those
-stages.
+of the runners is in `workflowsv2-architecture.md`.
 
 ## The engagement and its stages
 
