@@ -1,191 +1,390 @@
-# workflowsv2 — the claims-audit workflow, as built
+# workflowsv2 — the claims-review programs, as built
 
-> **Status, 2026-09-18.** The four stages below are described as they were
-> on 2026-09-02, with changes to 2026-09-11. This document does not cover
-> what was added since, all before the surface is frozen or beside the
-> chain: the sorting of the materials (`workflowsv2/materials_sorting/`),
-> the behaviour split, the pass that marks repeated claims and claims
-> within a wider one (`claims_audit/duplicates.py`), the reliance statement
-> (`claims_audit/reliance.py`), the tiers (`claims_audit/tiers.py`), and
-> hand-back (`claims_audit/handback.py`). Two things below are no longer
-> true as written: the audit tests only claims in tier 1 or with no tier,
-> and the rest are carried as `not_tested` in the run's `claims.json`; and
-> materiality also reads the engagement's reliance statement. The current
-> account of all of these is `claims-review-workflow.md`. This document is
-> queued to be re-derived from the code.
+Re-derived from the code on 2026-09-19, at commit `ad2a8cd5` (tag `v2.2`).
+Every statement here was checked against the file it names. The vocabulary
+(engagement, surface, tier, finding, holds, material) is defined in
+`claims-review-workflow.md` and is not repeated here. This document says which
+program does each step, what it reads and writes, and which controls the code
+enforces.
 
-Re-derived from the code on 2026-09-02. Four stages, each a runner over a
-method document and a schema, each writing typed JSON that the next stage
-reads. Nothing downstream re-judges what a stage upstream decided; every
-figure is arithmetic over typed fields.
+Each step is a runner over a method document and a JSON schema. A method
+document is loaded by `chat.workflow.load_workflow`, which drops the sections
+marked for the practice, and the result is the system text of the model calls.
+Every deliverable is produced by `workflowsv2/emit.py`: one schema-constrained
+call with two messages and no conversation history, which records how the
+response parsed and whether the route dropped `response_format`. A later step
+reads the typed JSON an earlier step wrote.
 
-| stage | directory | method | reads | writes |
+## The programs
+
+Before the freeze, per engagement:
+
+| step | program | method | reads | writes |
 |---|---|---|---|---|
-| audit | `workflowsv2/claims_audit/` | `method/METHOD.md` | an engagement (`engagements/<name>/engagement.yaml`, `brief.md`) and its target tree | `runs/<ts>_<world>/claims.json`, `findings.json`, `run_meta.json`, `issues.jsonl`, `working_record/` |
-| review | `workflowsv2/audit_review/` | `method/REVIEW.md` | one run directory and the target | `runs/<run>/review/review.json`, `outcomes.json`, `retest.json`, `statistics.json`, `issues.jsonl` |
-| materiality | `workflowsv2/audit_materiality/` | `method/MATERIALITY.md` | one or more reviewed runs and the current intake's `transaction:` and `thresholds:` (else engagement.yaml's) | `merged/<ts>_<label>/merged.json`, `materiality.json`, `materiality.md`, `meta.json` (pins the intake), `issues.jsonl` |
-| report | `workflowsv2/audit_report/` | `method/REPORT.md` | one merged directory and the intake it pinned | `report.md`, `report.html`, `report.pdf`, `report_skeleton.md`, `prose.json`, `worklist.md` |
+| intake | `intake/runner.py`, `intake/session.py` | `INTAKE.md` | the client's turns | `intakes/<id>/intake.json`, `intake.log`; on finish `blocks.yaml`, `intake_meta.json`, and `brief.md` if there is none |
+| sorting | `materials_sorting/runner.py` | `SORTING.md` | every prose file under the target | `sorting/selection.json`, `SELECTION.md`; on confirm, `claim_sources` and `evidence_excludes` in `engagement.yaml` and extracted text under `target/claim_sources/` |
+| enumeration | `claims_audit/runner.py --enumerate-only` | `METHOD.md`, `BEHAVIOUR_SPLIT.md` | one claim source | `runs/<ts>_<world>/claims.json` |
+| repeats | `claims_audit/duplicates.py` | `DUPLICATES.md` | the latest enumeration of every source | `same_as` and `within` marks in those `claims.json`; `surface/duplicates.json` |
+| reliance | `claims_audit/reliance.py` | `RELIANCE.md` | the current intake's whole form (else the engagement's two blocks), every claim statement | `surface/reliance.json` |
+| tiers | `claims_audit/tiers.py` | `TIERS.md` | the two blocks, the reliance statement, the claims | `tier` and `tier_basis` on each claim; `surface/tiers.json` |
+| decompose | `claims_audit/decompose.py`, from the surface page | `DECOMPOSE.md` | one claim and its section | proposals; accepted ones become draft claims |
 
-Two runners sit either side of the chain. `intake/runner.py` with
-`method/INTAKE.md` is the client conversation that fills the ISBAR form and,
-on `--finish`, writes the blocks a run reads. `claims_audit/continuation.py`
-with `method/CONTINUATION.md` is the post-delivery conversation: it answers
-questions about a finished run from its record and is interactive.
+After the freeze, the chain:
 
-## Engagement state (2026-09-03)
+| step | program | method | reads | writes |
+|---|---|---|---|---|
+| audit | `claims_audit/runner.py --surface` | `METHOD.md` | the frozen surface of one claim source, `brief.md`, the target | `runs/<ts>_<world>/claims.json`, `findings.json`, `run_meta.json`, `run.log`, `issues.jsonl`, `working_record/` |
+| review | `audit_review/runner.py` | `REVIEW.md` | one audit run directory and the target | `<run>/review/statistics.json`, `review.json`, `outcomes.json`, `retest.json`, `adverse_recall.json`, `review_meta.json` |
+| materiality | `audit_materiality/runner.py` | `MATERIALITY.md` | the named runs, the intake's blocks, the reliance statement | `merged/<ts>_<label>/merged.json`, `materiality.json`, `materiality.md`, `meta.json`, `issues.jsonl` |
+| report | `audit_report/runner.py` | `REPORT.md` | one merged directory, the intake it pinned, the frozen surfaces, `surface/duplicates.json` | `report.md`, `report.html`, `report.pdf`, `report_skeleton.md`, `prose.json`, `report_meta.json`, `worklist.md` |
 
-The engagement comes first, explicitly: `engagement_state.py <name> new
-[--clone <url or path>]` creates the directory, a stub engagement.yaml and,
-with `--clone`, the materials at `target/` inside it (the default `target:`;
-a local clone hardlinks objects and takes seconds). Nothing else creates an
-engagement, and the intake refuses a name it does not find. The practice
-fills `claim_sources:` after the intake has said where the claims are.
+Beside the chain: `claims_audit/handback.py` (a command, not a job step), and
+the post-delivery conversation (`claims_audit/post_session.py`,
+`continuation.py`, `record.py`, method `CONTINUATION.md`).
 
-An engagement directory holds intakes under `intakes/<id>/` (the form,
-`intake_meta.json`, `intake.log`, and after `--finish` a `blocks.yaml` with
-`transaction:` and `thresholds:`) and runs under `merged/<ts>_<label>/`, each
-of which pins in its `meta.json` the intake its ratings were read against.
-One intake is *current*, and one run per intake: an explicit choice if one
-was made and not cancelled, else the most recent not cancelled. `state.json`
-holds only the explicit choices and the cancelled marks; nothing is deleted.
-`workflowsv2/engagement_state.py` is the module and the CLI (`status`,
-`intake current|cancel <id>`, `run current|cancel <name>`); every runner
-reads the current intake and run through it, and `--intake` / `--merged`
-override. An engagement with no intake reads its blocks from engagement.yaml,
-which is how the fixtures state them.
+All paths in the tables are under
+`workflowsv2/claims_audit/engagements/<name>/`; methods are under each
+program's `method/` directory.
 
-**Retention.** Run and merged directories are the record and live as long
-as the engagement's `retention:` term; nothing deletes them but deleting the
-engagement. The world a stage ran in is scratch once its run directory holds
-the working record, and `workflowsv2/sweep_worlds.py` removes such worlds
-after 30 days (dry run by default; post-delivery, intake and demo worlds are
-kept by name). The chat launcher's log rotates at 20 MB.
+## Engagement state
 
-The browser page (`src/client_ui/app.py`, `intake` and `post` subcommands)
-drives the same two conversations through `workflowsv2/intake/session.py`
-and `workflowsv2/claims_audit/post_session.py`, the objects the terminal
-runners loop over, from one worker thread per process: chat on the left, the
-filling form or the delivered report on the right, a token on the URL, an
-upload that lands in `engagements/<e>/uploads/` and is told to the agent as
-a turn. The page initiates nothing: `--new`, `--finish` and the current
-choices stay on the command line.
+`workflowsv2/engagement_state.py` is the module every runner and the site use,
+and a CLI: `<engagement> new [--clone <url or path>]`, `status`, `intake
+current|cancel <id>`, `run current|cancel <merged dir>`, `stage <stage>
+<value>`.
 
-The practice's own page (`src/client_ui/practice.py`, port 8802) lists the
-engagements with their intakes and runs, makes the current choices and
-cancels, creates an engagement with an optional clone, and shows the launch
-commands to copy. It runs nothing: an intake, a run or a conversation is
-started from the command line by a person.
+`new` creates the directory and a stub `engagement.yaml` (`target`,
+`claim_sources`, `client_emails`, `seller_emails`, `retention`) and marks the
+stage `created`; with `--clone` it fills `target/` and refuses to replace an
+entry already there. Nothing else creates an engagement. The target is
+`target/` inside the engagement unless `engagement.yaml` names another path.
+`evidence_excludes` is the engagement's list when the key is present, else the
+claim sources. `update_engagement` rewrites only the named key in place, so
+comments in the file survive.
 
-The public demo (`src/demo/app.py`) serves one delivered run to many
-visitors, each identified by a cookie and given a world of their own
-(`demo_<engagement>_<run>_<sid>`), with live sessions capped and evicted
-least-recently-used, turns in flight held below the local model server's
-concurrency, and per-visitor limits. Everything sent to a browser passes
-`src/demo/redact.py`, a substitution over the identifiers the practice lists
-in the engagement's `demo.yaml`. The site itself is the static folder
-`site/`, six pages and one stylesheet, hosted anywhere; its demo button
-points at the demo's origin.
+`state.json` holds five things: the explicit current intake, the explicit
+current run per intake, the cancelled lists, `stages` and `jobs`. Intakes and
+runs are read from disk, never listed in the file. In this module a *run* is a
+merged directory that holds a `meta.json`; that file pins the intake the
+ratings were read against. The current intake or run is the explicit choice if
+it exists and is not cancelled, else the most recent not cancelled. A new
+intake clears the explicit choice. An engagement with no intake reads
+`transaction` and `thresholds` from `engagement.yaml`.
 
-Worlds: the intake runs in `client_<engagement>`, reused across sessions. The
-post-delivery conversation runs in one world per (intake, run), named from
-their timestamps and reused, so a second session remembers the first and a
-different run or intake starts clean. Audit, review, materiality and report
-each run in a fresh world.
+The ten stages, in order: `created`, `letter`, `intake`, `materials`,
+`sorting`, `enumeration`, `surface`, `chain`, `release`, `closed`. Each mark
+is `{value, at, by}`. A job record in state `running` is the engagement's
+lock: `add_job` refuses a second one. Writes to `state.json` are serialised by
+a lock within one process and written by atomic replace; two processes writing
+one engagement at once is not handled.
 
-## The audit stage
+## Intake
 
-**Enumeration by section.** The claim source is cut at markdown headings
-outside code fences (`schemas.split_sections`); each section is one
-schema-constrained call that sees the claims enumerated so far with their ids.
-The runner assigns ids in document order, folds a `restates` reference and any
-identical quote within a section into the earlier claim's `locations`, and
-marks each claim `about: target | seller`. METHOD §2 says what is not a claim.
-The surface is frozen when the last section is in. `--enumerate-only` stops
-here.
+`IntakeSession` owns the chat loop and the form; the terminal runner and the
+site both call its `turn()`. The intake agent has no repository tools. The
+runner sends the opening turn, appends to each client turn a one-line ledger
+of the slots still empty, and after each exchange makes one schema-constrained
+call that re-emits the whole form (`intake/schemas.py`: five slots) from the
+conversation. The form is written to `intake.json` and mirrored into a note in
+the world. The world is `client_<engagement>` and is reused across sessions.
+An upload lands under the engagement's `target/` and its text is given to the
+agent as a turn.
 
-**Gathering legs.** The agent works the target through the `inspect_external`
-subagent, naming on each request the claims it serves (`claims: [ids]`, written
-into the trace's query line; `TAG_INSTRUCTION`). The runner sets `subagent_map: false` for both
-the audit and the review, so the subagent's repository-map primitive is
-absent; `run_meta.json` records that under `repo_map`. Legs end with `yield` and are continued by the
-runner; `respond` ends gathering. A leg cut by the action cap is a boundary.
+`finish` writes `transaction:` and `thresholds:` from the form to the intake's
+`blocks.yaml`. `--finish --conclusion` on the command line also writes
+`conclusion: true`. The site's finish button calls `finish` without it, so a
+conclusion can be asked for only from the command line.
 
-**Adjudication in batches.** `evidence_batches` walks claims in id order and
-fills a batch until ten claims or until the union of its claims' full traces
-would exceed `--evidence-budget` (400k chars). Each call is handed only the
-traces filed under its claims: full if they fit, else trimmed to cited lines
-with a 16-line band (`trim_trace`), else query-and-answer (`compact_trace`).
-Every claim gets one finding under `schemas.audit_schema`; `check_output`
-resolves every citation against the target.
+## Sorting
 
-**Two chases.** Before adjudication, claims no request was filed under get one
-targeted gathering leg each pass until every claim is named. After
-adjudication, `unverifiable` findings whose searches named a file the run
-never opened (`not_examined`) get a leg to open it and are re-adjudicated.
-Both loops stop when a pass changes nothing or the leg cap is spent, and what
-is left is recorded in `run_meta.chase` and as issues.
+Code lists the candidates: every prose file in the target (by `git ls-files`,
+else a walk), members of zip archives, the files and outside hosts the prose
+links to, and the repository's hosting description (the only thing fetched
+from outside the target). One model call per file with at least 20 words
+assigns a kind (`description`, `instrument`, `product_text`, `neither`).
+`propose` derives the two lists by rule: every description is a proposed claim
+source and an evidence exclude, plus `claim_sources/`. The stage is marked
+`proposed`.
 
-## The review stage
+`--confirm --by <email>` (or the sorting page) applies the proposal or the
+lists given in its place: claim sources that are HTML, PDF or archive members
+are extracted to text under `target/claim_sources/`, the two keys in
+`engagement.yaml` are written, the confirmation and its changes are recorded,
+and the stage becomes `confirmed`. The enumerate job is refused until then.
 
-Mechanical statistics first (`statistics()`), then reading legs, then
-schema-constrained calls in batches of ten: claim fidelity per claim, four
-observations per finding with a required exception when any is not clean,
-and one record check. Outcomes are derived, never written by the reviewer. A
-blind second reviewer retests adverse observations and a sample of findings
-that hold; the sample is a calibration figure only.
+## The audit runner
 
-## The materiality stage
+One program, `claims_audit/runner.py`, does enumeration and the audit. It
+refuses a world name that already exists under `scenarios/`, replaces the
+scenario's `llm_config` with the model file's (never merges), asks the server
+what it serves when the model file sets `expects_served_model`, resolves the
+temperature before any work, and sets `evidence_excludes` and `subagent_map:
+false` in the agent's configuration. Autonomy is off; the runner drives every
+leg.
 
-`merge.py` concatenates per-document runs with their review outcomes and
-citation problems, no deduplication (the surface is human-owned). Findings
-with a verdict about the claim are rated for `materiality`; `unverifiable`
-findings for `exposure`; never in one total. Rated against the engagement's
-`transaction:` block and the intake's thresholds. Every rating is made twice
-in independently shuffled batches; a finding the two passes rate differently
-is rated three more times, and the shipped rating is the majority with its
-count ("4 of 5") or, on a three-to-two split or no majority, the plurality
-marked borderline with every basis kept and a worklist entry for the
-practice. `--single` rates once. The count measures the rater's stability on
-fixed inputs, not the rating's truth.
+**Enumeration.** `schemas.split_sections` cuts the claim source at markdown
+headings outside code fences, with a minimum and a maximum section size. Each
+section is one call that sees the claims so far. `schemas.assemble_surface`
+assigns ids in document order and folds a claim carrying `restates`, or a
+repeat of the same quote and statement within a section, into the earlier
+claim's `locations`. Each claim is marked `about`: `target`, `seller` or
+`document`. Then `behaviour_split.propose` runs once per section and `apply`
+rewrites the parent's statement and appends the behaviour claim (`implied_by`,
+`approved_by` the pass); `--no-behaviour-split` skips it, and a section whose
+call fails keeps its claims and records an issue. `schemas.check_surface`
+checks every quote against the source; problems are recorded as blocking
+issues. `--enumerate-only` stops here.
 
-## The report stage
+**A frozen surface.** With `--surface` nothing is enumerated or split.
+`schemas.split_by_tier` puts claims rated tier 2 or 3 under `not_tested` in
+the run's `claims.json`; tier 1 and unrated claims are `claims`. Only `claims`
+reach the legs, adjudication and every later step.
 
-`render.py` assembles the client document from the record: the transaction,
-what the audit showed by materiality, unsettled claims by exposure, claims not
-examined, claims that hold, questions, observations, computed coverage, an
-appendix of every claim with its verdict. One schema-constrained call writes
-the passages (REPORT.md §6), among them a conclusion that is present only
-when the intake recorded the buyer's opt-in (`--finish --conclusion`) and
-their thresholds: negative in form, every sentence conditional on those
-thresholds, no view on whether to proceed. `--no-prose` assembles without a
-model.
-`worklist.md` gathers every stage's `issues.jsonl`.
+**Gathering legs.** The first message is the brief, the instruction to name on
+every `inspect_external` request the claims it serves, and the claims. Each
+request is one run of the code subagent
+(`src/chat/subagents/code_subagent.py`), which writes one trace file whose
+query line carries the claim ids. A subagent that reaches its step cap stores
+its state under `subagent_continuations/` and returns an id; the request can
+be resumed once with `continue_id`. A leg that ends in `yield` is followed by
+`continue` plus a line of engagement state; any other ending stops gathering.
+A leg cut by the action cap counts as a yield if it filed a new request and
+ends the run as invalid if it did not. `--max-turns` (default 25) caps all
+legs, chases included; reaching it is recorded as `gathering_capped`, not as
+an error.
 
-## Controls that hold across stages
+**Adjudication.** `evidence_batches` walks claims in id order and closes a
+batch at `--batch` claims (default 10) or when the full traces of its claims
+would exceed `--evidence-budget` (default 400,000 characters). Each call gets
+only the traces filed under its claims: full, else trimmed to the cited lines
+with a 16-line band, else query and answer only. Findings are written to
+`findings.partial.json` batch by batch. A route that dropped
+`response_format`, or findings that do not parse, end the run as failed.
+Claims that got no finding are asked for once more.
 
-- **Sampling settings are code.** Temperature per model in
-  `src/chat/model_params.py`; a model without an entry raises.
-- **Every route records its reliability.** `transient_events` in every
-  stage's metadata: transient statuses retried, by code, and calls that
-  spent the retry budget.
-- **Method documents are linted** (`lint_workflow.py`): retired tokens, dates
-  in the prompt, section references, and each document's vocabulary against
-  its schema.
-- **A fresh world per audit run.** The conversational runners (intake,
-  post-delivery) persist their worlds by design; the four chain stages never
-  reuse one.
+**Three chases.** Before adjudication, claims with no request filed get a
+gathering leg naming them, repeated until a pass tags nothing new; claims
+still untagged are not adjudicated and are named in `not_completed`. After
+adjudication, `schemas.missing_search_kinds` names findings that rest on
+searches and record only one of the two kinds (an `unverifiable` finding on a
+claim about the seller is exempt); a leg asks for the missing search and those
+claims are adjudicated again, two passes at most. Then
+`schemas.candidate_files` names files that a finding's searches named and the
+run never opened; a leg opens them and those claims are adjudicated again,
+until a pass opens nothing new. What remains after each chase is in
+`run_meta.chase` and recorded as an issue.
+
+**Output check and record.** `schemas.check_output` resolves every citation
+against the target, strips line-number prefixes from quotes, checks the fields
+each evidence form requires, the `not_examined` rule against the files the run
+read, and records citations into excluded documents. A check problem is a
+blocking issue, not a failed run; the exit code is non-zero only when the run
+did not complete. The runner copies into `working_record/` the method as
+delivered, the first message, the resolved scenario, the reasoning trace and
+every subagent trace. `run_meta.json` records the resolved model, temperature
+and `top_p`, the target's and the harness's commit, the materials listing,
+files read and matched, the legs, the chases, the batches, and the route's
+transient errors.
+
+## The passes between enumeration and the freeze
+
+`duplicates.py` embeds every statement (`BAAI/bge-small-en-v1.5`, CPU) and
+shows the model, for each claim, up to five earlier claims with similarity of
+at least 0.70 (`NEAREST`, `FLOOR`); a claim with none is not sent. The model
+decides `same_as` or `within`; the similarity figure decides only what is
+shown. A behaviour claim is compared only with behaviour claims. A pairing is
+kept only if it points to an earlier source or a smaller id. A source that
+already has a draft or a frozen surface gets no new marks.
+
+`reliance.py` makes one call and overwrites `surface/reliance.json`,
+corrections included. The surface page saves a person's correction through
+`site.save_reliance`, with who corrected it.
+
+`tiers.py` rates fifteen claims per call with a 32,768-token limit. For each
+source it reads the frozen surface, else the draft, else the latest
+enumeration, and writes `tier` and `tier_basis` into the draft or the
+enumeration. It never writes to a frozen surface, skips claims marked
+`same_as`, and leaves a claim with `tier_by` alone. A frozen surface is still
+rated and the ratings go to `tiers.json` only. A claim the call did not rate
+keeps no tier and is therefore tested. If a batch does not parse the program
+stops: that source's claims are not marked and `tiers.json`, which is written
+once at the end, is not written; sources rated earlier in the same invocation
+keep their marks.
+
+## Review
+
+`statistics()` recomputes the mechanical properties of the audit's output from
+`claims.json`, `findings.json` and the target; it does not read the audit's
+own checks. Reading legs follow (default cap 12), with the same `subagent_map:
+false` and the run's `evidence_excludes`. Then schema-constrained calls in
+batches of ten: one claim check per claim, one finding review per finding with
+four observations (`evidence_relevant`, `evidence_supports`,
+`verdict_calibration`, `searches_adequate`) and a required exception when one
+is not clean, and one record check. `schemas.derive_outcomes` sets `holds`
+when all four observations are clean; the reviewer never writes it. `retest`
+gives the findings with adverse observations, and a sample of held ones
+(default 3), to a second reviewer in its own world that sees none of the first
+review; `--retest-model` defaults to `--model`. The runner refuses a run whose
+`review/review.json` exists.
+
+`adverse_recall` is a separate check in the same program: for findings rated
+`real` it reads the full traces filed under the claim and names lines adverse
+to the claim that the finding does not cite. It writes `adverse_recall.json`
+and issues and does not change `holds`. `--adverse-recall-only` runs it on an
+existing run. `handback.py` takes those rows, adjudicates exactly those claims
+again with a note that names the location and not the reviewer's reading, and
+writes a copy of the run, `<run>_handback_<ts>`, without `review/`; the review
+runner is then run on the copy. No job calls it.
+
+## Materiality
+
+`merge.py` concatenates the named runs' findings with their review outcomes
+and citation problems. It removes nothing; identical quotes across sources are
+reported as an issue. Findings with verdict `contradicted`, `partial` or
+`real_with_caveat` are rated for `materiality` (`not_material`, `material`,
+`decisive`); `unverifiable` findings are rated for `exposure`; `real` findings
+are not rated. Each call gets the transaction, the thresholds, and the
+rendered reliance statement where `surface/reliance.json` exists. Every rating
+is made twice in independently shuffled batches (default 20); a finding rated
+differently gets three more samples and `schemas.combine` ships the majority
+with its count, or the plurality marked borderline with an issue. `--single`
+rates once. `meta.json` pins the intake id and the SHA-256 of the thresholds,
+the transaction and the reliance statement. A rated finding the review did not
+uphold is recorded as issue `rated_but_not_upheld`.
+
+## Report
+
+`render.py` assembles the document from the record and re-judges nothing:
+transaction, executive summary, scope and approach (a table of tested and
+not-tested counts per claim source, including a source with no run), what the
+review showed by materiality, unsettled claims by exposure, unsettled claims
+about the seller, claims not examined, claims that hold, questions for the
+seller, observations the seller did not claim, coverage, limitations, an
+appendix of every tested claim with its verdict, and a second appendix of
+claims listed and not tested. `not_tested` reads the engagement's frozen
+surfaces and `covered_by` reads `surface/duplicates.json`, both by path from
+the merged directory; a claim marked `within` is reported with the wider claim
+beside it and its verdict is never derived.
+
+One schema-constrained call writes seven passages (`summary`, `conclusion`,
+`scope_note`, `shown_note`, `unsettled_note`, `not_examined_note`,
+`limitations`). The report reads the intake that `meta.json` pinned. The
+conclusion is placed only when that intake's blocks carry `conclusion: true`
+and thresholds exist; `schemas.check_prose` records a conclusion written when
+none was asked, an empty required passage, and a claim id no finding carries.
+The runner refuses a merged directory that already has `prose.json`;
+`--rerender` rebuilds the document from it with no model call, and
+`--no-prose` assembles without a model. `printable.py` writes the HTML and the
+PDF. `worklist.md` gathers every step's `issues.jsonl`.
+
+## The client site
+
+`src/client_ui/site.py` is one FastAPI process for every engagement (default
+port 8803). `access.py` verifies the Cloudflare Access JWT from the header or
+cookie and gives a role: practice (`PRACTICE_EMAILS`), client
+(`client_emails`), seller (`seller_emails`). `--no-access` takes the identity
+from `?as=` for loopback use and tests. `cf_access.py` adds new client emails
+to the Access policy and never removes one; unconfigured it does nothing.
+
+Client pages are under `/e/<engagement>/`: home with the stages and
+`next_step`, letter acceptance, the intake chat with upload and finish, the
+surface with comments, and the report chat. The seller has only
+`/e/<engagement>/materials/` (`materials.py`): upload, mkdir, delete under the
+target, and for the practice marking a file as a claim source or an evidence
+exclude; writes are refused while a job runs and, for the seller, after the
+materials are marked ready; paths that leave the target root are refused.
+Practice pages are under `/p/`: engagements and settings, current and cancel
+for intakes and runs, the three stage buttons (`materials` ready, `release`,
+`closed`; release is refused without a `report.md` in the current run), the
+job buttons and logs, the sorting page with confirm, the scrub guidance
+(`SCRUB.md`), and the surface page: draft save, reliance correction,
+decompose, freeze and unfreeze. `freeze` writes `surface/<slug>.surface.json`
+from the draft or the enumeration and marks the stage when every source is
+frozen. `unfreeze` archives the frozen file, makes it the draft, and marks a
+finished chain `superseded`; it is refused while a job runs.
+
+`jobs.py` runs three job kinds as subprocesses in a thread, logging to
+`jobs/<id>.log`: `sort`; `enumerate` (one `--enumerate-only` run per claim
+source, then duplicates on the low-reasoning model file, reliance, tiers);
+`chain` (per source an audit on the frozen surface and its review, then
+materiality over those runs with the current intake, then the report). The
+chain is refused if any source has no frozen surface or no claim would be
+tested, and it skips a source with nothing to test. A step that exits non-zero
+ends the job as failed. `mail.py` sends the practice a notice when a job ends
+and the client a notice on release; without `SMTP_PASS`, or with
+`MAIL_DRY_RUN`, it logs the notice and sends nothing.
+
+`registry.py` keeps one live session per (kind, engagement) with a worker
+thread each, evicts the least recently used, and limits turns in flight.
+
+`src/client_ui/app.py` (one client, a token on the URL, ports 8800 and 8801)
+and `practice.py` (port 8802, shows commands and starts nothing) are the
+earlier single-session pages. They still run; `site.py` imports two helpers
+from `app.py`; `practice.py` is imported only by its test.
+
+## Post-delivery conversation and the demo
+
+`PostSession` binds `inspect_external` to the target, `inspect` to the
+engagement directory, and `CONTINUATION.md` as the system text, over the
+current run of the current intake. Its world is `post_<…>` per (intake, run)
+and is resumed. `record.py` registers a `claim` action on that loop only: one
+call returns a claim's finding, review outcome, rating, report lines and
+seller questions, with each citation checked against the target at call time.
+
+`src/demo/app.py` (port 8810) serves one delivered run to many visitors: a
+cookie per visitor, a world `demo_<engagement>_<run>_<sid>`, a cap on live
+sessions, turns in flight, turns per visitor and sessions per address, and its
+own sweep of demo worlds (`keep_days`, default 7). `redact.py` substitutes the
+identifiers listed in the engagement's `demo.yaml` in every string sent to a
+browser. The public site is the static folder `site/`.
+
+## Controls the code enforces
+
+- **Sampling.** `src/chat/model_params.py`: `TOP_P` 0.95 for every call;
+  temperature per model; a model with no entry raises. The audit runner logs
+  and records the resolved values. It also accepts `--temperature`, which
+  overrides the per-model value for action emission; the jobs never pass it.
+- **Schema-constrained deliverables.** A route that drops `response_format`
+  fails the audit and the report; `emit` records parse state for every call.
+- **A fresh world per audit run**, refused otherwise. Review, materiality and
+  report name their worlds from a timestamp or the run. Intake and
+  post-delivery worlds persist by design.
+- **One review per run; one report per merged directory** unless `--rerender`.
+- **Issues.** `issues.py` appends to `issues.jsonl` in the run or merged
+  directory at the moment a step notices something a person must decide.
+- **Route reliability.** `transient_events` (retried statuses by code, calls
+  that spent the retry budget) is in each step's metadata.
+- **Method lint.** `lint_workflow.py` checks METHOD, REVIEW, MATERIALITY,
+  REPORT and INTAKE for retired tokens, dates, section references, counts and
+  vocabulary against the schemas. It checks form only. The other method
+  documents are not in its list.
+- **World sweep.** `sweep_worlds.py` lists, and with `--delete` removes,
+  worlds under `scenarios/` older than `--days` (default 30), keeping names
+  that start `jill_`, `post_`, `intake_` or `demo_`. It never touches run or
+  merged directories. The intake world is named `client_<engagement>`, which
+  none of those prefixes matches.
 
 ## Routes
 
-Local: Qwen3.8-Flash-Next on the box (`measure/models/local_qwen38flashnext.yaml`)
-for debugging. Hosted: GLM-5.3-Flash on Fireworks
-(`measure/models/fw_glm53flash.yaml`), the default hosted route from
-2026-09-02; direct hosts before brokers (`docs/model-prescreen.md`).
+`jobs.MODEL` is `measure/models/fw_glm53flash.yaml` (GLM-5.3-Flash on
+Fireworks) for every job step except the repeats pass, which uses
+`fw_glm53flash_low.yaml`. `measure/models/local_qwen38flashnext.yaml` is the
+local route and the one the demo is written for. Every program takes
+`--model`; there is no per-step model choice inside a job beyond the repeats
+pass. Provenance of temperatures: `docs/model-settings.md`; route choice:
+`docs/model-prescreen.md`.
 
-## Not built
+## Not built, or not connected
 
-A recommendation (the conclusion exists, as an opt-in passage; advice does
-not); the public website; the security audit (held); a
-per-stage model choice so enumeration can run hosted while the rest runs
-local. The fixture (`measure/fixtures/dataroom/`) is scored by reading
-`findings.json` against `answer_key.md`.
+- The report does not derive a `within` claim's verdict from the wider
+  claim's; both are audited.
+- No button rates the tiers again after the reliance statement is corrected;
+  the practice runs `tiers.py`.
+- Hand-back is not a job step.
+- `retention:` in `engagement.yaml` is read and shown; no program acts on it,
+  and none deletes an engagement.
+- `workflowsv2/security_audit/` is a separate runner with its own method and
+  report; no job and no page reaches it.
+- `workflowsv2/blocks.py`, `citations.py` and `coverage.py` are imported only
+  by the linter, by each other and by tests; no program in the chain uses
+  them. `workflowsv2/audit_postprocess/` holds no source.
