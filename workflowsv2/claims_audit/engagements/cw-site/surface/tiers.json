@@ -1,205 +1,1351 @@
 {
  "sources": {
   "claim_sources/site/how-it-works.md": {
-   "at": "2026-09-18T17-43-39Z",
+   "at": "2026-09-19T16-49-30Z",
    "model": "accounts/fireworks/models/glm-5p3-flash",
-   "claims_from": "surface/claim_sources_site_how_it_works_md.surface.json",
-   "reliance_statement": "2026-09-18T17-33-31Z",
+   "marked": 39,
+   "claims_from": "surface/claim_sources_site_how_it_works_md.draft.json",
+   "reliance_statement": "2026-09-19T16-47-11Z",
    "tiers": [
     {
      "claim_id": 1,
      "tier": 3,
-     "basis": "If the service did not work in fixed steps, nothing in the firm's stated plan changes: it pays for the six listed outcomes and the thresholds it named, none of which requires the steps to be fixed. No reliance item the firm depends on rests on this wording. Rated on the scale alone."
+     "basis": "If the service did not proceed in fixed steps, the buyer's stated pay-fors and walk-away conditions are untouched, and no reliance item turns on the steps being fixed. The failure would cost the buyer nothing it said it was paying for. Rated on the scale alone."
     },
     {
      "claim_id": 2,
      "tier": 1,
-     "basis": "If claims were not frozen before testing, the first of the six things the firm listed as the whole of what it is paying for would fail, and the firm would have to build the claim list itself. This is exactly what the firm said would change the price or terms. Rated against the buyer's stated threshold: \"every seller claim listed and frozen before testing\"."
+     "basis": "The buyer listed this among what it is paying for, and the reliance statement marks it as something the plan depends on: if the list were not frozen before testing, the report's coverage of the claim set could not be trusted and the firm could not repair that inside its 10-day window. Its falsity would change the price the buyer was willing to pay. Rated against the buyer's stated threshold: \"every seller claim listed and frozen before testing\"."
     },
     {
      "claim_id": 3,
      "tier": 1,
-     "basis": "If findings were not cited to file and line, the firm's engineer could not open and confirm them, and the firm would have to re-derive every finding unaided. The firm named this among the six things it is paying for and among the things that would change the price or terms. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
+     "basis": "The buyer's plan depends on citations its own engineer can open and confirm; without them the firm must take the report on trust or commission its own diligence. Its falsity would defeat an item the buyer depends on and would reopen the price. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
     },
     {
      "claim_id": 4,
      "tier": 1,
-     "basis": "If the independent check were missing, re-used the first reader's conclusions, or were skipped for some findings, the firm said the price or terms would change; the firm would need its own engineer or an outside adviser to re-check, defeating the purpose of the engagement. Rated against the buyer's stated threshold: \"every finding checked a second time independently\"."
+     "basis": "The buyer named the independence of the second check as something that would change the price or terms if it re-used the first reader's work or was skipped. Without it the firm is paying for a single reading and cannot supply a second reader itself. Rated against the buyer's stated threshold: \"an independent check that re-uses the first reader's conclusions or is skipped for some findings\"."
     },
     {
      "claim_id": 5,
      "tier": 1,
-     "basis": "If ratings were made against the service's own judgement rather than the firm's thresholds, the firm's vice-president would have to re-rate every finding from raw findings, and the firm named this as something that would change the price or terms. Rated against the buyer's stated threshold: \"ratings made against the thresholds the firm states\"."
+     "basis": "Ratings made against anything other than the firm's stated thresholds would be meaningless to its investment committee, and the firm cannot credibly re-weight the findings itself. The buyer named this as price- or terms-changing. Rated against the buyer's stated threshold: \"a rating step that does not use the firm's stated thresholds\"."
     },
     {
      "claim_id": 6,
      "tier": 1,
-     "basis": "If no person signed the conclusion, the firm's investment committee would be asked to rely on an unsigned conclusion, which the firm has said would change the price, and the firm cannot easily supply a signatory of its own. Rated against the buyer's stated threshold: \"a person's signature on the conclusion\"."
+     "basis": "The buyer pays for a person's signature, and named a step described as human but done by tooling alone as price- or terms-changing; without it the report's authority with the committee fails. The buyer cannot repair this itself. Rated against the buyer's stated threshold: \"a step the website describes as done by a person that is done by the tooling alone, or the reverse\"."
     },
     {
      "claim_id": 7,
      "tier": 1,
-     "basis": "If the record were not kept, a committee question a year later could not be answered, which the firm has said would change the price, and the firm cannot reconstruct the record itself. Rated against the buyer's stated threshold: \"the working record not being kept, because the committee may ask for it a year later\"."
+     "basis": "The buyer named the keeping of the working record as price- or terms-changing, because the committee may ask to see it a year later, and a record never held cannot be reconstructed. Its falsity would change the terms the firm would accept. Rated against the buyer's stated threshold: \"the working record not being kept, because the committee may ask for it a year later\"."
     },
     {
      "claim_id": 8,
      "tier": 3,
-     "basis": "If uploads arrived by some other route than a page of the engagement site, the firm's plan is untouched: the firm never handles the materials, and the confidentiality the firm actually depends on is carried by the claims about who can open the materials and what leaves the engagement. Nothing in the stated thresholds or the reliance items reaches the upload mechanism as such. Rated on the scale alone."
+     "basis": "The upload page is an item the buyer only uses: the reliance statement records that if it failed, the firm could supply materials by another arrangement with Tuuyi, at the cost of some of the 10 days. The stated turnaround threshold concerns the report's turnaround, not the upload route. Rated on the practice's reading of the buyer's plan."
     },
     {
      "claim_id": 9,
      "tier": 1,
-     "basis": "If anyone beyond the seller and the practice could open the uploaded materials, the firm said that ends the deal: it would walk away from the service, and its non-disclosure obligations to sellers leave no workaround. Rated against the buyer's stated threshold: \"the seller's materials being visible to anyone but the seller and the practice\"."
+     "basis": "A failure here admits the seller's materials to eyes beyond the seller and the practice, which the buyer stated would end the deal outright and which no repair can undo. The buyer depends on this item. Rated against the buyer's stated threshold: \"the seller's materials being visible to anyone but the seller and the practice\"."
     },
     {
      "claim_id": 10,
      "tier": 3,
-     "basis": "If the practice did not review and mark the uploaded materials ready, nothing in the firm's stated plan, thresholds or reliance items changes; the firm neither sees the materials nor depends on this internal step. Rated on the scale alone."
+     "basis": "Whether the practice marks the materials ready changes nothing in the buyer's pay-fors, thresholds or walk-away conditions; no reliance item the plan depends on rests on this step. The buyer's plan is untouched either way. Rated on the scale alone."
     },
     {
      "claim_id": 11,
-     "tier": 1,
-     "basis": "If the firm did receive the examination materials, the materials would be visible to a party beyond the seller and the practice, which the firm said ends the deal; as a named adviser it may be permitted to hold code, but the firm's own words define the boundary it relies on. Rated against the buyer's stated threshold: \"the seller's materials being visible to anyone but the seller and the practice\"."
+     "tier": 3,
+     "basis": "This is the division of labour the reliance statement marks as the practice's inference: if the service instead demanded materials or assumptions the firm had not agreed to supply, the vice-president would renegotiate the workflow — disruptive to the 10-day need but feasible before the review starts. Nothing the buyer said it was paying for is lost. Rated on the practice's reading of the buyer's plan."
     },
     {
      "claim_id": 12,
      "tier": 1,
-     "basis": "If any part of the materials beyond the report's paths and quoted lines left the engagement, the seller's materials would be visible or movable beyond the boundary the firm set, which the firm said ends the deal and which its non-disclosure agreements leave unrepairable. Rated against the buyer's stated threshold: \"the seller's materials being visible to anyone but the seller and the practice\"."
+     "basis": "This is a boundary claim: if it failed, examination materials would leave the engagement beyond the report's paths and quoted lines, admitting exactly the exposure the buyer said would end the deal. The buyer depends on the seller's code and materials never reaching another party or service. Rated against the buyer's stated threshold: \"the seller's materials being visible to anyone but the seller and the practice\"."
     },
     {
      "claim_id": 13,
      "tier": 3,
-     "basis": "This claim is conditional on the buyer already holding the materials and concerns only the route by which they are supplied; the firm's plan, thresholds and reliance items do not reach it, and its failure would cost the firm a different supply arrangement at most. Rated on the scale alone."
+     "basis": "The claim concerns a path for buyers who already hold the materials; on this deal the seller supplies them, and the firm's pay-fors, thresholds and walk-away conditions say nothing about this route. Its falsity would change nothing for this buyer. Rated on the scale alone."
     },
     {
      "claim_id": 14,
      "tier": 3,
-     "basis": "Reading documents one section at a time is internal method; the firm depends on what the reading produces (the frozen claim list, the citations), not on the sequence of the reading, and no stated threshold or reliance item names it. Rated on the scale alone."
+     "basis": "How the documents are chunked for reading is internal method; no stated threshold, pay-for or walk-away condition reaches it, and no reliance item the plan depends on turns on sections rather than any other unit. The buyer's plan is unaffected. Rated on the scale alone."
     },
     {
      "claim_id": 15,
      "tier": 1,
-     "basis": "If assertions in the seller's documents were not all enumerated, some seller claims would go unlisted and so untested, defeating the first of the six things the firm is paying for and the firm's assurance that every claim is captured before testing. Rated against the buyer's stated threshold: \"every seller claim listed and frozen before testing\"."
+     "basis": "If assertions in the seller's documents were not all enumerated, the frozen claim list could not cover every seller claim — the item the buyer is paying for and depends on — and the firm could not know what was missed. Its falsity would reopen the price. Rated against the buyer's stated threshold: \"every seller claim listed and frozen before testing\"."
     },
     {
      "claim_id": 16,
      "tier": 1,
-     "basis": "Seeing the frozen list is how the firm confirms the freeze happened before testing and exercises its right to add claims of its own; without it the firm cannot verify what it is paying for and would go back over the terms. Rated against the buyer's stated threshold: \"every seller claim listed and frozen before testing\"."
+     "basis": "The firm can verify that the claim set is complete and fixed only by seeing the list itself; without it the firm's engineer would have to reconstruct coverage from the seller's documents inside the 10-day window. Rated against the buyer's stated threshold: \"every seller claim listed and frozen before testing\"."
     },
     {
      "claim_id": 17,
      "tier": 1,
-     "basis": "If claims were read by some other convention, the findings and ratings the firm relies on would be built on a reading the firm never agreed to, and with only the website before it the firm would go back over what it is buying. No stated threshold names the reading convention, and the firm's plan rests on the method as described. Rated on the practice's reading of the buyer's plan."
+     "basis": "If claims were read by any other convention, the findings and ratings would be systematically misaligned with what a buyer in this transaction would rely on, and the firm — which never receives the code — has no way to supply that reading itself. The whole value of the report would change. Rated on the scale alone."
     },
     {
      "claim_id": 18,
      "tier": 1,
-     "basis": "Testing against code, configuration and build files is what makes findings citable to files the firm's engineer can open and confirm; if claims were tested against anything else, the verification the firm is paying for fails and the engineer must re-derive findings unaided. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
+     "basis": "Reading the code, configuration and build files is the substance of what the firm is buying; if claims were settled some other way, the firm's engineer would have to do the code-reading deal by deal itself and could not repair the report. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
     },
     {
      "claim_id": 19,
-     "tier": 1,
-     "basis": "The firm hands over seller code under non-disclosure terms and would go back to reopen the terms if the review compiled, executed or measured that code rather than only reading it. No stated threshold names execution, and the method item is the practice's inference. Rated on the practice's reading of the buyer's plan."
+     "tier": 3,
+     "basis": "No stated threshold reaches whether the software is run, and the item the practice maps this to — runtime claims being reported unsettled — is one the firm uses rather than depends on, so a failure would not defeat anything the firm's plan rests on. Rated on the practice's reading of the buyer's plan."
     },
     {
      "claim_id": 20,
-     "tier": 1,
-     "basis": "If runtime claims were tested by any other means than the mechanism in the code, findings on how the software behaves would rest on a process the firm did not agree to, and a firm that has seen only the website would go back over what it is buying. No stated threshold reaches this, and the method item is the practice's inference. Rated on the practice's reading of the buyer's plan."
+     "tier": 3,
+     "basis": "How a runtime claim is tested as to mechanism defeats no item the firm depends on, and no stated threshold names it; the nearest reliance item is one the firm only uses. Rated on the practice's reading of the buyer's plan."
     },
     {
      "claim_id": 21,
-     "tier": 1,
-     "basis": "If behaviour in operation could be reported as settled without records of it running, findings would state as settled what the firm cannot verify from code, and the ratings the firm relies on would inherit that overstatement on a live deal. No stated threshold reaches this, and the method item is the practice's inference. Rated on the practice's reading of the buyer's plan."
+     "tier": 3,
+     "basis": "If operation were settled without records of it running, the report would say more than the evidence shows, but no stated threshold names this and the reliance item is one the firm uses, not one it depends on. Rated on the practice's reading of the buyer's plan."
     },
     {
      "claim_id": 22,
      "tier": 1,
-     "basis": "If documentation could settle claims, findings would rest on the seller's own documents rather than the code, defeating the file-and-line confirmation the firm's engineer performs and which the firm is paying for. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
+     "basis": "If the seller's documentation could settle a claim, claims would no longer be tested against the code, and the firm would be paying for a document-reading exercise it can neither verify nor repair. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
     },
     {
      "claim_id": 23,
-     "tier": 1,
-     "basis": "If vague general statements were treated as claims, more statements would be listed and tested at the fee fixed at intake, and the firm would lose nothing it has said it is paying for. Rated on the scale alone."
+     "tier": 3,
+     "basis": "The filter decides which statements enter the frozen list, not whether the list is made and frozen; its absence would mostly widen the list, and nothing the firm stated reaches how vagueness is judged. Rated on the scale alone."
     },
     {
      "claim_id": 24,
-     "tier": 1,
-     "basis": "If implied properties were not reported separately, the firm would still have findings and ratings on every stated claim, and nothing in its stated thresholds or plan names implied properties. Rated on the scale alone."
+     "tier": 3,
+     "basis": "Reporting implied properties separately is added completeness the firm has not said it depends on and no stated threshold names; its absence would not change the price or terms on its own. Rated on the scale alone."
     },
     {
      "claim_id": 25,
      "tier": 1,
-     "basis": "Findings on each claim are the deliverable the firm is paying for; without a finding on a claim the firm has a frozen list and nothing tested, and it would go back over the price. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
+     "basis": "A report without a stated status for each frozen claim would be a pile of evidence with no conclusions, which the firm cannot supply itself and which would not justify the fee. Rated on the practice's reading of the buyer's plan."
     },
     {
      "claim_id": 26,
-     "tier": 1,
-     "basis": "If the report expressed opinions on the software, the seller or the transaction, the firm would receive more than the findings and ratings it asked for, and nothing in its stated thresholds or plan is affected. Rated on the scale alone."
+     "tier": 3,
+     "basis": "The firm verifies findings from their citations and makes its own judgements for committee, so whether the report also editorialises is named in no threshold and defeats no depended-on item. Rated on the scale alone."
     },
     {
      "claim_id": 27,
      "tier": 1,
-     "basis": "The firm has said that a citation check not done mechanically as the website describes would change the price or terms; this claim is exactly that commitment. Rated against the buyer's stated threshold: \"citations that are not verified mechanically as the website says\"."
+     "basis": "Mechanical citation checking is one of the six things the firm listed as what it is paying for, and it cannot check each citation by hand inside the 10-day window at every deal. Rated against the buyer's stated threshold: \"citations that are not verified mechanically as the website says\"."
     },
     {
      "claim_id": 28,
      "tier": 1,
-     "basis": "If the verdict scheme differed and \"unsettled\" were not among the verdicts, claims the materials cannot settle would read as definitive to the committee, and the firm would go back over a report that overstates certainty on a live deal. No stated threshold names the verdict set, and the report's fixed shape is the practice's inference. Rated on the practice's reading of the buyer's plan."
+     "basis": "The verdict scheme, with \"unsettled\" among it, is what gives each frozen claim a stated status and keeps the report honest about what it could not settle; without it the firm could not read the report's coverage and could not supply the missing judgement itself. Rated on the practice's reading of the buyer's plan."
     },
     {
      "claim_id": 29,
      "tier": 1,
-     "basis": "For a claim that something is absent, the recorded searches are the only means of tracing the finding back to what was searched — the working record the firm said must be kept because the committee may ask a year later. Failure for the absence class of claims would change the price. Rated against the buyer's stated threshold: \"the working record not being kept, because the committee may ask for it a year later\"."
+     "basis": "For an absence claim the recorded searches are the only thing the firm's engineer can open and confirm and the only trace the working record would carry, so without them such findings are unverifiable and untraceable a year later. Rated against the buyer's stated threshold: \"the working record not being kept, because the committee may ask for it a year later\"."
     },
     {
      "claim_id": 30,
      "tier": 1,
-     "basis": "If claims the materials cannot reach were not reported as unreachable with a reason, the firm would read untested claims as tested and rate them against its thresholds on that false footing, and it would go back over the terms once it discovered this. No stated threshold names unreachability and no reliance item covers it. Rated on the scale alone."
+     "basis": "The firm never receives the code, so it cannot discover on its own that a claim was unreachable; if such claims were not reported as such, the report would look complete when it is not and the firm would carry false assurance to its committee. Rated on the practice's reading of the buyer's plan."
     },
     {
      "claim_id": 31,
      "tier": 1,
-     "basis": "If unsettled claims counted against the seller, the rating step would import the service's own judgement rather than the firm's thresholds, and the firm — with one vice-president and one engineer across six deals a year — would have to re-rate the findings itself. The firm named this rating step among the six things it is paying for and said its falsity would change the price or terms. Rated against the buyer's stated threshold: \"ratings made against the thresholds the firm states\"."
+     "basis": "If unsettled claims were counted against the seller, the ratings the firm receives would overstate the evidence, and the firm cannot re-weight findings itself without the very skill it is buying. Rated against the buyer's stated threshold: \"a rating step that does not use the firm's stated thresholds\"."
     },
     {
      "claim_id": 32,
-     "tier": 3,
-     "basis": "The statement of what was not examined belongs to the report's fixed shape, an item the firm uses but has not named among the six things it is paying for; if it were false the engineer would have to assemble the review's limits himself, which is costly but workable within the plan. Rated on the practice's reading of the buyer's plan."
+     "tier": 1,
+     "basis": "If what was not examined were not listed as such, the firm could not tell what the report actually covered, and its engineer would have to test the gaps itself inside the 10-day window on an eleven-person firm. Rated on the practice's reading of the buyer's plan."
     },
     {
      "claim_id": 33,
      "tier": 1,
-     "basis": "If the report did not say which findings held up under the second check, the independent check the firm is paying for would tell it nothing it can act on, and the firm would have to re-check findings itself or accept them unverified. Rated against the buyer's stated threshold: \"every finding checked a second time independently\"."
+     "basis": "If the report did not say which findings held up under the second check, the firm would be paying for a second reading whose outcome it cannot see, and would have to discount the report or stop using the service. Rated against the buyer's stated threshold: \"every finding checked a second time independently\"."
     },
     {
      "claim_id": 35,
      "tier": 1,
-     "basis": "The claim promises that a person decides any rating the two readings split on; if tooling alone decided it, the firm would be getting exactly the substitution it said would change the price or terms, and the ratings it depends on would not be made against its thresholds. Rated against the buyer's stated threshold: \"a step the website describes as done by a person that is done by the tooling alone, or the reverse\"."
+     "basis": "The firm's terms make a person-versus-tooling substitution on any described step a price-and-terms matter; if borderline ratings were decided by the tooling alone, that condition would be met on the rating step the firm depends on. Rated against the buyer's stated threshold: \"a step the website describes as done by a person that is done by the tooling alone, or the reverse\"."
     },
     {
      "claim_id": 36,
      "tier": 1,
-     "basis": "Line-level attribution is how the firm tells human judgement from machine work in the report it hands its investment committee; if the report did not show it, the committee would be relying on a conclusion whose authorship it cannot separate, the firm having said it cannot easily supply a signatory of its own. Rated against the buyer's stated threshold: \"a step the website describes as done by a person that is done by the tooling alone, or the reverse\"."
+     "basis": "If the report did not show which lines rest on cited fact and which on judgement, the firm's engineer could not tell what it can verify and what rests on opinion, and the report's authority with the investment committee would fail. Rated against the buyer's stated threshold: \"a step the website describes as done by a person that is done by the tooling alone, or the reverse\"."
     },
     {
      "claim_id": 37,
      "tier": 3,
-     "basis": "The firm has recorded that it has no view on the stated limits and buys penetration testing from other advisers, so nothing in its plan changes if this exclusion were inaccurate. Rated on the scale alone."
+     "basis": "The firm said it has no view on the stated limits and buys nothing in these categories from Tuuyi, covering them through other advisers, so the claim's falsity would cost it nothing. Rated on the scale alone."
     },
     {
      "claim_id": 38,
      "tier": 3,
-     "basis": "The firm has recorded that it has no view on the stated limits and buys code-quality review from other advisers, so nothing in its plan changes if this exclusion were inaccurate. Rated on the scale alone."
+     "basis": "The firm said it has no view on the stated limits and buys nothing in these categories from Tuuyi, covering them through other advisers, so the claim's falsity would cost it nothing. Rated on the scale alone."
     },
     {
      "claim_id": 39,
      "tier": 3,
-     "basis": "The firm has recorded that it has no view on the stated limits and obtains legal advice elsewhere, so nothing in its plan changes if this exclusion were inaccurate. Rated on the scale alone."
+     "basis": "The firm said it has no view on the stated limits and buys nothing in these categories from Tuuyi, covering them through other advisers, so the claim's falsity would cost it nothing. Rated on the scale alone."
+    },
+    {
+     "claim_id": 40,
+     "tier": 1,
+     "basis": "If the review judged claims it did not resolve, verdicts would overreach the evidence and the firm would carry unsupported judgements into the pricing of a $4.2M deal; it cannot supply the missing judgement itself. Rated on the practice's reading of the buyer's plan."
+    }
+   ],
+   "unrated": []
+  },
+  "claim_sources/site/index.md": {
+   "at": "2026-09-19T16-50-45Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 37,
+   "claims_from": "surface/claim_sources_site_index_md.draft.json",
+   "reliance_statement": "2026-09-19T16-47-11Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 1,
+     "basis": "If the service did not perform technical due diligence for software acquisitions at all, the buyer would receive nothing of what the engagement is for and would not close; the fee is paid solely for this function. Rated on the scale alone."
+    },
+    {
+     "claim_id": 2,
+     "tier": 1,
+     "basis": "Comparing the seller's claims against the code is the core of what the firm is paying $5,000 a review for; if the service did not do this, the firm would be paying for a report with no substance behind it and would not close. Rated on the scale alone."
+    },
+    {
+     "claim_id": 4,
+     "tier": 1,
+     "basis": "If the engagement did not end in a signed opinion, the buyer loses the signed conclusion it named as one of the six things it is paying for, and the report's authority with its investment committee would fail; the free-demo endpoint of the span does not matter to this buyer, but the signature does. Rated against the buyer's stated threshold: \"a person's signature on the conclusion\"."
+    },
+    {
+     "claim_id": 5,
+     "tier": 3,
+     "basis": "The claim concerns the free, limited beta path; the firm stated the free demo and the developer beta are of no commercial interest to it and it will never use them again, and its fee is set at intake in any case. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 6,
+     "tier": 3,
+     "basis": "A statement of the audience the service is aimed at changes nothing for this buyer if false: the firm's price, terms and thresholds do not rest on who else the service is marketed to. Rated on the scale alone."
+    },
+    {
+     "claim_id": 7,
+     "tier": 1,
+     "basis": "A report the buyer can check line by line is the second of the six things the firm listed as the whole of what it is paying for; if the report were not checkable this way, the firm could not verify the review itself and would have to discount it or commission its own diligence. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
+    },
+    {
+     "claim_id": 8,
+     "tier": 3,
+     "basis": "The private question page is an item the buyer uses but does not depend on: if it failed, the firm would fall back on the report and its own copy of the working record, an irritation rather than a failure, and no stated threshold names it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 9,
+     "tier": 1,
+     "basis": "The report's stated shape carries the evidence with file and lines, the independent check's outcome and the unsettled claims — the very things the firm said are the whole of what it is paying for; if the report did not have these parts, the firm could not confirm the citations or see the second check, and the price would not be justified. Rated against the buyer's stated threshold: \"every finding checked a second time independently\"."
+    },
+    {
+     "claim_id": 11,
+     "tier": 3,
+     "basis": "If the buyer did see the code, the division of labour would have to be renegotiated before the review could start — feasible but disruptive — yet nothing in the firm's price, terms or walk-away conditions rests on whether the firm itself is shown the code. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 12,
+     "tier": 1,
+     "basis": "The firm must have the report in hand within 10 days of the seller uploading the code, inside a 21-day exclusivity period, and named turnaround as something that would change the price or terms; if a small target did not come back within days, the review could not fit the live deal. Rated against the buyer's stated threshold: \"a turnaround longer than the website states, because the exclusivity period is short\"."
+    },
+    {
+     "claim_id": 13,
+     "tier": 1,
+     "basis": "The same threshold reaches this claim: the firm's plan assumes the website's stated turnaround, and if a typical deal took materially longer than about a week, the review would not fit the 10-day need the firm stated for this and the further five deals a year. Rated against the buyer's stated threshold: \"a turnaround longer than the website states, because the exclusivity period is short\"."
+    },
+    {
+     "claim_id": 14,
+     "tier": 3,
+     "basis": "The demo is something the firm stated is of no commercial interest to it and it will never use again; whether the demo tier is free changes nothing about the firm's paid engagement or its $5,000 fee set at intake. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 15,
+     "tier": 3,
+     "basis": "The demo's contents and question interface sit entirely within the free path the firm stated it will never use again; its falsity would have no effect on the firm's plan, though the firm still expects the demo to be described honestly. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 16,
+     "tier": 3,
+     "basis": "A statement of intent about setting up visitors who supply their own repositories concerns the free path the firm said it will never use; the firm's engagement is a paid one-review-at-a-time service under an engagement letter, which this claim does not touch. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 17,
+     "tier": 3,
+     "basis": "The firm has already been quoted $5,000 at intake, so whether the price is quoted after intake or published changes nothing for it; the engagement structure it agreed to is unaffected. Rated on the scale alone."
+    },
+    {
+     "claim_id": 18,
+     "tier": 1,
+     "basis": "If not every named claim were tested against the code, the core of what the firm is paying for fails and its engineer would have to read the code deal by deal inside a 10-day window. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
+    },
+    {
+     "claim_id": 21,
+     "tier": 1,
+     "basis": "If the report were not signed by a person who takes responsibility for it, the report's authority with the investment committee would fail and the fee would not be justified. Rated against the buyer's stated threshold: \"a person's signature on the conclusion\"."
+    },
+    {
+     "claim_id": 22,
+     "tier": 3,
+     "basis": "If attested due diligence were not priced per engagement, no term the firm stated as price-changing or deal-ending would be affected; the firm's budget assumes a fee set at intake either way. Rated on the scale alone."
+    },
+    {
+     "claim_id": 23,
+     "tier": 3,
+     "basis": "If the attested tier did not include a reading of the whole record by someone who has sat on both sides of a deal, the claims review itself would still stand and no stated threshold would be reached; the firm would weigh the signature on the citations alone. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 24,
+     "tier": 1,
+     "basis": "If the attested tier did not deliver a signed opinion, the report's authority with the committee would fail and the price would not be justified; the on-call part rests on practice inference, but the signature alone carries the claim. Rated against the buyer's stated threshold: \"a person's signature on the conclusion\"."
+    },
+    {
+     "claim_id": 25,
+     "tier": 3,
+     "basis": "If the service were not aimed at buyers in the $1M to $5M range at the pre-letter-of-intent stage, the firm's live deal — $4.2M, during exclusivity — would sit at or past the stated edge, but no stated price, term or walk-away condition reaches this and the firm can judge fit at intake. Rated on the scale alone."
+    },
+    {
+     "claim_id": 26,
+     "tier": 3,
+     "basis": "If a claims review were not narrower, quicker or cheaper than a full technical due diligence, nothing the firm listed as price-changing or deal-ending would change; the fee is set at intake regardless. Rated on the scale alone."
+    },
+    {
+     "claim_id": 27,
+     "tier": 3,
+     "basis": "If the method did not work from a README alone or the demo did not show that case, the firm would feel no effect, since it ran the demo once and will not use it again. Rated on the scale alone."
+    },
+    {
+     "claim_id": 28,
+     "tier": 3,
+     "basis": "If the service did not exclude penetration testing, code-quality review and legal advice as stated, the firm buys nothing in those categories from Tuuyi and covers them through other advisers. Rated on the scale alone."
+    },
+    {
+     "claim_id": 29,
+     "tier": 1,
+     "basis": "If the review did not read the target's code, the firm's engineer would have to do that code-reading itself, which it cannot repair cheaply inside a 10-day window. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
+    },
+    {
+     "claim_id": 31,
+     "tier": 1,
+     "basis": "If the report did not state a status for each claim and the consequence of each gap, the report would be evidence without conclusions and the firm could not supply the missing judgement itself. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 32,
+     "tier": 1,
+     "basis": "If the engagement did not begin with an intake conversation capturing what would change the decision or the price, the ratings step would have nothing to rate against and the timetable would slip. Rated against the buyer's stated threshold: \"ratings made against the thresholds the firm states\"."
+    },
+    {
+     "claim_id": 34,
+     "tier": 1,
+     "basis": "If frozen claims were not tested against the code and documents supplied, the core of the service would fail and the firm's engineer would have to replace it deal by deal. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
+    },
+    {
+     "claim_id": 35,
+     "tier": 1,
+     "basis": "If every gap were not rated twice and re-examined where the readings differ, the firm would be paying for a single reading of the materiality judgement, which it cannot repair or re-weight credibly itself. Rated against the buyer's stated threshold: \"every finding checked a second time independently\"."
+    },
+    {
+     "claim_id": 36,
+     "tier": 3,
+     "basis": "If the private question page did not provide access to the working record behind each answer, the firm would fall back on the report and its own copy of the record — an irritation, since its stated condition is that the record is kept, not that the page exists. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 37,
+     "tier": 1,
+     "basis": "If the reading were not done as described, a step the website attributes to tooling would be attributed wrongly, which is exactly the mismatch the firm said would change the price or terms. The buyer relies on machine and human work being distinguishable, and would reopen the price if the attribution were false. Rated against the buyer's stated threshold: \"a step the website describes as done by a person that is done by the tooling alone, or the reverse\"."
+    },
+    {
+     "claim_id": 38,
+     "tier": 1,
+     "basis": "If the reading were a single unverified answer taken on trust, the firm would be paying for one reading with no independent confirmation, defeating the second-check item it marked as depends. The firm said it cannot repair that itself and would have to discount the report or stop using the service. Rated against the buyer's stated threshold: \"an independent check that re-uses the first reader's conclusions or is skipped for some findings\"."
+    },
+    {
+     "claim_id": 39,
+     "tier": 1,
+     "basis": "If this were false, three items the firm marked as depends would fail at once: the claim list held separate from verdicts, the working record of every search and file, and the refusal of uncited findings. The firm's walk-away threshold reaches the working record because the committee may ask for it a year later, and the failure cannot be repaired by the firm. Rated against the buyer's stated threshold: \"the working record not being kept, because the committee may ask for it a year later\"."
+    },
+    {
+     "claim_id": 40,
+     "tier": 1,
+     "basis": "If lines did not attribute machine work to the tooling and judgement to a person, the firm could not tell which part of the report carries a person's authority, defeating an item it marked as depends. The buyer said this mismatch would change the price or terms. Rated against the buyer's stated threshold: \"a step the website describes as done by a person that is done by the tooling alone, or the reverse\"."
+    },
+    {
+     "claim_id": 41,
+     "tier": 1,
+     "basis": "If the report did not show machines drafting and a person confirming and signing as distinct acts, the signature the firm is paying for would not carry the authority it expects with its committee. The firm said this distinction is one of the six things it is paying for and cannot repair its absence itself. Rated against the buyer's stated threshold: \"a person's signature on the conclusion\"."
+    },
+    {
+     "claim_id": 42,
+     "tier": 1,
+     "basis": "If the seller's claims were not actually checked against the code, the core of what the firm is buying would be absent, and its engineer would have to read the code deal by deal itself inside a 10-day window. The firm marked this item as depends and said no competent engineer replaces it in a day. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
+    },
+    {
+     "claim_id": 43,
+     "tier": 1,
+     "basis": "The firm stated the free demo and its question-answering interface are of no commercial interest and that it will never use them again, so nothing in its plan would change if this claim were false. No stated threshold reaches the demo, and the tier rests on no further judgement of weight. Rated on the scale alone."
+    }
+   ],
+   "unrated": []
+  },
+  "claim_sources/site/introduction-transcript.md": {
+   "at": "2026-09-19T16-54-01Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 51,
+   "claims_from": "surface/claim_sources_site_introduction_transcript_md.draft.json",
+   "reliance_statement": "2026-09-19T16-47-11Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 1,
+     "basis": "The firm's first stated requirement is that every seller claim be listed and frozen before testing; a service with no mechanism for identifying claims could not deliver that, and the firm would be paying for a step it must then perform itself deal by deal. Rated against the buyer's stated threshold: \"every seller claim listed and frozen before testing\"."
+    },
+    {
+     "claim_id": 4,
+     "tier": 1,
+     "basis": "The report is the deliverable the firm pays for and the only thing its committee acts on; if no mechanism generated a report from the review's results, nothing the firm bought would reach it and the price would not be justified. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 5,
+     "tier": 1,
+     "basis": "The firm's engineer verifies findings by opening the cited evidence himself; fields for the claim, the evidence and its provenance are what make that possible, and without them the firm would have to take the report on trust or commission its own diligence, which it cannot repair cheaply inside a 10-day window. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
+    },
+    {
+     "claim_id": 7,
+     "tier": 1,
+     "basis": "The firm is buying a stated verdict on each claim, not a pile of evidence; without the three-outcome assignment the report would carry no conclusions the committee could act on, and the firm could not supply that judgement itself. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 8,
+     "tier": 1,
+     "basis": "If explicit seller statements were not enumerated as claims, the frozen list would not contain every seller claim and those claims would go untested while the firm believed they were covered. Rated against the buyer's stated threshold: \"every seller claim listed and frozen before testing\"."
+    },
+    {
+     "claim_id": 9,
+     "tier": 1,
+     "basis": "A service that caught only explicit statements would leave the seller's implied claims unlisted and untested, so the frozen list would look complete while missing part of the coverage the firm is paying for. Rated against the buyer's stated threshold: \"every seller claim listed and frozen before testing\"."
+    },
+    {
+     "claim_id": 10,
+     "tier": 3,
+     "basis": "If the service invented requirements beyond ordinary meaning, the frozen list would carry claims the seller never made, but each would still be attempted and verdicted, and the firm may add claims of its own in any case, so no pricing or terms decision rests on this boundary alone. Rated on the scale alone."
+    },
+    {
+     "claim_id": 12,
+     "tier": 1,
+     "basis": "The intake step is what records the firm's identity, deal and thresholds before testing begins; without it the ratings step would have nothing to rate against, and the firm would have to restate its thresholds against a timetable it said is already short. Rated against the buyer's stated threshold: \"ratings made against the thresholds the firm states\"."
+    },
+    {
+     "claim_id": 13,
+     "tier": 1,
+     "basis": "If the review supplied its own answers to the intake questions rather than taking them from the buyer, the ratings could be weighted against deal facts the firm never stated, which the firm said would change the price or terms. Rated against the buyer's stated threshold: \"a rating step that does not use the firm's stated thresholds\"."
+    },
+    {
+     "claim_id": 14,
+     "tier": 1,
+     "basis": "If the review filled in missing deal assumptions itself, the materiality ratings would rest on invented context rather than the firm's stated thresholds and deal facts, and the firm cannot credibly re-weight findings without the very skill it is buying. Rated against the buyer's stated threshold: \"ratings made against the thresholds the firm states\"."
+    },
+    {
+     "claim_id": 15,
+     "tier": 3,
+     "basis": "If the repository were treated as a claim source, the frozen list would at most gain non-seller claims, each still attempted and verdicted, and the firm adds claims of its own anyway; no stated threshold reaches how the list is sourced. Rated on the scale alone."
+    },
+    {
+     "claim_id": 16,
+     "tier": 1,
+     "basis": "The firm's plan is to name the claim documents and add claims of its own; if it could not, the workflow would have to be renegotiated before the review could start, threatening the 10-day turnaround the firm said would change the price or terms because exclusivity is short. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 18,
+     "tier": 1,
+     "basis": "Each frozen claim producing its own finding with a verdict is what the firm is paying for; if claims could be skipped, the report would not show what was and was not checked and the firm could not rely on the coverage it believes it bought. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 19,
+     "tier": 1,
+     "basis": "A citation that merely points at a file without bearing on the claim is one the firm's engineer opens and cannot use, defeating the verification the firm is paying for at every deal, work it would then have to redo itself. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
+    },
+    {
+     "claim_id": 20,
+     "tier": 3,
+     "basis": "This is a statement of method about evidence breadth rather than a commitment about any deliverable; if it were false, the firm's own protections — its engineer confirming each citation and the independent second check — would still surface thin evidence, and no stated threshold names evidence breadth. Rated on the scale alone."
+    },
+    {
+     "claim_id": 21,
+     "tier": 1,
+     "basis": "Exclusion claims are exactly where checking only the named mechanism fails — the demo's own example is a default access log the seller's claim did not mention — so if the review did not search logging, telemetry and network calls, privacy-style claims could be reported as fully true when the target records more than it says. The firm's plan depends on each frozen claim being tested against the target's code and configuration, and an eleven-person firm could not reconstruct that search deal by deal inside the 10-day window. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 22,
+     "tier": 3,
+     "basis": "This is a statement of review method — that the evidence required follows from what a claim asserts — rather than an operational commitment the firm listed among its six payment items or named in a threshold. Its falsity would change nothing in what the firm pays for, the terms, or any item of its reliance statement. Rated on the scale alone."
+    },
+    {
+     "claim_id": 23,
+     "tier": 3,
+     "basis": "The claim concerns what the free demo contains, and the firm recorded the demo as of no commercial interest, saying it will never use it again. No stated threshold reaches the demo's contents, and the firm's expectation that the website is honest is not tied to this example. Rated on the scale alone."
+    },
+    {
+     "claim_id": 24,
+     "tier": 3,
+     "basis": "If the demo's database code did not increment the hit counter as described, nothing in the firm's plan, its six stated payment items or its walk-away conditions would change, since the firm said it will never use the demo again. Rated on the scale alone."
+    },
+    {
+     "claim_id": 25,
+     "tier": 3,
+     "basis": "This is a claim about the demo's own code, which the firm recorded as of no commercial interest and will never use. Its falsity would not alter the price, the terms, or any item the firm depends on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 26,
+     "tier": 3,
+     "basis": "The claim describes the demo server's access log, part of the demo example the firm said it will never use again. No stated threshold reaches the demo's internals, and the firm's own engagements never touch the demo. Rated on the scale alone."
+    },
+    {
+     "claim_id": 27,
+     "tier": 3,
+     "basis": "This describes the conclusion reached in the demo's worked example. The firm will never use the demo, and its stake in partly-true results being preserved at the report level is rated separately under the report claim. Rated on the scale alone."
+    },
+    {
+     "claim_id": 28,
+     "tier": 1,
+     "basis": "The firm's plan depends on each frozen claim producing a verdict that preserves both sides of a partly-true result; if the report collapsed such findings to a bare true or false, the committee would receive a conclusion without the evidence on either side, and the firm cannot supply that structure itself. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 29,
+     "tier": 1,
+     "basis": "If the review judged commercial significance on its own account rather than by the buyer's reliance, the ratings would not be made against the thresholds the firm states, and the firm said a rating step that ignores its thresholds would change the price or terms because the judgements would be meaningless to its investment committee. Rated against the buyer's stated threshold: \"ratings made against the thresholds the firm states\"."
+    },
+    {
+     "claim_id": 30,
+     "tier": 1,
+     "basis": "A misstatement of AI assistance in either direction destroys the distinction between human and machine judgement on which the signature the firm is paying for rests. Rated against the buyer's stated threshold: \"a step the website describes as done by a person that is done by the tooling alone, or the reverse\"."
+    },
+    {
+     "claim_id": 31,
+     "tier": 1,
+     "basis": "The questions listed are the substance of the independent second check: without them the check would not examine whether the seller's claim was stated accurately, whether the evidence supports the verdict, or whether searches were broad enough. The firm is paying for every finding to be checked a second time independently and cannot repair a hollow second reading itself. Rated against the buyer's stated threshold: \"every finding checked a second time independently\"."
+    },
+    {
+     "claim_id": 32,
+     "tier": 3,
+     "basis": "A check that went beyond the issued findings and redid the review would give the firm more coverage, not less; the firm's stated concern is a second check that is skipped for some findings or re-uses the first reader's conclusions, which this claim's falsity does not touch. Rated on the scale alone."
+    },
+    {
+     "claim_id": 33,
+     "tier": 3,
+     "basis": "Retesting of some findings is a safeguard beyond the six items the firm listed as the whole of what it is paying for, and the second check itself is rated separately. Its absence would defeat no item the firm depends on and no stated threshold reaches it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 34,
+     "tier": 3,
+     "basis": "This describes the benefit of the retesting covered by the preceding claim, which the firm did not list among its payment items or thresholds. The firm's engineer independently confirms each citation, so the claim's falsity changes nothing in the firm's plan. Rated on the scale alone."
+    },
+    {
+     "claim_id": 35,
+     "tier": 1,
+     "basis": "If the report did not separate unsettled claims from settled ones and describe the buyer's exposure, the firm could not tell which conclusions in the report rest on unverified material, and its engineer would have to test runtime behaviour deal by deal against a 10-day window inside a 21-day exclusivity period. The firm cannot repair an overstated report itself. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 36,
+     "tier": 1,
+     "basis": "If findings issued at delivery were later quietly rewritten, the year-old record the committee may consult would no longer match the report, and the firm could not repair that itself — it would have to demand frozen, dated deliveries as a term. No stated threshold names rewriting, but the reliance statement marks the item as the practice's inference and the firm's plan rests on traceable, stable findings. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 37,
+     "tier": 3,
+     "basis": "The firm uses the question page but does not depend on it; if it failed the firm would fall back on the report and its own copy of the record, an irritation rather than a failure. No stated threshold reaches post-delivery question-answering. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 38,
+     "tier": 3,
+     "basis": "What sources the continuation draws on matters only if the firm relies on the continuation, which it uses rather than depends on; the firm chiefly pays for the working record itself, which it would still hold. No stated threshold reaches this claim. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 39,
+     "tier": 3,
+     "basis": "If the continuation invented an answer, the firm's engineer could catch it against the citations the report gives, which the firm can open and confirm itself; no stated threshold reaches the continuation's honesty. The firm uses this path but does not depend on it. Rated on the practice's reading of the buyer's plan."
     },
     {
      "claim_id": 40,
      "tier": 3,
-     "basis": "That the review does not judge claims it did not resolve sits under the method item the firm uses but has not made one of its six stated requirements; if it were false, the engineer would still have the findings and citations to re-derive any such judgement from, which is costly but workable inside the ten-day window. Rated on the practice's reading of the buyer's plan."
+     "basis": "The firm stated it has no view on the limits the website states and covers those categories through other advisers, buying nothing in them from Tuuyi. Its falsity would change nothing in the firm's plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 42,
+     "tier": 3,
+     "basis": "The firm stated it has no view on the stated limits — not a code-quality review, not legal advice — and covers those through other advisers. Its falsity would change nothing the firm pays for. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 43,
+     "tier": 1,
+     "basis": "The firm's first engagement is a $4.2M purchase of a scheduling-software company and its plan is roughly six such small software deals a year; if the service did not fit small software acquisitions, the plan the firm is paying $30,000 a year for does not exist. This is not one of the six things the firm listed as paying for, so it rests on how the plan reads rather than on a quoted threshold. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 44,
+     "tier": 3,
+     "basis": "If the service demanded materials or context the firm had not agreed to supply, the vice-president could renegotiate the workflow before the review starts — feasible, though disruptive to the 10-day need. The reliance statement marks the division of labour as the practice's inference and the firm uses rather than depends on it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 45,
+     "tier": 1,
+     "basis": "This is the deliverable list, and two of its five items are things the firm said would change the price or terms if absent or diluted: the independent second check and buyer-specific ratings. If the service did not deliver them, the firm would be paying for something other than what it listed. Rated against the buyer's stated threshold: \"every finding checked a second time independently\"."
+    },
+    {
+     "claim_id": 46,
+     "tier": 3,
+     "basis": "A statement of bounded scope is among the stated limits the firm said it has no view on, covering those categories through other advisers. Its falsity would change nothing in the firm's plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 47,
+     "tier": 1,
+     "basis": "Listing the seller's claims is the first of the six things the firm said it is paying for, and its failure would mean the report covers an incomplete or shifting claim set the firm's engineer would have to reconstruct inside a 10-day window. Rated against the buyer's stated threshold: \"every seller claim listed and frozen before testing\"."
+    },
+    {
+     "claim_id": 48,
+     "tier": 1,
+     "basis": "Testing the claims against the supplied code is the core of what the firm is buying; if it were not done, the firm's engineer would have to read the code deal by deal itself, which it cannot do for an eleven-person firm on this timetable. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
+    },
+    {
+     "claim_id": 49,
+     "tier": 1,
+     "basis": "The independent second check is among the six things the firm listed as paying for, and the firm said an independent check that re-uses the first reader's conclusions or is skipped for some findings would change the price or terms. Rated against the buyer's stated threshold: \"every finding checked a second time independently\"."
+    },
+    {
+     "claim_id": 50,
+     "tier": 1,
+     "basis": "Each frozen claim producing a verdict supported by the evidence is what turns the report from a pile of evidence into conclusions; without it the firm could not supply the missing judgement itself and the price would not be justified. The reliance statement marks this as the practice's inference but records that the firm depends on it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 51,
+     "tier": 1,
+     "basis": "Findings showing claim, evidence and its source so the buyer can check directly is one of the six things the firm said it is paying for, and the firm said citations that are not verifiable would change the price or terms. Its falsity would leave the firm taking the report on trust or commissioning its own diligence. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
+    },
+    {
+     "claim_id": 52,
+     "tier": 3,
+     "basis": "If the continuation did not answer questions about the delivered report, the firm would fall back on the report and on the working record it is chiefly paying to have kept, and its plan would survive that fallback. No threshold among the six things the firm is paying for or its walk-away conditions reaches post-delivery question answering. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 53,
+     "tier": 1,
+     "basis": "Each frozen claim ending in a stated verdict is what turns the report from a pile of evidence into conclusions the investment committee can act on; if it failed, the price would not be justified and the firm could not supply the missing judgement itself. The firm's plan depends on this, though the reliance item is the practice's inference rather than the buyer's words. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 54,
+     "tier": 3,
+     "basis": "The claim concerns the free demo's access log, and the firm has stated the demo is of no commercial interest to it and that it will never use it again; no stated threshold or walk-away condition reaches demo logging. If the claim were false, nothing in the firm's plan for the paid engagements it is actually buying would change. Rated on the scale alone."
+    },
+    {
+     "claim_id": 55,
+     "tier": 3,
+     "basis": "If unsettled claims were not reported as exposure but were presented as settled or as findings against the seller without basis, the firm's engineer would have to test runtime behaviour deal by deal, which is costly for an eleven-person firm on a 10-day timetable but leaves the plan standing on that fallback. No threshold among the six things the firm is paying for or its walk-away conditions names how unsettled claims are described. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 56,
+     "tier": 1,
+     "basis": "If issued findings were quietly rewritten, the year-old working record the committee may consult would no longer match the report, destroying the traceability the firm is paying for, and the firm cannot repair that itself. A buyer of a diligence report whose issued conclusions can change after delivery would go back to the seller to demand frozen, dated deliveries as a term, or would not close. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 57,
+     "tier": 3,
+     "basis": "If the continuation did not answer questions of these types, the firm would fall back on the report and its own copy of the working record, an irritation rather than a failure since the record itself is what it is chiefly paying to have kept. No threshold among the six things the firm is paying for or its walk-away conditions reaches post-delivery question answering. Rated on the practice's reading of the buyer's plan."
+    }
+   ],
+   "unrated": []
+  },
+  "claim_sources/site/introduction.md": {
+   "at": "2026-09-19T16-54-13Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 9,
+   "claims_from": "runs/2026-09-17T19-55-24Z_enum_cw-site_claim_sources_site_introduction_md_20260917T193725Z/claims.json",
+   "reliance_statement": "2026-09-19T16-47-11Z",
+   "tiers": [
+    {
+     "claim_id": 2,
+     "tier": 1,
+     "basis": "If claims were not tested against the target's code, the firm's engineer would have to read the code itself deal by deal, which is the core of what the fee buys and cannot be repaired inside the 10-day window. This is an item the firm depends on. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
+    },
+    {
+     "claim_id": 4,
+     "tier": 1,
+     "basis": "If the review did not rate its findings, the report would arrive without the materiality judgements the investment committee reads, and the firm would be paying for evidence it must weigh itself. The reliance statement marks ratings against stated thresholds as an item the firm depends on. Rated against the buyer's stated threshold: \"ratings made against the thresholds the firm states\"."
+    },
+    {
+     "claim_id": 5,
+     "tier": 3,
+     "basis": "If the introduction video were served from elsewhere, nothing in the firm's plan would change: the firm listed what it is paying for, the video is not among it, and no reliance item covers the site's media hosting. The falsity would affect neither price, terms, nor any step the firm relies on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 7,
+     "tier": 1,
+     "basis": "If the review did not begin with intake, the firm's thresholds would never be captured and the rating step would have nothing to rate against, delaying a timetable that is already tight. The reliance statement marks the intake conversation as an item the firm depends on. Rated against the buyer's stated threshold: \"ratings made against the thresholds the firm states\"."
+    },
+    {
+     "claim_id": 9,
+     "tier": 1,
+     "basis": "If a finding were not a claim, a verdict and evidence, the report would be a pile of citations with no conclusion, and the firm could not supply the missing judgement itself inside the deal window. The reliance statement marks each frozen claim producing its own finding with a verdict as an item the firm depends on, at the practice's inference. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 10,
+     "tier": 1,
+     "basis": "If the check re-used the first reader's conclusions or were skipped for some findings, the firm would be paying for a single reading, which it named as something that would change the price or terms. The reliance statement marks the independent second check as an item the firm depends on. Rated against the buyer's stated threshold: \"an independent check that re-uses the first reader's conclusions or is skipped for some findings\"."
+    },
+    {
+     "claim_id": 11,
+     "tier": 1,
+     "basis": "If materiality were not read against this buyer's transaction, the ratings would be meaningless to the investment committee and the firm would have to re-weight findings with a skill it is buying rather than holding. The reliance statement marks ratings against stated thresholds as an item the firm depends on. Rated against the buyer's stated threshold: \"a rating step that does not use the firm's stated thresholds\"."
+    },
+    {
+     "claim_id": 12,
+     "tier": 3,
+     "basis": "If the delivered product were not what the method calls a live continuation, the firm's stated thresholds and its reliance items would be untouched: the firm pays for the report, the record and the ratings, and no threshold names delivery as continuation. Nothing in the transaction as stated would change in price or terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 13,
+     "tier": 1,
+     "basis": "If the service were in beta, the firm would be paying a full attested fee, budgeted at $30,000 a year, for a service not yet at release quality, and would go back to Tuuyi over the terms before the first live deal inside the exclusivity window. A beta designation changes what the firm is contracting for, though no stated threshold names it. Rated on the scale alone."
+    }
+   ],
+   "unrated": []
+  },
+  "claim_sources/site/pricing.md": {
+   "at": "2026-09-19T16-56-05Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 35,
+   "claims_from": "surface/claim_sources_site_pricing_md.draft.json",
+   "reliance_statement": "2026-09-19T16-47-11Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 3,
+     "basis": "The firm buys only the attested level and has said the demo and beta are of no commercial interest, so the shape and count of the other levels changes nothing in its plan. Rated on the scale alone."
+    },
+    {
+     "claim_id": 2,
+     "tier": 3,
+     "basis": "The fee is in any case set at intake, so which variable the price turns on does not change what the firm would pay or when it would learn the figure; no stated threshold reaches the pricing model. Rated on the scale alone."
+    },
+    {
+     "claim_id": 5,
+     "tier": 3,
+     "basis": "No stated threshold or planned use reaches the practice's beta status; whether it is in beta changes nothing the firm pays for or relies on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 8,
+     "tier": 3,
+     "basis": "The firm has said the developer beta is of no commercial interest and it will never use it again, so how beta access is set up touches nothing in its plan. Rated on the scale alone."
+    },
+    {
+     "claim_id": 10,
+     "tier": 1,
+     "basis": "The attested tier is the only level the firm will buy, and its price assumes the claims review comes with a full reading of the record and a signed opinion; if the level did not comprise them, the firm would be paying for less than its thresholds require. Rated against the buyer's stated threshold: \"a person's signature on the conclusion\"."
+    },
+    {
+     "claim_id": 11,
+     "tier": 1,
+     "basis": "The signed opinion's weight with the investment committee rests on the signatory's stated buy-side and sell-side experience and on availability through closing; if either were not as described, the firm would revisit the price before committing to the further five deals a year. Rated against the buyer's stated threshold: \"a person's signature on the conclusion\"."
+    },
+    {
+     "claim_id": 12,
+     "tier": 1,
+     "basis": "The firm's price basis and its $30,000-a-year budget assume the fee is fixed at intake; if the fee were set some other way, the terms the firm budgeted against would change and it would renegotiate them. Rated on the scale alone."
+    },
+    {
+     "claim_id": 13,
+     "tier": 1,
+     "basis": "The intake conversation is what carries the firm's thresholds into the rating step; if it did not cover what the firm is evaluating and its thresholds, the ratings the firm pays for would have nothing to rate against, and restating them would eat into a 10-day timetable. Rated against the buyer's stated threshold: \"ratings made against the thresholds the firm states\"."
+    },
+    {
+     "claim_id": 14,
+     "tier": 3,
+     "basis": "The firm has said it does not care how the intake page is built or how long intake takes, so long as the report arrives inside the 10 days; the claim's falsity would change nothing it relies on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 16,
+     "tier": 1,
+     "basis": "An independent re-reading of every finding's evidence is the second check the firm names as one of the six things it is paying for; if it were skipped for some findings or re-used the first reader's work, the firm would be paying for a single reading. Rated against the buyer's stated threshold: \"every finding checked a second time independently\"."
+    },
+    {
+     "claim_id": 17,
+     "tier": 1,
+     "basis": "Ratings made against the firm's own thresholds are what make the materiality judgements meaningful to its investment committee; if the ratings did not use them, the firm could not credibly re-weight the findings itself. Rated against the buyer's stated threshold: \"ratings made against the thresholds the firm states\"."
+    },
+    {
+     "claim_id": 18,
+     "tier": 1,
+     "basis": "The report's contents are what the firm's engineer verifies and what the committee reads: citations it can open and confirm, the scope of what was and was not examined, and a signed conclusion; without them the firm could not confirm the work itself and would be taking the report on trust. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
+    },
+    {
+     "claim_id": 19,
+     "tier": 3,
+     "basis": "The private question page is a convenience over the working record the firm chiefly pays to have kept; if it failed, the firm would fall back on the report and its own copy of the record, an irritation rather than a change to the plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 21,
+     "tier": 1,
+     "basis": "The working record is what lets the firm answer its investment committee's questions a year later, and it cannot reconstruct a record it never held. Rated against the buyer's stated threshold: \"the working record not being kept, because the committee may ask for it a year later\"."
+    },
+    {
+     "claim_id": 22,
+     "tier": 3,
+     "basis": "The firm buys nothing in these categories from the practice and covers them through other advisers, so the accuracy of the stated boundaries changes nothing in its plan. Rated on the scale alone."
+    },
+    {
+     "claim_id": 23,
+     "tier": 1,
+     "basis": "If materials the seller does not supply were guessed at rather than flagged, the report would present conjecture as findings and the firm's engineer could not tell which conclusions rest on evidence — the testing the firm is paying for. The failure defeats an item the practice reads as central to the buyer's plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 24,
+     "tier": 3,
+     "basis": "Intake duration sits before the 10-day clock starts and its length changes nothing the firm relies on. Rated against the buyer's stated threshold: \"it does not care how the intake page is built or how long intake takes, so long as the report arrives inside the 10 days.\""
+    },
+    {
+     "claim_id": 27,
+     "tier": 1,
+     "basis": "The firm plans its 10-day window against the website's stated turnaround; if the report does not come when stated, the firm would need a longer exclusivity window and would go back to the seller over the timetable. Rated against the buyer's stated threshold: \"a turnaround longer than the website states, because the exclusivity period is short.\""
+    },
+    {
+     "claim_id": 28,
+     "tier": 1,
+     "basis": "The firm's engagement will be at the attested tier, so this is the turnaround provision its timetable rests on; if the time is not fixed at intake, the firm cannot plan against an exclusivity period it called short. Rated against the buyer's stated threshold: \"a turnaround longer than the website states, because the exclusivity period is short.\""
+    },
+    {
+     "claim_id": 29,
+     "tier": 1,
+     "basis": "Where the repository is examined is the substance of the firm's condition that seller code stay on hardware Tuuyi controls on paid engagements; its falsity would put seller code on hardware no one named. Rated against the buyer's stated threshold: \"the seller's code kept on hardware Tuuyi controls\"."
+    },
+    {
+     "claim_id": 30,
+     "tier": 1,
+     "basis": "If the isolated hardware were not controlled by the practice, the firm's requirement that its sellers' code stay on hardware Tuuyi controls would fail, and the firm cannot repair who holds the hardware. Rated against the buyer's stated threshold: \"the seller's code kept on hardware Tuuyi controls\"."
+    },
+    {
+     "claim_id": 31,
+     "tier": 1,
+     "basis": "If no examination environment is stood up per engagement, one seller's code could persist into another deal — a failure the firm named as grounds to end the engagement and cannot repair after the fact. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 32,
+     "tier": 1,
+     "basis": "If the environment is not removed when an engagement ends, one seller's code could survive into a later engagement, which the firm cannot repair and would treat as a walk-away. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 33,
+     "tier": 1,
+     "basis": "The firm made this a condition that ends the deal outright, and its non-disclosure obligations to sellers leave no repair once code has reached a model service. Rated against the buyer's stated threshold: \"any of a seller's code reaching a cloud model service or any party other than Tuuyi on a paid engagement\"."
+    },
+    {
+     "claim_id": 35,
+     "tier": 1,
+     "basis": "The firm stated that its deal terms must be held only in the engagement file and made any other storage a condition ending the engagement. Rated against the buyer's stated threshold: \"the firm's deal terms being stored anywhere other than the engagement file\"."
+    },
+    {
+     "claim_id": 36,
+     "tier": 1,
+     "basis": "The boundary is what makes the engagement-file promise complete; if the deal terms are held elsewhere, the firm's end-the-deal condition is met and no repair is possible on Tuuyi's side. Rated against the buyer's stated threshold: \"the firm's deal terms being stored anywhere other than the engagement file\"."
+    },
+    {
+     "claim_id": 37,
+     "tier": 3,
+     "basis": "The beta path never touches the firm's paid engagements, so its configuration changes nothing the firm relies on. Rated against the buyer's stated threshold: \"the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again\"."
+    },
+    {
+     "claim_id": 38,
+     "tier": 3,
+     "basis": "If the engagement letter does not govern as described, the firm must settle terms before the first review — doable before paying, and cheap at this stage — so no price or term would change over this claim alone. The document is not itself the fact the firm relies on; the terms can still be agreed. Rated on the scale alone."
+    },
+    {
+     "claim_id": 39,
+     "tier": 3,
+     "basis": "How the intake form is filled changes nothing about the report the firm receives. Rated against the buyer's stated threshold: \"it does not care how the intake page is built or how long intake takes, so long as the report arrives inside the 10 days\"."
+    },
+    {
+     "claim_id": 40,
+     "tier": 3,
+     "basis": "The firm chiefly pays for the working record it can hold itself; losing the question page would be an irritation answered from the record, not a change to price or terms. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 41,
+     "tier": 3,
+     "basis": "If answers on the private question page did not come with the record behind them, the firm would fall back on the report and its own copy of the working record, which the reliance statement treats as an irritation rather than a failure; no stated threshold names the question page. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 42,
+     "tier": 1,
+     "basis": "The working record is one of the six things the firm is paying for: it depends on it outright, and its falsity would leave the firm unable to answer its investment committee's questions a year later, with nothing to reconstruct the record from. That is a failure the firm said would change the price or terms, and it would go back to the seller over it alone. Rated against the buyer's stated threshold: \"the working record not being kept, because the committee may ask for it a year later\"."
+    },
+    {
+     "claim_id": 43,
+     "tier": 1,
+     "basis": "If no fresh environment were created per paid engagement, one seller's code could survive into another engagement, which the firm stated as a condition that would end the deal outright and cannot repair on Tuuyi's side. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 44,
+     "tier": 1,
+     "basis": "If the examination environment were not deleted after the engagement, prior sellers' code would persist on Tuuyi's hardware, which the firm stated as a condition that would end the deal outright and cannot repair on Tuuyi's side. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 45,
+     "tier": 3,
+     "basis": "The free beta review is outside the engagement: the firm will never use the demo or the beta, and the hosted model touches none of its paid engagements, so the walk-away condition about code reaching a cloud model service — which is limited to paid engagements — does not reach it. Rated on the scale alone."
+    }
+   ],
+   "unrated": []
+  },
+  "claim_sources/site/demo.md": {
+   "at": "2026-09-19T16-57-01Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 26,
+   "claims_from": "runs/2026-09-17T20-00-22Z_enum_cw-site_claim_sources_site_demo_md_20260917T193725Z/claims.json",
+   "reliance_statement": "2026-09-19T16-47-11Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 3,
+     "basis": "The firm will never use the demo again, and no stated threshold or paid-for item reaches what the demo's subject is, so its falsity would change nothing for the engagement. Rated on the scale alone."
+    },
+    {
+     "claim_id": 2,
+     "tier": 3,
+     "basis": "The firm's plan depends on the method applied to paid targets, not on how the demo itself was reviewed, and it has said it will not use the demo again; no stated threshold reaches the demo review. Rated on the scale alone."
+    },
+    {
+     "claim_id": 3,
+     "tier": 3,
+     "basis": "Whether the demo's subject is named changes nothing the firm pays for or relies on, since the firm will never use the demo. Rated on the scale alone."
+    },
+    {
+     "claim_id": 4,
+     "tier": 3,
+     "basis": "The firm's requirement that citations be openable and confirmable attaches to delivered reports on paid engagements, not to the demo's interface, which it will not use. Rated on the scale alone."
+    },
+    {
+     "claim_id": 5,
+     "tier": 3,
+     "basis": "The demo's question-answering interface falls under an item the firm named as of no commercial interest and which it will never use again. Rated on the scale alone."
+    },
+    {
+     "claim_id": 6,
+     "tier": 1,
+     "basis": "The firm has seen nothing but the website and is committing $5,000 on the assumption that it describes the service accurately; if the demo were modified from what a client receives, the firm's whole picture of the deliverable would be wrong and it would reopen the terms or not proceed with the first engagement. Rated on the scale alone."
+    },
+    {
+     "claim_id": 7,
+     "tier": 3,
+     "basis": "The video is incidental to the six things the firm is paying for, and none of its price, terms or walk-away conditions reach it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 8,
+     "tier": 3,
+     "basis": "What the introduction walks through affects nothing the firm relies on for a paid review, and no stated threshold names it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 9,
+     "tier": 3,
+     "basis": "The claim concerns the demo report's sections, not the report the firm will receive on a paid engagement, and the firm will not use the demo again. Rated on the scale alone."
+    },
+    {
+     "claim_id": 10,
+     "tier": 3,
+     "basis": "The ordering of the demo report's findings is a property of the demo, which the firm has said it will never use; the rating requirement it is paying for attaches to delivered reports. Rated on the scale alone."
+    },
+    {
+     "claim_id": 11,
+     "tier": 3,
+     "basis": "The demo's answering path is part of an item the firm named as of no commercial interest and will never use again. Rated on the scale alone."
+    },
+    {
+     "claim_id": 12,
+     "tier": 3,
+     "basis": "The claim is about the demo page's behaviour, not about how unsettled claims are flagged in a paid report, and the firm will not use the demo. Rated on the scale alone."
+    },
+    {
+     "claim_id": 13,
+     "tier": 3,
+     "basis": "The firm's walk-away condition covers a seller's code reaching a cloud model service on a paid engagement; the demo is free, runs a public project, and the firm will never use it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 14,
+     "tier": 1,
+     "basis": "This is a boundary claim about the whole practice: if the demo were not the only place a cloud inference service is used, cloud use could extend to paid engagements, where the firm's non-disclosure obligations mean any disclosure is unrepairable and the deal ends. Rated against the buyer's stated threshold: \"any of a seller's code reaching a cloud model service or any party other than Tuuyi on a paid engagement\"."
+    },
+    {
+     "claim_id": 15,
+     "tier": 3,
+     "basis": "The claim concerns the scope of the demo and its stated reason, and the firm's walk-away condition is confined to paid engagements on which the demo never runs; the firm will not use the demo again. Rated on the scale alone."
+    },
+    {
+     "claim_id": 16,
+     "tier": 3,
+     "basis": "If the demo's reply took longer than a minute or two, nothing in the firm's plan would change: it ran the demo once and buys the paid review, not the demo's speed, and no stated threshold reaches response time. The claim falls under the reliance item 'The free demo and its question-answering interface', which the firm does not use. Rated against the buyer's stated threshold: \"the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again\"."
+    },
+    {
+     "claim_id": 17,
+     "tier": 1,
+     "basis": "If paid engagements were not on isolated, single-tenant hardware the practice controls, the firm's sellers' code could be exposed to other tenants, a cloud model service or another party — the firm named this as a condition that would end the deal outright and as one of the six things it is paying for, and no repair is possible once code has been disclosed. The claim falls under the reliance items the firm depends on: 'The seller's code kept on hardware Tuuyi controls' and 'A fresh examination environment provisioned per paid engagement'. Rated against the buyer's stated threshold: \"any of a seller's code reaching a cloud model service or any party other than Tuuyi on a paid engagement\"."
+    },
+    {
+     "claim_id": 19,
+     "tier": 3,
+     "basis": "If the demo displayed file paths and quoted code modified, the firm's plan would not change: it verifies citations in the paid report with its own engineer, not in the demo, and it will never use the demo again. The claim falls under the reliance item 'The free demo and its question-answering interface', which the firm does not use. Rated against the buyer's stated threshold: \"the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again\"."
+    },
+    {
+     "claim_id": 20,
+     "tier": 3,
+     "basis": "If demo conversations were served to other visitors, nothing in the firm's plan would change: the demo carries none of the firm's deal materials, and its walk-away thresholds reach only seller code, seller materials and deal terms on paid engagements. The claim falls under the reliance item 'The free demo and its question-answering interface', which the firm does not use. Rated against the buyer's stated threshold: \"the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again\"."
+    },
+    {
+     "claim_id": 21,
+     "tier": 3,
+     "basis": "If the demo's retention or deletion of conversations differed from a few days, the firm would not be affected: it never places anything it must protect into the demo, and no stated threshold reaches the demo's retention setting. The claim falls under the reliance item 'The free demo and its question-answering interface', which the firm does not use. Rated against the buyer's stated threshold: \"the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again\"."
+    },
+    {
+     "claim_id": 22,
+     "tier": 3,
+     "basis": "If the demo's question limit were not roughly twenty-four, the firm's plan would not change: it does not use the demo, and no stated threshold reaches a question cap on a product it will never touch again. The claim falls under the reliance item 'The free demo and its question-answering interface', which the firm does not use. Rated against the buyer's stated threshold: \"the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again\"."
+    },
+    {
+     "claim_id": 23,
+     "tier": 3,
+     "basis": "If clicking a finding in the demo did not reveal the cited lines, the firm's plan would not change: the citations it pays to have confirmed are those in the delivered report, which its own engineer checks directly, not those in the demo. The claim falls under the reliance item 'The free demo and its question-answering interface', which the firm does not use. Rated against the buyer's stated threshold: \"the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again\"."
+    },
+    {
+     "claim_id": 25,
+     "tier": 3,
+     "basis": "If the demo's answers came from the model's memory rather than the record, the firm's plan would not change: it judges the paid review's findings, not the demo's answering method, and it will never use the demo again. The claim falls under the reliance item 'The free demo and its question-answering interface', which the firm does not use. Rated against the buyer's stated threshold: \"the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again\"."
+    },
+    {
+     "claim_id": 26,
+     "tier": 3,
+     "basis": "If the demo page did not flag questions the record does not settle, the firm's plan would not change: the comparable behaviour it relies on — unsettled runtime claims being reported unsettled in the paid review — is a separate reliance item, and the firm will never use the demo itself. The claim falls under the reliance item 'The free demo and its question-answering interface', which the firm does not use. Rated against the buyer's stated threshold: \"the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again\"."
+    },
+    {
+     "claim_id": 27,
+     "tier": 3,
+     "basis": "If a visitor's demo conversation were visible to other visitors in operation, nothing the firm relies on would change: its walk-away thresholds govern seller code, seller materials and deal terms on paid engagements, none of which pass through the demo. The claim falls under the reliance item 'The free demo and its question-answering interface', which the firm does not use. Rated against the buyer's stated threshold: \"the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again\"."
+    },
+    {
+     "claim_id": 28,
+     "tier": 3,
+     "basis": "If demo conversations were not in fact deleted after a few days, the firm's plan would not change: nothing of the firm's reaches the demo, and its stated deletion and isolation concerns attach to paid engagements, not the free path. The claim falls under the reliance item 'The free demo and its question-answering interface', which the firm does not use. Rated against the buyer's stated threshold: \"the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again\"."
+    }
+   ],
+   "unrated": []
+  },
+  "claim_sources/site/about.md": {
+   "at": "2026-09-19T16-57-52Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 18,
+   "claims_from": "surface/claim_sources_site_about_md.draft.json",
+   "reliance_statement": "2026-09-19T16-47-11Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 3,
+     "basis": "If false, the credential and signature claims on the page lose their subject, but the firm's price and terms rest on the process features it listed, not on who holds the founder title. No stated threshold names the founder's identity. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 2,
+     "tier": 3,
+     "basis": "An academic credential bearing on the weight of the signature the firm pays for; its falsity would leave the firm weighing the report on its citations rather than reopening the price or terms of the first review. No stated threshold reaches the founder's academic standing. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 3,
+     "tier": 3,
+     "basis": "If false, the firm would have to weigh the report on its citations alone, which its own engineer can open and confirm, rather than reopen the price or terms of the first engagement. The six things the firm listed as paying for are process features, not the practitioner's history. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 4,
+     "tier": 1,
+     "basis": "The firm is paying for a person to sign the conclusion and the website names who that person is; if he does not personally sign the attested reviews, the firm would go back to the seller over the terms of the engagement before relying on the report. Rated against the buyer's stated threshold: \"a person's signature on the conclusion\"."
+    },
+    {
+     "claim_id": 6,
+     "tier": 3,
+     "basis": "If false, the practice has other lines of work, but nothing in the firm's plan or thresholds turns on the practice's focus or exclusivity of service. The firm's walk-away conditions concern where code and materials go, not what else the practice sells. Rated on the scale alone."
+    },
+    {
+     "claim_id": 7,
+     "tier": 3,
+     "basis": "A background credential supporting the founder's standing; its falsity would diminish the weight of the signature without changing the price or terms of this engagement. No stated threshold reaches the founder's length of experience. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 8,
+     "tier": 3,
+     "basis": "A historical credential about a prior company; its falsity would bear on the founder's standing but not on any process feature the firm listed or any condition it stated. The firm can verify the delivered work through its engineer's citation checks. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 9,
+     "tier": 3,
+     "basis": "A claim about the reach of the founder's earlier venture; its falsity would not change what the firm pays, the terms, or whether it closes the first engagement. No stated threshold reaches the founder's history. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 10,
+     "tier": 3,
+     "basis": "A verifiable historical fact about a past acquisition; its falsity would bear on the founder's narrative rather than on the review the firm is buying. No stated threshold or plan item turns on it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 11,
+     "tier": 3,
+     "basis": "A claim about where the founder's recommender ran in production; its falsity would affect the founder's standing, not the process features the firm is paying for or any condition it stated. The firm's engineer verifies findings directly from citations. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 12,
+     "tier": 3,
+     "basis": "A supporting detail about a project document; its falsity would not change the price, the terms, or whether the firm closes. No stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 13,
+     "tier": 3,
+     "basis": "A description of the service's shape; if false, the service is more general than described, but nothing in the firm's listed payments, price conditions or walk-away conditions turns on that characterization. The firm's plan is stated in terms of process features and data handling. Rated on the scale alone."
+    },
+    {
+     "claim_id": 14,
+     "tier": 1,
+     "basis": "If the service ran on third-party hosted infrastructure, seller code on a paid engagement would reach a party other than Tuuyi, which the firm stated would end the deal outright and which no repair can undo. Rated against the buyer's stated threshold: \"any of a seller's code reaching a cloud model service or any party other than Tuuyi on a paid engagement\"."
+    },
+    {
+     "claim_id": 16,
+     "tier": 3,
+     "basis": "If false, claims review is not the first application built on the practice's models, which would bear on maturity but not on the price, the terms, or whether the firm closes the first engagement. No stated threshold or plan item reaches it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 17,
+     "tier": 3,
+     "basis": "A claim of directly relevant experience on the buyer's side of a diligence; its falsity would leave the firm weighing the report on its citations alone rather than reopening the price or terms of the first review. The firm's listed payments are process features, not the practitioner's history. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 18,
+     "tier": 3,
+     "basis": "If the founder were not available through closing, the firm would lose a service the reliance statement marks as 'uses' rather than 'depends', and the buyer's stated six things it is paying for and three walk-away conditions do not name the practitioner's availability. The statement's own note is that the buyer has not said what would happen if this failed. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 22,
+     "tier": 1,
+     "basis": "A person's judgement on the conclusion is one of the six things the firm listed it is paying for, and the firm said it would change the price or terms if a step described as done by a person were done by the tooling alone or the reverse; the reliance statement marks the item 'depends' and notes the firm cannot repair it. Rated against the buyer's stated threshold: \"a step the website describes as done by a person that is done by the tooling alone, or the reverse\"."
+    },
+    {
+     "claim_id": 23,
+     "tier": 3,
+     "basis": "A reply within one business day to contact-form enquiries is not among the six things the firm is paying for, and its turnaround threshold reaches the report arriving within 10 days, not replies to enquiries; the reliance statement marks the website's visitor-facing behaviour as 'uses' with the buyer not having said what would happen if it failed. Rated on the practice's reading of the buyer's plan."
+    }
+   ],
+   "unrated": []
+  },
+  "claim_sources/site/privacy.md": {
+   "at": "2026-09-19T16-59-14Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 30,
+   "claims_from": "surface/claim_sources_site_privacy_md.draft.json",
+   "reliance_statement": "2026-09-19T16-47-11Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 3,
+     "basis": "The public site's cookie behaviour falls under an item the buyer uses but has not made a condition of price, terms or closing, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 2,
+     "tier": 3,
+     "basis": "Analytics on the public pages sits under the same buyer-used item as the cookie claim, with no stated threshold reaching it and no dependent item it would defeat. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 3,
+     "tier": 3,
+     "basis": "The buyer said the free demo is of no commercial interest and it will never use it again, and no stated threshold names demo cookies. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 4,
+     "tier": 3,
+     "basis": "Page-view counting on the public site is under an item the buyer uses but has not made a condition, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 5,
+     "tier": 3,
+     "basis": "Whether the counting service uses cookies is a detail of a public-site behaviour the buyer uses but has not made a condition of price, terms or closing. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 6,
+     "tier": 3,
+     "basis": "A failure here would admit visitor identification on the public site; the firm's stated thresholds concern seller code, seller materials and its own deal terms, not its website visits. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 7,
+     "tier": 3,
+     "basis": "The buyer said it will never use the demo again, so a false statement about the demo's cookie affects nothing the firm is paying for. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 8,
+     "tier": 3,
+     "basis": "Demo conversation storage matters only to demo users, and the buyer has said it will never use the demo and named no threshold reaching it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 9,
+     "tier": 3,
+     "basis": "Though this is a boundary claim whose failure would admit wider demo recording, the buyer will never use the demo and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 11,
+     "tier": 3,
+     "basis": "Demo retention and deletion concern a path the buyer said it will never use again, and no stated threshold names the demo. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 13,
+     "tier": 3,
+     "basis": "Transmission of demo text to a hosted inference service sits on the free demo path, not a paid engagement, so the firm's walk-away condition as written does not reach it, and the buyer said it will never use the demo. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 15,
+     "tier": 1,
+     "basis": "If intake information and seller materials were not held in the engagement file, the firm's deal terms could sit outside the one store it permits, which the firm cannot repair on Tuuyi's side. Rated against the buyer's stated threshold: \"the firm's deal terms being stored anywhere other than the engagement file\"."
+    },
+    {
+     "claim_id": 16,
+     "tier": 1,
+     "basis": "If retention did not follow the engagement letter as stated, the working record could be gone before the committee asks to see it a year later, and the firm cannot reconstruct a record it never held. Rated against the buyer's stated threshold: \"the working record not being kept, because the committee may ask for it a year later\"."
+    },
+    {
+     "claim_id": 17,
+     "tier": 3,
+     "basis": "Failure of the deletion process would leave materials kept longer than stated but still within the engagement file, which violates no stated condition; the firm's paying-for list says nothing about deletion. Rated on the scale alone."
+    },
+    {
+     "claim_id": 19,
+     "tier": 1,
+     "basis": "If a paid review did not run in an environment created for that engagement, one seller's code could survive into another deal, breaching the walk-away condition as the reliance statement reads it, and the firm cannot repair Tuuyi's infrastructure. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 20,
+     "tier": 1,
+     "basis": "If the engagement environment were not dedicated to this engagement or were not deleted when it ends, one seller's code could survive into another deal's review, defeating the isolation the firm relies on and breaching a condition it made a condition of any paid engagement. The firm cannot repair Tuuyi's infrastructure and would have to stop using the service. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 26,
+     "tier": 1,
+     "basis": "If the report did not identify files by path, the firm's engineer could not open and confirm the findings, and the firm would be taking the report on trust or commissioning its own diligence — the core of what it is paying for. The firm cannot repair this cheaply given who it said will operate the offering. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
+    },
+    {
+     "claim_id": 27,
+     "tier": 1,
+     "basis": "If the report did not quote the lines each finding rests on, the firm's engineer could not confirm the citations itself and the report's whole method of verification fails for this buyer. The firm cannot repair this cheaply given who it said will operate the offering. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
+    },
+    {
+     "claim_id": 28,
+     "tier": 1,
+     "basis": "If the post-delivery question page did not exist or did not draw on the engagement's record, the firm would fall back on the report and its own copy of the record to answer committee questions. That fallback is workable but eats time the firm does not have across six deals a year, and the record is what it is chiefly paying to have kept. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 29,
+     "tier": 1,
+     "basis": "If the repository were taken out of the engagement environment, the seller's code would no longer sit only on hardware Tuuyi controls, which is one of the six things the firm listed as the whole of what it is paying for. The firm cannot verify containment itself and has made code containment a condition of any paid engagement. Rated against the buyer's stated threshold: \"the seller's code kept on hardware Tuuyi controls\"."
+    },
+    {
+     "claim_id": 30,
+     "tier": 1,
+     "basis": "If the deletion process did not cover the repository together with the rest of the environment, one seller's code could survive the engagement and reach a later one, breaching the firm's walk-away condition about seller materials. The firm cannot repair Tuuyi's infrastructure and would have to stop using the service. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 31,
+     "tier": 1,
+     "basis": "If contact submissions were not sent by email as described, the handling of what visitors type would differ from the website's account, and the firm is retaining this service on the strength of the website's accuracy alone. The buyer has not said what it would lose here; a person should ask. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 32,
+     "tier": 1,
+     "basis": "If submissions were stored somewhere besides the email, the website's privacy account would be wrong, and the firm assumes the website describes the service accurately and has seen nothing else. No stated threshold names the public contact form; a person should ask. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 33,
+     "tier": 1,
+     "basis": "If the form did not use Cloudflare Turnstile, the bot protection would be something other than described, a detail of the public site's visitor-facing behaviour. The buyer has not said what it would lose; a person should ask. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 34,
+     "tier": 1,
+     "basis": "If the check ran somewhere other than the visitor's browser, the description of how the visitor's own machine is involved would be inaccurate, a detail of the public site the firm does not operate against. The buyer has not said; a person should ask. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 35,
+     "tier": 1,
+     "basis": "If the bot protection set a cookie, the public pages would not be free of cookies as the website suggests, and the firm assumes the website is accurate. No stated threshold names cookies or analytics on the public pages; a person should ask. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 36,
+     "tier": 1,
+     "basis": "If returning demo visitors could not resume their own conversations, or conversations were mixed, the demo would misbehave in a way the firm will never see: it said the demo is of no commercial interest and it will never use it again. Nothing in the firm's plan rests on the demo. Rated on the scale alone."
+    },
+    {
+     "claim_id": 37,
+     "tier": 1,
+     "basis": "If demo questions and answers were kept beyond the stated retention period, the firm would be unaffected: it ran the demo once, will never use it again, and the hosted demo touches none of its paid engagements. Nothing in the firm's plan rests on demo retention. Rated on the scale alone."
+    },
+    {
+     "claim_id": 38,
+     "tier": 1,
+     "basis": "If engagement files were not actually deleted when the engagement letter's period ends, the firm's stated interest — the working record being kept for the committee a year later — is not harmed; its falsity would mean records kept longer, not shorter, than stated. No stated threshold names deletion timing on Tuuyi's side, and the firm's walk-away conditions concern where materials are visible, not how long they persist in the engagement file. Rated on the scale alone."
+    },
+    {
+     "claim_id": 40,
+     "tier": 1,
+     "basis": "If the repository survived the environment's deletion, one seller's code could persist past its engagement and reach a later one, which is exactly the failure the firm cannot repair and has made a condition of any paid engagement. The firm has no way to check Tuuyi's deletion and would have to stop using the service. Rated on the practice's reading of the buyer's plan."
+    }
+   ],
+   "unrated": []
+  },
+  "claim_sources/site/contact.md": {
+   "at": "2026-09-19T16-59-52Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 7,
+   "claims_from": "surface/claim_sources_site_contact_md.draft.json",
+   "reliance_statement": "2026-09-19T16-47-11Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 3,
+     "basis": "The claim concerns the beta review path, which the firm put outside its plan: the free demo and developer beta are, in its words, of no commercial interest and it will never use them again, and no stated threshold reaches the beta. If the claim were false the firm's engagement for the attested reviews would be unaffected. Rated on the scale alone."
+    },
+    {
+     "claim_id": 3,
+     "tier": 2,
+     "basis": "If a successful submission showed no sent confirmation, the firm could not tell that its request to open the first review had arrived and would re-submit or chase inside a timetable it said is already tight; on its own this costs minutes, not days. It is a detail of the described form behaviour the firm acts on, and with the other form claims its falsity would bear on whether the website's description, the only description the firm has seen, can be relied on. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 4,
+     "tier": 2,
+     "basis": "If the reply went somewhere other than the address the submitter entered, the firm would wait at its address for a response that never comes and lose days at the start of an engagement whose window it said is short; on its own it could fall back on info@tuuyi.com. It is a detail of the described form behaviour the firm acts on, and with the other form claims its falsity would bear on whether the website's description can be relied on. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 5,
+     "tier": 3,
+     "basis": "If the form accepted submissions lacking a name, a working email address or a message, the firm's own complete submission would still work and the burden of an unanswerable enquiry falls on the practice, not on the firm's plan. No stated threshold reaches validation behaviour and the firm's use of the form does not rest on it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 6,
+     "tier": 3,
+     "basis": "If the bot check did not exist or did not block submissions, the firm's loss is essentially nil: its own legitimate submission is unaffected, and spam or a false block is a cost to the practice or is worked around by writing to info@tuuyi.com. No stated threshold reaches the bot check and the firm's use of the form does not rest on it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 7,
+     "tier": 3,
+     "basis": "If a server-side failure showed no error state pointing to info@tuuyi.com, the firm might be briefly without a fallback address, but it holds the address through the engagement and the delay is recoverable within the timetable. No stated threshold reaches the error state and the firm's use of the form does not rest on it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 10,
+     "tier": 1,
+     "basis": "If submissions were not actually delivered by email to the practice, the firm's request to open the first review would silently never arrive, and the lost days at the start of an engagement that must fit inside a 21-day exclusivity period with a 10-day report need are exactly the kind of delay the firm said would change the price or terms. No workaround is described on the form's face, and the firm has seen nothing but the website. Rated against the buyer's stated threshold: \"a turnaround longer than the website states, because the exclusivity period is short\"."
     }
    ],
    "unrated": []

@@ -25,7 +25,9 @@
       61
      ]
     }
-   ]
+   ],
+   "tier": 1,
+   "tier_basis": "The firm's first stated requirement is that every seller claim be listed and frozen before testing; a service with no mechanism for identifying claims could not deliver that, and the firm would be paying for a step it must then perform itself deal by deal. Rated against the buyer's stated threshold: \"every seller claim listed and frozen before testing\"."
   },
   {
    "id": 4,
@@ -35,7 +37,9 @@
     5
    ],
    "statement": "The service contains a mechanism that generates a report from the results of its review.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The report is the deliverable the firm pays for and the only thing its committee acts on; if no mechanism generated a report from the review's results, nothing the firm bought would reach it and the price would not be justified. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 5,
@@ -61,7 +65,9 @@
       61
      ]
     }
-   ]
+   ],
+   "tier": 1,
+   "tier_basis": "The firm's engineer verifies findings by opening the cited evidence himself; fields for the claim, the evidence and its provenance are what make that possible, and without them the firm would have to take the report on trust or commission its own diligence, which it cannot repair cheaply inside a 10-day window. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
   },
   {
    "id": 7,
@@ -80,7 +86,9 @@
       65
      ]
     }
-   ]
+   ],
+   "tier": 1,
+   "tier_basis": "The firm is buying a stated verdict on each claim, not a pile of evidence; without the three-outcome assignment the report would carry no conclusions the committee could act on, and the firm could not supply that judgement itself. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 8,
@@ -90,7 +98,9 @@
     17
    ],
    "statement": "The service enumerates explicit seller statements, such as 'no telemetry,' 'runs in Docker,' and 'supports PostgreSQL,' as claims.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If explicit seller statements were not enumerated as claims, the frozen list would not contain every seller claim and those claims would go untested while the firm believed they were covered. Rated against the buyer's stated threshold: \"every seller claim listed and frozen before testing\"."
   },
   {
    "id": 9,
@@ -109,7 +119,9 @@
       17
      ]
     }
-   ]
+   ],
+   "tier": 1,
+   "tier_basis": "A service that caught only explicit statements would leave the seller's implied claims unlisted and untested, so the frozen list would look complete while missing part of the coverage the firm is paying for. Rated against the buyer's stated threshold: \"every seller claim listed and frozen before testing\"."
   },
   {
    "id": 10,
@@ -119,7 +131,9 @@
     17
    ],
    "statement": "Implied claims are bounded by ordinary meaning: a category description does not automatically promise additional features such as analytics, custom domains, or an API, and the service does not invent requirements beyond them.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the service invented requirements beyond ordinary meaning, the frozen list would carry claims the seller never made, but each would still be attempted and verdicted, and the firm may add claims of its own in any case, so no pricing or terms decision rests on this boundary alone. Rated on the scale alone."
   },
   {
    "id": 12,
@@ -130,7 +144,9 @@
    ],
    "statement": "The review begins with an intake step, before examining the software, that establishes the review's context by asking the buyer who the buyer is, what is being purchased, which seller documents carry the material claims, what the buyer already knows or suspects, and which kinds of findings would affect price, terms, or the decision to close.",
    "about": "target",
-   "restates": 12
+   "restates": 12,
+   "tier": 1,
+   "tier_basis": "The intake step is what records the firm's identity, deal and thresholds before testing begins; without it the ratings step would have nothing to rate against, and the firm would have to restate its thresholds against a timetable it said is already short. Rated against the buyer's stated threshold: \"ratings made against the thresholds the firm states\"."
   },
   {
    "id": 13,
@@ -140,7 +156,9 @@
     21
    ],
    "statement": "The answers to the intake questions are supplied by the buyer.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the review supplied its own answers to the intake questions rather than taking them from the buyer, the ratings could be weighted against deal facts the firm never stated, which the firm said would change the price or terms. Rated against the buyer's stated threshold: \"a rating step that does not use the firm's stated thresholds\"."
   },
   {
    "id": 14,
@@ -150,7 +168,9 @@
     21
    ],
    "statement": "The review does not supply missing deal assumptions itself; it relies on what the buyer provides.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the review filled in missing deal assumptions itself, the materiality ratings would rest on invented context rather than the firm's stated thresholds and deal facts, and the firm cannot credibly re-weight findings without the very skill it is buying. Rated against the buyer's stated threshold: \"ratings made against the thresholds the firm states\"."
   },
   {
    "id": 15,
@@ -160,7 +180,9 @@
     21
    ],
    "statement": "The review treats the repository as evidence for testing claims and does not treat it as a claim source.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the repository were treated as a claim source, the frozen list would at most gain non-seller claims, each still attempted and verdicted, and the firm adds claims of its own anyway; no stated threshold reaches how the list is sourced. Rated on the scale alone."
   },
   {
    "id": 16,
@@ -170,7 +192,9 @@
     27
    ],
    "statement": "In addition to the seller's claims, the buyer can add specific claims to be tested.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The firm's plan is to name the claim documents and add claims of its own; if it could not, the workflow would have to be renegotiated before the review could start, threatening the 10-day turnaround the firm said would change the price or terms because exclusivity is short. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 18,
@@ -180,7 +204,9 @@
     27
    ],
    "statement": "Every frozen claim is attempted, and each frozen claim produces its own finding.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "Each frozen claim producing its own finding with a verdict is what the firm is paying for; if claims could be skipped, the report would not show what was and was not checked and the firm could not rely on the coverage it believes it bought. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 19,
@@ -190,7 +216,9 @@
     33
    ],
    "statement": "A citation used in a finding bears on the particular claim being adjudicated, rather than merely pointing at a file.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "A citation that merely points at a file without bearing on the claim is one the firm's engineer opens and cannot use, defeating the verification the firm is paying for at every deal, work it would then have to redo itself. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
   },
   {
    "id": 20,
@@ -200,7 +228,9 @@
     33
    ],
    "statement": "Some claims require evidence beyond a single citation.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "This is a statement of method about evidence breadth rather than a commitment about any deliverable; if it were false, the firm's own protections — its engineer confirming each citation and the independent second check — would still surface thin evidence, and no stated threshold names evidence breadth. Rated on the scale alone."
   },
   {
    "id": 21,
@@ -210,7 +240,9 @@
     33
    ],
    "statement": "For the exclusion part of a claim such as 'we store only the hit count and nothing else', the review searches beyond the named mechanism — logging, telemetry, network calls, and other places where visitor information might be recorded.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "Exclusion claims are exactly where checking only the named mechanism fails — the demo's own example is a default access log the seller's claim did not mention — so if the review did not search logging, telemetry and network calls, privacy-style claims could be reported as fully true when the target records more than it says. The firm's plan depends on each frozen claim being tested against the target's code and configuration, and an eleven-person firm could not reconstruct that search deal by deal inside the 10-day window. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 22,
@@ -221,7 +253,9 @@
    ],
    "statement": "The evidence required for a finding is determined by what the claim asserts.",
    "about": "target",
-   "restates": 22
+   "restates": 22,
+   "tier": 3,
+   "tier_basis": "This is a statement of review method — that the evidence required follows from what a claim asserts — rather than an operational commitment the firm listed among its six payment items or named in a threshold. Its falsity would change nothing in what the firm pays for, the terms, or any item of its reliance statement. Rated on the scale alone."
   },
   {
    "id": 23,
@@ -231,7 +265,9 @@
     37
    ],
    "statement": "The demo contains an example of the kind just discussed: a seller privacy claim, whose content is that only the hit is recorded and nothing else.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns what the free demo contains, and the firm recorded the demo as of no commercial interest, saying it will never use it again. No stated threshold reaches the demo's contents, and the firm's expectation that the website is honest is not tied to this example. Rated on the scale alone."
   },
   {
    "id": 24,
@@ -241,7 +277,9 @@
     37
    ],
    "statement": "The demo's database code increments the hit counter.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the demo's database code did not increment the hit counter as described, nothing in the firm's plan, its six stated payment items or its walk-away conditions would change, since the firm said it will never use the demo again. Rated on the scale alone."
   },
   {
    "id": 25,
@@ -251,7 +289,9 @@
     37
    ],
    "statement": "The demo's database code adds no information to that table beyond the hit count.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "This is a claim about the demo's own code, which the firm recorded as of no commercial interest and will never use. Its falsity would not alter the price, the terms, or any item the firm depends on. Rated on the scale alone."
   },
   {
    "id": 26,
@@ -261,7 +301,9 @@
     37
    ],
    "statement": "The demo's server is configured with (or ships with enabled) its default access log, which writes an entry for each request it handles.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim describes the demo server's access log, part of the demo example the firm said it will never use again. No stated threshold reaches the demo's internals, and the firm's own engagements never touch the demo. Rated on the scale alone."
   },
   {
    "id": 27,
@@ -271,7 +313,9 @@
     37
    ],
    "statement": "For the demo's privacy example, the review's conclusion is that the claim is partly true rather than simply true or false.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "This describes the conclusion reached in the demo's worked example. The firm will never use the demo, and its stake in partly-true results being preserved at the report level is rated separately under the report claim. Rated on the scale alone."
   },
   {
    "id": 28,
@@ -281,7 +325,9 @@
     37
    ],
    "statement": "The report preserves both sides of a partly-true finding — the part the evidence supports and the part it does not.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The firm's plan depends on each frozen claim producing a verdict that preserves both sides of a partly-true result; if the report collapsed such findings to a bare true or false, the committee would receive a conclusion without the evidence on either side, and the firm cannot supply that structure itself. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 29,
@@ -300,7 +346,9 @@
       49
      ]
     }
-   ]
+   ],
+   "tier": 1,
+   "tier_basis": "If the review judged commercial significance on its own account rather than by the buyer's reliance, the ratings would not be made against the thresholds the firm states, and the firm said a rating step that ignores its thresholds would change the price or terms because the judgements would be meaningless to its investment committee. Rated against the buyer's stated threshold: \"ratings made against the thresholds the firm states\"."
   },
   {
    "id": 30,
@@ -310,7 +358,9 @@
     41
    ],
    "statement": "The first review of the claims is performed with AI assistance.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "A misstatement of AI assistance in either direction destroys the distinction between human and machine judgement on which the signature the firm is paying for rests. Rated against the buyer's stated threshold: \"a step the website describes as done by a person that is done by the tooling alone, or the reverse\"."
   },
   {
    "id": 31,
@@ -320,7 +370,9 @@
     43
    ],
    "statement": "The separate check asks, for each finding: whether the seller's claim was stated accurately, whether the cited material relates to that claim, whether it shows what the finding says, whether the verdict fits the evidence, and, where searches were required, whether they were broad enough.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The questions listed are the substance of the independent second check: without them the check would not examine whether the seller's claim was stated accurately, whether the evidence supports the verdict, or whether searches were broad enough. The firm is paying for every finding to be checked a second time independently and cannot repair a hollow second reading itself. Rated against the buyer's stated threshold: \"every finding checked a second time independently\"."
   },
   {
    "id": 32,
@@ -330,7 +382,9 @@
     43
    ],
    "statement": "The separate check does not redo the whole review or look for additional faults in the target; its scope is the issued findings themselves.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "A check that went beyond the issued findings and redid the review would give the firm more coverage, not less; the firm's stated concern is a second check that is skipped for some findings or re-uses the first reader's conclusions, which this claim's falsity does not touch. Rated on the scale alone."
   },
   {
    "id": 33,
@@ -340,7 +394,9 @@
     43
    ],
    "statement": "Some findings are retested, and the retesting includes findings the first check accepted.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Retesting of some findings is a safeguard beyond the six items the firm listed as the whole of what it is paying for, and the second check itself is rated separately. Its absence would defeat no item the firm depends on and no stated threshold reaches it. Rated on the scale alone."
   },
   {
    "id": 34,
@@ -350,7 +406,9 @@
     43
    ],
    "statement": "The retesting helps detect both false alarms and problems the checker missed.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "This describes the benefit of the retesting covered by the preceding claim, which the firm did not list among its payment items or thresholds. The firm's engineer independently confirms each citation, so the claim's falsity changes nothing in the firm's plan. Rated on the scale alone."
   },
   {
    "id": 35,
@@ -360,7 +418,9 @@
     49
    ],
    "statement": "The report contains logic that, when the supplied materials cannot settle a claim, records no finding against the seller and instead describes the buyer's exposure — how much the buyer is relying on something unverified.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the report did not separate unsettled claims from settled ones and describe the buyer's exposure, the firm could not tell which conclusions in the report rest on unverified material, and its engineer would have to test runtime behaviour deal by deal against a 10-day window inside a 21-day exclusivity period. The firm cannot repair an overstated report itself. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 36,
@@ -370,7 +430,9 @@
     55
    ],
    "statement": "The target issues findings at delivery in a form that is not subject to later modification.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If findings issued at delivery were later quietly rewritten, the year-old record the committee may consult would no longer match the report, and the firm could not repair that itself — it would have to demand frozen, dated deliveries as a term. No stated threshold names rewriting, but the reliance statement marks the item as the practice's inference and the firm's plan rests on traceable, stable findings. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 37,
@@ -380,7 +442,9 @@
     55
    ],
    "statement": "The post-delivery continuation provides for answering the listed question types: reasoning behind verdicts, evidence behind findings, basis for materiality ratings, what might settle unresolved claims, and which parts of the target were not examined.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The firm uses the question page but does not depend on it; if it failed the firm would fall back on the report and its own copy of the record, an irritation rather than a failure. No stated threshold reaches post-delivery question-answering. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 38,
@@ -390,7 +454,9 @@
     55
    ],
    "statement": "The continuation's question-answering draws on the completed report, the working record behind it, and the cited target material as its sources.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "What sources the continuation draws on matters only if the firm relies on the continuation, which it uses rather than depends on; the firm chiefly pays for the working record itself, which it would still hold. No stated threshold reaches this claim. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 39,
@@ -400,7 +466,9 @@
     55
    ],
    "statement": "The continuation's question-answering includes a path that, when the completed review does not answer a question, states that it cannot rather than producing an invented answer.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the continuation invented an answer, the firm's engineer could catch it against the citations the report gives, which the firm can open and confirm itself; no stated threshold reaches the continuation's honesty. The firm uses this path but does not depend on it. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 40,
@@ -410,7 +478,9 @@
     61
    ],
    "statement": "The service does not usually replace any of the large categories of diligence; it is positioned as something other than a substitute for them.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The firm stated it has no view on the limits the website states and covers those categories through other advisers, buying nothing in them from Tuuyi. Its falsity would change nothing in the firm's plan. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 42,
@@ -420,7 +490,9 @@
     61
    ],
    "statement": "The service is not a general code-quality score, not an architecture assessment, not legal advice, and not a valuation opinion.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The firm stated it has no view on the stated limits — not a code-quality review, not legal advice — and covers those through other advisers. Its falsity would change nothing the firm pays for. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 43,
@@ -430,7 +502,9 @@
     61
    ],
    "statement": "The service is applicable to small software acquisitions, claims about AI technology, acceptance of contracted software, and evaluation of open-source dependencies where important decisions rest on the documentation.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The firm's first engagement is a $4.2M purchase of a scheduling-software company and its plan is roughly six such small software deals a year; if the service did not fit small software acquisitions, the plan the firm is paying $30,000 a year for does not exist. This is not one of the six things the firm listed as paying for, so it rests on how the plan reads rather than on a quoted threshold. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 44,
@@ -440,7 +514,9 @@
     65
    ],
    "statement": "In an engagement the client supplies three things: a code snapshot or repository, identification of the seller documents whose claims matter, and the deal context needed to understand which differences would matter commercially.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the service demanded materials or context the firm had not agreed to supply, the vice-president could renegotiate the workflow before the review starts — feasible, though disruptive to the 10-day need. The reliance statement marks the division of labour as the practice's inference and the firm uses rather than depends on it. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 45,
@@ -450,7 +526,9 @@
     65
    ],
    "statement": "The engagement delivers five things: the claims and their verdicts, the evidence behind each finding, the independent check, buyer-specific materiality or exposure ratings, and the questions that remain for the seller.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "This is the deliverable list, and two of its five items are things the firm said would change the price or terms if absent or diluted: the independent second check and buyer-specific ratings. If the service did not deliver them, the firm would be paying for something other than what it listed. Rated against the buyer's stated threshold: \"every finding checked a second time independently\"."
   },
   {
    "id": 46,
@@ -460,7 +538,9 @@
     65
    ],
    "statement": "The service does not set out to pronounce on everything about a company or its software; its scope is bounded.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "A statement of bounded scope is among the stated limits the firm said it has no view on, covering those categories through other advisers. Its falsity would change nothing in the firm's plan. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 47,
@@ -473,7 +553,9 @@
    "about": "target",
    "implied_by": 1,
    "property": "behaviour in operation",
-   "approved_by": "behaviour split, automatic"
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "Listing the seller's claims is the first of the six things the firm said it is paying for, and its failure would mean the report covers an incomplete or shifting claim set the firm's engineer would have to reconstruct inside a 10-day window. Rated against the buyer's stated threshold: \"every seller claim listed and frozen before testing\"."
   },
   {
    "id": 48,
@@ -486,7 +568,9 @@
    "about": "target",
    "implied_by": 2,
    "property": "behaviour in operation",
-   "approved_by": "behaviour split, automatic"
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "Testing the claims against the supplied code is the core of what the firm is buying; if it were not done, the firm's engineer would have to read the code deal by deal itself, which it cannot do for an eleven-person firm on this timetable. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
   },
   {
    "id": 49,
@@ -499,7 +583,9 @@
    "about": "target",
    "implied_by": 3,
    "property": "behaviour in operation",
-   "approved_by": "behaviour split, automatic"
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "The independent second check is among the six things the firm listed as paying for, and the firm said an independent check that re-uses the first reader's conclusions or is skipped for some findings would change the price or terms. Rated against the buyer's stated threshold: \"every finding checked a second time independently\"."
   },
   {
    "id": 50,
@@ -512,7 +598,9 @@
    "about": "target",
    "implied_by": 4,
    "property": "behaviour in operation",
-   "approved_by": "behaviour split, automatic"
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "Each frozen claim producing a verdict supported by the evidence is what turns the report from a pile of evidence into conclusions; without it the firm could not supply the missing judgement itself and the price would not be justified. The reliance statement marks this as the practice's inference but records that the firm depends on it. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 51,
@@ -525,7 +613,9 @@
    "about": "target",
    "implied_by": 5,
    "property": "behaviour in operation",
-   "approved_by": "behaviour split, automatic"
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "Findings showing claim, evidence and its source so the buyer can check directly is one of the six things the firm said it is paying for, and the firm said citations that are not verifiable would change the price or terms. Its falsity would leave the firm taking the report on trust or commissioning its own diligence. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
   },
   {
    "id": 52,
@@ -538,7 +628,9 @@
    "about": "target",
    "implied_by": 6,
    "property": "behaviour in operation",
-   "approved_by": "behaviour split, automatic"
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If the continuation did not answer questions about the delivered report, the firm would fall back on the report and on the working record it is chiefly paying to have kept, and its plan would survive that fallback. No threshold among the six things the firm is paying for or its walk-away conditions reaches post-delivery question answering. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 53,
@@ -551,7 +643,9 @@
    "about": "target",
    "implied_by": 7,
    "property": "behaviour in operation",
-   "approved_by": "behaviour split, automatic"
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "Each frozen claim ending in a stated verdict is what turns the report from a pile of evidence into conclusions the investment committee can act on; if it failed, the price would not be justified and the firm could not supply the missing judgement itself. The firm's plan depends on this, though the reliance item is the practice's inference rather than the buyer's words. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 54,
@@ -564,7 +658,9 @@
    "about": "target",
    "implied_by": 26,
    "property": "behaviour in operation",
-   "approved_by": "behaviour split, automatic"
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "The claim concerns the free demo's access log, and the firm has stated the demo is of no commercial interest to it and that it will never use it again; no stated threshold or walk-away condition reaches demo logging. If the claim were false, nothing in the firm's plan for the paid engagements it is actually buying would change. Rated on the scale alone."
   },
   {
    "id": 55,
@@ -577,7 +673,9 @@
    "about": "target",
    "implied_by": 35,
    "property": "behaviour in operation",
-   "approved_by": "behaviour split, automatic"
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If unsettled claims were not reported as exposure but were presented as settled or as findings against the seller without basis, the firm's engineer would have to test runtime behaviour deal by deal, which is costly for an eleven-person firm on a 10-day timetable but leaves the plan standing on that fallback. No threshold among the six things the firm is paying for or its walk-away conditions names how unsettled claims are described. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 56,
@@ -590,7 +688,9 @@
    "about": "target",
    "implied_by": 36,
    "property": "behaviour in operation",
-   "approved_by": "behaviour split, automatic"
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "If issued findings were quietly rewritten, the year-old working record the committee may consult would no longer match the report, destroying the traceability the firm is paying for, and the firm cannot repair that itself. A buyer of a diligence report whose issued conclusions can change after delivery would go back to the seller to demand frozen, dated deliveries as a term, or would not close. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 57,
@@ -603,7 +703,9 @@
    "about": "target",
    "implied_by": 37,
    "property": "behaviour in operation",
-   "approved_by": "behaviour split, automatic"
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If the continuation did not answer questions of these types, the firm would fall back on the report and its own copy of the working record, an irritation rather than a failure since the record itself is what it is chiefly paying to have kept. No threshold among the six things the firm is paying for or its walk-away conditions reaches post-delivery question answering. Rated on the practice's reading of the buyer's plan."
   }
  ]
 }

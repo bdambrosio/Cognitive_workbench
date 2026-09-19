@@ -1,196 +1,203 @@
 {
- "at": "2026-09-18T17-33-31Z",
+ "at": "2026-09-19T16-47-11Z",
  "model": "accounts/fireworks/models/glm-5p3-flash",
- "use": "Merrow Lane Partners is an eleven-person private-equity firm that buys software companies valued between $2M and $15M, about six deals a year. It will use Tuuyi's claims-review service as its technical diligence on those acquisitions — first as one attested review on a live $4.2M purchase of a scheduling-software company, at a $5,000 fee set at intake, and, if that goes well, on every deal thereafter within a $30,000 annual budget. The firm's vice-president for technical diligence and the firm's own engineer will read the report; the engineer will open and confirm the citations. The firm's plan needs six things from the service, which it listed as the whole of what it is paying for: every seller claim listed and frozen before testing, every finding cited to a file and line its engineer can open, every finding checked a second time independently, ratings made against the thresholds the firm states, a person's signature on the conclusion, and the seller's code kept on hardware Tuuyi controls. It needs the report in hand within 10 days of the seller uploading the code, because the live deal's exclusivity period ends in 21 days. The firm has budgeted $30,000 a year for six reviews and assumes the website describes the service accurately, having seen nothing but the website and one run of the free demo.",
+ "use": "Merrow Lane Partners, an eleven-person private-equity firm buying software companies valued between $2M and $15M, will retain Tuuyi's claims-review service at the attested tier, first for a $4.2M purchase of a scheduling-software company and then, if that goes well, for roughly six deals a year. The firm's vice-president for technical diligence runs the engagement; the firm's own engineer opens and confirms the citations in the report. The firm has listed six things it is paying for — claims frozen before testing, citations its engineer can confirm, an independent second check, ratings against its stated thresholds, a person's signature, and the seller's code kept on hardware Tuuyi controls — and three conditions that would end the deal outright. It needs the report within 10 days of the seller uploading the code, inside a 21-day exclusivity period, and its investment committee may ask to see the working record as much as a year later.",
  "items": [
   {
-   "item": "Listing and freezing every seller claim before any claim is tested",
+   "item": "Listing every seller claim and freezing the list before any testing",
    "reliance": "depends",
-   "if_it_failed": "The firm's diligence vice-president and its engineer would have to build the claim list themselves from the seller's documents, which is costly for a firm of eleven people with one technical lead covering six deals a year.",
+   "if_it_failed": "If claims could be added or changed after testing began, the firm could not trust that the report covers the whole claim set, and its engineer would have to reconstruct the list from the seller's documents — costly for an eleven-person firm inside a 10-day window.",
    "source": "buyer",
    "buyer_words": "every seller claim listed and frozen before testing"
   },
   {
-   "item": "Findings cited to a file and line that the firm's own engineer can open and confirm",
+   "item": "Testing each frozen claim against the target's code, configuration and build files",
    "reliance": "depends",
-   "if_it_failed": "The firm's engineer would have to re-derive each finding from the seller's code unaided, which is costly and would duplicate much of what the firm is paying for.",
+   "if_it_failed": "If the claims were not actually tested against the code, the firm's engineer would have to do that code-reading deal by deal themselves; this is the core of what is being bought, not something a competent engineer replaces in a day, so the cost would be heavy.",
    "source": "buyer",
    "buyer_words": "every finding cited to a file and line that the firm's own engineer can open and confirm"
   },
   {
-   "item": "Citations that do not resolve being caught mechanically before anyone reads the report",
+   "item": "Citing every finding to a file and line the firm's engineer can open and confirm",
    "reliance": "depends",
-   "if_it_failed": "The firm's engineer would have to open and verify every citation by hand inside the ten-day window, which is costly for one engineer and speaks directly to a doubt a partner has already raised about trusting model citations.",
+   "if_it_failed": "If findings were not cited this way, the firm could not verify the review's work itself and would have to take it on trust or commission its own diligence; it cannot repair that cheaply given who it said will operate the offering.",
+   "source": "buyer",
+   "buyer_words": "every finding cited to a file and line that the firm's own engineer can open and confirm"
+  },
+  {
+   "item": "Mechanically catching citations that do not resolve before anyone reads the report",
+   "reliance": "depends",
+   "if_it_failed": "The firm's engineer would have to check each citation by hand before the report went to the committee, which is slow work against the 10-day need and repeated at every deal.",
    "source": "buyer",
    "buyer_words": "citations that are not verified mechanically as the website says"
   },
   {
-   "item": "An independent second check of every finding, not re-using the first reader's conclusions and not skipped for some findings",
+   "item": "An independent second check of every finding, done without re-using the first reader's conclusions",
    "reliance": "depends",
-   "if_it_failed": "The firm would have to have its own engineer or an outside adviser re-check the findings, which is costly and defeats the purpose of the engagement.",
+   "if_it_failed": "If the check were skipped for some findings or re-used the first reader's work, the firm would be paying for a single reading; it cannot repair this itself and would have to discount the report or stop using the service.",
    "source": "buyer",
-   "buyer_words": "every finding checked a second time independently"
+   "buyer_words": "every finding checked a second time independently ... an independent check that re-uses the first reader's conclusions or is skipped for some findings"
   },
   {
-   "item": "Ratings made against the thresholds the firm states, not against the service's own judgement of materiality",
+   "item": "Materiality and exposure ratings made against the thresholds the firm states",
    "reliance": "depends",
-   "if_it_failed": "The firm would have to re-rate every finding against its own thresholds from the raw findings, which is costly for a firm whose diligence capacity is one vice-president and one engineer.",
+   "if_it_failed": "If ratings ignored the firm's stated thresholds, the materiality judgements would be meaningless to the investment committee; the firm would have to re-weight the findings itself, which it cannot credibly do without the very skill it is buying.",
    "source": "buyer",
-   "buyer_words": "ratings made against the thresholds the firm states"
+   "buyer_words": "ratings made against the thresholds the firm states ... a rating step that does not use the firm's stated thresholds"
   },
   {
-   "item": "A person's signature on the conclusion, with each line of the report attributing its content to machine work or to human judgement",
+   "item": "A person's signature on the conclusion, with human judgement distinguishable from machine work",
    "reliance": "depends",
-   "if_it_failed": "The firm's investment committee would be asked to rely on an unsigned conclusion whose authorship is unclear, which the firm has said would change the price, and the firm cannot easily supply a human signatory of its own.",
+   "if_it_failed": "The firm cannot repair this; if a step the website describes as done by a person were done by the tooling alone, the report's authority with the committee would fail and the price would not be justified.",
    "source": "buyer",
-   "buyer_words": "a person's signature on the conclusion"
+   "buyer_words": "a person's signature on the conclusion ... a step the website describes as done by a person that is done by the tooling alone, or the reverse"
   },
   {
-   "item": "The seller's code kept on isolated, single-tenant hardware that Tuuyi controls, with no code sent to any cloud model service or any other party on a paid engagement",
+   "item": "The seller's code kept on hardware Tuuyi controls on paid engagements, never reaching a cloud model service or any other party",
    "reliance": "depends",
-   "if_it_failed": "The firm would have to abandon the engagement entirely, since its non-disclosure agreements with sellers forbid passing code to any third party other than a named adviser and no workaround exists.",
+   "if_it_failed": "This ends the deal: the firm's non-disclosure agreements with sellers forbid passing seller code to any third party other than a named adviser, and no repair is possible once a disclosure has happened.",
    "source": "buyer",
-   "buyer_words": "any of a seller's code reaching a cloud model service or any party other than Tuuyi on a paid engagement"
+   "buyer_words": "any of a seller's code reaching a cloud model service or any party other than Tuuyi on a paid engagement ... the seller's code kept on hardware Tuuyi controls"
   },
   {
-   "item": "Uploaded examination materials openable only by the seller and the practice, with nothing beyond the report's paths and quoted lines leaving the engagement",
+   "item": "Seller materials visible to no one but the seller and the practice",
    "reliance": "depends",
-   "if_it_failed": "The firm would have to walk away from the service, since it has said that seller materials being visible to anyone but the seller and the practice ends the deal.",
+   "if_it_failed": "This ends the deal; a leak to any other eyes would breach the firm's obligations to its sellers and cannot be undone.",
    "source": "buyer",
    "buyer_words": "the seller's materials being visible to anyone but the seller and the practice"
   },
   {
-   "item": "The firm's deal terms held in the engagement file and nowhere else",
+   "item": "The firm's deal terms held only in the engagement file",
    "reliance": "depends",
-   "if_it_failed": "The firm would have to walk away from the service, since it has said that deal terms stored anywhere other than the engagement file end the deal.",
+   "if_it_failed": "This ends the deal; the firm stated this as a condition of any paid engagement and cannot repair a storage practice on Tuuyi's side.",
    "source": "buyer",
    "buyer_words": "the firm's deal terms being stored anywhere other than the engagement file"
   },
   {
-   "item": "The working record kept, so that any finding can be traced back to the searches and files behind it",
+   "item": "The report arriving within 10 days of the seller uploading the code",
    "reliance": "depends",
-   "if_it_failed": "The firm would have to accept that a committee question a year later cannot be answered from a record, which the firm has said would change the price, and it cannot reconstruct the record itself.",
+   "if_it_failed": "The firm would have to negotiate a longer exclusivity period or drop the review from the deal; with exclusivity already short, this is costly and may not be achievable.",
+   "source": "buyer",
+   "buyer_words": "the firm needs the report in hand within 10 days of the seller uploading the code ... a turnaround longer than the website states, because the exclusivity period is short"
+  },
+  {
+   "item": "The working record being kept, so any finding can be traced back to its searches and files a year later",
+   "reliance": "depends",
+   "if_it_failed": "If the record were not kept, the firm could not answer its investment committee's later questions; it cannot reconstruct a record it never held, and the report alone would not carry the traceability it is paying for.",
    "source": "buyer",
    "buyer_words": "the working record not being kept, because the committee may ask for it a year later"
   },
   {
-   "item": "Turnaround — the report in hand within ten days of the seller uploading the code, as the website's stated delivery times describe",
-   "reliance": "depends",
-   "if_it_failed": "The firm could lose the live deal when the exclusivity period ends in 21 days, and no repair by the firm is possible inside the window.",
-   "source": "buyer",
-   "buyer_words": "the firm needs the report in hand within 10 days of the seller uploading the code"
+   "item": "The engagement-site page where the seller uploads the materials, open only to the seller and the practice",
+   "reliance": "uses",
+   "if_it_failed": "If the upload page failed, the firm could supply the materials by another arrangement with Tuuyi, since the firm itself never has to handle the code; a workable workaround, though it would eat some of the 10 days.",
+   "source": "inference",
+   "buyer_words": "within 10 days of the seller uploading the code"
   },
   {
-   "item": "The intake conversation — capturing who the firm is, what the deal is, the firm's thresholds and what would change the price, and setting the fee",
-   "reliance": "uses",
-   "if_it_failed": "The firm would confirm in writing what Tuuyi captured before the review began, which is cheap.",
+   "item": "A fresh examination environment provisioned per paid engagement and deleted when it ends",
+   "reliance": "depends",
+   "if_it_failed": "If environments were shared between deals or not torn down, one seller's code could survive into another engagement, breaching the firm's walk-away condition; the firm cannot repair Tuuyi's infrastructure and would have to stop using the service.",
    "source": "inference",
+   "buyer_words": "the seller's code kept on hardware Tuuyi controls"
+  },
+  {
+   "item": "The intake conversation that records who the firm is, what it is evaluating, and its thresholds",
+   "reliance": "depends",
+   "if_it_failed": "If intake failed to capture the firm's thresholds, the ratings step would have nothing to rate against; the firm would have to restate them before the review could proceed, which is feasible but delays a timetable that is already tight.",
+   "source": "buyer",
    "buyer_words": "ratings made against the thresholds the firm states"
   },
   {
-   "item": "The report's fixed shape — the six listed parts, the five verdicts, the statement of what was and was not examined, and questions to put to the seller",
-   "reliance": "uses",
-   "if_it_failed": "The firm's engineer would still have the findings and citations to work from but would have to assemble the picture for the committee himself, which is costly inside a ten-day window. The buyer has not said; a person should ask.",
-   "source": "inference",
-   "buyer_words": ""
-  },
-  {
-   "item": "The method of testing by reading code, configuration and build files without compiling, executing or measuring anything, with runtime claims tested only as to mechanism and unsettled claims reported unsettled",
-   "reliance": "uses",
-   "if_it_failed": "The firm's engineer would have to run the software itself to settle runtime behaviour, which is costly for one engineer during a ten-day window on a live deal.",
-   "source": "inference",
-   "buyer_words": "every finding cited to a file and line that the firm's own engineer can open and confirm"
-  },
-  {
-   "item": "The division of labour — the firm names the claim documents and may add claims of its own, while never receiving the code or the examination materials",
-   "reliance": "uses",
-   "if_it_failed": "The firm would have to negotiate a different arrangement for handling the seller's materials, which is costly given its confidentiality obligations to sellers.",
-   "source": "inference",
-   "buyer_words": "every seller claim listed and frozen before testing"
-  },
-  {
-   "item": "The attested tier — the claims review plus a full reading of the record and a signed opinion from a practitioner who has sat on both sides of a deal, available to the firm's deal team through closing",
-   "reliance": "uses",
-   "if_it_failed": "The firm would be left with the claims review alone and would need another adviser to give the opinion and stand behind it through closing, which is costly for a firm of eleven people.",
-   "source": "inference",
-   "buyer_words": "one attested review on a live deal"
-  },
-  {
-   "item": "The free demo and the developer beta, including the demo report, its question-answering interface and its hosted model",
+   "item": "How the intake page is built and how long intake takes",
    "reliance": "does_not_use",
-   "if_it_failed": "Nothing in the firm's plan changes; the firm's only interest in these tiers is that they are described honestly.",
+   "if_it_failed": "No effect on the firm's plan, provided the report still arrives inside the 10 days.",
+   "source": "buyer",
+   "buyer_words": "it does not care how the intake page is built or how long intake takes, so long as the report arrives inside the 10 days"
+  },
+  {
+   "item": "The free demo and its question-answering interface",
+   "reliance": "does_not_use",
+   "if_it_failed": "No effect; the firm ran the demo once and will not use it again, though it still expects the demo to be described honestly on the website.",
    "source": "buyer",
    "buyer_words": "the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again"
   },
   {
-   "item": "The intake page that fills the engagement form as the conversation proceeds, and the time intake takes",
+   "item": "The developer beta and the free beta review path that runs on a hosted model",
    "reliance": "does_not_use",
-   "if_it_failed": "Nothing in the firm's plan changes so long as the report arrives inside the ten days.",
+   "if_it_failed": "No effect; the firm will never use it, and the hosted model it runs on touches none of the firm's own engagements.",
    "source": "buyer",
-   "buyer_words": "does not care how the intake page is built or how long intake takes, so long as the report arrives inside the 10 days"
+   "buyer_words": "the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again"
   },
   {
-   "item": "The stated exclusions — that the review is not a penetration test, not a code-quality review, not legal advice, and not a substitute for the larger categories of diligence",
+   "item": "The stated limits of the review — not a penetration test, not a code-quality review, not legal advice",
    "reliance": "does_not_use",
-   "if_it_failed": "Nothing in the firm's plan changes; the firm buys those services from other advisers.",
+   "if_it_failed": "No effect on the plan; the firm buys nothing in those categories from Tuuyi and covers them through other advisers.",
    "source": "buyer",
    "buyer_words": "it has no view on the limits the website states (not a penetration test, not a code-quality review, not legal advice); it has other advisers for those"
   },
   {
-   "item": "The private question page after delivery, answered from the working record and the cited material, including saying when the record cannot settle a question",
+   "item": "Runtime claims reported unsettled rather than verified, since nothing is compiled or executed",
    "reliance": "uses",
-   "if_it_failed": "The firm would have to request the record directly and have its own people answer from it during a live decision, which is moderately costly for a firm of its size.",
+   "if_it_failed": "If the review did not flag clearly what it could not settle and instead implied more than the evidence shows, the firm's engineer would have to test runtime behaviour deal by deal — costly for an eleven-person firm on a 10-day timetable.",
    "source": "inference",
-   "buyer_words": "the working record not being kept, because the committee may ask for it a year later"
+   "buyer_words": "every finding cited to a file and line that the firm's own engineer can open and confirm"
   },
   {
-   "item": "Findings issued at delivery and never quietly modified afterwards",
+   "item": "The private question page for asking about the delivered report, drawing on the working record, available for the life of the decision",
    "reliance": "uses",
-   "if_it_failed": "The firm could no longer trust that a finding read at delivery matches what the committee sees a year later, which would be costly to detect and would undermine the record it is relying on.",
+   "if_it_failed": "The firm would fall back on the report and its own copy of the record to answer committee questions; an irritation rather than a failure, since the record itself is what it is chiefly paying to have kept.",
    "source": "inference",
-   "buyer_words": "the working record not being kept, because the committee may ask for it a year later"
+   "buyer_words": "the committee may ask for it a year later"
   },
   {
-   "item": "Retention and deletion of the engagement file on the terms set out in the engagement letter",
+   "item": "Findings issued at delivery staying unmodified, with no quiet rewriting afterwards",
    "reliance": "uses",
-   "if_it_failed": "The firm would have to negotiate retention terms directly or keep its own copies of what it is permitted to keep. The buyer has not said; a person should ask.",
+   "if_it_failed": "If issued findings were quietly changed, the year-old record the committee may consult would no longer match the report; the firm cannot repair this itself and would have to demand frozen, dated deliveries.",
    "source": "inference",
-   "buyer_words": ""
+   "buyer_words": "the committee may ask for it a year later"
   },
   {
-   "item": "Provisioning and teardown of the examination environment, with the seller's repository deleted along with the environment when the engagement ends",
-   "reliance": "uses",
-   "if_it_failed": "The seller's code would sit on Tuuyi's hardware after the deal closes, and the firm could ask for written confirmation of deletion. The buyer has not said; a person should ask.",
+   "item": "Each frozen claim producing its own finding with a verdict, with both sides of a partly-true result preserved",
+   "reliance": "depends",
+   "if_it_failed": "Without a stated status for each claim, the report would be a pile of evidence with no conclusions; the price would not be justified and the firm could not supply the missing judgement itself.",
    "source": "inference",
-   "buyer_words": ""
+   "buyer_words": "every finding cited to a file and line that the firm's own engineer can open and confirm"
   },
   {
-   "item": "The contact form and enquiry handling, including delivery of submissions by email and a reply within one business day",
+   "item": "The attested tier's practitioner being available to the firm's deal team through closing",
    "reliance": "uses",
-   "if_it_failed": "The firm would write to info@tuuyi.com directly, which is cheap.",
+   "if_it_failed": "The buyer has not said; a person should ask.",
    "source": "inference",
-   "buyer_words": ""
+   "buyer_words": "the live deal's exclusivity period ends in 21 days"
   },
   {
-   "item": "Privacy of the public website — its cookies, its page-view counting, and the contact form's bot check",
+   "item": "The engagement letter setting the terms, retention and limitation of liability, one review at a time",
    "reliance": "uses",
-   "if_it_failed": "The firm's visits to the website would be handled differently from how the privacy page describes, which the firm could work around with its own browser settings and which would have no effect on any deal. The buyer has not said; a person should ask.",
-   "source": "inference",
-   "buyer_words": ""
+   "if_it_failed": "If the letter did not govern as described, the firm would have to settle terms before the first engagement; that is doable before paying and cheap at this stage, but it must happen.",
+   "source": "buyer",
+   "buyer_words": "a service engagement under Tuuyi's engagement letter, one review at a time, no retainer"
   },
   {
-   "item": "The nine-minute introduction video and its hosting by the site itself",
+   "item": "The founder's stated credentials — due diligence done from both sides of deals, and that he personally signs the attested reviews",
    "reliance": "uses",
-   "if_it_failed": "The firm would read the introduction page instead, which is cheap. The buyer has not said; a person should ask.",
-   "source": "inference",
-   "buyer_words": ""
-  },
-  {
-   "item": "The founder's stated background — his due-diligence experience on both the buyer's and seller's side, his personal signing of attested reviews, and the career history the about page gives",
-   "reliance": "uses",
-   "if_it_failed": "The firm would weigh the signature differently and check the background from public sources, which is cheap.",
+   "if_it_failed": "If the credentials were not as described, the signature the firm is paying for would carry less weight; the firm cannot repair that and would have to weigh the report on its citations alone before continuing to the further five deals a year.",
    "source": "inference",
    "buyer_words": "a person's signature on the conclusion"
+  },
+  {
+   "item": "The division of labour: the firm names the claim documents and supplies the deal context, may add claims of its own, and never receives the code",
+   "reliance": "uses",
+   "if_it_failed": "If the service demanded materials or deal assumptions the firm had not agreed to supply, the firm's vice-president would have to renegotiate the workflow before the review could start — feasible but disruptive to the 10-day need.",
+   "source": "inference",
+   "buyer_words": "one attested review on a live deal (a $4.2M purchase of a scheduling-software company)"
+  },
+  {
+   "item": "The public website's own visitor-facing behaviour — the contact form and its bot check, the absence of cookies and analytics on the public pages",
+   "reliance": "uses",
+   "if_it_failed": "The buyer has not said; a person should ask.",
+   "source": "inference",
+   "buyer_words": ""
   }
  ]
 }

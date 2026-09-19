@@ -18,7 +18,9 @@
       7
      ]
     }
-   ]
+   ],
+   "tier": 3,
+   "tier_basis": "The claim concerns the beta review path, which the firm put outside its plan: the free demo and developer beta are, in its words, of no commercial interest and it will never use them again, and no stated threshold reaches the beta. If the claim were false the firm's engagement for the attested reviews would be unaffected. Rated on the scale alone."
   },
   {
    "id": 3,
@@ -28,7 +30,9 @@
     9
    ],
    "statement": "On successful submission the contact form shows a sent confirmation state.",
-   "about": "target"
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If a successful submission showed no sent confirmation, the firm could not tell that its request to open the first review had arrived and would re-submit or chase inside a timetable it said is already tight; on its own this costs minutes, not days. It is a detail of the described form behaviour the firm acts on, and with the other form claims its falsity would bear on whether the website's description, the only description the firm has seen, can be relied on. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 4,
@@ -38,7 +42,9 @@
     9
    ],
    "statement": "The practice's reply is sent to the email address the submitter entered in the form.",
-   "about": "seller"
+   "about": "seller",
+   "tier": 2,
+   "tier_basis": "If the reply went somewhere other than the address the submitter entered, the firm would wait at its address for a response that never comes and lose days at the start of an engagement whose window it said is short; on its own it could fall back on info@tuuyi.com. It is a detail of the described form behaviour the firm acts on, and with the other form claims its falsity would bear on whether the website's description can be relied on. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 5,
@@ -48,7 +54,9 @@
     11
    ],
    "statement": "The form rejects submission unless a name, a working email address and a message are all provided.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the form accepted submissions lacking a name, a working email address or a message, the firm's own complete submission would still work and the burden of an unanswerable enquiry falls on the practice, not on the firm's plan. No stated threshold reaches validation behaviour and the firm's use of the form does not rest on it. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 6,
@@ -58,7 +66,9 @@
     13
    ],
    "statement": "The form includes a bot check, and failing it prevents submission.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the bot check did not exist or did not block submissions, the firm's loss is essentially nil: its own legitimate submission is unaffected, and spam or a false block is a cost to the practice or is worked around by writing to info@tuuyi.com. No stated threshold reaches the bot check and the firm's use of the form does not rest on it. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 7,
@@ -68,7 +78,9 @@
     15
    ],
    "statement": "When submission fails on the server side, the form shows an error state directing the sender to write to info@tuuyi.com instead.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If a server-side failure showed no error state pointing to info@tuuyi.com, the firm might be briefly without a fallback address, but it holds the address through the engagement and the delay is recoverable within the timetable. No stated threshold reaches the error state and the firm's use of the form does not rest on it. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 10,
@@ -81,7 +93,9 @@
    "about": "target",
    "implied_by": 8,
    "property": "behaviour in operation",
-   "approved_by": "behaviour split, automatic"
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "If submissions were not actually delivered by email to the practice, the firm's request to open the first review would silently never arrive, and the lost days at the start of an engagement that must fit inside a 21-day exclusivity period with a 10-day report need are exactly the kind of delay the firm said would change the price or terms. No workaround is described on the form's face, and the firm has seen nothing but the website. Rated against the buyer's stated threshold: \"a turnaround longer than the website states, because the exclusivity period is short\"."
   }
  ]
 }

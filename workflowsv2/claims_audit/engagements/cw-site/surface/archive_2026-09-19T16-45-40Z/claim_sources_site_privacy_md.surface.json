@@ -1,0 +1,335 @@
+{
+ "claim_source": "claim_sources/site/privacy.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "This site sets no cookies",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The public website sets no cookies on visitors.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "This site sets no cookies",
+     "lines": [
+      7,
+      7
+     ]
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "quote": "This site sets no cookies and runs no analytics",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The public website runs no analytics.",
+   "about": "target"
+  },
+  {
+   "id": 3,
+   "quote": "The demo sets one",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The demo sets exactly one cookie.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "The demo sets one cookie",
+     "lines": [
+      7,
+      7
+     ]
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "quote": "It counts page views with Cloudflare Web Analytics",
+   "lines": [
+    7,
+    7
+   ],
+   "statement": "The site counts page views using Cloudflare Web Analytics.",
+   "about": "target"
+  },
+  {
+   "id": 5,
+   "quote": "which uses no cookies",
+   "lines": [
+    7,
+    7
+   ],
+   "statement": "The site's page-view counting via Cloudflare Web Analytics uses no cookies.",
+   "about": "target"
+  },
+  {
+   "id": 6,
+   "quote": "does not identify visitors",
+   "lines": [
+    7,
+    7
+   ],
+   "statement": "The site's page-view counting via Cloudflare Web Analytics does not identify visitors.",
+   "about": "target"
+  },
+  {
+   "id": 7,
+   "quote": "The demo sets a single cookie that identifies your browser to it",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The demo sets a single cookie whose function is to identify the visitor's browser to the demo.",
+   "about": "target"
+  },
+  {
+   "id": 8,
+   "quote": "so that your conversation is yours and you can return to it",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The demo stores each visitor's conversation under the identifier of the single cookie it set in that visitor's browser, so that the stored conversation can be retrieved for that visitor on a later visit.",
+   "about": "target"
+  },
+  {
+   "id": 9,
+   "quote": "It records when a session was opened, a hash of the address it came from, and how many questions were asked",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The demo records only session metadata: when the session was opened, a hash of the source address, and the question count.",
+   "about": "target"
+  },
+  {
+   "id": 11,
+   "quote": "Your questions and the answers are kept for a few days and then deleted",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The demo includes a deletion process that removes stored demo questions and answers once the few-day retention period ends.",
+   "about": "target"
+  },
+  {
+   "id": 13,
+   "quote": "What you type there is sent to that service to produce the reply",
+   "lines": [
+    13,
+    13
+   ],
+   "statement": "Text typed into the demo is transmitted to the hosted inference service to generate the reply.",
+   "about": "target"
+  },
+  {
+   "id": 15,
+   "quote": "What a client tells us at intake and what a seller supplies are held in the engagement file",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "Client intake information and seller-supplied materials are held in the engagement file.",
+   "about": "target"
+  },
+  {
+   "id": 16,
+   "quote": "for the period set in the engagement letter",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "The engagement file is retained for the period stated in the engagement letter.",
+   "about": "target"
+  },
+  {
+   "id": 17,
+   "quote": "What a client tells us at intake and what a seller supplies are held in the engagement file, for the period set in the engagement letter, and then deleted",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "The engagement file includes a deletion process that removes client intake information and seller-supplied materials once the period set in the engagement letter ends.",
+   "about": "target"
+  },
+  {
+   "id": 19,
+   "quote": "in an environment created for the engagement",
+   "lines": [
+    19,
+    19
+   ],
+   "statement": "A paid review runs in an environment created specifically for that engagement.",
+   "about": "target"
+  },
+  {
+   "id": 20,
+   "quote": "in an environment created for the engagement and deleted afterwards",
+   "lines": [
+    19,
+    19
+   ],
+   "statement": "The paid-review setup creates an environment dedicated to each engagement and includes a process that deletes that environment when the engagement ends.",
+   "about": "target"
+  },
+  {
+   "id": 26,
+   "quote": "The report names files by their path",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "The delivered report identifies files by their path.",
+   "about": "target"
+  },
+  {
+   "id": 27,
+   "quote": "quotes the lines each finding rests on",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "The delivered report quotes the source lines each finding rests on.",
+   "about": "target"
+  },
+  {
+   "id": 28,
+   "quote": "the page after delivery answers questions from the engagement's record",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "After delivery, a page exists where the client's questions are answered from the engagement's record.",
+   "about": "target"
+  },
+  {
+   "id": 29,
+   "quote": "The repository itself stays in the engagement's environment",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "The seller's repository remains inside the engagement's environment and is not taken out of it.",
+   "about": "target"
+  },
+  {
+   "id": 30,
+   "quote": "The repository itself stays in the engagement's environment and is deleted with it",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "The seller's repository is kept inside the engagement environment, and the environment's deletion process covers the repository together with the rest of the environment.",
+   "about": "target"
+  },
+  {
+   "id": 31,
+   "quote": "What you type into the contact form is sent by email to the practice",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "Contact form submissions are sent by email to the practice.",
+   "about": "target"
+  },
+  {
+   "id": 32,
+   "quote": "What you type into the contact form is sent by email to the practice and is not stored anywhere else",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "Contact form submissions are stored nowhere besides the email sent to the practice.",
+   "about": "target"
+  },
+  {
+   "id": 33,
+   "quote": "The form uses Cloudflare Turnstile to keep bots out",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "The contact form uses Cloudflare Turnstile for bot protection.",
+   "about": "target"
+  },
+  {
+   "id": 34,
+   "quote": "it runs a check in your browser",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "The Turnstile check runs in the visitor's browser.",
+   "about": "target"
+  },
+  {
+   "id": 35,
+   "quote": "it runs a check in your browser and sets no cookie",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "The contact form's bot protection sets no cookie.",
+   "about": "target"
+  },
+  {
+   "id": 36,
+   "quote": "so that your conversation is yours and you can return to it",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "A demo visitor who returns to the demo can resume their own earlier conversation, which remains theirs and is not mixed with other visitors' conversations.",
+   "about": "target",
+   "implied_by": 8,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 37,
+   "quote": "Your questions and the answers are kept for a few days and then deleted",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "Demo questions and answers are actually deleted after the retention period passes and are not kept beyond it.",
+   "about": "target",
+   "implied_by": 11,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 38,
+   "quote": "What a client tells us at intake and what a seller supplies are held in the engagement file, for the period set in the engagement letter, and then deleted",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "Engagement files are actually deleted when the retention period stated in the engagement letter ends and are not kept beyond it.",
+   "about": "target",
+   "implied_by": 17,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  },
+  {
+   "id": 40,
+   "quote": "The repository itself stays in the engagement's environment and is deleted with it",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "When the engagement environment is deleted after the engagement, the seller's repository is actually deleted with it and does not survive the deletion.",
+   "about": "target",
+   "implied_by": 30,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic"
+  }
+ ]
+}

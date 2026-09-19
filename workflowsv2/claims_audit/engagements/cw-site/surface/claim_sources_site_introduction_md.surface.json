@@ -1,0 +1,141 @@
+{
+ "claim_source": "claim_sources/site/introduction.md",
+ "claims": [
+  {
+   "id": 2,
+   "quote": "how each one is tested against the code",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The claims review tests each claim against the target's code.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "how a claim is tested against the code",
+     "lines": [
+      7,
+      7
+     ]
+    }
+   ],
+   "tier": 1,
+   "tier_basis": "If claims were not tested against the target's code, the firm's engineer would have to read the code itself deal by deal, which is the core of what the fee buys and cannot be repaired inside the 10-day window. This is an item the firm depends on. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
+  },
+  {
+   "id": 4,
+   "quote": "findings are checked and rated",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The review rates the findings it produces.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "findings are checked and rated",
+     "lines": [
+      7,
+      7
+     ]
+    }
+   ],
+   "tier": 1,
+   "tier_basis": "If the review did not rate its findings, the report would arrive without the materiality judgements the investment committee reads, and the firm would be paying for evidence it must weigh itself. The reliance statement marks ratings against stated thresholds as an item the firm depends on. Rated against the buyer's stated threshold: \"ratings made against the thresholds the firm states\"."
+  },
+  {
+   "id": 5,
+   "quote": "The video is served from this site",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The introduction video is hosted and served by the site itself.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the introduction video were served from elsewhere, nothing in the firm's plan would change: the firm listed what it is paying for, the video is not among it, and no reliance item covers the site's media hosting. The falsity would affect neither price, terms, nor any step the firm relies on. Rated on the scale alone."
+  },
+  {
+   "id": 7,
+   "quote": "The review begins with intake",
+   "lines": [
+    19,
+    19
+   ],
+   "statement": "The review process begins with an intake step.",
+   "about": "target",
+   "within": {
+    "source": "claim_sources/site/introduction-transcript.md",
+    "id": 12,
+    "statement": "The review begins with an intake step, before examining the software, that establishes the review's context by asking the buyer who the buyer is, what is being purchased, which seller documents carry the material claims, what the buyer already knows or suspects, and which kinds of findings would affect price, terms, or the decision to close."
+   },
+   "tier": 1,
+   "tier_basis": "If the review did not begin with intake, the firm's thresholds would never be captured and the rating step would have nothing to rate against, delaying a timetable that is already tight. The reliance statement marks the intake conversation as an item the firm depends on. Rated against the buyer's stated threshold: \"ratings made against the thresholds the firm states\"."
+  },
+  {
+   "id": 9,
+   "quote": "A finding is a claim, a verdict and evidence",
+   "lines": [
+    23,
+    23
+   ],
+   "statement": "Each finding the review produces consists of a claim, a verdict and evidence.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If a finding were not a claim, a verdict and evidence, the report would be a pile of citations with no conclusion, and the firm could not supply the missing judgement itself inside the deal window. The reliance statement marks each frozen claim producing its own finding with a verdict as an item the firm depends on, at the practice's inference. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 10,
+   "quote": "Control 2: an independent check of each finding",
+   "lines": [
+    27,
+    27
+   ],
+   "statement": "Each finding undergoes an independent check — the check is separate from the work that produced the finding.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the check re-used the first reader's conclusions or were skipped for some findings, the firm would be paying for a single reading, which it named as something that would change the price or terms. The reliance statement marks the independent second check as an item the firm depends on. Rated against the buyer's stated threshold: \"an independent check that re-uses the first reader's conclusions or is skipped for some findings\"."
+  },
+  {
+   "id": 11,
+   "quote": "Materiality is read against the buyer's transaction",
+   "lines": [
+    29,
+    29
+   ],
+   "statement": "The materiality of findings is assessed against the buyer's specific transaction.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If materiality were not read against this buyer's transaction, the ratings would be meaningless to the investment committee and the firm would have to re-weight findings with a skill it is buying rather than holding. The reliance statement marks ratings against stated thresholds as an item the firm depends on. Rated against the buyer's stated threshold: \"a rating step that does not use the firm's stated thresholds\"."
+  },
+  {
+   "id": 12,
+   "quote": "The delivered product is live continuation",
+   "lines": [
+    31,
+    31
+   ],
+   "statement": "The product delivered by the review is what the method calls a live continuation.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the delivered product were not what the method calls a live continuation, the firm's stated thresholds and its reliance items would be untouched: the firm pays for the report, the record and the ratings, and no threshold names delivery as continuation. Nothing in the transaction as stated would change in price or terms. Rated on the scale alone."
+  },
+  {
+   "id": 13,
+   "quote": "A beta engagement",
+   "lines": [
+    35,
+    35
+   ],
+   "statement": "The engagement is offered in beta — the service is at a beta stage.",
+   "about": "target",
+   "within": {
+    "source": "claim_sources/site/index.md",
+    "id": 5,
+    "statement": "The service is currently offered in beta, with claims reviews free of charge and availability limited."
+   },
+   "tier": 1,
+   "tier_basis": "If the service were in beta, the firm would be paying a full attested fee, budgeted at $30,000 a year, for a service not yet at release quality, and would go back to Tuuyi over the terms before the first live deal inside the exclusivity window. A beta designation changes what the firm is contracting for, though no stated threshold names it. Rated on the scale alone."
+  }
+ ]
+}

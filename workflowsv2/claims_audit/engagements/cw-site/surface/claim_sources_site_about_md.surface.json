@@ -18,7 +18,9 @@
       7
      ]
     }
-   ]
+   ],
+   "tier": 3,
+   "tier_basis": "If false, the credential and signature claims on the page lose their subject, but the firm's price and terms rest on the process features it listed, not on who holds the founder title. No stated threshold names the founder's identity. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 2,
@@ -37,7 +39,9 @@
       9
      ]
     }
-   ]
+   ],
+   "tier": 3,
+   "tier_basis": "An academic credential bearing on the weight of the signature the firm pays for; its falsity would leave the firm weighing the report on its citations rather than reopening the price or terms of the first review. No stated threshold reaches the founder's academic standing. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 3,
@@ -63,7 +67,9 @@
       15
      ]
     }
-   ]
+   ],
+   "tier": 3,
+   "tier_basis": "If false, the firm would have to weigh the report on its citations alone, which its own engineer can open and confirm, rather than reopen the price or terms of the first engagement. The six things the firm listed as paying for are process features, not the practitioner's history. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 4,
@@ -82,7 +88,9 @@
       17
      ]
     }
-   ]
+   ],
+   "tier": 1,
+   "tier_basis": "The firm is paying for a person to sign the conclusion and the website names who that person is; if he does not personally sign the attested reviews, the firm would go back to the seller over the terms of the engagement before relying on the report. Rated against the buyer's stated threshold: \"a person's signature on the conclusion\"."
   },
   {
    "id": 6,
@@ -92,7 +100,9 @@
     7
    ],
    "statement": "Tuuyi is a practice with a single service; claims review is the only thing it does.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If false, the practice has other lines of work, but nothing in the firm's plan or thresholds turns on the practice's focus or exclusivity of service. The firm's walk-away conditions concern where code and materials go, not what else the practice sells. Rated on the scale alone."
   },
   {
    "id": 7,
@@ -102,7 +112,9 @@
     9
    ],
    "statement": "Bruce D'Ambrosio has worked in artificial intelligence for roughly forty years.",
-   "about": "seller"
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "A background credential supporting the founder's standing; its falsity would diminish the weight of the signature without changing the price or terms of this engagement. No stated threshold reaches the founder's length of experience. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 8,
@@ -112,7 +124,9 @@
     9
    ],
    "statement": "Bruce D'Ambrosio founded the company CleverSet.",
-   "about": "seller"
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "A historical credential about a prior company; its falsity would bear on the founder's standing but not on any process feature the firm listed or any condition it stated. The firm can verify the delivered work through its engineer's citation checks. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 9,
@@ -122,7 +136,9 @@
     9
    ],
    "statement": "CleverSet's research became a personalization service used by more than seventy retailers.",
-   "about": "seller"
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "A claim about the reach of the founder's earlier venture; its falsity would not change what the firm pays, the terms, or whether it closes the first engagement. No stated threshold reaches the founder's history. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 10,
@@ -132,7 +148,9 @@
     9
    ],
    "statement": "CleverSet was acquired by Art Technology Group in 2008.",
-   "about": "seller"
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "A verifiable historical fact about a past acquisition; its falsity would bear on the founder's narrative rather than on the review the firm is buying. No stated threshold or plan item turns on it. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 11,
@@ -142,7 +160,9 @@
     9
    ],
    "statement": "Tuuyi's recommender ran in production on the SciCast forecasting platform (IARPA-funded, at George Mason University) during 2014 and 2015.",
-   "about": "seller"
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "A claim about where the founder's recommender ran in production; its falsity would affect the founder's standing, not the process features the firm is paying for or any condition it stated. The firm's engineer verifies findings directly from citations. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 12,
@@ -161,7 +181,9 @@
       15
      ]
     }
-   ]
+   ],
+   "tier": 3,
+   "tier_basis": "A supporting detail about a project document; its falsity would not change the price, the terms, or whether the firm closes. No stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 13,
@@ -171,7 +193,9 @@
     11
    ],
    "statement": "The service operates as a fixed procedure designed around the models for one specific job, not as a general assistant.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "A description of the service's shape; if false, the service is more general than described, but nothing in the firm's listed payments, price conditions or walk-away conditions turns on that characterization. The firm's plan is stated in terms of process features and data handling. Rated on the scale alone."
   },
   {
    "id": 14,
@@ -181,7 +205,9 @@
     11
    ],
    "statement": "The service runs on infrastructure controlled by the practice, not on third-party hosted infrastructure.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the service ran on third-party hosted infrastructure, seller code on a paid engagement would reach a party other than Tuuyi, which the firm stated would end the deal outright and which no repair can undo. Rated against the buyer's stated threshold: \"any of a seller's code reaching a cloud model service or any party other than Tuuyi on a paid engagement\"."
   },
   {
    "id": 16,
@@ -191,7 +217,9 @@
     11
    ],
    "statement": "Claims review is the first application the practice has built on this model.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If false, claims review is not the first application built on the practice's models, which would bear on maturity but not on the price, the terms, or whether the firm closes the first engagement. No stated threshold or plan item reaches it. Rated on the scale alone."
   },
   {
    "id": 17,
@@ -201,7 +229,9 @@
     15
    ],
    "statement": "Bruce D'Ambrosio was contracted to the buyer of a French SaaS product-recommendation service and performed the technical side of that diligence.",
-   "about": "seller"
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "A claim of directly relevant experience on the buyer's side of a diligence; its falsity would leave the firm weighing the report on its citations alone rather than reopening the price or terms of the first review. The firm's listed payments are process features, not the practitioner's history. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 18,
@@ -211,7 +241,9 @@
     21
    ],
    "statement": "Bruce D'Ambrosio remains available to the client's deal team through closing, on terms set at intake.",
-   "about": "seller"
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "If the founder were not available through closing, the firm would lose a service the reliance statement marks as 'uses' rather than 'depends', and the buyer's stated six things it is paying for and three walk-away conditions do not name the practitioner's availability. The statement's own note is that the buyer has not said what would happen if this failed. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 22,
@@ -221,7 +253,9 @@
     25
    ],
    "statement": "The judgement in the report is made by a person, not by the tooling alone.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "A person's judgement on the conclusion is one of the six things the firm listed it is paying for, and the firm said it would change the price or terms if a step described as done by a person were done by the tooling alone or the reverse; the reliance statement marks the item 'depends' and notes the firm cannot repair it. Rated against the buyer's stated threshold: \"a step the website describes as done by a person that is done by the tooling alone, or the reverse\"."
   },
   {
    "id": 23,
@@ -231,7 +265,9 @@
     29
    ],
    "statement": "Enquiries via the contact form receive a reply within one business day.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "A reply within one business day to contact-form enquiries is not among the six things the firm is paying for, and its turnaround threshold reaches the report arriving within 10 days, not replies to enquiries; the reliance statement marks the website's visitor-facing behaviour as 'uses' with the buyer not having said what would happen if it failed. Rated on the practice's reading of the buyer's plan."
   }
  ]
 }

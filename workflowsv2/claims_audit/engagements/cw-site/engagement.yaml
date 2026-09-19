@@ -1,8 +1,9 @@
 # claims-audit engagement: cw-site
 #
-# Created 2026-09-17T15-52-46Z. A self-review: the target is this repository at
-# commit 3b57e91d, cloned locally, and the claim sources are the pages of the
-# practice's public website (site/*.html, identical to https://tuuyi.com on
+# Created 2026-09-17T15-52-46Z. A self-review: the target is this repository,
+# cloned locally at commit 3b57e91d and moved to tag v2.2 (ad2a8cd5) on
+# 2026-09-19 for the rerun under tiers; site/ is identical at both commits.
+# The claim sources are the pages of the practice's public website (site/*.html, identical to https://tuuyi.com on
 # 2026-09-17). Each page's text was extracted with
 # utils.doc_extract.extract_to_markdown into target/claim_sources/site/, one
 # file per page, by extract_sources.py in this directory; each file opens with

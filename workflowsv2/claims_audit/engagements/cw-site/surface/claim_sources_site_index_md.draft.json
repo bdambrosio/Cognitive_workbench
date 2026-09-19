@@ -9,7 +9,9 @@
     3
    ],
    "statement": "The service belongs to the category it names: it performs technical due diligence for software acquisitions — that the core function of the category exists is what is claimed.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the service did not perform technical due diligence for software acquisitions at all, the buyer would receive nothing of what the engagement is for and would not close; the fee is paid solely for this function. Rated on the scale alone."
   },
   {
    "id": 2,
@@ -28,7 +30,9 @@
       11
      ]
     }
-   ]
+   ],
+   "tier": 1,
+   "tier_basis": "Comparing the seller's claims against the code is the core of what the firm is paying $5,000 a review for; if the service did not do this, the firm would be paying for a report with no substance behind it and would not close. Rated on the scale alone."
   },
   {
    "id": 4,
@@ -38,7 +42,9 @@
     3
    ],
    "statement": "The service's engagement spans from a free demo to a delivered signed opinion.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the engagement did not end in a signed opinion, the buyer loses the signed conclusion it named as one of the six things it is paying for, and the report's authority with its investment committee would fail; the free-demo endpoint of the span does not matter to this buyer, but the signature does. Rated against the buyer's stated threshold: \"a person's signature on the conclusion\"."
   },
   {
    "id": 5,
@@ -57,7 +63,9 @@
       74
      ]
     }
-   ]
+   ],
+   "tier": 3,
+   "tier_basis": "The claim concerns the free, limited beta path; the firm stated the free demo and the developer beta are of no commercial interest to it and it will never use them again, and its fee is set at intake in any case. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 6,
@@ -67,7 +75,9 @@
     13
    ],
    "statement": "The service is aimed at buyers and advisers of small software companies.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "A statement of the audience the service is aimed at changes nothing for this buyer if false: the firm's price, terms and thresholds do not rest on who else the service is marketed to. Rated on the scale alone."
   },
   {
    "id": 7,
@@ -86,7 +96,9 @@
       72
      ]
     }
-   ]
+   ],
+   "tier": 1,
+   "tier_basis": "A report the buyer can check line by line is the second of the six things the firm listed as the whole of what it is paying for; if the report were not checkable this way, the firm could not verify the review itself and would have to discount it or commission its own diligence. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
   },
   {
    "id": 8,
@@ -112,7 +124,9 @@
       116
      ]
     }
-   ]
+   ],
+   "tier": 3,
+   "tier_basis": "The private question page is an item the buyer uses but does not depend on: if it failed, the firm would fall back on the report and its own copy of the working record, an irritation rather than a failure, and no stated threshold names it. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 9,
@@ -122,7 +136,9 @@
     52
    ],
    "statement": "The report has a fixed shape comprising the six listed parts — executive summary, what the review showed, unsettled claims, claims that hold, questions for the seller, and an appendix — each holding what its row describes.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The report's stated shape carries the evidence with file and lines, the independent check's outcome and the unsettled claims — the very things the firm said are the whole of what it is paying for; if the report did not have these parts, the firm could not confirm the citations or see the second check, and the price would not be justified. Rated against the buyer's stated threshold: \"every finding checked a second time independently\"."
   },
   {
    "id": 11,
@@ -132,7 +148,9 @@
     56
    ],
    "statement": "The buyer identifies the documents carrying the seller's claims and is never shown the code.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the buyer did see the code, the division of labour would have to be renegotiated before the review could start — feasible but disruptive — yet nothing in the firm's price, terms or walk-away conditions rests on whether the firm itself is shown the code. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 12,
@@ -142,7 +160,9 @@
     56
    ],
    "statement": "A small target's review is returned within days of receiving the materials.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The firm must have the report in hand within 10 days of the seller uploading the code, inside a 21-day exclusivity period, and named turnaround as something that would change the price or terms; if a small target did not come back within days, the review could not fit the live deal. Rated against the buyer's stated threshold: \"a turnaround longer than the website states, because the exclusivity period is short\"."
   },
   {
    "id": 13,
@@ -152,7 +172,9 @@
     56
    ],
    "statement": "A typical deal's review is returned in about a week.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The same threshold reaches this claim: the firm's plan assumes the website's stated turnaround, and if a typical deal took materially longer than about a week, the review would not fit the 10-day need the firm stated for this and the further five deals a year. Rated against the buyer's stated threshold: \"a turnaround longer than the website states, because the exclusivity period is short\"."
   },
   {
    "id": 14,
@@ -162,7 +184,9 @@
     62
    ],
    "statement": "The demo tier is offered at no charge.",
-   "about": "seller"
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "The demo is something the firm stated is of no commercial interest to it and it will never use again; whether the demo tier is free changes nothing about the firm's paid engagement or its $5,000 fee set at intake. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 15,
@@ -172,7 +196,9 @@
     64
    ],
    "statement": "The demo contains a completed claims review of a small open-source project together with an interface a visitor can use to question it.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The demo's contents and question interface sit entirely within the free path the firm stated it will never use again; its falsity would have no effect on the firm's plan, though the firm still expects the demo to be described honestly. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 16,
@@ -182,7 +208,9 @@
     64
    ],
    "statement": "The practice states it will set up a visitor who supplies their own repository to run a claims review on it — a statement of intent about the seller's own activity.",
-   "about": "seller"
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "A statement of intent about setting up visitors who supply their own repositories concerns the free path the firm said it will never use; the firm's engagement is a paid one-review-at-a-time service under an engagement letter, which this claim does not touch. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 17,
@@ -192,7 +220,9 @@
     70
    ],
    "statement": "The price of a claims review is given as a quote after the intake conversation rather than published.",
-   "about": "seller"
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "The firm has already been quoted $5,000 at intake, so whether the price is quoted after intake or published changes nothing for it; the engagement structure it agreed to is unaffected. Rated on the scale alone."
   },
   {
    "id": 18,
@@ -202,7 +232,9 @@
     72
    ],
    "statement": "Every claim in the documents the buyer names is tested against the target's code.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If not every named claim were tested against the code, the core of what the firm is paying for fails and its engineer would have to read the code deal by deal inside a 10-day window. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
   },
   {
    "id": 21,
@@ -212,7 +244,9 @@
     72
    ],
    "statement": "The report is signed by a person who takes responsibility for it.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the report were not signed by a person who takes responsibility for it, the report's authority with the investment committee would fail and the fee would not be justified. Rated against the buyer's stated threshold: \"a person's signature on the conclusion\"."
   },
   {
    "id": 22,
@@ -231,7 +265,9 @@
       120
      ]
     }
-   ]
+   ],
+   "tier": 3,
+   "tier_basis": "If attested due diligence were not priced per engagement, no term the firm stated as price-changing or deal-ending would be affected; the firm's budget assumes a fee set at intake either way. Rated on the scale alone."
   },
   {
    "id": 23,
@@ -241,7 +277,9 @@
     82
    ],
    "statement": "The attested due diligence tier consists of the claims review plus a reading of the whole record by a reviewer who has sat on both sides of a deal.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the attested tier did not include a reading of the whole record by someone who has sat on both sides of a deal, the claims review itself would still stand and no stated threshold would be reached; the firm would weigh the signature on the citations alone. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 24,
@@ -251,7 +289,9 @@
     82
    ],
    "statement": "The attested tier delivers a signed opinion and puts a person on call to the buyer's deal team for the duration that matters.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the attested tier did not deliver a signed opinion, the report's authority with the committee would fail and the price would not be justified; the on-call part rests on practice inference, but the signature alone carries the claim. Rated against the buyer's stated threshold: \"a person's signature on the conclusion\"."
   },
   {
    "id": 25,
@@ -261,7 +301,9 @@
     88
    ],
    "statement": "The service is aimed at advisers and buyers of software businesses in the $1M to $5M range, at the pre-letter-of-intent stage.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the service were not aimed at buyers in the $1M to $5M range at the pre-letter-of-intent stage, the firm's live deal — $4.2M, during exclusivity — would sit at or past the stated edge, but no stated price, term or walk-away condition reaches this and the firm can judge fit at intake. Rated on the scale alone."
   },
   {
    "id": 26,
@@ -271,7 +313,9 @@
     88
    ],
    "statement": "A claims review is narrower, quicker and priced lower than a full technical due diligence, such that it can be done before the letter of intent rather than after.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If a claims review were not narrower, quicker or cheaper than a full technical due diligence, nothing the firm listed as price-changing or deal-ending would change; the fee is set at intake regardless. Rated on the scale alone."
   },
   {
    "id": 27,
@@ -281,7 +325,9 @@
     88
    ],
    "statement": "The method works when the only claim source is a README, and the free demo demonstrates exactly that case.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the method did not work from a README alone or the demo did not show that case, the firm would feel no effect, since it ran the demo once and will not use it again. Rated on the scale alone."
   },
   {
    "id": 28,
@@ -291,7 +337,9 @@
     90
    ],
    "statement": "The service excludes penetration testing, code quality or architecture review, and legal advice.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the service did not exclude penetration testing, code-quality review and legal advice as stated, the firm buys nothing in those categories from Tuuyi and covers them through other advisers. Rated on the scale alone."
   },
   {
    "id": 29,
@@ -301,7 +349,9 @@
     90
    ],
    "statement": "The review reads the target's code.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the review did not read the target's code, the firm's engineer would have to do that code-reading itself, which it cannot repair cheaply inside a 10-day window. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
   },
   {
    "id": 31,
@@ -311,7 +361,9 @@
     90
    ],
    "statement": "The report states the status of each claim and the consequence each gap would have for the buyer.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the report did not state a status for each claim and the consequence of each gap, the report would be evidence without conclusions and the firm could not supply the missing judgement itself. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 32,
@@ -321,7 +373,9 @@
     98
    ],
    "statement": "The engagement begins with an intake conversation covering what is being evaluated, what is already known, and what would change the decision or the price.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the engagement did not begin with an intake conversation capturing what would change the decision or the price, the ratings step would have nothing to rate against and the timetable would slip. Rated against the buyer's stated threshold: \"ratings made against the thresholds the firm states\"."
   },
   {
    "id": 34,
@@ -331,7 +385,9 @@
     104
    ],
    "statement": "Each frozen claim is then tested against the code and the documents the buyer supplied.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If frozen claims were not tested against the code and documents supplied, the core of the service would fail and the firm's engineer would have to replace it deal by deal. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
   },
   {
    "id": 35,
@@ -341,7 +397,9 @@
     110
    ],
    "statement": "Every gap is rated twice, and the rating is re-examined when the two readings disagree.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If every gap were not rated twice and re-examined where the readings differ, the firm would be paying for a single reading of the materiality judgement, which it cannot repair or re-weight credibly itself. Rated against the buyer's stated threshold: \"every finding checked a second time independently\"."
   },
   {
    "id": 36,
@@ -351,7 +409,9 @@
     116
    ],
    "statement": "The private question page provides access to the working record underlying each answer to a buyer's question.",
-   "about": "target"
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the private question page did not provide access to the working record behind each answer, the firm would fall back on the report and its own copy of the record — an irritation, since its stated condition is that the record is kept, not that the page exists. Rated on the practice's reading of the buyer's plan."
   },
   {
    "id": 37,
@@ -361,7 +421,9 @@
     120
    ],
    "statement": "The review reading is performed by language models.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the reading were not done as described, a step the website attributes to tooling would be attributed wrongly, which is exactly the mismatch the firm said would change the price or terms. The buyer relies on machine and human work being distinguishable, and would reopen the price if the attribution were false. Rated against the buyer's stated threshold: \"a step the website describes as done by a person that is done by the tooling alone, or the reverse\"."
   },
   {
    "id": 38,
@@ -371,7 +433,9 @@
     120
    ],
    "statement": "The reading is not a single model's unverified answer taken on trust.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the reading were a single unverified answer taken on trust, the firm would be paying for one reading with no independent confirmation, defeating the second-check item it marked as depends. The firm said it cannot repair that itself and would have to discount the report or stop using the service. Rated against the buyer's stated threshold: \"an independent check that re-uses the first reader's conclusions or is skipped for some findings\"."
   },
   {
    "id": 39,
@@ -381,7 +445,9 @@
     120
    ],
    "statement": "The models operate inside a fixed procedure that separates the claim list from the verdicts, retains a record of every search and every file opened, and refuses findings that cannot be cited.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If this were false, three items the firm marked as depends would fail at once: the claim list held separate from verdicts, the working record of every search and file, and the refusal of uncited findings. The firm's walk-away threshold reaches the working record because the committee may ask for it a year later, and the failure cannot be repaired by the firm. Rated against the buyer's stated threshold: \"the working record not being kept, because the committee may ask for it a year later\"."
   },
   {
    "id": 40,
@@ -391,7 +457,9 @@
     120
    ],
    "statement": "Every line of the report attributes its content to machine work or to human judgment.",
-   "about": "target"
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If lines did not attribute machine work to the tooling and judgement to a person, the firm could not tell which part of the report carries a person's authority, defeating an item it marked as depends. The buyer said this mismatch would change the price or terms. Rated against the buyer's stated threshold: \"a step the website describes as done by a person that is done by the tooling alone, or the reverse\"."
   },
   {
    "id": 41,
@@ -402,7 +470,9 @@
    ],
    "statement": "Same assertion as the report-attribution claim: machines draft, a person confirms and signs, and the report distinguishes the two.",
    "about": "target",
-   "restates": 47
+   "restates": 47,
+   "tier": 1,
+   "tier_basis": "If the report did not show machines drafting and a person confirming and signing as distinct acts, the signature the firm is paying for would not carry the authority it expects with its committee. The firm said this distinction is one of the six things it is paying for and cannot repair its absence itself. Rated against the buyer's stated threshold: \"a person's signature on the conclusion\"."
   },
   {
    "id": 42,
@@ -415,7 +485,9 @@
    "about": "target",
    "implied_by": 2,
    "property": "behaviour in operation",
-   "approved_by": "behaviour split, automatic"
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "If the seller's claims were not actually checked against the code, the core of what the firm is buying would be absent, and its engineer would have to read the code deal by deal itself inside a 10-day window. The firm marked this item as depends and said no competent engineer replaces it in a day. Rated against the buyer's stated threshold: \"every finding cited to a file and line that the firm's own engineer can open and confirm\"."
   },
   {
    "id": 43,
@@ -428,7 +500,9 @@
    "about": "target",
    "implied_by": 15,
    "property": "behaviour in operation",
-   "approved_by": "behaviour split, automatic"
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "The firm stated the free demo and its question-answering interface are of no commercial interest and that it will never use them again, so nothing in its plan would change if this claim were false. No stated threshold reaches the demo, and the tier rests on no further judgement of weight. Rated on the scale alone."
   }
  ]
 }

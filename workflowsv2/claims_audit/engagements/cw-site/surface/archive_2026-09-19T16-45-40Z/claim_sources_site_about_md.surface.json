@@ -1,0 +1,237 @@
+{
+ "claim_source": "claim_sources/site/about.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "Founder Bruce D'Ambrosio",
+   "lines": [
+    2,
+    2
+   ],
+   "statement": "Bruce D'Ambrosio is the founder of Tuuyi.",
+   "about": "seller",
+   "locations": [
+    {
+     "quote": "Founder of Tuuyi",
+     "lines": [
+      7,
+      7
+     ]
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "quote": "Professor Emeritus at Oregon State",
+   "lines": [
+    2,
+    2
+   ],
+   "statement": "Bruce D'Ambrosio is Professor Emeritus at Oregon State (the page description later says Professor Emeritus of Computer Science at Oregon State University).",
+   "about": "seller",
+   "locations": [
+    {
+     "quote": "Bruce D'Ambrosio is Professor Emeritus of Computer Science at Oregon State University",
+     "lines": [
+      9,
+      9
+     ]
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "quote": "has done technical due diligence on both sides of a software acquisition",
+   "lines": [
+    2,
+    2
+   ],
+   "statement": "Bruce D'Ambrosio has performed technical due diligence from both the buyer's and the seller's side of a software acquisition.",
+   "about": "seller",
+   "locations": [
+    {
+     "quote": "he has done technical due diligence from both sides of that kind of transaction",
+     "lines": [
+      9,
+      9
+     ]
+    },
+    {
+     "quote": "Bruce has been on both sides of this work",
+     "lines": [
+      15,
+      15
+     ]
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "quote": "signs Tuuyi's attested reviews",
+   "lines": [
+    2,
+    2
+   ],
+   "statement": "Bruce D'Ambrosio personally signs Tuuyi's attested reviews.",
+   "about": "seller",
+   "locations": [
+    {
+     "quote": "For an attested engagement he signs this:",
+     "lines": [
+      17,
+      17
+     ]
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "quote": "a small practice doing one thing",
+   "lines": [
+    7,
+    7
+   ],
+   "statement": "Tuuyi is a practice with a single service; claims review is the only thing it does.",
+   "about": "target"
+  },
+  {
+   "id": 7,
+   "quote": "has worked in artificial intelligence for four decades",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "Bruce D'Ambrosio has worked in artificial intelligence for roughly forty years.",
+   "about": "seller"
+  },
+  {
+   "id": 8,
+   "quote": "He founded CleverSet",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "Bruce D'Ambrosio founded the company CleverSet.",
+   "about": "seller"
+  },
+  {
+   "id": 9,
+   "quote": "became a personalization service used by more than seventy retailers",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "CleverSet's research became a personalization service used by more than seventy retailers.",
+   "about": "seller"
+  },
+  {
+   "id": 10,
+   "quote": "before its acquisition by Art Technology Group in 2008",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "CleverSet was acquired by Art Technology Group in 2008.",
+   "about": "seller"
+  },
+  {
+   "id": 11,
+   "quote": "its recommender ran in production on SciCast, the IARPA-funded forecasting platform at George Mason University, through 2014 and 2015",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "Tuuyi's recommender ran in production on the SciCast forecasting platform (IARPA-funded, at George Mason University) during 2014 and 2015.",
+   "about": "seller"
+  },
+  {
+   "id": 12,
+   "quote": "the project's 2015 annual report describes it",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "SciCast's 2015 annual report describes Tuuyi's recommender.",
+   "about": "seller",
+   "locations": [
+    {
+     "quote": "as founder, selling CleverSet to Art Technology Group",
+     "lines": [
+      15,
+      15
+     ]
+    }
+   ]
+  },
+  {
+   "id": 13,
+   "quote": "a fixed procedure designed around the models for a single job",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The service operates as a fixed procedure designed around the models for one specific job, not as a general assistant.",
+   "about": "target"
+  },
+  {
+   "id": 14,
+   "quote": "run on infrastructure the practice controls",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The service runs on infrastructure controlled by the practice, not on third-party hosted infrastructure.",
+   "about": "target"
+  },
+  {
+   "id": 16,
+   "quote": "Claims review is the first such application.",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "Claims review is the first application the practice has built on this model.",
+   "about": "target"
+  },
+  {
+   "id": 17,
+   "quote": "under contract to the buyer of a French SaaS product-recommendation service, on the technical side of the diligence",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "Bruce D'Ambrosio was contracted to the buyer of a French SaaS product-recommendation service and performed the technical side of that diligence.",
+   "about": "seller"
+  },
+  {
+   "id": 18,
+   "quote": "He stays available to your deal team through closing, on terms set at intake.",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "Bruce D'Ambrosio remains available to the client's deal team through closing, on terms set at intake.",
+   "about": "seller"
+  },
+  {
+   "id": 22,
+   "quote": "and the judgement in it is a person's",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "The judgement in the report is made by a person, not by the tooling alone.",
+   "about": "target"
+  },
+  {
+   "id": 23,
+   "quote": "We reply within a business day.",
+   "lines": [
+    29,
+    29
+   ],
+   "statement": "Enquiries via the contact form receive a reply within one business day.",
+   "about": "target"
+  }
+ ]
+}

@@ -1,0 +1,394 @@
+{
+ "claim_source": "claim_sources/site/demo.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "A real open-source project",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The demo's subject is a real open-source project, not a fabricated one.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "A real, public open-source project",
+     "lines": [
+      7,
+      7
+     ]
+    }
+   ],
+   "tier": 3,
+   "tier_basis": "The firm will never use the demo again, and no stated threshold or paid-for item reaches what the demo's subject is, so its falsity would change nothing for the engagement. Rated on the scale alone."
+  },
+  {
+   "id": 2,
+   "quote": "reviewed as a client's target would be",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The demo was reviewed by the same method a paying client's target would receive.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "reviewed by this workflow the same way a client's target would be",
+     "lines": [
+      7,
+      7
+     ]
+    }
+   ],
+   "tier": 3,
+   "tier_basis": "The firm's plan depends on the method applied to paid targets, not on how the demo itself was reviewed, and it has said it will not use the demo again; no stated threshold reaches the demo review. Rated on the scale alone."
+  },
+  {
+   "id": 3,
+   "quote": "identity withheld",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The identity of the reviewed project is withheld in the demo.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Its identity is withheld",
+     "lines": [
+      7,
+      7
+     ]
+    },
+    {
+     "quote": "The project's name, its authors and its address are replaced throughout.",
+     "lines": [
+      31,
+      31
+     ]
+    }
+   ],
+   "within": {
+    "source": "claim_sources/site/demo.md",
+    "id": 6,
+    "statement": "Apart from the withheld identity, the demo is unmodified from what a client receives."
+   },
+   "tier": 3,
+   "tier_basis": "Whether the demo's subject is named changes nothing the firm pays for or relies on, since the firm will never use the demo. Rated on the scale alone."
+  },
+  {
+   "id": 4,
+   "quote": "click a finding to see the lines it cites",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The demo contains a click handler that, for each finding, opens and displays the lines of evidence that finding cites.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Click any finding to see the lines it cites.",
+     "lines": [
+      15,
+      15
+     ]
+    }
+   ],
+   "tier": 3,
+   "tier_basis": "The firm's requirement that citations be openable and confirmable attaches to delivered reports on paid engagements, not to the demo's interface, which it will not use. Rated on the scale alone."
+  },
+  {
+   "id": 5,
+   "quote": "ask it questions",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The demo contains a question-answering interface wired to the engagement's record and to a model that composes replies.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "A conversation on the left.",
+     "lines": [
+      17,
+      17
+     ]
+    }
+   ],
+   "tier": 3,
+   "tier_basis": "The demo's question-answering interface falls under an item the firm named as of no commercial interest and which it will never use again. Rated on the scale alone."
+  },
+  {
+   "id": 6,
+   "quote": "everything else is as delivered",
+   "lines": [
+    7,
+    7
+   ],
+   "statement": "Apart from the withheld identity, the demo is unmodified from what a client receives.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The firm has seen nothing but the website and is committing $5,000 on the assumption that it describes the service accurately; if the demo were modified from what a client receives, the firm's whole picture of the deliverable would be wrong and it would reopen the terms or not proceed with the first engagement. Rated on the scale alone."
+  },
+  {
+   "id": 7,
+   "quote": "a nine-minute narrated introduction",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "A narrated introductory video, nine minutes long, explaining what a claims review is, is available.",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "The video is incidental to the six things the firm is paying for, and none of its price, terms or walk-away conditions reach it. Rated on the scale alone."
+  },
+  {
+   "id": 8,
+   "quote": "walks through one finding from this demo",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The introduction walks through one finding taken from this demo.",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "What the introduction walks through affects nothing the firm relies on for a paid review, and no stated threshold names it. Rated on the scale alone."
+  },
+  {
+   "id": 9,
+   "quote": "The report on the right: what the review showed, ordered by how much it would change for a buyer; what it could not settle and why; what it did not examine; the claims that hold; and an appendix of every claim with its verdict.",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "The demo report contains the listed sections: findings, what could not be settled and why, what was not examined, the claims that hold, and an appendix of every claim with its verdict.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns the demo report's sections, not the report the firm will receive on a paid engagement, and the firm will not use the demo again. Rated on the scale alone."
+  },
+  {
+   "id": 10,
+   "quote": "ordered by how much it would change for a buyer",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "The report's findings are ordered by how much each would change the picture for a buyer.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The ordering of the demo report's findings is a property of the demo, which the firm has said it will never use; the rating requirement it is paying for attaches to delivered reports. Rated on the scale alone."
+  },
+  {
+   "id": 11,
+   "quote": "The answers come from the engagement's record, not from memory,",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "The demo's answering path retrieves from the engagement's record and supplies that retrieved material to the model composing the reply.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The demo's answering path is part of an item the firm named as of no commercial interest and will never use again. Rated on the scale alone."
+  },
+  {
+   "id": 12,
+   "quote": "the page will tell you when the record does not settle a question",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "The demo's page contains code that detects when a question is not settled by the engagement's record and displays a notice saying so.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim is about the demo page's behaviour, not about how unsettled claims are flagged in a paid report, and the firm will not use the demo. Rated on the scale alone."
+  },
+  {
+   "id": 13,
+   "quote": "It runs on a hosted model.",
+   "lines": [
+    23,
+    23
+   ],
+   "statement": "The demo runs on a hosted (cloud) model.",
+   "about": "target",
+   "within": {
+    "source": "claim_sources/site/demo.md",
+    "id": 15,
+    "statement": "The demo is limited to a public project, because of the cloud inference service it uses."
+   },
+   "tier": 3,
+   "tier_basis": "The firm's walk-away condition covers a seller's code reaching a cloud model service on a paid engagement; the demo is free, runs a public project, and the firm will never use it. Rated on the scale alone."
+  },
+  {
+   "id": 14,
+   "quote": "This demo is the one place the practice uses a cloud inference service",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "The demo is the only place in the practice's work where a cloud inference service is used.",
+   "about": "seller",
+   "tier": 1,
+   "tier_basis": "This is a boundary claim about the whole practice: if the demo were not the only place a cloud inference service is used, cloud use could extend to paid engagements, where the firm's non-disclosure obligations mean any disclosure is unrepairable and the deal ends. Rated against the buyer's stated threshold: \"any of a seller's code reaching a cloud model service or any party other than Tuuyi on a paid engagement\"."
+  },
+  {
+   "id": 15,
+   "quote": "which is why it is limited to a public project",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "The demo is limited to a public project, because of the cloud inference service it uses.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns the scope of the demo and its stated reason, and the firm's walk-away condition is confined to paid engagements on which the demo never runs; the firm will not use the demo again. Rated on the scale alone."
+  },
+  {
+   "id": 16,
+   "quote": "A reply takes a minute or two.",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "A reply in the demo conversation takes about a minute or two.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the demo's reply took longer than a minute or two, nothing in the firm's plan would change: it ran the demo once and buys the paid review, not the demo's speed, and no stated threshold reaches response time. The claim falls under the reliance item 'The free demo and its question-answering interface', which the firm does not use. Rated against the buyer's stated threshold: \"the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again\"."
+  },
+  {
+   "id": 17,
+   "quote": "Paid engagements run on isolated, single-tenant hardware the practice controls",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "Paid engagements run on isolated, single-tenant hardware controlled by the practice.",
+   "about": "seller",
+   "tier": 1,
+   "tier_basis": "If paid engagements were not on isolated, single-tenant hardware the practice controls, the firm's sellers' code could be exposed to other tenants, a cloud model service or another party — the firm named this as a condition that would end the deal outright and as one of the six things it is paying for, and no repair is possible once code has been disclosed. The claim falls under the reliance items the firm depends on: 'The seller's code kept on hardware Tuuyi controls' and 'A fresh examination environment provisioned per paid engagement'. Rated against the buyer's stated threshold: \"any of a seller's code reaching a cloud model service or any party other than Tuuyi on a paid engagement\"."
+  },
+  {
+   "id": 19,
+   "quote": "File paths and quoted code are shown as they are, since that is what a finding rests on.",
+   "lines": [
+    31,
+    31
+   ],
+   "statement": "File paths and quoted code in the demo are shown unmodified.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the demo displayed file paths and quoted code modified, the firm's plan would not change: it verifies citations in the paid report with its own engineer, not in the demo, and it will never use the demo again. The claim falls under the reliance item 'The free demo and its question-answering interface', which the firm does not use. Rated against the buyer's stated threshold: \"the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again\"."
+  },
+  {
+   "id": 20,
+   "quote": "It is tied to this browser, so no other visitor sees it;",
+   "lines": [
+    37,
+    37
+   ],
+   "statement": "The demo stores and serves conversations keyed to the visitor's own browser, so that conversation data is not served to other visitors.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If demo conversations were served to other visitors, nothing in the firm's plan would change: the demo carries none of the firm's deal materials, and its walk-away thresholds reach only seller code, seller materials and deal terms on paid engagements. The claim falls under the reliance item 'The free demo and its question-answering interface', which the firm does not use. Rated against the buyer's stated threshold: \"the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again\"."
+  },
+  {
+   "id": 21,
+   "quote": "kept on our server for a few days so you can return to it, then deleted;",
+   "lines": [
+    37,
+    37
+   ],
+   "statement": "The demo's server retains conversations under a retention setting that schedules their deletion a few days after they are created.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the demo's retention or deletion of conversations differed from a few days, the firm would not be affected: it never places anything it must protect into the demo, and no stated threshold reaches the demo's retention setting. The claim falls under the reliance item 'The free demo and its question-answering interface', which the firm does not use. Rated against the buyer's stated threshold: \"the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again\"."
+  },
+  {
+   "id": 22,
+   "quote": "limited to a couple of dozen questions per visitor",
+   "lines": [
+    37,
+    37
+   ],
+   "statement": "The conversation is limited to roughly twenty-four questions per visitor.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the demo's question limit were not roughly twenty-four, the firm's plan would not change: it does not use the demo, and no stated threshold reaches a question cap on a product it will never touch again. The claim falls under the reliance item 'The free demo and its question-answering interface', which the firm does not use. Rated against the buyer's stated threshold: \"the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again\"."
+  },
+  {
+   "id": 23,
+   "quote": "click a finding to see the lines it cites",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "Clicking a finding in the running demo reveals the lines of evidence that finding cites.",
+   "about": "target",
+   "implied_by": 4,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If clicking a finding in the demo did not reveal the cited lines, the firm's plan would not change: the citations it pays to have confirmed are those in the delivered report, which its own engineer checks directly, not those in the demo. The claim falls under the reliance item 'The free demo and its question-answering interface', which the firm does not use. Rated against the buyer's stated threshold: \"the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again\"."
+  },
+  {
+   "id": 25,
+   "quote": "The answers come from the engagement's record, not from memory,",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "The answers given in the running demo are actually drawn from the engagement's record rather than from the model's own memory.",
+   "about": "target",
+   "implied_by": 11,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If the demo's answers came from the model's memory rather than the record, the firm's plan would not change: it judges the paid review's findings, not the demo's answering method, and it will never use the demo again. The claim falls under the reliance item 'The free demo and its question-answering interface', which the firm does not use. Rated against the buyer's stated threshold: \"the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again\"."
+  },
+  {
+   "id": 26,
+   "quote": "the page will tell you when the record does not settle a question",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "When a question asked in the running demo is not settled by the record, the page actually tells the visitor so.",
+   "about": "target",
+   "implied_by": 12,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If the demo page did not flag questions the record does not settle, the firm's plan would not change: the comparable behaviour it relies on — unsettled runtime claims being reported unsettled in the paid review — is a separate reliance item, and the firm will never use the demo itself. The claim falls under the reliance item 'The free demo and its question-answering interface', which the firm does not use. Rated against the buyer's stated threshold: \"the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again\"."
+  },
+  {
+   "id": 27,
+   "quote": "It is tied to this browser, so no other visitor sees it;",
+   "lines": [
+    37,
+    37
+   ],
+   "statement": "In operation, a visitor's conversation is visible only in that visitor's browser and no other visitor can see it.",
+   "about": "target",
+   "implied_by": 20,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If a visitor's demo conversation were visible to other visitors in operation, nothing the firm relies on would change: its walk-away thresholds govern seller code, seller materials and deal terms on paid engagements, none of which pass through the demo. The claim falls under the reliance item 'The free demo and its question-answering interface', which the firm does not use. Rated against the buyer's stated threshold: \"the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again\"."
+  },
+  {
+   "id": 28,
+   "quote": "kept on our server for a few days so you can return to it, then deleted;",
+   "lines": [
+    37,
+    37
+   ],
+   "statement": "In operation, a conversation is kept on the server for a few days and is then actually deleted.",
+   "about": "target",
+   "implied_by": 21,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If demo conversations were not in fact deleted after a few days, the firm's plan would not change: nothing of the firm's reaches the demo, and its stated deletion and isolation concerns attach to paid engagements, not the free path. The claim falls under the reliance item 'The free demo and its question-answering interface', which the firm does not use. Rated against the buyer's stated threshold: \"the free demo and the developer beta are of no commercial interest to the firm, and that it will never use them again\"."
+  }
+ ]
+}

@@ -1,0 +1,507 @@
+{
+ "claim_source": "claim_sources/site/how-it-works.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "Code due diligence in fixed steps",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The claims-review service performs code due diligence in fixed steps.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "A fixed method, applied the same way every time",
+     "lines": [
+      7,
+      7
+     ]
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "quote": "claims frozen before testing",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The list of claims is frozen before any claim is tested.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "The list is frozen before anything is tested",
+     "lines": [
+      15,
+      15
+     ]
+    },
+    {
+     "quote": "so what counts as a claim is decided before the verdicts are in view",
+     "lines": [
+      15,
+      15
+     ]
+    },
+    {
+     "quote": "nothing is added to it later",
+     "lines": [
+      15,
+      15
+     ]
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "quote": "every finding cited to file and line",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "Every finding in the review output is cited to a file and line.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "the report names files by their path and quotes the lines each finding rests on",
+     "lines": [
+      11,
+      11
+     ]
+    },
+    {
+     "quote": "A finding names the file and the lines that settle it, quotes them, and says what they show.",
+     "lines": [
+      22,
+      22
+     ]
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "quote": "an independent check",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The review includes an independent check.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "A second pass, which did not do the review and does not see its reasoning first, re-reads every finding's cited evidence and asks whether it bears on the claim, whether it shows what the finding says, and whether the verdict is the right one.",
+     "lines": [
+      39,
+      39
+     ]
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "quote": "ratings against your thresholds",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The service rates findings against the buyer's thresholds.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Each gap the review showed is rated against those words: nothing, the price or terms, or the decision to close.",
+     "lines": [
+      43,
+      43
+     ]
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "quote": "a person signs",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The review is signed by a person.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "A person reads the borderline ratings, the citations the check flagged, and the findings the check questioned, and signs the report.",
+     "lines": [
+      47,
+      47
+     ]
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "quote": "with the record kept",
+   "lines": [
+    7,
+    7
+   ],
+   "statement": "The record of the review is kept.",
+   "about": "target"
+  },
+  {
+   "id": 8,
+   "quote": "The seller uploads the repository and the documents to be examined on a page of the engagement site",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The service has the seller upload the repository and documents to be examined to a page of the engagement site.",
+   "about": "target"
+  },
+  {
+   "id": 9,
+   "quote": "a page of the engagement site that only the seller and the practice can open",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The page holding the uploaded materials can be opened only by the seller and the practice.",
+   "about": "target"
+  },
+  {
+   "id": 10,
+   "quote": "The practice looks them over and marks them ready.",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The practice reviews the uploaded materials and marks them ready.",
+   "about": "target"
+  },
+  {
+   "id": 11,
+   "quote": "The buyer names the documents that carry the seller's claims and does not receive the materials",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The buyer names the claim documents but does not receive the examination materials.",
+   "about": "target"
+  },
+  {
+   "id": 12,
+   "quote": "nothing more of them leaves the engagement",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "No part of the materials beyond the report's paths and quoted lines leaves the engagement.",
+   "about": "target"
+  },
+  {
+   "id": 13,
+   "quote": "Where the buyer already holds the materials, an open-source target or a code drop, the buyer supplies them the same way.",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "Where the buyer already holds the materials, such as an open-source target or a code drop, the buyer supplies them through the same arrangement.",
+   "about": "target"
+  },
+  {
+   "id": 14,
+   "quote": "The seller's documents are read one section at a time",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "The seller's documents are read one section at a time.",
+   "about": "target"
+  },
+  {
+   "id": 15,
+   "quote": "every assertion is written down: features, numbers, guarantees, what a command does, what a default is",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "Every assertion in the seller's documents — features, numbers, guarantees, command behaviour, defaults — is enumerated.",
+   "about": "target"
+  },
+  {
+   "id": 16,
+   "quote": "You see the frozen list",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "The buyer is shown the frozen list of claims.",
+   "about": "target"
+  },
+  {
+   "id": 17,
+   "quote": "Each assertion is read the way a reasonable buyer would read it in the context of the transaction: in its ordinary sense, as one statement, with the seller's own documentation as the specification of what the software is said to do.",
+   "lines": [
+    19,
+    19
+   ],
+   "statement": "Claims are read as a reasonable buyer in this transaction would read them: in their ordinary sense, one statement at a time, with the seller's own documentation as the specification.",
+   "about": "target",
+   "restates": 17
+  },
+  {
+   "id": 18,
+   "quote": "It is tested against the code, configuration and build files, by reading them and following what they fix, the way a reviewer would with the code in front of them.",
+   "lines": [
+    19,
+    19
+   ],
+   "statement": "Claims are tested against the code, configuration and build files by reading them and following what they fix, the way a reviewer would.",
+   "about": "target"
+  },
+  {
+   "id": 19,
+   "quote": "The review reads; it does not run the software. Nothing is compiled, executed or measured.",
+   "lines": [
+    19,
+    19
+   ],
+   "statement": "The review does not run the software: nothing is compiled, executed or measured.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Not a run of the software: nothing is compiled, executed or measured.",
+     "lines": [
+      51,
+      51
+     ]
+    }
+   ]
+  },
+  {
+   "id": 20,
+   "quote": "A claim about what the software does when it runs is tested as to the mechanism the code provides for it.",
+   "lines": [
+    19,
+    19
+   ],
+   "statement": "A claim about runtime behaviour is tested only as to the mechanism the code provides for it.",
+   "about": "target"
+  },
+  {
+   "id": 21,
+   "quote": "Whether it behaves that way in operation is settled only by records of it running, and is otherwise reported unsettled.",
+   "lines": [
+    19,
+    19
+   ],
+   "statement": "Whether the software behaves as claimed in operation is settled only by records of it running, and is otherwise reported unsettled.",
+   "about": "target"
+  },
+  {
+   "id": 22,
+   "quote": "Documentation restates a claim and does not settle it, except where the claim is about the document itself, such as its licence.",
+   "lines": [
+    19,
+    19
+   ],
+   "statement": "Documentation restates a claim and does not settle it, except where the claim is about the document itself, such as its licence.",
+   "about": "target"
+  },
+  {
+   "id": 23,
+   "quote": "Vague general statements that a reasonable buyer would not rely on are not treated as claims.",
+   "lines": [
+    19,
+    19
+   ],
+   "statement": "Vague general statements that a reasonable buyer would not rely on are not treated as claims.",
+   "about": "target"
+  },
+  {
+   "id": 24,
+   "quote": "Where the ordinary sense of a claim implies properties the seller did not state, those are reported separately, marked as implied.",
+   "lines": [
+    19,
+    19
+   ],
+   "statement": "Properties a claim's ordinary sense implies but the seller did not state are reported separately, marked as implied.",
+   "about": "target"
+  },
+  {
+   "id": 25,
+   "quote": "The report states findings on each claim",
+   "lines": [
+    19,
+    19
+   ],
+   "statement": "The report states findings on each claim.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Each claim gets one finding.",
+     "lines": [
+      22,
+      22
+     ]
+    }
+   ]
+  },
+  {
+   "id": 26,
+   "quote": "expresses no opinion on the software, the seller or the transaction",
+   "lines": [
+    19,
+    19
+   ],
+   "statement": "The report expresses no opinion on the software, the seller or the transaction.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "not a recommendation on whether to proceed",
+     "lines": [
+      51,
+      51
+     ]
+    }
+   ]
+  },
+  {
+   "id": 27,
+   "quote": "A citation that does not resolve to the text it quotes is caught mechanically before anyone reads the report.",
+   "lines": [
+    23,
+    23
+   ],
+   "statement": "A citation that does not resolve to the text it quotes is caught mechanically before anyone reads the report.",
+   "about": "target"
+  },
+  {
+   "id": 28,
+   "quote": "Five verdicts, and \"unsettled\" is one of them",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "The report classifies findings under five verdicts: holds; true, with something to know; partly true; contradicted; unsettled.",
+   "about": "target"
+  },
+  {
+   "id": 29,
+   "quote": "For a claim that something is absent, the evidence is the recorded searches: what was searched, and every file they turned up, opened.",
+   "lines": [
+    29,
+    29
+   ],
+   "statement": "For a claim that something is absent, the evidence is the recorded searches, with every file they turned up opened.",
+   "about": "target"
+  },
+  {
+   "id": 30,
+   "quote": "A claim the materials cannot reach is reported as unreachable, with the reason",
+   "lines": [
+    35,
+    35
+   ],
+   "statement": "A claim the materials cannot reach is reported as unreachable, with the reason.",
+   "about": "target"
+  },
+  {
+   "id": 31,
+   "quote": "is never counted against the seller",
+   "lines": [
+    35,
+    35
+   ],
+   "statement": "An unsettled claim is never counted against the seller.",
+   "about": "target"
+  },
+  {
+   "id": 32,
+   "quote": "What is not examined is listed as not examined.",
+   "lines": [
+    35,
+    35
+   ],
+   "statement": "What is not examined is listed as not examined.",
+   "about": "target"
+  },
+  {
+   "id": 33,
+   "quote": "A finding either holds up under that check or it does not, and the report says which.",
+   "lines": [
+    39,
+    39
+   ],
+   "statement": "The report says which findings hold up under the independent check and which do not.",
+   "about": "target"
+  },
+  {
+   "id": 35,
+   "quote": "where the two readings differ, the finding is rated five times, and a rating the readings split on is marked borderline and decided by a person, with every reading shown.",
+   "lines": [
+    43,
+    43
+   ],
+   "statement": "Where the two ratings differ, the finding is rated five times, marked borderline, and decided by a person, with every reading shown.",
+   "about": "target"
+  },
+  {
+   "id": 36,
+   "quote": "The report shows which lines rest on a cited fact and which on the practice's judgement.",
+   "lines": [
+    47,
+    47
+   ],
+   "statement": "The report shows which lines rest on a cited fact and which on the practice's judgement.",
+   "about": "target"
+  },
+  {
+   "id": 37,
+   "quote": "Not a penetration test.",
+   "lines": [
+    51,
+    51
+   ],
+   "statement": "The review is not a penetration test.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "It reports the state of each claim and what a gap would change for the deal you described.",
+     "lines": [
+      51,
+      51
+     ]
+    }
+   ]
+  },
+  {
+   "id": 38,
+   "quote": "Not a code-quality review.",
+   "lines": [
+    51,
+    51
+   ],
+   "statement": "The review is not a code-quality review.",
+   "about": "target"
+  },
+  {
+   "id": 39,
+   "quote": "Not legal advice.",
+   "lines": [
+    51,
+    51
+   ],
+   "statement": "The review is not legal advice.",
+   "about": "target"
+  },
+  {
+   "id": 40,
+   "quote": "Not a judgement on claims it did not resolve",
+   "lines": [
+    51,
+    51
+   ],
+   "statement": "The review is not a judgement on claims it did not resolve.",
+   "about": "target"
+  }
+ ]
+}
