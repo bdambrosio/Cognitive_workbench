@@ -19,6 +19,15 @@ is read then and the quote checked at the cited lines by the same rule the
 audit's output check uses (`schemas.quote_at`). Reading at call time rather
 than at session start costs milliseconds and never serves a stale answer.
 
+A CLAIM LISTED AND NOT TESTED (2026-09-19). A claim rated tier 2 or 3 before
+the freeze has no finding (TIERS.md §1); it is on the frozen surface and in
+the report's second appendix. Until this date the action answered "no claim N"
+for one, which is false, and with no `source` given it could return the
+tested claim of another source that has the same id. The record now holds
+those claims too, read from the frozen surfaces the way the report reads them
+(`audit_report.render.not_tested`), and returns the claim's words, its tier
+and the reason for the tier, and says that it was not tested.
+
 The record text is for the model, which then answers the client in the
 client's words (CONTINUATION.md §6); labels here use those words where the
 method defines them ("check", not "review").
@@ -59,7 +68,9 @@ DESCRIPTION = (
     "and whether that quote is at those lines in the materials now; a search "
     "with what was performed and what it found), the rating with its basis "
     "and each rater's basis, the lines of report.md that carry the claim, and "
-    "the questions put to the seller about it. Use it first for any question "
+    "the questions put to the seller about it. For a claim that was listed and "
+    "not tested: its words and lines, its statement, its tier and the reason "
+    "for the tier, and that no finding exists. Use it first for any question "
     "about a named claim. `inspect` is for the record beyond the findings "
     "(traces, run_meta, the method); `inspect_external` for the materials "
     "beyond the cited lines.")
@@ -140,7 +151,15 @@ class ClaimRecord:
         # read at call time, so the index holds keys only.
         self._docs: Dict[str, List[str]] = {
             rel: [] for rel in schemas.corpus_view(self.target)["materials"]}
-        self.sources = sorted({k[0] for k in self.findings})
+        # Claims listed and not tested, from the frozen surfaces. A key that
+        # has a finding is a tested claim, whatever a later surface says.
+        from workflowsv2.audit_report.render import not_tested
+        self.not_tested: Dict[Key, Dict[str, Any]] = {}
+        for c in not_tested(merged_dir):
+            key = (str(c.get("claim_source")), int(c.get("id")))
+            if key not in self.findings:
+                self.not_tested[key] = c
+        self.sources = sorted({k[0] for k in self.findings} | {k[0] for k in self.not_tested})
 
     # -- one citation, against the materials now ---------------------------
 
@@ -186,7 +205,29 @@ class ClaimRecord:
 
     # -- one claim, as text ------------------------------------------------
 
+    def text_not_tested(self, key: Key) -> str:
+        c = self.not_tested[key]
+        src, cid = key
+        lines = c.get("lines")
+        where = f"{src} lines {lines[0]}-{lines[1]}" if isinstance(lines, list) and len(lines) == 2 else src
+        out = [f"{src} #{cid} — listed, not tested (tier {c.get('tier')})",
+               f"  quote ({where}): {c.get('quote')}",
+               f"  statement: {c.get('statement')}",
+               f"  about: {c.get('about')}"]
+        if c.get("implied_by") is not None:
+            out.append(f"  implied by: {c.get('implied_by')}")
+        out.append("  reason for the tier"
+                   + (f" (set by {c.get('tier_by')})" if c.get("tier_by") else "") + ":\n"
+                   + _indent(c.get("tier_basis"), "    "))
+        out.append("  The review did not test this claim: there is no finding, no "
+                   "evidence, no check and no rating for it.")
+        refs = self.report.get(key) or []
+        out.append("  in report.md: " + ("; ".join(refs) if refs else "not named"))
+        return "\n".join(out)
+
     def text(self, key: Key) -> str:
+        if key in self.not_tested:
+            return self.text_not_tested(key)
         f = self.findings[key]
         src, cid = key
         adj = f.get("adjudication") or {}
@@ -282,13 +323,13 @@ class ClaimRecord:
         keys: List[Key] = []
         for cid in wanted:
             if src is not None:
-                if (src, cid) in self.findings:
+                if (src, cid) in self.findings or (src, cid) in self.not_tested:
                     keys.append((src, cid))
                 else:
                     return [], (f"no claim {cid} under {src}; claim sources: "
                                 f"{', '.join(self.sources)}")
             else:
-                hits = [k for k in self.findings if k[1] == cid]
+                hits = [k for k in list(self.findings) + list(self.not_tested) if k[1] == cid]
                 if len(hits) != 1:
                     return [], (f"claim {cid} is under {len(hits)} sources "
                                 f"({', '.join(h[0] for h in hits) or 'none'}); "

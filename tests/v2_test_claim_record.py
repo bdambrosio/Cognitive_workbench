@@ -141,3 +141,29 @@ def test_register_puts_the_action_on_a_loop(rec):
     mod = loop._tool_module_cache["claim"]
     res = mod.react_invoke({"ids": [2]}, character_name="Jill", backend=None, logger=None)
     assert res["status"] == "ok" and "README.md #2" in res["text"]
+
+
+def test_a_claim_listed_and_not_tested_is_returned_as_such(tmp_path):
+    eng = tmp_path / "eng"
+    target = eng / "target"; target.mkdir(parents=True)
+    (target / "README.md").write_text("one\ntwo\n")
+    merged_dir = eng / "merged" / "run"; merged_dir.mkdir(parents=True)
+    (eng / "surface").mkdir()
+    (eng / "surface" / "cli_md.surface.json").write_text(json.dumps({
+        "claim_source": "CLI.md", "claims": [
+            {"id": 1, "quote": "q", "lines": [3, 3], "statement": "a detail", "about": "target",
+             "tier": 2, "tier_basis": "Cheap to correct. Rated on the scale alone."},
+            {"id": 3, "quote": "q3", "lines": [5, 5], "statement": "tested", "about": "target",
+             "tier": 1, "tier_basis": "b"}]}))
+    rec = record.ClaimRecord(_merged(), merged_dir, target)
+    assert rec.sources == ["CLI.md", "README.md"]
+    out = rec.invoke({"ids": [1], "source": "CLI.md"})
+    assert out["status"] == "ok"
+    assert "CLI.md #1 — listed, not tested (tier 2)" in out["text"]
+    assert "Cheap to correct" in out["text"] and "no finding" in out["text"]
+    # README.md #1 is tested and CLI.md #1 is not: without a source the id is
+    # under two sources, so the action asks which.
+    out = rec.invoke({"ids": [1]})
+    assert out["status"] == "error" and "give `source`" in out["text"]
+    # A tier 1 claim on a surface is not among the claims not tested.
+    assert rec.invoke({"ids": [3], "source": "CLI.md"})["status"] == "error"
