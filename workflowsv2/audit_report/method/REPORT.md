@@ -30,13 +30,15 @@ Within the unsettled class, claims about the seller's own conduct or services �
 
 Claims the review found to hold are listed after the three classes.
 
+Some claims may have been listed and not tested: before testing, the practice rated them as ones whose being false would not lead the buyer to reopen the price or the terms. They are in none of the three classes. Nothing was found for or against them, and the document lists them in its second appendix with the reason for each.
+
 ## 4. What you must not do
 
 **Do not restate a finding.** Refer to a finding by its claim source and claim id. Its claim, gap, evidence and rating are already in the document, in the record's words, and every one of them can be checked against a cited line. Your passages carry no citations, so anything you assert in them cannot be checked.
 
 **Do not assert anything the record has not established.** Not the quality of the code, not the seller's intent, not how hard a gap is to fix, not whether the buyer should proceed.
 
-**Do not treat an unsettled or unexamined claim as a gap.** The review showed nothing against those claims. Say what rests on them; do not say they failed.
+**Do not treat an unsettled, unexamined or untested claim as a gap.** The review showed nothing against those claims. Say what rests on them; do not say they failed. A claim that was not tested was not looked at; say nothing about whether it holds.
 
 **Do not write the figures.** The counts, the list of the material findings, and the table of what was examined are computed by the client's process and placed in the document. Do not restate them, recalculate them, or describe them as approximate.
 
@@ -61,14 +63,14 @@ Seven, each one field of the output. The document is assembled in this order, an
 1. Title, the date and version of the materials, the assurance given, and the transaction as the engagement states it. Written by the client's process.
 2. **Executive summary.** **`summary`** — two or three short paragraphs: what this document is and what was examined, the claim sources and the materials they were tested against; that every finding cites the evidence that settles it, so any finding can be checked; and in one or two sentences what most changes what the buyer assumed, named by claim source and claim id. The client's process then lists the material findings, one line each; do not list them yourself.
 3. **Conclusion.** **`conclusion`** — one paragraph, present only when the document says the engagement asked for a conclusion and the document carries the buyer's thresholds. It is written in the negative form, and every sentence is conditional on those thresholds as the document states them: whether the review found any gap rated `decisive`, which the buyer said would end the deal — where it found none, say so in those terms; the gaps rated `material`, which the buyer said would change the price or the terms, named by claim source and claim id, and nothing rated below them; and that unsettled claims are not counted, because the review showed nothing against them. A rating the document marks *borderline* is named as borderline wherever the paragraph relies on it, and a `decisive` rating is given with its count where the document shows one. No view on whether the buyer should proceed, and no sentence that is true without the thresholds. An empty string when the document does not ask for a conclusion or carries no thresholds.
-4. **Scope and approach.** The table of what was examined, computed, followed by **`scope_note`** — two or three short paragraphs on what the table does not say: which claim sources were reviewed and which were not, what kind of material was not supplied or sits outside the materials, and what parts of the target the findings did not reach.
+4. **Scope and approach.** The table of what was examined, computed, followed by **`scope_note`** — two or three short paragraphs on what the table does not say: which claim sources were reviewed and which were not; where the table shows claims not tested, that they were listed and not tested and that the buyer can ask for any of them to be tested; what kind of material was not supplied or sits outside the materials; and what parts of the target the findings did not reach.
 5. How to read a finding, with every term defined. Written by the client's process.
 6. **`shown_note`** — one paragraph before the shown findings: what kind of gaps they are, what pattern they make taken together, and that they are ordered by materiality.
 7. **`unsettled_note`** — one paragraph before the unsettled claims: that nothing was found against them, what they have in common and why the materials cannot settle them, and that they are ordered by exposure. The document lists unsettled claims about the seller's own conduct or services under a second heading after this passage; the passage introduces both, and the document's own line before the second heading says what sets them apart.
 8. **`not_examined_note`** — one to three sentences before the unexamined claims: that the searches named files nobody opened, that these claims are the first thing a further pass would settle, and that they are ordered by exposure. Empty when the document has no such claims.
 9. The claims that hold, the questions for the seller, the unclaimed observations, and the coverage figures, copied or computed.
 10. **`limitations`** — one paragraph. What this document is not: not a penetration test, not a code-quality review, not legal advice, not a judgement on claims it did not resolve. The facts about scope come from the document itself; add nothing it does not state. The client's process adds the inherent limitations it states in every report.
-11. The appendix of every claim and its verdict, computed.
+11. The appendix of every tested claim and its verdict, and the appendix of claims listed and not tested, computed.
 
 ## 7. The output
 
