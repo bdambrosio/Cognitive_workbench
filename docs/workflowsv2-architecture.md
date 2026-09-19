@@ -385,6 +385,7 @@ pass. Provenance of temperatures: `docs/model-settings.md`; route choice:
   and none deletes an engagement.
 - `workflowsv2/security_audit/` is a separate runner with its own method and
   report; no job and no page reaches it.
-- `workflowsv2/blocks.py`, `citations.py` and `coverage.py` are imported only
-  by the linter, by each other and by tests; no program in the chain uses
-  them. `workflowsv2/audit_postprocess/` holds no source.
+- `workflowsv2/blocks.py` is used by the security audit runner, the linter
+  and a test; `coverage.py` is imported only by a test, and `citations.py`
+  only by `coverage.py`. No program in the chain uses any of the three.
+  `workflowsv2/audit_postprocess/` holds no source.
