@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Tuple
 #: INTAKE.md §2, in order; the next question is for the emptiest slot.
 SLOTS: Dict[str, Tuple[str, ...]] = {
     "identify": ("client", "acting", "counterparty", "confidentiality"),
-    "situation": ("subject", "price", "structure", "timetable"),
+    "situation": ("subject", "price", "structure", "timetable", "use"),
     "background": ("target", "claim_sources", "known"),
     "assessment": ("paying_for", "price_movers", "walk_away"),
     # `deliverable` and `seller_questions` were removed 2026-09-05 (Bruce):
@@ -96,7 +96,8 @@ def engagement_blocks(obj: Dict[str, Any]) -> Dict[str, str]:
         line("Subject", s.get("subject")),
         line("Price and basis", s.get("price")),
         line("Structure", s.get("structure")),
-        line("Timetable", s.get("timetable"))) if x)
+        line("Timetable", s.get("timetable")),
+        line("Intended use", s.get("use"))) if x)
     thresholds = "\n".join(x for x in (
         line("Paying for", a.get("paying_for")),
         line("Would change the price or terms", a.get("price_movers")),

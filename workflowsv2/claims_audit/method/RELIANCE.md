@@ -10,7 +10,7 @@ A person reads the statement and corrects it before it is used. Write it so that
 
 ## 2. What you have
 
-**What the buyer said** — the intake form where the engagement has one: who the buyer is, the transaction, what they know, what they are paying for, what would change the price or end the deal, the scope, and the practice's notes of the conversation. Where there is no intake form, the engagement's statement of the transaction and of the buyer's thresholds.
+**What the buyer said** — the intake form where the engagement has one: who the buyer is, the transaction, what they will do with the offering, what they know, what they are paying for, what would change the price or end the deal, the scope, and the practice's notes of the conversation. Where there is no intake form, the engagement's statement of the transaction and of the buyer's thresholds.
 
 **The claims** — every claim enumerated from the seller's documents, by claim source, as statements. Use them as an inventory of what the offering says it is and does. You are not asked whether any claim is true, and nothing you write may say or suggest that one is or is not.
 

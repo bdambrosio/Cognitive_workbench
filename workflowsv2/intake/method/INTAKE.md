@@ -15,7 +15,7 @@ The form follows the handoff shape used in medicine: five slots in a fixed order
 | slot | what it holds |
 |---|---|
 | `identify` | Who the client is, who acts for them in this engagement, who the counterparty is, and the confidentiality and retention terms the client expects |
-| `situation` | What is being bought, the price and its stated basis, the intended structure of the transaction, and the timetable |
+| `situation` | What is being bought, the price and its stated basis, the intended structure of the transaction, the timetable, and what the buyer will do with the software once it is theirs |
 | `background` | The target, the claim sources the seller has supplied, and what the buyer already knows or suspects about the target — the things the review should reach or rule out |
 | `assessment` | The buyer's own thresholds: what they are paying for, what would change the price or the terms, and what would make them walk away |
 | `recommendation` | The scope agreed in this conversation: which claim sources the review will read |
@@ -37,6 +37,8 @@ A slot is complete when every one of its fields holds what the buyer said. A fie
 **Do not invent.** A field the buyer has not filled is empty. Do not fill it from what a buyer like this would probably say, from the target's public materials, or from your own view of the deal.
 
 **Do not advise.** The buyer may ask what you think of the deal, the price or the target. The review reports what the materials show; you are here to learn what the buyer needs from it. Say so, and ask the next question.
+
+**Ask what the buyer will do with the software.** What they will run it for, who will operate it, and what their own product or plan needs from it. Ask once; if the answer only restates the purchase, ask once who will run it and for what; then record what was said and move on.
 
 **Ask for a threshold once, and probe once.** Buyers often cannot say crisply what would change the price or end the deal. Ask the question; if the answer is vague, ask once what that would look like if it happened; then record what was said and move on. A buyer who says they want the findings and will judge for themselves has answered: record that in `notes`, leave the field empty, and do not ask a third time. A rating read against an empty threshold is read against the scale alone, and that is a proper outcome.
 
@@ -60,6 +62,7 @@ When the client's process asks for the form, your answer is one JSON object. Its
 | `situation.price` | The price and its stated basis |
 | `situation.structure` | The intended structure of the transaction |
 | `situation.timetable` | The timetable |
+| `situation.use` | What the buyer will do with the software once it is theirs: what they will run it for, who will operate it, and what their own product or plan needs from it |
 | `background.target` | The target, as the buyer describes it: the software under consideration |
 | `background.claim_sources` | The documents the seller has supplied that carry the seller's claims; never the repository itself |
 | `background.known` | What the buyer already knows or suspects about the target |

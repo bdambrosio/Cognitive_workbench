@@ -22,7 +22,7 @@ is a mark with who made it and when. Inside the stages that do work:
 **intake agent**, a model with `workflowsv2/intake/method/INTAKE.md` as its
 instructions and no repository tools. Each exchange is a **turn**, one
 message from the client and one reply. After every turn a separate model
-call rewrites the **form**, fifteen fields in five **slots** (identify,
+call rewrites the **form**, sixteen fields in five **slots** (identify,
 situation, background, assessment, recommendation), from the whole
 conversation so far. **Finish** writes the transaction and the buyer's
 thresholds out of the form into the engagement; the agent never finishes

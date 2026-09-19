@@ -16,9 +16,9 @@ def test_empty_form_matches_schema_and_checks_as_empty():
     req = sch.intake_schema()["required"]
     assert set(req) == set(f)
     c = sch.check_intake(f)
-    assert c["complete"] == [] and c["filled"] == 0 and c["total"] == 15
+    assert c["complete"] == [] and c["filled"] == 0 and c["total"] == 16
     assert c["emptiest"] == "identify"          # all equal: the first in §2 order
-    assert sch.ledger(c).startswith("[form: 0 of 15 fields filled; still empty — identify (")
+    assert sch.ledger(c).startswith("[form: 0 of 16 fields filled; still empty — identify (")
 
 
 def test_check_finds_the_emptiest_slot_and_completeness():
@@ -29,7 +29,7 @@ def test_check_finds_the_emptiest_slot_and_completeness():
     c = sch.check_intake(f)
     assert c["complete"] == ["identify"]
     assert c["emptiest"] in ("background", "assessment", "recommendation")
-    assert "identify" not in c["empty"] and c["empty"]["situation"] == ["price", "structure", "timetable"]
+    assert "identify" not in c["empty"] and c["empty"]["situation"] == ["price", "structure", "timetable", "use"]
     full = {s: {k: "v" for k in fs} for s, fs in sch.SLOTS.items()}
     full.update(open_questions=[], notes=[])
     assert sch.ledger(sch.check_intake(full)) == "[form: every slot is filled]"
@@ -39,9 +39,11 @@ def test_engagement_blocks_assemble_only_what_was_said():
     f = sch.empty_form()
     f["identify"]["client"] = "Acme"
     f["situation"]["price"] = "$480k, 12x MRR"
+    f["situation"]["use"] = "run it as our booking backend"
     f["assessment"]["walk_away"] = "backups not daily"
     b = sch.engagement_blocks(f)
-    assert b["transaction"] == "Client: Acme\nPrice and basis: $480k, 12x MRR"
+    assert b["transaction"] == ("Client: Acme\nPrice and basis: $480k, 12x MRR\n"
+                                "Intended use: run it as our booking backend")
     assert b["thresholds"] == "Would end the deal: backups not daily"
     assert sch.engagement_blocks(sch.empty_form()) == {"transaction": "", "thresholds": ""}
 
