@@ -52,7 +52,8 @@ DISPOSITION_WORDS = {
 RATING_WORDS = {
     "not_material": "would change neither the price, the terms, nor the "
                     "decision to close",
-    "material": "would change the price or the terms",
+    "material": "would change the price or the terms materially: the buyer "
+                "would go back to the seller over it",
     "decisive": "on its own would change the decision to close",
 }
 
@@ -508,6 +509,10 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
     dates = sorted({(r.get("captured_at_utc") or "")[:10] for r in runs} - {""})
     revs = sorted({r.get("target_rev") or "" for r in runs} - {""})
     sources = [r.get("claim_source") for r in runs if r.get("claim_source")]
+    untested = record.get("not_tested") or []
+    # A claim source whose every claim was listed and not tested has no run.
+    unrun = sorted({c.get("claim_source") for c in untested} - set(sources) - {None})
+    sources = sources + unrun
     out = _front_matter(engagement or merged.get("engagement") or "engagement",
                         dates, revs, sources)
 
@@ -537,16 +542,29 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
                 "else; it counts what the review showed, not what it could "
                 "not settle.", ""] + _slot("conclusion", prose)
 
+    listed = {s: sum(1 for c in untested if c.get("claim_source") == s) for s in sources}
     out += ["## Scope and approach", "",
-            "| claim source | claims | findings | checked | files read | "
-            "gathering legs | model |", "|---|---|---|---|---|---|---|"]
+            "| claim source | " + ("tested | not tested" if untested else "claims")
+            + " | findings | checked | files read | gathering legs | model |",
+            "|---|---|---|---|---|---|---|" + ("---|" if untested else "")]
     for r in runs:
         out.append(f"| {r.get('claim_source')} | {r.get('claims')} | "
-                   f"{r.get('findings')} | {'yes' if r.get('reviewed') else 'no'} | "
+                   + (f"{listed.get(r.get('claim_source'), 0)} | " if untested else "")
+                   + f"{r.get('findings')} | {'yes' if r.get('reviewed') else 'no'} | "
                    f"{r.get('files_read', '')} | {r.get('gathering_legs', '')} | "
                    f"{r.get('resolved_model') or ''} |")
-    out += ["", "*Claims* are the seller's assertions as enumerated from the "
-                "claim source, one finding each. *Files read* counts the "
+    for s in unrun:
+        out.append(f"| {s} | 0 | {listed[s]} | 0 | | | | |")
+    out += ["", ("*Tested* counts the seller's assertions, as enumerated from the "
+                 "claim source, that the review tested, one finding each. *Not "
+                 "tested* counts those rated before testing as ones whose being "
+                 "false would not lead the buyer to reopen the price or the "
+                 "terms; they are listed with their reasons in the second "
+                 "appendix, and a claim source with nothing to test has no other "
+                 "figures. " if untested else
+                 "*Claims* are the seller's assertions as enumerated from the "
+                 "claim source, one finding each. ")
+                + "*Files read* counts the "
                 "target's files the practice opened while gathering evidence, "
                 "over the number of *gathering legs* it took. *Checked* says "
                 "whether the independent check ran on that claim source.", ""]
@@ -605,7 +623,6 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
             out += ["  " + x for x in _evidence([u.get("evidence") or {}])]
         out.append("")
 
-    untested = record.get("not_tested") or []
     out += ["## Coverage", "", ("Every claim received one finding. " if not untested else
             f"Every claim that was tested received one finding. {len(untested)} further "
             f"claim(s) were rated before testing as ones whose being false would not "

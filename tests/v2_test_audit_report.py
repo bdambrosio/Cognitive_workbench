@@ -267,3 +267,18 @@ def test_claims_listed_and_not_tested_are_counted_and_given_their_own_appendix(t
     assert "Every claim that was tested received one finding. 1 further claim(s)" in text
     assert "## Appendix — claims listed, not tested" in text
     assert "| docs/CLI.md | 9 | 40 | page_size defaults to 10 | 2 | A default a developer codes against." in text
+
+
+def test_the_scope_table_counts_what_was_not_tested_and_names_a_source_with_no_run(tmp_path):
+    rec = _record()
+    plain = render.assemble(rec)
+    assert "| claim source | claims | findings |" in plain and "not tested" not in plain.split("## How to read")[0]
+    src = rec["merged"]["runs"][0]["claim_source"]
+    rec["not_tested"] = [{"id": 9, "claim_source": src, "tier": 2, "tier_basis": "x", "quote": "q", "lines": [1, 1]},
+                         {"id": 1, "claim_source": "docs/SECURITY.md", "tier": 3, "tier_basis": "y", "quote": "q", "lines": [3, 6]}]
+    text = render.assemble(rec)
+    assert "| claim source | tested | not tested | findings |" in text
+    assert "| docs/SECURITY.md | 0 | 1 | 0 | | | | |" in text
+    assert "`docs/SECURITY.md`" in text.split("**What this document is.**")[0]
+    row = next(l for l in text.splitlines() if l.startswith(f"| {src} | "))
+    assert row.split(" | ")[2] == "1"
