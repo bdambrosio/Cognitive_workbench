@@ -185,8 +185,6 @@ SPACEMAP_ARCHITECTURE.md
 | [business-case-plan.md](business-case-plan.md) | The set of business-case documents to write and why (2026-08-23) |
 | [business-case-01-opportunity-summary.md](business-case-01-opportunity-summary.md) | Document 1 of that set: opportunity summary for the claims review as a business (draft 2026-08-23) |
 | [venture-proposal.md](venture-proposal.md) | Venture proposal of 2026-08-21, agent reliability as a product; synthesised from two `bench/venture` runs |
-| [RESUME-2026-08-24.md](RESUME-2026-08-24.md) | Historical resume point (state at end of 2026-08-23); superseded by later work — keep or delete is Bruce's call |
-| [justify-resume-2026-08-09.md](justify-resume-2026-08-09.md) | Historical resume point for the justify / provenance work (2026-08-09); superseded by provenance-verifiability.md — keep or delete is Bruce's call |
 | [cohabitation-writeup.md](cohabitation-writeup.md) | DRAFT essay: five days living with the Factorio agent — records both v1 criteria passed, the perception-layer lessons, FLE upstream issues |
 | [cw-voice-sensor-plan.md](cw-voice-sensor-plan.md) | Historical build plan behind the shipped voice sensor (implemented 2026-06-19; retained for planning rationale) |
 | [design_note_agreements_rag.md](design_note_agreements_rag.md) | Discourse/agreements design; write-side (triage+CRUD + date-stamp aging) implemented 2026-06-11, read-side RAG-push deferred |

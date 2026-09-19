@@ -389,7 +389,7 @@ Backups section)`): not sloppiness, the only locator it had.
 
 **This is the fourth instance of the shape.** Retrieval was reliable; transit
 was not. See `docs/RESUME-2026-08-24.md`, "evidence was retrieved and then lost
-in transit".
+in transit" (the file was deleted on 2026-09-19 and is in the git history).
 
 Note what it does **not** explain. doc2 and doc9 arrived fully numbered and the
 auditor still used ordinals. Where the numbers were present it did not want

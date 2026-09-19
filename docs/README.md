@@ -39,7 +39,6 @@ For the project itself — what it is, why, and a quick start — see the
 | [provenance-verifiability.md](provenance-verifiability.md) | Staged verifiability toward "justify your response" |
 | [justification-taxonomy.md](justification-taxonomy.md) | Closed claim taxonomy and its reduction to ordinal grades |
 | [justification-technical-note.md](justification-technical-note.md) | What a justification record has to be to count as one |
-| [justify-resume-2026-08-09.md](justify-resume-2026-08-09.md) | Working notes from the justify hardening pass |
 
 ## Memory and data model
 
