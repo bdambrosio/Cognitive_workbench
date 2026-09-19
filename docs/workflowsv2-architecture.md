@@ -1,5 +1,19 @@
 # workflowsv2 — the claims-audit workflow, as built
 
+> **Status, 2026-09-18.** The four stages below are described as they were
+> on 2026-09-02, with changes to 2026-09-11. This document does not cover
+> what was added since, all before the surface is frozen or beside the
+> chain: the sorting of the materials (`workflowsv2/materials_sorting/`),
+> the behaviour split, the pass that marks repeated claims and claims
+> within a wider one (`claims_audit/duplicates.py`), the reliance statement
+> (`claims_audit/reliance.py`), the tiers (`claims_audit/tiers.py`), and
+> hand-back (`claims_audit/handback.py`). Two things below are no longer
+> true as written: the audit tests only claims in tier 1 or with no tier,
+> and the rest are carried as `not_tested` in the run's `claims.json`; and
+> materiality also reads the engagement's reliance statement. The current
+> account of all of these is `claims-review-workflow.md`. This document is
+> queued to be re-derived from the code.
+
 Re-derived from the code on 2026-09-02. Four stages, each a runner over a
 method document and a schema, each writing typed JSON that the next stage
 reads. Nothing downstream re-judges what a stage upstream decided; every

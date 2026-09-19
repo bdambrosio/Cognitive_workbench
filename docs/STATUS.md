@@ -7,7 +7,10 @@ status banners, second superseded set deleted — list below); third pass
 **2026-08-08** (essay/draft cleanup, third superseded set deleted, index
 reconciled against the tree); partial pass **2026-08-20** (exec-script
 rows reconciled — three docs described it as broken or as running in a
-directory that never existed).
+directory that never existed); partial pass **2026-09-18** (claims-review
+rows only: the top-down workflow doc brought up to date, the architecture
+doc given a status banner, thirteen docs that were never indexed added —
+indexed from their own opening lines, not re-verified against code).
 
 Context: the OODA executive, incremental planner (Stage 0–3, envisioning,
 vision eval), GoalScheduler, and task-execution machinery were deleted
@@ -16,6 +19,12 @@ vision eval), GoalScheduler, and task-execution machinery were deleted
 fire-time triage and per-concern WIP as of 2026-06), infospace
 Notes/Collections, SKILL.md tools and sensors, resource browser / affect /
 canvas displays.
+
+Since 2026-08 the repository also carries the claims review practice:
+`workflowsv2/` (runners over method documents: intake, materials sorting,
+claims audit, review, materiality, report) and the client site
+`src/client_ui/`. It imports the chat loop and is otherwise separate from
+the Jill runtime. Start at [claims-review-workflow.md](claims-review-workflow.md).
 
 As of **2026-08-20** `exec-script` is live again for Jill and Sentinel
 after four and a half months broken, rewritten as a bubblewrap sandbox:
@@ -74,8 +83,12 @@ point of recording this here:
 
 | Doc | Covers |
 |---|---|
-| [claims-review-workflow.md](claims-review-workflow.md) | The claims review top down: engagement, stages, intake, surface, the chain's four steps and their inner vocabulary (leg, action loop, evidence request, batch, finding, observation, retest, sample, borderline), and where each thing lives — written 2026-09-05 against the code |
-| [workflowsv2-architecture.md](workflowsv2-architecture.md) | The claims-audit workflow as built (`workflowsv2/`): audit → review → materiality → report, each a runner over a method document and a schema; chases, batching, routes, what is not built — re-derived from code 2026-09-02 |
+| [claims-review-workflow.md](claims-review-workflow.md) | The claims review top down: engagement, stages, intake, surface, the chain's four steps and their inner vocabulary (leg, action loop, evidence request, batch, finding, observation, retest, sample, borderline), and where each thing lives — written 2026-09-05 against the code; brought up to date 2026-09-18 for the seller's materials page, materials sorting, the repeats pass, the reliance statement, the tiers (tier 1 tested, tiers 2 and 3 listed and not tested) and hand-back |
+| [claim-source-selection.md](claim-source-selection.md) | Working procedure for sorting a seller's materials into claim sources and evidence excludes; written 2026-09-17 from three engagements; the procedure `workflowsv2/materials_sorting/` carries out — indexed 2026-09-18 |
+| [workflowsv2-architecture.md](workflowsv2-architecture.md) | The claims-audit workflow as built (`workflowsv2/`): audit → review → materiality → report, each a runner over a method document and a schema; chases, batching, routes, what is not built — re-derived from code 2026-09-02; **banner 2026-09-18**: the four stages are accurate as of 2026-09-11, the stages added since are not covered, and two statements are out of date (the audit tests tier 1 only; materiality also reads the reliance statement). Queued for re-derivation |
+| [model-qualification.md](model-qualification.md) | The frozen pass criteria a model must meet before its output is shipped in a delivered report (the pre-screen asks only whether it can be used) — indexed 2026-09-18, not re-verified |
+| [measurement-v3.md](measurement-v3.md) | Scoring traces rather than tasks; implementation `measure/`; replaces the retired `bench/` and the M0–M5 harness roadmap — indexed 2026-09-18, not re-verified |
+| [practice-remote-access.md](practice-remote-access.md) | Reaching the client site and practice pages away from the desk: `tuuyi-site` systemd user unit, the tunnel, Access — indexed 2026-09-18, not re-verified |
 | [RESOURCE_BROWSER.md](RESOURCE_BROWSER.md) | Standalone web resource browser (`src/resource_browser.py`, port 3001); banner 2026-07-19 — now read-write (edit/delete/concern management), Graph tab non-functional |
 | [REMOTE_VIEWER_DESIGN.md](REMOTE_VIEWER_DESIGN.md) | Remote viewing via `mirror.sh` (affect/canvas/CLI tunneling); runbook verified 2026-07-19 |
 | [audio-out-design.md](audio-out-design.md) | ChatterBot audio-out ("say") — CW binding SHIPPED (`zenoh_io._publish_say` → `voice_pipeline.synthesize` → `chatter/audio/out`) |
@@ -111,6 +124,7 @@ point of recording this here:
 | [jill-self-extension.md](jill-self-extension.md) | Recursive tool construction; Phase 2a (judgment/propose-only) SHIPPED 2026-06 — capability-gap capture → self-extension concern; Phase 1/2b (generative author-test-restart path) unbuilt. `exec-script` rows corrected 2026-08-20 (bubblewrap, not `scenarios/<world>/fs/`); its author→test→propose→human-gate pipeline is also the nearest existing design for the L3 propose-patch step |
 | [knowledge-base-system.md](knowledge-base-system.md) | Obsidian-backed three-tier knowledge base; obsidian tool (read/search/write→Notes) exists, decomposition/curation system doesn't |
 | [learned-disposition-design.md](learned-disposition-design.md) | Tiny-LM state→value learning over fire decisions (RL on imagined trajectories, real judged outcomes as anchor); G1 offline anchor passed 2026-07-24 (suite retired 2026-08-18), build-order step 1 — state capture + render — SHIPPED 2026-07-25 (`src/chat/disposition.py`, shadow-log only); scorer, imagination gate, and triage coupling unbuilt. Descends from substack-gut-feeling-draft.md |
+| [multi-run-merge.md](multi-run-merge.md) | Merging several audit runs of one surface and weeding findings by review; idea recorded 2026-08-27, not built, not designed in detail |
 | [model-prescreen.md](model-prescreen.md) | Three gates before a model gets a temperature conversation (json_schema with the real payload / completion tokens per one-line action / one admissible fixture run) + the 2026-08-26 results table; runner `measure/prescreen.py` |
 | [model-settings.md](model-settings.md) | Provenance for `src/chat/model_params.py` — per-model temperature and the global top_p 0.95, with the source of each value; was never indexed here |
 | [provenance-verifiability.md](provenance-verifiability.md) | Staged verifiability toward "justify your response" (claim-graph, no invented numerics); Levels 1–2 LIVE-VALIDATED; epistemic grader v1 SHIPPED 2026-08-04 (`f30d3f05`/`ad9bbda5`: verbatim-quote checks, [justification-taxonomy.md](justification-taxonomy.md) tags, ordinal grades + weakest-link + audit notes in `justify`) — refute/confirm/quiet branches all live-validated (SpaceX turns 2231/2236, Canberra 2239); Stage 5 background verification of suspect replies SHIPPED `8c1396e0` and LIVE-VALIDATED 2026-08-06 (confirm/silent turn 2247; unprompted correction turn 2295 — epistemic downgrade posted ~12 min post-reply); autonomous-turn claims next; Levels 3–4 unbuilt |
@@ -165,6 +179,14 @@ SPACEMAP_ARCHITECTURE.md
 | Doc | Covers |
 |---|---|
 | [method-superseded-rules.md](method-superseded-rules.md) | METHOD's former §19: each rule the claims-review method once had and why it changed; moved out of the executable file 2026-09-05 |
+| [held-claims-are-unreviewed.md](held-claims-are-unreviewed.md) | Finding of 2026-08-27 on the first real-target run: what the review did not look at; nothing proposed for building |
+| [derived-findings-and-uncited-evidence.md](derived-findings-and-uncited-evidence.md) | Understanding recorded 2026-08-27: derived findings and what `[uncited]` catches; no instrument change proposed |
+| [audit-sample-body-report.md](audit-sample-body-report.md) | A sample audit report recovered from a reasoning trace of 2026-08-22, incomplete; its own header says what is missing |
+| [business-case-plan.md](business-case-plan.md) | The set of business-case documents to write and why (2026-08-23) |
+| [business-case-01-opportunity-summary.md](business-case-01-opportunity-summary.md) | Document 1 of that set: opportunity summary for the claims review as a business (draft 2026-08-23) |
+| [venture-proposal.md](venture-proposal.md) | Venture proposal of 2026-08-21, agent reliability as a product; synthesised from two `bench/venture` runs |
+| [RESUME-2026-08-24.md](RESUME-2026-08-24.md) | Historical resume point (state at end of 2026-08-23); superseded by later work — keep or delete is Bruce's call |
+| [justify-resume-2026-08-09.md](justify-resume-2026-08-09.md) | Historical resume point for the justify / provenance work (2026-08-09); superseded by provenance-verifiability.md — keep or delete is Bruce's call |
 | [cohabitation-writeup.md](cohabitation-writeup.md) | DRAFT essay: five days living with the Factorio agent — records both v1 criteria passed, the perception-layer lessons, FLE upstream issues |
 | [cw-voice-sensor-plan.md](cw-voice-sensor-plan.md) | Historical build plan behind the shipped voice sensor (implemented 2026-06-19; retained for planning rationale) |
 | [design_note_agreements_rag.md](design_note_agreements_rag.md) | Discourse/agreements design; write-side (triage+CRUD + date-stamp aging) implemented 2026-06-11, read-side RAG-push deferred |
