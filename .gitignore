@@ -158,3 +158,6 @@ logs/
 # The introduction video is deployed by rsync from site/media/ but is too large for git;
 # the source file is Bruce's tuuyi-claims-review.mp4. Its poster and captions are committed.
 site/media/*.mp4
+
+# Outreach prospect records hold personal data and relationship notes; they stay on this machine.
+workflowsv2/outreach/prospects/

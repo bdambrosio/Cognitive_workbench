@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tuuyi outreach</title>
+<style>
+  :root { --ink:#1c2430; --soft:#5b6675; --line:#d9dee6; --bg:#f6f7f9; --card:#fff; --go:#1f6f4a; --warn:#9a5b00; --stop:#8a2f2f; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.5 system-ui, sans-serif; color:var(--ink); background:var(--bg); }
+  header { padding:14px 20px; background:var(--card); border-bottom:1px solid var(--line); display:flex; gap:18px; align-items:baseline; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; }
+  #counts { color:var(--soft); font-size:13px; }
+  main { max-width:980px; margin:0 auto; padding:16px 16px 60px; }
+  section { margin-top:22px; }
+  h2 { font-size:14px; text-transform:uppercase; letter-spacing:.04em; color:var(--soft); margin:0 0 8px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:12px; }
+  .card h3 { margin:0; font-size:16px; }
+  .meta { color:var(--soft); font-size:13px; margin:2px 0 8px; }
+  .meta a { color:inherit; }
+  .why { margin:6px 0 10px; }
+  .flag { color:var(--warn); font-size:13px; margin:2px 0; }
+  textarea, input, select { font:inherit; width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); }
+  textarea.msg { min-height:150px; }
+  .row { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; align-items:center; }
+  .row > * { flex:0 0 auto; width:auto; }
+  .row .grow { flex:1 1 200px; }
+  button { font:inherit; padding:7px 14px; border-radius:6px; border:1px solid var(--line); background:#fff; color:var(--ink); cursor:pointer; }
+  button.go { background:var(--go); border-color:var(--go); color:#fff; }
+  button.stop { color:var(--stop); }
+  button:disabled { opacity:.5; cursor:default; }
+  details { margin-top:8px; }
+  summary { cursor:pointer; color:var(--soft); font-size:13px; }
+  pre.brief { white-space:pre-wrap; font:13px/1.45 ui-monospace, monospace; background:var(--bg); padding:10px; border-radius:6px; max-height:420px; overflow:auto; }
+  .words { color:var(--soft); font-size:12px; }
+  #note { position:fixed; bottom:14px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:8px 14px; border-radius:6px; display:none; max-width:90%; }
+  #runlog { font:12px/1.4 ui-monospace, monospace; color:var(--soft); white-space:pre-wrap; margin-top:8px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  @media (max-width:640px) { .grid { grid-template-columns:1fr; } }
+  .warnbar { background:#fff4e0; border:1px solid #f0d49a; padding:8px 12px; border-radius:6px; font-size:13px; margin-top:12px; display:none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Tuuyi outreach</h1>
+  <span id="counts">loading…</span>
+</header>
+<main>
+  <div class="warnbar" id="nostage">The Attio list has no stage “Not pursuing”. Skip cannot record anything until it is added to the Stage attribute.</div>
+
+  <section>
+    <h2>Ready to contact</h2>
+    <div id="ready"></div>
+  </section>
+
+  <section>
+    <h2>Qualified, no reason to write yet</h2>
+    <div id="qualified"></div>
+  </section>
+
+  <section>
+    <h2>Waiting for research</h2>
+    <div id="research"></div>
+  </section>
+
+  <section>
+    <h2>Add a name</h2>
+    <div class="card">
+      <div class="grid">
+        <input id="a_name" placeholder="Name">
+        <input id="a_title" placeholder="Title and firm (optional)">
+        <input id="a_linkedin" placeholder="LinkedIn URL (optional)">
+        <input id="a_how" placeholder="How you know them, or who introduced them (optional)">
+      </div>
+      <div class="row"><input class="grow" id="a_source" placeholder="Where the pasted text is from, e.g. LinkedIn post of 14 Sept"></div>
+      <div class="row"><textarea class="grow" id="a_pasted" placeholder="Paste a post, an email, anything that gives a reason to write (optional)" style="min-height:90px"></textarea></div>
+      <div class="row"><button class="go" onclick="addName()">Add to Research</button></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Run</h2>
+    <div class="card">
+      <div class="row">
+        <button id="b_research" onclick="startRun('research')">Research the waiting names</button>
+        <select id="r_kind"></select>
+        <input id="r_want" type="number" min="1" max="10" value="3" style="width:70px" title="how many found people to research now">
+        <button id="b_scout" onclick="startRun('scout')">Scout for this kind</button>
+      </div>
+      <div id="runlog"></div>
+    </div>
+  </section>
+</main>
+<div id="note"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => (s || "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function note(text) { const n = $("note"); n.textContent = text; n.style.display = "block"; setTimeout(() => n.style.display = "none", 4000); }
+async function call(path, body) {
+  const r = await fetch(path, body ? {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)} : undefined);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { note(j.detail || ("failed: " + r.status)); throw new Error(j.detail || r.status); }
+  return j;
+}
+const words = s => (s || "").trim().split(/\s+/).filter(Boolean).length;
+
+function card(c, i) {
+  const links = [c.linkedin ? `<a href="${esc(c.linkedin)}" target="_blank" rel="noopener">LinkedIn</a>` : "",
+                 c.web_url ? `<a href="${esc(c.web_url)}" target="_blank" rel="noopener">Attio</a>` : ""].filter(Boolean).join(" · ");
+  const head = `<h3>${esc(c.name)}</h3><div class="meta">${esc([c.title, c.category].filter(Boolean).join(" · "))}${links ? " · " + links : ""}</div>`;
+  const why = c.fit_rationale ? `<div class="why">${esc(c.fit_rationale)}</div>` : "";
+  const flags = (c.flags || []).map(f => `<div class="flag">Check: ${esc(f)}</div>`).join("");
+  const brief = c.brief ? `<details><summary>Brief and evidence</summary><pre class="brief">${esc(c.brief)}</pre></details>` : "";
+  if (c.stage !== "Ready to contact") return `<div class="card">${head}${why}${flags}${brief}</div>`;
+  return `<div class="card" id="card${i}">${head}${why}${flags}
+    <textarea class="msg" id="msg${i}" oninput="$('w${i}').textContent = words(this.value) + ' words'">${esc(c.message)}</textarea>
+    <div class="words" id="w${i}">${words(c.message)} words</div>
+    <div class="row">
+      <button onclick="copyMsg(${i})">Copy</button>
+      <button onclick="saveMsg(${i})">Save edit</button>
+      <button class="go" onclick="sent(${i})">Sent</button>
+      <input class="grow" id="why${i}" placeholder="Reason, if skipping">
+      <button class="stop" onclick="skip(${i})">Skip</button>
+      <input id="until${i}" type="date" title="put off until">
+      <button onclick="later(${i})">Later</button>
+    </div>${brief}</div>`;
+}
+
+let cards = [];
+async function load() {
+  const q = await call("/api/queue");
+  cards = q.cards;
+  $("nostage").style.display = q.has_not_pursuing ? "none" : "block";
+  $("counts").textContent = Object.entries(q.counts).map(([k, v]) => `${k}: ${v}`).join("   ") || "the list is empty";
+  const by = s => cards.map((c, i) => c.stage === s ? card(c, i) : "").join("") || `<div class="meta">Nobody.</div>`;
+  $("ready").innerHTML = by("Ready to contact");
+  $("qualified").innerHTML = by("Qualified");
+  $("research").innerHTML = by("Research");
+  if (!$("r_kind").options.length) $("r_kind").innerHTML = q.kinds.map(k => `<option>${esc(k)}</option>`).join("");
+}
+async function copyMsg(i) { await navigator.clipboard.writeText($("msg" + i).value); note("Copied. Paste it into LinkedIn, then press Sent."); }
+async function saveMsg(i) { await call("/api/edit", {name: cards[i].name, message: $("msg" + i).value}); note("Edit saved."); }
+async function sent(i) {
+  if (!confirm(`Record that this message was sent to ${cards[i].name}?`)) return;
+  await call("/api/sent", {record_id: cards[i].record_id, name: cards[i].name, message: $("msg" + i).value});
+  note("Recorded as sent."); load();
+}
+async function skip(i) {
+  const reason = $("why" + i).value.trim();
+  if (!reason) { note("Give a reason; it is the record of why."); return; }
+  await call("/api/skip", {record_id: cards[i].record_id, reason}); note("Skipped."); load();
+}
+async function later(i) {
+  const until = $("until" + i).value;
+  if (!until) { note("Choose a date."); return; }
+  await call("/api/later", {record_id: cards[i].record_id, until}); note("Put off until " + until + "."); load();
+}
+async function addName() {
+  await call("/api/add", {name: $("a_name").value, title: $("a_title").value, linkedin: $("a_linkedin").value,
+                          how_known: $("a_how").value, pasted: $("a_pasted").value, pasted_source: $("a_source").value});
+  ["a_name", "a_title", "a_linkedin", "a_how", "a_pasted", "a_source"].forEach(id => $(id).value = "");
+  note("Added. The next research run will work on them."); load();
+}
+async function startRun(what) {
+  await call("/api/run", {what, kind: $("r_kind").value, want: parseInt($("r_want").value || "3", 10)});
+  poll();
+}
+let wasRunning = false;
+async function poll() {
+  const s = await call("/api/run");
+  $("b_research").disabled = $("b_scout").disabled = s.running;
+  $("runlog").textContent = (s.what ? `${s.running ? "Running" : "Last run"}: ${s.what}, started ${s.started}${s.exit === null || s.exit === undefined ? "" : ", exit " + s.exit}\n` : "") + s.log.join("\n");
+  if (wasRunning && !s.running) load();
+  wasRunning = s.running;
+  if (s.running) setTimeout(poll, 5000);
+}
+load(); poll();
+</script>
+</body>
+</html>
