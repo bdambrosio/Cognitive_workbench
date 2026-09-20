@@ -45,6 +45,8 @@ def _call(method: str, path: str, body: Optional[Dict[str, Any]] = None,
         out = resp.json()
     except ValueError as e:
         raise AttioError(f"{method} {path}: unparseable response: {e}") from e
+    if method == "DELETE":
+        return out if isinstance(out, dict) else {}
     if not isinstance(out, dict) or "data" not in out:
         raise AttioError(f"{method} {path}: no `data` in the response: {str(out)[:200]}")
     return out
@@ -240,3 +242,20 @@ def create_note(record_id: str, title: str, markdown: str) -> Dict[str, Any]:
     return _call("POST", "/notes", {"data": {"parent_object": "people", "parent_record_id": record_id,
                                              "title": title, "format": "markdown",
                                              "content": markdown}})["data"]
+
+
+def not_pursuing(record_id: str, reason: str, on: str) -> None:
+    """Record that the practice will not approach this person: a note on the
+    person, "Not pursuing <date>", holding the reason and what the list entry
+    said, and the entry removed from the outreach list. The list has no such
+    stage and the practice's token cannot add one; the note is the record, the
+    person stays in Attio so scouting does not bring them back, and the next
+    qualification reads the note's title and date in the contact record."""
+    entry = entry_of(record_id)
+    was = ""
+    if entry is not None:
+        was = (f"\n\nThe entry was at stage '{stage_of(entry)}'. "
+               f"Fit rationale then: {_first(entry, 'fit_rationale', 'value') or '(none)'}")
+    create_note(record_id, f"Not pursuing {on}", reason.strip() + was)
+    if entry is not None:
+        _call("DELETE", f"/lists/{LIST}/entries/{entry['id']['entry_id']}")

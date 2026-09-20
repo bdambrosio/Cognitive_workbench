@@ -37,7 +37,6 @@
   #runlog { font:12px/1.4 ui-monospace, monospace; color:var(--soft); white-space:pre-wrap; margin-top:8px; }
   .grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   @media (max-width:640px) { .grid { grid-template-columns:1fr; } }
-  .warnbar { background:#fff4e0; border:1px solid #f0d49a; padding:8px 12px; border-radius:6px; font-size:13px; margin-top:12px; display:none; }
 </style>
 </head>
 <body>
@@ -46,8 +45,6 @@
   <span id="counts">loading…</span>
 </header>
 <main>
-  <div class="warnbar" id="nostage">The Attio list has no stage “Not pursuing”. Skip cannot record anything until it is added to the Stage attribute.</div>
-
   <section>
     <h2>Ready to contact</h2>
     <div id="ready"></div>
@@ -82,7 +79,10 @@
     <h2>Run</h2>
     <div class="card">
       <div class="row">
-        <button id="b_research" onclick="startRun('research')">Research the waiting names</button>
+        <button class="go" id="b_research" onclick="startRun('daily')" title="research the names you added; if fewer than five people are ready, scout for more; put everyone qualified on this page">Run today's work</button>
+      </div>
+      <div class="row">
+        <span class="meta" style="margin:0">or scout by hand:</span>
         <select id="r_kind"></select>
         <input id="r_want" type="number" min="1" max="10" value="3" style="width:70px" title="how many found people to research now">
         <label title="find firms first, then the person to approach at each" style="font-size:13px"><input type="checkbox" id="r_firms" style="width:auto"> by firm</label>
@@ -132,7 +132,6 @@ let cards = [];
 async function load() {
   const q = await call("/api/queue");
   cards = q.cards;
-  $("nostage").style.display = q.has_not_pursuing ? "none" : "block";
   $("counts").textContent = Object.entries(q.counts).map(([k, v]) => `${k}: ${v}`).join("   ") || "the list is empty";
   const by = s => cards.map((c, i) => c.stage === s ? card(c, i) : "").join("") || `<div class="meta">Nobody.</div>`;
   $("ready").innerHTML = by("Ready to contact");

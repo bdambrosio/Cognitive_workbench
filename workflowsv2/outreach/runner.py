@@ -1,7 +1,15 @@
 """Research, qualify and draft a first message for people the practice names.
 
-    python3 workflowsv2/outreach/runner.py run --candidates <file.yaml> --model <yaml> [--only <slug>]
+    workflowsv2/outreach/daily.sh                                  (the whole day's work, and the page)
+    python3 workflowsv2/outreach/runner.py daily [--pool 5] [--want 3]
+    python3 workflowsv2/outreach/runner.py run --candidates <file.yaml> [--only <slug>]
     python3 workflowsv2/outreach/runner.py research|qualify|draft|brief ...   (one stage)
+
+`daily` works on the names waiting at Research in Attio; then, when fewer than
+`--pool` people are Ready to contact, scouts for the day's kind (the kinds take turns by date; people
+an earlier scout found of that kind are taken before any new search)
+(`--want` of the people found go on to research); and pushes everything it
+qualified. The model is the local Qwen unless `--model` names another.
 
 THE CANDIDATES FILE is a YAML list. Each entry has `name`, and any of `firm`,
 `urls` (pages to fetch), `pasted` (a list of `{source, date, text}`: text
@@ -28,7 +36,8 @@ no tools; everything that touches the network is code.
                is put in the outreach list at "Ready to contact" with the
                rationale and the three selects, and the brief is attached as a
                note. A plausible candidate goes to "Qualified" with the brief;
-               a weak or rejected one to "Not pursuing" with the reason. An
+               a weak or rejected one leaves the list with a "Not pursuing"
+               note that gives the reason. An
                existing person record is never changed, and an entry at any
                stage but Research is left alone: a person set it. Recorded in
                attio.json; a candidate with that file is not pushed again.
@@ -431,10 +440,10 @@ def brief(c: Dict[str, Any], cand_dir: Path) -> str:
     return text
 
 
-#: The list stage each category is written as. `Not pursuing` is written only
-#: when the list has that stage; until then such an entry stays where it is.
-STAGE_OF = {"strong": "Ready to contact", "plausible": "Qualified",
-            "weak": "Not pursuing", "reject": "Not pursuing"}
+#: The list stage a category is written as. A weak or rejected person gets no
+#: stage: they leave the list with a "Not pursuing" note (attio.not_pursuing).
+STAGE_OF = {"strong": "Ready to contact", "plausible": "Qualified"}
+CATEGORIES_PUSHED = ("strong", "plausible", "weak", "reject")
 #: The stages this program may move an entry out of. Any other stage was set
 #: by a person or records a message sent, and is left alone.
 OURS = (None, "Research")
@@ -448,7 +457,7 @@ def push(c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]]:
     q = _read_json(cand_dir / "qualification.json") or {}
     d = _read_json(cand_dir / "draft.json")
     category = q.get("category")
-    if category not in STAGE_OF or (category == "strong" and not (d and d.get("message"))):
+    if category not in CATEGORIES_PUSHED or (category == "strong" and not (d and d.get("message"))):
         logger.info("%s: no category, or strong with no draft; nothing is pushed", c["name"])
         return None
     if (cand_dir / "attio.json").is_file():
@@ -466,12 +475,13 @@ def push(c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]]:
     if entry is not None and attio.stage_of(entry) not in OURS:
         logger.info("%s: the entry is at '%s', set by a person; left alone", c["name"], attio.stage_of(entry))
         return None
-    stage = STAGE_OF[category]
-    if stage not in attio.stages():
-        issues.note(cand_dir, "push", "no_stage", f"the outreach list has no stage '{stage}'; "
-                    f"{c['name']} ({category}) was left where it is")
-        return None
     why = q.get("reject_reason") or f"{q.get('why_person', '')} {q.get('why_now', '')}".strip()
+    if category not in STAGE_OF:
+        attio.not_pursuing(rid, f"Qualified as {category}. {why}", today())
+        rec = {"at": today(), "record_id": rid, "person_created": False, "not_pursuing": True, "reason": why}
+        _write_json(cand_dir / "attio.json", rec)
+        return rec
+    stage = STAGE_OF[category]
     values: Dict[str, Any] = {"stage": stage, "fit_rationale": why}
     if category == "strong":
         values.update(next_action="Review the draft and send on LinkedIn", next_action_date=today())
@@ -554,8 +564,8 @@ def scout(backend, kind: str, data: Path, want: int) -> List[Dict[str, Any]]:
                    "prospect_type": lo.get("prospect_type"), "reason": str(lo.get("reason") or "").strip()}
             _write_json(cand_dir / "first_look.json", rec)
             logger.info("scout: %s: fits=%s (%s)", name, rec["fits"], rec["reason"][:90])
-            if rec["fits"] == "yes":
-                found.append(c)
+            if rec["fits"] == "yes" and rec["prospect_type"] == kind:
+                found.append(c)                 # someone who fits another kind waits for a scout of that kind
         append_jsonl(log, {"at": today(), "kind": kind, "query": q, "results": len(results), "new": new})
     return found[:want]
 
@@ -697,20 +707,94 @@ def load_candidates(path: Path) -> List[Dict[str, Any]]:
     return cands
 
 
+#: The kinds the daily run scouts for, in turn, and those scouted by firm
+#: because the person to approach has to be chosen (PROSPECT.md §4).
+DAILY_KINDS = ("M&A adviser", "Repeat acquirer", "Searcher", "Small PE-family office",
+               "Technical feedback", "VC / Investor")
+FIRM_KINDS = ("Repeat acquirer", "Small PE-family office")
+MODEL = REPO / "measure/models/local_qwen38flashnext.yaml"
+RECORDS = {"research": "research.json", "qualify": "qualification.json", "draft": "draft.json"}
+
+
+def work(backend, cands: List[Dict[str, Any]], stages, data: Path, use_attio: bool, redo: bool = False) -> None:
+    """Run the named stages for each candidate. A stage whose record exists
+    is not run again unless `redo`."""
+    for c in cands:
+        cand_dir = data / slug(c["name"])
+        cand_dir.mkdir(parents=True, exist_ok=True)
+        atomic_write_text(cand_dir / "candidate.yaml", yaml.safe_dump(c, allow_unicode=True, sort_keys=False))
+        for st in stages:
+            if st == "push":
+                push(c, cand_dir)
+                continue
+            if st == "brief":
+                brief(c, cand_dir)
+                continue
+            if (cand_dir / RECORDS[st]).is_file() and not redo:
+                logger.info("%s: %s is already recorded", c["name"], st)
+                continue
+            logger.info("%s: %s", c["name"], st)
+            if st == "qualify":
+                q = qualify(backend, c, cand_dir,
+                            attio.contact_for(c["name"], str(c.get("firm") or ""), firm_domain(c)) if use_attio else "")
+                better_contact(c, q, data, use_attio)
+                continue
+            {"research": research, "draft": draft}[st](backend, c, cand_dir)
+
+
+def unpushed(data: Path) -> List[Dict[str, Any]]:
+    """People scouting found who are qualified and not yet written to Attio."""
+    return [yaml.safe_load((f.parent / "candidate.yaml").read_text(encoding="utf-8"))
+            for f in sorted(data.glob("*/first_look.json"))
+            if (f.parent / "qualification.json").is_file() and not (f.parent / "attio.json").is_file()]
+
+
+def next_kind(day: Optional[datetime.date] = None) -> str:
+    """The kind for the day: DAILY_KINDS in turn, by the date, so that the
+    people approached in a week are of different kinds."""
+    return DAILY_KINDS[(day or datetime.date.today()).toordinal() % len(DAILY_KINDS)]
+
+
+def daily(backend, data: Path, pool: int, want: int) -> str:
+    """The whole day's work, in order: the names waiting at Research in Attio;
+    then, when fewer than `pool` people are Ready to contact, a scout for the
+    day's kind. Everything qualified is pushed. Returns what a
+    person needs to read."""
+    data.mkdir(parents=True, exist_ok=True)
+    named = pickup(data)
+    work(backend, named, STAGES + ("push",), data, use_attio=True)
+    work(backend, unpushed(data), ("push",), data, use_attio=True)      # left by an earlier scout
+    ready = sum(1 for e in attio.entries() if attio.stage_of(e) == "Ready to contact")
+    lines = [f"Names you added, researched today: {len(named)}.",
+             f"Ready to contact before scouting: {ready} (scouting starts below {pool})."]
+    scouted: List[Dict[str, Any]] = []
+    if ready < pool:
+        kind = next_kind()
+        by_firm = kind in FIRM_KINDS
+        lines.append(f"Scouted for: {kind}{', by firm' if by_firm else ''}.")
+        scouted = (scout_firms if by_firm else scout)(backend, kind, data, want)
+        work(backend, scouted, STAGES + ("push",), data, use_attio=True)
+    ready = sum(1 for e in attio.entries() if attio.stage_of(e) == "Ready to contact")
+    lines.append(f"Ready to contact now: {ready}.")
+    return summary(named + scouted, data) + "\n" + "\n".join(lines) + "\n"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("stage", choices=STAGES + ("run", "push", "scout"))
+    ap.add_argument("stage", choices=STAGES + ("run", "push", "scout", "daily"))
     ap.add_argument("--kind", choices=[k for k in schemas.TYPES if k != "none"], default=None,
                     help="for `scout`: the kind of prospect to look for")
     ap.add_argument("--candidates", type=Path, default=None,
                     help="a YAML file of candidates; without it, the entries at stage Research in Attio")
-    ap.add_argument("--model", type=Path, default=None, help="required by every stage but `brief`")
+    ap.add_argument("--model", type=Path, default=MODEL, help="default: the local Qwen model file")
     ap.add_argument("--firms", action="store_true",
                     help="for `scout`: find firms of the kind, then the person to approach at each")
-    ap.add_argument("--want", type=int, default=5,
-                    help="for `scout`: how many of the people found go on to research now; "
+    ap.add_argument("--want", type=int, default=3,
+                    help="for `scout` and `daily`: how many of the people found go on to research now; "
                          "the rest wait for the next scout (research costs searches)")
+    ap.add_argument("--pool", type=int, default=5,
+                    help="for `daily`: scout when fewer than this many people are Ready to contact")
     ap.add_argument("--scouted", action="store_true",
                     help="the candidates are the people scouting found to fit who are qualified and not yet pushed")
     ap.add_argument("--only", default=None, help="one candidate, by slug (the name in lower case, _ for spaces)")
@@ -721,45 +805,23 @@ def main() -> int:
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     stages = STAGES if args.stage in ("run", "scout") else (args.stage,)
-    if stages not in (("brief",), ("push",)) and args.model is None:
-        raise SystemExit("--model is required")
-    backend = backend_from_model(args.model) if args.model else None
+    backend = backend_from_model(args.model) if stages not in (("brief",), ("push",)) else None
+    if args.stage == "daily":
+        print(daily(backend, args.data, args.pool, args.want))
+        return 0
     if args.stage == "scout":
         if not args.kind:
             raise SystemExit("scout needs --kind")
         args.data.mkdir(parents=True, exist_ok=True)
         cands = (scout_firms if args.firms else scout)(backend, args.kind, args.data, args.want)
     elif args.scouted:
-        cands = [yaml.safe_load((f.parent / "candidate.yaml").read_text(encoding="utf-8"))
-                 for f in sorted(args.data.glob("*/first_look.json"))
-                 if (f.parent / "qualification.json").is_file() and not (f.parent / "attio.json").is_file()]
+        cands = unpushed(args.data)
     else:
         cands = load_candidates(args.candidates) if args.candidates else pickup(args.data)
     todo = [c for c in cands if args.only in (None, slug(c["name"]))]
     if not todo and args.only:
         raise SystemExit(f"no candidate with the slug {args.only}")
-    records = {"research": "research.json", "qualify": "qualification.json", "draft": "draft.json"}
-    for c in todo:
-        cand_dir = args.data / slug(c["name"])
-        cand_dir.mkdir(parents=True, exist_ok=True)
-        atomic_write_text(cand_dir / "candidate.yaml", yaml.safe_dump(c, allow_unicode=True, sort_keys=False))
-        for st in stages:
-            if st == "push":
-                push(c, cand_dir)
-                continue
-            if st == "brief":
-                brief(c, cand_dir)
-                continue
-            if (cand_dir / records[st]).is_file() and not args.redo:
-                logger.info("%s: %s is already recorded", c["name"], st)
-                continue
-            logger.info("%s: %s", c["name"], st)
-            if st == "qualify":
-                q = qualify(backend, c, cand_dir,
-                            attio.contact_for(c["name"], str(c.get("firm") or ""), firm_domain(c)) if args.attio else "")
-                better_contact(c, q, args.data, args.attio)
-                continue
-            {"research": research, "qualify": qualify, "draft": draft}[st](backend, c, cand_dir)
+    work(backend, todo, stages, args.data, args.attio, args.redo)
     print(summary(cands, args.data))
     return 0
 

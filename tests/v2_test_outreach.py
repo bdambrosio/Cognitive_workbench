@@ -197,15 +197,14 @@ def test_attio_two_people_of_one_name_is_an_error_and_writes_have_the_documented
         attio.create_person("Jane Smith")
 
 
-def _fake_attio(monkeypatch, wrote, person=None, entry_stage=None,
-                stages=("Research", "Qualified", "Ready to contact", "Initial sent")):
+def _fake_attio(monkeypatch, wrote, person=None, entry_stage=None):
     a = runner.attio
     monkeypatch.setattr(a, "find_person", lambda name: person)
     monkeypatch.setattr(a, "create_person",
                         lambda name, title, li: wrote.append(("person", name, li)) or {"id": {"record_id": "r1"}})
     monkeypatch.setattr(a, "entry_of", lambda rid: None if entry_stage is None else
                         {"entry_values": {"stage": [{"status": {"title": entry_stage}}]}})
-    monkeypatch.setattr(a, "stages", lambda: list(stages))
+    monkeypatch.setattr(a, "not_pursuing", lambda rid, reason, on: wrote.append(("not pursuing", rid, reason)))
     monkeypatch.setattr(a, "upsert_entry",
                         lambda rid, v: wrote.append(("entry", rid, v)) or {"id": {"entry_id": "e1"}})
     monkeypatch.setattr(a, "create_note",
@@ -260,12 +259,9 @@ def test_push_moves_a_research_entry_by_category(tmp_path, monkeypatch):
     assert "next_action" not in wrote[0][2]
     wrote.clear()
     _qualified(tmp_path, monkeypatch, "reject")
-    assert runner.push(CAND, tmp_path) is None and not wrote          # the list has no such stage yet
-    assert "no_stage" in (tmp_path / "issues.jsonl").read_text()
-    _fake_attio(monkeypatch, wrote, person=known, entry_stage="Research",
-                stages=("Research", "Not pursuing"))
-    runner.push(CAND, tmp_path)
-    assert [w[0] for w in wrote] == ["entry"] and wrote[0][2]["stage"] == "Not pursuing"
+    rec = runner.push(CAND, tmp_path)
+    assert [w[0] for w in wrote] == ["not pursuing"] and wrote[0][2].startswith("Qualified as reject.")
+    assert rec["not_pursuing"] and runner.push(CAND, tmp_path) is None   # once
 
 
 def test_candidate_from_an_attio_entry(monkeypatch):
@@ -376,3 +372,43 @@ def test_attio_contact_for_someone_unknown_reports_colleagues_at_the_firm(monkey
     text = attio.contact_for("Ravi Diligence", "Acme Software Group", "acme.example")
     assert text == "A colleague at the same firm, Pat Head, is in the outreach list at stage 'Initial sent'."
     assert calls[1]["json"]["filter"] == {"domains": "acme.example"}
+
+
+def test_daily_works_the_named_then_scouts_the_least_scouted_kind_when_the_pool_is_low(tmp_path, monkeypatch):
+    did = []
+    named = [{"name": "Ann Named"}]
+    monkeypatch.setattr(runner, "pickup", lambda data: named)
+    monkeypatch.setattr(runner, "work", lambda backend, cands, stages, data, use_attio, redo=False:
+                        did.append(("work", [c["name"] for c in cands], stages[-1], use_attio)))
+    ready = [{"entry_values": {"stage": [{"status": {"title": "Ready to contact"}}]}}] * 2
+    monkeypatch.setattr(runner.attio, "entries", lambda: ready)
+    monkeypatch.setattr(runner, "scout", lambda b, kind, data, want: did.append(("scout", kind, want)) or [{"name": "Sue Scouted"}])
+    monkeypatch.setattr(runner, "scout_firms", lambda b, kind, data, want: did.append(("firms", kind, want)) or [])
+    monkeypatch.setattr(runner, "next_kind", lambda: "Repeat acquirer")
+    text = runner.daily(Backend(), tmp_path, pool=5, want=2)
+    assert did == [("work", ["Ann Named"], "push", True), ("work", [], "push", True),
+                   ("firms", "Repeat acquirer", 2), ("work", [], "push", True)]
+    assert "Scouted for: Repeat acquirer, by firm." in text and "Ready to contact now: 2." in text
+    did.clear()
+    runner.daily(Backend(), tmp_path, pool=2, want=2)                 # the pool is full: no scouting
+    assert [d[0] for d in did] == ["work", "work"]
+
+
+def test_attio_not_pursuing_writes_the_note_then_removes_the_entry(monkeypatch):
+    calls = []
+    attio = _attio(monkeypatch, [
+        _Resp({"data": [{"list_api_slug": "tuuyi_outreach", "entry_id": "e1"}]}),
+        _Resp({"data": {"id": {"entry_id": "e1"}, "entry_values": {
+            "stage": [{"status": {"title": "Ready to contact"}}], "fit_rationale": [{"value": "Advises sellers."}]}}}),
+        _Resp({"data": {"id": {"note_id": "n1"}}}), _Resp({})], calls)
+    attio.not_pursuing("r1", "Skipped by the practice. Too large.", "2026-09-21")
+    note = calls[2]["json"]["data"]
+    assert note["title"] == "Not pursuing 2026-09-21" and "Too large." in note["content"]
+    assert "Ready to contact" in note["content"] and "Advises sellers." in note["content"]
+    assert (calls[3]["method"], calls[3]["path"]) == ("DELETE", "/lists/tuuyi_outreach/entries/e1")
+
+
+def test_the_daily_kind_takes_turns_by_date():
+    import datetime
+    kinds = [runner.next_kind(datetime.date(2026, 9, 21) + datetime.timedelta(days=i)) for i in range(6)]
+    assert sorted(kinds) == sorted(runner.DAILY_KINDS)

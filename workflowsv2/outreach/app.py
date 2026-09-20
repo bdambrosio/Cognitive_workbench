@@ -74,7 +74,6 @@ def page() -> FileResponse:
 def queue() -> Dict[str, Any]:
     try:
         entries = attio.entries()
-        stages = attio.stages()
     except attio.AttioError as e:
         raise HTTPException(502, str(e))
     cards: List[Dict[str, Any]] = []
@@ -103,7 +102,7 @@ def queue() -> Dict[str, Any]:
                       "flags": (local.get("qualification") or {}).get("flags", []) + draft.get("flags", []),
                       "brief": local.get("brief")})
     cards.sort(key=lambda c: SHOWN.index(c["stage"]))
-    return {"cards": cards, "counts": counts, "has_not_pursuing": "Not pursuing" in stages,
+    return {"cards": cards, "counts": counts,
             "kinds": [k for k in schemas.TYPES if k != "none"]}
 
 
@@ -136,10 +135,7 @@ class Skip(BaseModel):
 @app.post("/api/skip")
 def skip(body: Skip) -> Dict[str, Any]:
     try:
-        if "Not pursuing" not in attio.stages():
-            raise HTTPException(409, "the outreach list has no stage 'Not pursuing'; add it in Attio")
-        attio.upsert_entry(body.record_id, {"stage": "Not pursuing", "next_action": "",
-                                            "fit_rationale": f"Skipped {today()}: {body.reason.strip()}"})
+        attio.not_pursuing(body.record_id, f"Skipped by the practice. {body.reason.strip()}", today())
     except attio.AttioError as e:
         raise HTTPException(502, str(e))
     return {"ok": True}
@@ -212,7 +208,7 @@ def add(body: Add) -> Dict[str, Any]:
 
 
 class Run(BaseModel):
-    what: str                          # "research" or "scout"
+    what: str                          # "daily" or "scout"
     kind: str = ""
     want: int = 5
     firms: bool = False
@@ -230,14 +226,14 @@ def run(body: Run) -> Dict[str, Any]:
         first = [py, script, "scout", "--kind", body.kind, "--want", str(body.want), "--attio", "--model", str(MODEL)]
         first += ["--firms"] if body.firms else []
         what = f"scout for {body.kind}" + (", by firm" if body.firms else "")
-    elif body.what == "research":
-        first = [py, script, "run", "--attio", "--model", str(MODEL)]
-        what = "research the names at Research"
+    elif body.what == "daily":
+        first = [py, script, "daily", "--want", str(body.want), "--model", str(MODEL)]
+        what = "today's work"
     else:
-        raise HTTPException(422, "what must be research or scout")
+        raise HTTPException(422, "what must be daily or scout")
     runner.DATA.mkdir(parents=True, exist_ok=True)
-    push = [py, script, "push"] + (["--scouted"] if body.what == "scout" else [])
-    cmd = " && ".join(" ".join(f"'{a}'" for a in argv) for argv in (first, push))
+    steps = [first] + ([[py, script, "push", "--scouted"]] if body.what == "scout" else [])
+    cmd = " && ".join(" ".join(f"'{a}'" for a in argv) for argv in steps)
     out = open(RUN_LOG, "w", encoding="utf-8")
     _run.update(proc=subprocess.Popen(["bash", "-c", cmd], cwd=str(REPO), stdout=out, stderr=subprocess.STDOUT),
                 what=what, started=datetime.datetime.now().isoformat(timespec="seconds"))

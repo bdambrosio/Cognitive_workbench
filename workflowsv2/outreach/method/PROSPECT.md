@@ -206,7 +206,7 @@ Asked when the practice is looking for people it does not yet know of. You are g
 
 | Field | Contents |
 |---|---|
-| `queries[]` | At most three queries, each a description of people of this kind who would meet §5: what they do, for which companies, at what size of transaction. Each differs from the searches already made and from the others, by narrowing to a sector, a region, a transaction size or a way of working. Do not name a person or a firm |
+| `queries[]` | At most three queries, each a description of people of this kind: what they do, for which companies, at what size of transaction. Describe the person's work in the words their own profile would use. Leave out the problem Tuuyi addresses (diligence, code quality, checking claims) unless that work is what makes someone this kind, as it is for `Technical feedback`: a profile says what a person does, and a query about diligence finds diligence consultants whatever kind was wanted. Each query differs from the searches already made and from the others, by narrowing to a sector, a region, a transaction size or a way of working. Do not name a person or a firm |
 | `reason` | One sentence: how these differ from the searches already made |
 
 ## 17. Output: first look at a person found
@@ -225,7 +225,7 @@ Asked when the practice is looking for firms of a kind in which the person to ap
 
 | Field | Contents |
 |---|---|
-| `queries[]` | At most three queries, each a description of firms of this kind: what the firm does, for or to which companies, at what size of transaction. Each differs from the searches already made and from the others. Do not name a firm |
+| `queries[]` | At most three queries, each a description of firms of this kind: what the firm does, for or to which companies, at what size of transaction, in the words the firm's own profile would use. Leave out the problem Tuuyi addresses, as in §16. Each differs from the searches already made and from the others. Do not name a firm |
 | `reason` | One sentence: how these differ from the searches already made |
 
 ## 19. Output: first look at a firm found
