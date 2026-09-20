@@ -215,6 +215,7 @@ class Run(BaseModel):
     what: str                          # "research" or "scout"
     kind: str = ""
     want: int = 5
+    firms: bool = False
 
 
 @app.post("/api/run")
@@ -227,7 +228,8 @@ def run(body: Run) -> Dict[str, Any]:
         if body.kind not in schemas.TYPES or body.kind == "none":
             raise HTTPException(422, "choose a kind to scout for")
         first = [py, script, "scout", "--kind", body.kind, "--want", str(body.want), "--attio", "--model", str(MODEL)]
-        what = f"scout for {body.kind}"
+        first += ["--firms"] if body.firms else []
+        what = f"scout for {body.kind}" + (", by firm" if body.firms else "")
     elif body.what == "research":
         first = [py, script, "run", "--attio", "--model", str(MODEL)]
         what = "research the names at Research"

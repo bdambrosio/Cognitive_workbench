@@ -85,7 +85,7 @@ def test_qualify_prompt_and_record(tmp_path, monkeypatch):
     user = seen[0]["user"]
     assert "PROSPECT.md §14" in user and "introduced by a friend" in user
     assert "sent 2026-09-01" in user and "   4|Several of our sellers" in user
-    assert "## 18." not in seen[0]["system"]                 # practice sections do not reach the model
+    assert "## 21." not in seen[0]["system"]                 # practice sections do not reach the model
     assert rec["category"] == "strong" and rec["attempts"] == 1 and not rec["flags"]
     assert json.loads((tmp_path / "qualification.json").read_text())["model"] == "fake-model"
 
@@ -310,3 +310,69 @@ def test_scout_skips_known_names_looks_once_and_limits_research(tmp_path, monkey
     monkeypatch.setattr(runner.exa, "search", lambda q, cat: (_ for _ in ()).throw(AssertionError("searched")))
     assert [c["name"] for c in runner.scout(Backend(), "M&A adviser", tmp_path, want=1)] == ["Di New"]
     assert "vertical SaaS" in (tmp_path / "scout_log.jsonl").read_text()
+
+
+def test_firm_scout_picks_one_checked_person_per_firm(tmp_path, monkeypatch):
+    firm_text = "Acme Software Group buys small vertical software companies and holds them. " * 4
+    head = "Head of M&A at Acme Software Group. Runs acquisitions of vertical software companies. " * 3
+    def search(q, category="people", *a):
+        if category == "company":
+            return [{"title": "Acme Software Group", "url": "https://acme.example/", "text": firm_text},
+                    {"title": "Known Holdings", "url": "https://known.example/", "text": firm_text}]
+        return [{"title": "Pat Head", "url": "https://www.linkedin.com/in/pat", "text": head},
+                {"title": "Sam Former", "url": "https://www.linkedin.com/in/sam", "text": "Formerly at Acme. " * 10}]
+    monkeypatch.setattr(runner.exa, "search", search)
+    monkeypatch.setattr(runner.attio, "firm_record", lambda firm, domain: {} if firm == "Known Holdings" else None)
+    monkeypatch.setattr(runner.attio, "known", lambda name: False)
+    seen = []
+    whom = {"first": "01_pat_head.md", "first_role": "Head of M&A", "alternate": "02_sam_former.md",
+            "first_citation": {"file": "01_pat_head.md", "lines": [4, 4], "quote": "Head of M&A at Acme Software Group."},
+            "reason": "Runs the acquisitions."}
+    monkeypatch.setattr(runner, "emit", _fake([
+        {"queries": ["holding companies that buy small vertical software businesses"], "reason": "first"},
+        {"fits": "yes", "prospect_type": "Repeat acquirer", "reason": "buys and holds"}, whom], seen))
+    got = runner.scout_firms(Backend(), "Repeat acquirer", tmp_path, want=3)
+    assert [c["name"] for c in got] == ["Pat Head"] and got[0]["firm"] == "Acme Software Group"
+    assert "Alternate at the firm" in got[0]["notes"] and "Sam Former" in got[0]["notes"]
+    assert "PROSPECT.md §18" in seen[0]["user"] and "§19" in seen[1]["user"] and "§20" in seen[2]["user"]
+    assert not (tmp_path / "_firms" / "known_holdings").exists()          # Attio has that firm
+    firm = json.loads((tmp_path / "_firms" / "acme_software_group" / "firm.json").read_text())
+    assert firm["chosen"] == "Pat Head" and firm["alternate"] == "Sam Former"
+    assert runner.firm_domain(got[0]) == "acme.example"
+
+    # a choice whose citation is not in the chosen profile makes no candidate
+    monkeypatch.setattr(runner.exa, "search", lambda q, category="people", *a: (
+        [{"title": "Beta Holdings", "url": "https://beta.example/", "text": firm_text}] if category == "company"
+        else [{"title": "Lee Other", "url": "https://www.linkedin.com/in/lee", "text": head}]))
+    bad = {**whom, "first": "01_lee_other.md", "alternate": "",
+           "first_citation": {"file": "01_lee_other.md", "lines": [4, 4], "quote": "Head of M&A at Beta Holdings."}}
+    monkeypatch.setattr(runner, "emit", _fake([
+        {"queries": ["another description"], "reason": "second"},
+        {"fits": "yes", "prospect_type": "Repeat acquirer", "reason": "buys"}, bad], []))
+    (tmp_path / "pat_head" / "research.json").write_text("{}")
+    assert runner.scout_firms(Backend(), "Repeat acquirer", tmp_path, want=3) == []
+    assert "did not match" in json.loads((tmp_path / "_firms" / "beta_holdings" / "firm.json").read_text())["chosen_reason"]
+
+
+def test_a_better_contact_named_in_qualification_waits_for_research(tmp_path, monkeypatch):
+    cand = {**CAND, "urls": ["https://acme.example/team", "https://www.linkedin.com/in/jane"]}
+    q = {"better_contact_name": "Ravi Diligence", "better_contact_role": "VP R&D, M&A", "prospect_type": "Repeat acquirer"}
+    d = runner.better_contact(cand, q, tmp_path, use_attio=False)
+    made = runner.waiting(tmp_path, "Repeat acquirer")
+    assert d is not None and [m["name"] for m in made] == ["Ravi Diligence"]
+    assert made[0]["firm"] == "Acme Advisers" and made[0]["urls"] == ["https://acme.example/team"]
+    assert runner.better_contact(cand, q, tmp_path, use_attio=False) is None     # once
+    assert runner.better_contact(cand, {"better_contact_name": ""}, tmp_path, use_attio=False) is None
+
+
+def test_attio_contact_for_someone_unknown_reports_colleagues_at_the_firm(monkeypatch):
+    calls = []
+    attio = _attio(monkeypatch, [
+        _Resp({"data": []}),                                                       # no such person
+        _Resp({"data": [{"values": {"team": [{"target_record_id": "r2"}]}}]}),      # the firm, by domain
+        _Resp({"data": {"values": {"name": [{"full_name": "Pat Head"}]}}}),
+        _Resp({"data": [{"list_api_slug": "tuuyi_outreach", "entry_id": "e2"}]}),
+        _Resp({"data": {"entry_values": {"stage": [{"status": {"title": "Initial sent"}}]}}})], calls)
+    text = attio.contact_for("Ravi Diligence", "Acme Software Group", "acme.example")
+    assert text == "A colleague at the same firm, Pat Head, is in the outreach list at stage 'Initial sent'."
+    assert calls[1]["json"]["filter"] == {"domains": "acme.example"}

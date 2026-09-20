@@ -66,6 +66,13 @@ def first_look_schema() -> Dict[str, Any]:
         "required": ["fits", "prospect_type", "reason"]}
 
 
+def whom_schema() -> Dict[str, Any]:
+    return {"type": "object", "properties": {
+        "first": _STR, "first_role": _STR, "first_citation": CITATION,
+        "alternate": _STR, "reason": _STR},
+        "required": ["first", "first_role", "alternate", "reason"]}
+
+
 def qualification_schema() -> Dict[str, Any]:
     answer = {"type": "object", "properties": {
         "question": {"type": "integer", "minimum": 1, "maximum": QUESTIONS},
@@ -79,9 +86,11 @@ def qualification_schema() -> Dict[str, Any]:
         "category": {"type": "string", "enum": list(CATEGORIES)},
         "why_person": _STR, "why_now": _STR,
         "why_now_citations": _CITATIONS,
-        "use_case": _STR, "concerns": _STR, "reject_reason": _STR},
-        "required": ["answers", "prospect_type", "relationship", "problem_recognition", "category", "why_person", "why_now",
-                     "why_now_citations", "use_case", "concerns", "reject_reason"]}
+        "use_case": _STR, "concerns": _STR, "reject_reason": _STR,
+        "better_contact_name": _STR, "better_contact_role": _STR},
+        "required": ["answers", "prospect_type", "relationship", "problem_recognition", "category",
+                     "why_person", "why_now", "why_now_citations", "use_case", "concerns",
+                     "reject_reason", "better_contact_name", "better_contact_role"]}
 
 
 def draft_schema() -> Dict[str, Any]:
@@ -166,7 +175,9 @@ def clean_qualification(obj: Any, evidence: Dict[str, List[str]]
             "why_person": s("why_person"), "why_now": s("why_now"),
             "why_now_citations": kept_now,
             "use_case": s("use_case"), "concerns": s("concerns"),
-            "reject_reason": s("reject_reason")}, dropped
+            "reject_reason": s("reject_reason"),
+            "better_contact_name": s("better_contact_name"),
+            "better_contact_role": s("better_contact_role")}, dropped
 
 
 def clean_draft(obj: Any, evidence: Dict[str, List[str]]

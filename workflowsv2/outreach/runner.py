@@ -41,7 +41,11 @@ no tools; everything that touches the network is code.
                (§17), which costs no search. Those who fit become candidates,
                with the profile as their first evidence file, and go through
                the four stages at once. Nothing found by scouting is written to
-               Attio unless `push` later finds it strong.
+               Attio unless `push` later finds it strong. With `--firms` the
+               search is for firms (§18, §19); for each firm that fits, one
+               people search at that firm and one emission (§20) choose whom
+               to approach, with a checked citation that they work there now.
+               One candidate per firm; a firm Attio already has is skipped.
 
 WITHOUT --candidates the candidates are the entries of the Attio outreach list
 at stage Research: a person adds a name there, with how they know them in the
@@ -262,6 +266,37 @@ def research(backend, c: Dict[str, Any], cand_dir: Path) -> Dict[str, Any]:
     return rec
 
 
+def firm_domain(c: Dict[str, Any]) -> str:
+    """The web domain of the candidate's firm: the host of the first link that
+    is not a profile on a site the program does not fetch."""
+    for u in c.get("urls") or []:
+        host = urlparse(u).netloc.lower().removeprefix("www.")
+        if host and not any(host == h or host.endswith("." + h) for h in NOT_FETCHABLE):
+            return host
+    return ""
+
+
+def better_contact(c: Dict[str, Any], q: Dict[str, Any], data: Path, use_attio: bool) -> Optional[Path]:
+    """When the qualification names a better person to approach at the firm,
+    that person becomes a candidate waiting for research, unless the practice
+    already has them. Returns their directory when one was made."""
+    name = str(q.get("better_contact_name") or "").strip()
+    if not name or not slug(name) or slug(name) == slug(c["name"]):
+        return None
+    cand_dir = data / slug(name)
+    if cand_dir.exists() or (use_attio and attio.known(name)):
+        return None
+    new = {"name": name, "firm": c.get("firm") or "", "title": q.get("better_contact_role") or "",
+           "urls": [u for u in c.get("urls") or [] if firm_domain({"urls": [u]})],
+           "notes": f"Named as the better person to approach at the firm when {c['name']} was qualified."}
+    cand_dir.mkdir(parents=True)
+    atomic_write_text(cand_dir / "candidate.yaml", yaml.safe_dump(new, allow_unicode=True, sort_keys=False))
+    _write_json(cand_dir / "first_look.json", {"at": today(), "fits": "yes", "prospect_type": q.get("prospect_type"),
+                                               "reason": new["notes"]})
+    logger.info("%s: %s is named as the better contact and waits for research", c["name"], name)
+    return cand_dir
+
+
 def kept_files(rec: Dict[str, Any]) -> List[Dict[str, Any]]:
     """The evidence qualification reads: everything given or pasted, and each
     found page not judged to be about someone else."""
@@ -465,11 +500,14 @@ def pickup(data: Path) -> List[Dict[str, Any]]:
 SCOUT_LOG = "scout_log.jsonl"
 
 
-def waiting(data: Path) -> List[Dict[str, Any]]:
-    """People an earlier scout found to fit and nobody has researched yet."""
+def waiting(data: Path, kind: str) -> List[Dict[str, Any]]:
+    """People of this kind an earlier scout found to fit and nobody has
+    researched yet."""
     out = []
     for look in sorted(data.glob("*/first_look.json")):
-        if (_read_json(look) or {}).get("fits") == "yes" and not (look.parent / "research.json").is_file():
+        rec = _read_json(look) or {}
+        if rec.get("fits") == "yes" and rec.get("prospect_type") == kind \
+                and not (look.parent / "research.json").is_file():
             out.append(yaml.safe_load((look.parent / "candidate.yaml").read_text(encoding="utf-8")))
     return out
 
@@ -479,7 +517,7 @@ def scout(backend, kind: str, data: Path, want: int) -> List[Dict[str, Any]]:
     passed the first look, taking first those an earlier scout left waiting;
     it searches only when they are fewer than `want`. Every person looked at
     leaves a directory, so nobody is looked at twice."""
-    found = waiting(data)
+    found = waiting(data, kind)
     if len(found) >= want:
         return found[:want]
     log = data / SCOUT_LOG
@@ -522,6 +560,121 @@ def scout(backend, kind: str, data: Path, want: int) -> List[Dict[str, Any]]:
     return found[:want]
 
 
+FIRMS = "_firms"
+#: The people search made for every firm that fits. One query, the same for
+#: every kind: PROSPECT.md §4 says who at a firm is the person, and §20 picks.
+PEOPLE_AT = ("people who work at {firm} ({domain}) on acquisitions, M&A, corporate development, "
+             "investments or technical due diligence")
+PROFILE_WORDS = 500
+
+
+def scout_firms(backend, kind: str, data: Path, want: int) -> List[Dict[str, Any]]:
+    """Find firms of one kind, then the person to approach at each. One
+    candidate per firm. A firm Attio already has is skipped: the practice
+    knows it. Every firm looked at leaves a record under _firms/."""
+    found = waiting(data, kind)
+    if len(found) >= want:
+        return found[:want]
+    log = data / SCOUT_LOG
+    earlier = [r["query"] for r in read_jsonl(log) if r.get("kind") == kind and r.get("firms")]
+    out = _ask(backend, f"The kind of prospect: `{kind}`.\n\nSearches already made for firms of this kind:\n\n"
+               + ("\n".join(f"- {q}" for q in earlier) or "(none)")
+               + "\n\nThis step proposes searches for firms. Emit the answer per PROSPECT.md §18.",
+               schemas.scout_schema(), 4096)
+    obj = out.get("obj") if isinstance(out.get("obj"), dict) else {}
+    for q in [x.strip() for x in obj.get("queries") or [] if isinstance(x, str) and x.strip()][:3]:
+        results = exa.search(q, "company")
+        new = 0
+        for r in results:
+            if len(found) >= want:
+                break
+            firm, url, text = str(r.get("title") or "").strip(), str(r.get("url") or ""), str(r.get("text") or "")
+            domain = urlparse(url).netloc.lower().removeprefix("www.")
+            firm_dir = data / FIRMS / slug(firm)
+            if not slug(firm) or firm_dir.exists() or len(text.split()) < MIN_WORDS \
+                    or attio.firm_record(firm, domain) is not None:
+                continue
+            new += 1
+            firm_dir.mkdir(parents=True)
+            shown, _ = schemas.numbered(text.splitlines(), PAGE_WORDS)
+            look = _ask(backend, f"The firm found: {firm} ({url}).\n\nIts profile, with line numbers:\n\n{shown}\n\n"
+                                 f"This step takes a first look at a firm. Emit the answer per PROSPECT.md §19.",
+                        schemas.first_look_schema(), 2048)
+            lo = look.get("obj") if isinstance(look.get("obj"), dict) else {}
+            rec: Dict[str, Any] = {"at": today(), "firm": firm, "url": url, "kind_sought": kind, "query": q,
+                                   "fits": lo.get("fits"), "prospect_type": lo.get("prospect_type"),
+                                   "reason": str(lo.get("reason") or "").strip()}
+            logger.info("scout: firm %s: fits=%s (%s)", firm, rec["fits"], rec["reason"][:90])
+            if rec["fits"] == "yes":
+                c = person_at(backend, firm, url, domain, rec, text, firm_dir, data)
+                if c is not None:
+                    found.append(c)
+            _write_json(firm_dir / "firm.json", rec)
+        append_jsonl(log, {"at": today(), "kind": kind, "firms": True, "query": q,
+                           "results": len(results), "new": new})
+    return found[:want]
+
+
+def person_at(backend, firm: str, url: str, domain: str, rec: Dict[str, Any], firm_text: str,
+              firm_dir: Path, data: Path) -> Optional[Dict[str, Any]]:
+    """The person to approach at one firm, as a candidate; None when the
+    search shows nobody suitable or the choice cannot be checked. What was
+    chosen and why is written into `rec`."""
+    people = exa.search(PEOPLE_AT.format(firm=firm, domain=domain), "people")
+    files: Dict[str, Dict[str, Any]] = {}
+    for n, r in enumerate(people, 1):
+        text = str(r.get("text") or "")
+        if str(r.get("title") or "").strip() and len(text.split()) >= MIN_WORDS:
+            name = save_evidence(firm_dir, n, str(r["title"]), {
+                "Source": f"Professional profile as the search service holds it, {r.get('url') or ''}",
+                "Date of the text": str(r.get("publishedDate") or "")[:10]}, text)
+            files[name] = r
+    if not files:
+        rec["chosen"] = None
+        rec["chosen_reason"] = "the people search found nobody"
+        return None
+    shown = "\n\n".join(f"Profile file `{f}`:\n\n"
+                         + schemas.numbered((firm_dir / f).read_text(encoding='utf-8').splitlines(), PROFILE_WORDS)[0]
+                         for f in files)
+    firm_shown, _ = schemas.numbered(firm_text.splitlines(), PROFILE_WORDS)
+    out = _ask(backend, f"The firm: {firm} ({url}), a `{rec['prospect_type']}`.\n\nIts profile:\n\n{firm_shown}\n\n"
+                        f"People a search found for this firm:\n\n{shown}\n\n"
+                        f"This step chooses whom to approach at the firm. Emit the answer per PROSPECT.md §20.",
+               schemas.whom_schema(), 4096)
+    obj = out.get("obj") if isinstance(out.get("obj"), dict) else {}
+    first, alt = str(obj.get("first") or "").strip(), str(obj.get("alternate") or "").strip()
+    evidence = {f: (firm_dir / f).read_text(encoding="utf-8").splitlines() for f in files}
+    kept, _ = schemas.check_citations([obj.get("first_citation")], evidence)
+    rec.update(chosen=None, chosen_reason=str(obj.get("reason") or "").strip(),
+               alternate=str(files[alt].get("title")) if alt in files else None)
+    if first not in files:
+        rec["chosen_reason"] = (rec["chosen_reason"] + " (the model chose nobody)").strip()
+        return None
+    if not kept or kept[0]["file"] != first:
+        rec["chosen_reason"] = (rec["chosen_reason"] + f" ({files[first].get('title')} was chosen, but the citation "
+                                "showing they work at the firm did not match their profile)").strip()
+        return None
+    r = files[first]
+    name = str(r["title"]).strip()
+    cand_dir = data / slug(name)
+    if cand_dir.exists() or attio.known(name):
+        rec["chosen_reason"] += f" ({name} is already known)"
+        return None
+    rec["chosen"] = name
+    c = {"name": name, "firm": firm, "title": str(obj.get("first_role") or "").strip(),
+         "urls": [u for u in (url, str(r.get("url") or "")) if u],
+         "notes": (f"Found by the firm scout search: {rec['query']}. Chosen at {firm}: {rec['chosen_reason']}"
+                   + (f" Alternate at the firm, not to be approached meanwhile: {rec['alternate']}."
+                      if rec["alternate"] else "")),
+         "pasted": [{"source": f"Professional profile as the search service holds it, {r.get('url') or ''}",
+                     "date": str(r.get("publishedDate") or "")[:10], "text": str(r.get("text") or "")}]}
+    cand_dir.mkdir(parents=True)
+    atomic_write_text(cand_dir / "candidate.yaml", yaml.safe_dump(c, allow_unicode=True, sort_keys=False))
+    _write_json(cand_dir / "first_look.json", {"at": today(), "fits": "yes", "prospect_type": rec["prospect_type"],
+                                               "reason": f"Chosen at {firm}: {rec['chosen_reason']}"})
+    return c
+
+
 def summary(cands: List[Dict[str, Any]], data: Path) -> str:
     rows = [f"# Outreach run of {today()}", ""]
     for c in cands:
@@ -553,6 +706,8 @@ def main() -> int:
     ap.add_argument("--candidates", type=Path, default=None,
                     help="a YAML file of candidates; without it, the entries at stage Research in Attio")
     ap.add_argument("--model", type=Path, default=None, help="required by every stage but `brief`")
+    ap.add_argument("--firms", action="store_true",
+                    help="for `scout`: find firms of the kind, then the person to approach at each")
     ap.add_argument("--want", type=int, default=5,
                     help="for `scout`: how many of the people found go on to research now; "
                          "the rest wait for the next scout (research costs searches)")
@@ -573,7 +728,7 @@ def main() -> int:
         if not args.kind:
             raise SystemExit("scout needs --kind")
         args.data.mkdir(parents=True, exist_ok=True)
-        cands = scout(backend, args.kind, args.data, args.want)
+        cands = (scout_firms if args.firms else scout)(backend, args.kind, args.data, args.want)
     elif args.scouted:
         cands = [yaml.safe_load((f.parent / "candidate.yaml").read_text(encoding="utf-8"))
                  for f in sorted(args.data.glob("*/first_look.json"))
@@ -599,9 +754,10 @@ def main() -> int:
                 logger.info("%s: %s is already recorded", c["name"], st)
                 continue
             logger.info("%s: %s", c["name"], st)
-            if st == "qualify" and args.attio:
-                person = attio.find_person(c["name"])
-                qualify(backend, c, cand_dir, attio.contact_record(person) if person else "")
+            if st == "qualify":
+                q = qualify(backend, c, cand_dir,
+                            attio.contact_for(c["name"], str(c.get("firm") or ""), firm_domain(c)) if args.attio else "")
+                better_contact(c, q, args.data, args.attio)
                 continue
             {"research": research, "qualify": qualify, "draft": draft}[st](backend, c, cand_dir)
     print(summary(cands, args.data))

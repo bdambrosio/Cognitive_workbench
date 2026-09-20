@@ -76,6 +76,32 @@ def known(name: str) -> bool:
         return True
 
 
+def firm_record(firm: str = "", domain: str = "") -> Optional[Dict[str, Any]]:
+    """The company record for a firm, by its web domain, else by its exact
+    name. None when Attio has neither."""
+    for f in ([{"domains": domain}] if domain else []) + ([{"name": firm}] if firm else []):
+        hits = _call("POST", "/objects/companies/records/query", {"filter": f, "limit": 2})["data"]
+        if hits:
+            return hits[0]
+    return None
+
+
+def colleagues(company: Dict[str, Any], but: str = "") -> str:
+    """The people Attio holds at this firm, other than the record `but`, each
+    with their stage in the outreach list: what "one approach per firm" is
+    judged from. Empty when there is nobody else."""
+    rows: List[str] = []
+    for ref in (company.get("values") or {}).get("team") or []:
+        rid = ref.get("target_record_id")
+        if not rid or rid == but:
+            continue
+        person = _call("GET", f"/objects/people/records/{rid}")["data"]
+        entry = entry_of(rid)
+        where = f"in the outreach list at stage '{stage_of(entry)}'" if entry else "not in the outreach list"
+        rows.append(f"A colleague at the same firm, {_first(person, 'name', 'full_name')}, is {where}.")
+    return "\n".join(rows)
+
+
 def contact_record(person: Dict[str, Any]) -> str:
     """What Attio holds about approaches to this person, as the text the
     qualification reads: the list stage and last contact, each task linked
@@ -102,6 +128,26 @@ def contact_record(person: Dict[str, Any]) -> str:
     for n in notes:
         rows.append(f"Note of {(n.get('created_at') or '')[:10]}: {n.get('title') or '(untitled)'}")
     return "\n".join(rows)
+
+
+def contact_for(name: str, firm: str = "", domain: str = "") -> str:
+    """Everything the qualification is told about earlier approaches: the
+    person's own record when Attio has them, and their colleagues at the firm,
+    found through the person's company or, for someone Attio does not have,
+    through the firm's domain or name."""
+    person = find_person(name)
+    rows: List[str] = []
+    company = None
+    if person is not None:
+        rows.append(contact_record(person))
+        cid = _first(person, "company", "target_record_id")
+        if cid:
+            company = _call("GET", f"/objects/companies/records/{cid}")["data"]
+    if company is None:
+        company = firm_record(firm, domain)
+    if company is not None:
+        rows.append(colleagues(company, but=person["id"]["record_id"] if person else ""))
+    return "\n".join(r for r in rows if r)
 
 
 def stage_of(entry: Dict[str, Any]) -> Optional[str]:

@@ -85,6 +85,7 @@
         <button id="b_research" onclick="startRun('research')">Research the waiting names</button>
         <select id="r_kind"></select>
         <input id="r_want" type="number" min="1" max="10" value="3" style="width:70px" title="how many found people to research now">
+        <label title="find firms first, then the person to approach at each" style="font-size:13px"><input type="checkbox" id="r_firms" style="width:auto"> by firm</label>
         <button id="b_scout" onclick="startRun('scout')">Scout for this kind</button>
       </div>
       <div id="runlog"></div>
@@ -163,7 +164,8 @@ async function addName() {
   note("Added. The next research run will work on them."); load();
 }
 async function startRun(what) {
-  await call("/api/run", {what, kind: $("r_kind").value, want: parseInt($("r_want").value || "3", 10)});
+  await call("/api/run", {what, kind: $("r_kind").value, want: parseInt($("r_want").value || "3", 10),
+                         firms: $("r_firms").checked});
   poll();
 }
 let wasRunning = false;
