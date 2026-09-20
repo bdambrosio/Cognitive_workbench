@@ -22,19 +22,9 @@ import re
 from typing import Any, Dict, List
 from urllib.parse import urlparse
 
-import requests
+from utils import tavily_client
 
 logger = logging.getLogger(__name__)
-
-API_URL = "https://api.tavily.com/search"
-
-# `advanced` costs 2 credits against `basic`'s 1, and is pinned anyway:
-# raw page extraction is best-effort on both, but materially more
-# reliable here. Measured live 2026-08-19 over three queries — basic
-# returned page text for 4 of 9 results, advanced for 9 of 9. A result
-# with no page text is a lead, not a source, which is the one thing this
-# tool exists to provide.
-SEARCH_DEPTH = "advanced"
 
 _DEFAULT_RESULTS = 4
 _MAX_RESULTS = 6
@@ -47,7 +37,6 @@ _PER_RESULT_CAP = 2000   # chars of one result's page text
 # sentences on basic depth but runs to 2000 chars of multi-chunk extract
 # on advanced, which is what this tool always asks for.
 _TOTAL_CAP = 8_000
-_TIMEOUT = 60.0
 
 # Markdown noise: an image embed carries no text worth reading, and a
 # link's target is a URL the agent cannot follow from inside an
@@ -103,34 +92,14 @@ def react_invoke(args, *, character_name=None, backend=None, logger=None):
         max_results = _DEFAULT_RESULTS
     max_results = max(1, min(_MAX_RESULTS, max_results))
 
+    # The request lives in utils.tavily_client, shared with programs that
+    # want the pages whole. It raises for anything but a readable answer,
+    # including a 200 with no `results`: that is a failure, not "nothing found".
     try:
-        resp = requests.post(
-            API_URL,
-            headers={"Authorization": f"Bearer {api_key}",
-                     "Content-Type": "application/json"},
-            json={"query": query,
-                  "max_results": max_results,
-                  "search_depth": SEARCH_DEPTH,
-                  "include_answer": False,
-                  "include_raw_content": "markdown"},
-            timeout=_TIMEOUT,
-        )
-    except requests.exceptions.Timeout:
-        return {"status": "error", "text": f"tavily timed out after {_TIMEOUT}s"}
-    except Exception as e:
-        log.error(f"tavily: request failed: {e}")
-        return {"status": "error", "text": f"tavily request failed: {e}"}
-
-    if resp.status_code != 200:
-        log.error(f"tavily: HTTP {resp.status_code}: {resp.text[:300]}")
-        return {"status": "error",
-                "text": f"tavily API error {resp.status_code}: {resp.text[:200]}"}
-
-    try:
-        results = resp.json().get("results") or []
-    except ValueError as e:
-        log.error(f"tavily: unparseable response: {e}")
-        return {"status": "error", "text": f"tavily returned unparseable JSON: {e}"}
+        results = tavily_client.search(query, max_results)
+    except tavily_client.TavilyError as e:
+        log.error(f"tavily: {e}")
+        return {"status": "error", "text": f"tavily: {e}"}
 
     if not results:
         return {"status": "empty", "text": f"tavily found nothing for {query!r}"}
