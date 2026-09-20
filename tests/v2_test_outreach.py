@@ -215,9 +215,9 @@ def _qualified(tmp_path, monkeypatch, category, with_draft=True):
     _prepare(tmp_path)
     for f in ("attio.json", "draft.json"):
         (tmp_path / f).unlink(missing_ok=True)
-    monkeypatch.setattr(runner, "emit", _fake([_qualification(category), {
-        "angle": "a", "message": "Jane, a short message." if with_draft else "", "assumes": "",
-        "rests_on": [_cite("Several of our sellers are entering diligence")]}], []))
+    drafted = {"angle": "a", "message": "Jane, a short message." if with_draft else "", "assumes": "",
+               "rests_on": [_cite("Several of our sellers are entering diligence")]}
+    monkeypatch.setattr(runner, "emit", _fake([_qualification(category), drafted, drafted], []))   # an empty draft is asked for twice
     runner.qualify(Backend(), CAND, tmp_path)
     runner.draft(Backend(), CAND, tmp_path)
 
@@ -412,3 +412,17 @@ def test_the_daily_kind_takes_turns_by_date():
     import datetime
     kinds = [runner.next_kind(datetime.date(2026, 9, 21) + datetime.timedelta(days=i)) for i in range(6)]
     assert sorted(kinds) == sorted(runner.DAILY_KINDS)
+
+
+def test_an_empty_draft_is_asked_for_once_more(tmp_path, monkeypatch):
+    _prepare(tmp_path)
+    empty = {"angle": "", "message": "", "rests_on": [], "assumes": ""}
+    good = {"angle": "a", "message": "Jane, a short message.", "assumes": "",
+            "rests_on": [_cite("Several of our sellers are entering diligence")]}
+    seen = []
+    monkeypatch.setattr(runner, "emit", _fake([_qualification(), empty, good], seen))
+    runner.qualify(Backend(), CAND, tmp_path)
+    d = runner.draft(Backend(), CAND, tmp_path)
+    assert len(seen) == 3 and d["message"].startswith("Jane") and not d["flags"]
+    monkeypatch.setattr(runner, "emit", _fake([empty, empty], seen))
+    assert "the draft returned nothing usable" in runner.draft(Backend(), CAND, tmp_path)["flags"]

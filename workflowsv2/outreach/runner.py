@@ -378,9 +378,14 @@ def draft(backend, c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]
             f"{json.dumps(shown, indent=1, ensure_ascii=False)}\n\n"
             f"{evidence_block(cand_dir, files)}\n\n"
             f"This step drafts the first message. Emit the answer per PROSPECT.md §15.")
-    out = _ask(backend, user, schemas.draft_schema(), 8192)
-    d, dropped, flags = schemas.clean_draft(out.get("obj"), evidence)
-    if out.get("parse") not in ("parsed", "repaired") or not d["message"]:
+    for _ in range(2):
+        # Asked again once when nothing usable comes back: a strong candidate
+        # with no message is not pushed, and would wait for a person to notice.
+        out = _ask(backend, user, schemas.draft_schema(), 8192)
+        d, dropped, flags = schemas.clean_draft(out.get("obj"), evidence)
+        if out.get("parse") in ("parsed", "repaired") and d["message"]:
+            break
+    else:
         flags.append("the draft returned nothing usable")
     rec = {**d, "at": today(), "model": backend.resolved_model(),
            "citations_dropped": dropped, "flags": flags}
