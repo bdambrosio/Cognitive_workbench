@@ -15,7 +15,7 @@ not adverse (claims_audit.schemas.ADVERSE_VERDICTS); this split keeps it so.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 #: MATERIALITY.md §3, in increasing order of consequence. `exposure` uses the
 #: same values.
@@ -41,12 +41,18 @@ def exposable(finding: Dict[str, Any]) -> bool:
     return _verdict(finding) in EXPOSED_VERDICTS
 
 
-def ratings_schema() -> Dict[str, Any]:
+def ratings_schema(sources: Optional[Sequence[str]] = None) -> Dict[str, Any]:
     """One batch, or the whole set: MATERIALITY.md §7. Both arrays are always
-    present; a batch fills one and leaves the other empty."""
+    present; a batch fills one and leaves the other empty.
+
+    `sources` are the claim sources of the findings being rated; when given,
+    `claim_source` can only be one of them. On cw-site (2026-09-19) one pass
+    wrote `site/privacy.md` for `claim_sources/site/privacy.md` on twelve
+    findings; the rows matched no finding and the ratings check failed the
+    step after twenty minutes of calls."""
     def item(field: str) -> Dict[str, Any]:
         return {"type": "object", "properties": {
-            "claim_source": {"type": "string"},
+            "claim_source": {"enum": list(sources)} if sources else {"type": "string"},
             "claim_id": {"type": "integer", "minimum": 1},
             field: {"enum": list(MATERIALITY)},
             "basis": {"type": "string"}},

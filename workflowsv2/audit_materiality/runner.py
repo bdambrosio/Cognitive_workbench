@@ -160,7 +160,8 @@ def rate(loop, method_text: str, transaction: Optional[str],
                 + "\n\n".join(_rating_text(f) for f in g)
                 + f"\n\nEmit `{array}` for exactly these findings, and an "
                   f"empty `{other}`.")
-        out = emit(loop, method_text, head + body, schemas.ratings_schema(),
+        out = emit(loop, method_text, head + body,
+                   schemas.ratings_schema(sorted({f["claim_source"] for f in g})),
                    max_tokens)
         calls.append({"part": f"{array}[{n}/{len(plan)}]", "findings": len(g),
                       **{k: v for k, v in out.items() if k not in ("raw", "obj")}})

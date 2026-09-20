@@ -301,3 +301,11 @@ def test_the_rating_call_is_given_the_reliance_statement_when_there_is_one(monke
     runner.rate(object(), "method", "Client: a buyer", [f], [], 100, 0, thresholds="Paying for: privacy")
     assert "The reliance statement:\n\n- Hit count only — depends\n\nRate these 1 findings" in seen[0]
     assert "Paying for: privacy" in seen[0] and "The reliance statement" not in seen[1]
+
+
+def test_ratings_schema_limits_claim_source_to_the_sources_given():
+    from workflowsv2.audit_materiality import schemas as ms
+    item = ms.ratings_schema(["claim_sources/site/privacy.md"])["properties"]["ratings"]["items"]
+    assert item["properties"]["claim_source"] == {"enum": ["claim_sources/site/privacy.md"]}
+    assert ms.ratings_schema()["properties"]["exposures"]["items"]["properties"][
+        "claim_source"] == {"type": "string"}
