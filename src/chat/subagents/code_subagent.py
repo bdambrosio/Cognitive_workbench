@@ -586,6 +586,14 @@ def _tool_grep(repo_root: Path, pattern: str,
         e = str(e).strip().lstrip("./").rstrip("/")
         if e:
             base += [f'--glob=!{e}', f'--glob=!{e}/**']
+    # RIPGREP ANCHORS A --glob WITH A SLASH AT ITS WORKING DIRECTORY, not at
+    # the path it searches. Run from wherever the agent was started, an
+    # exclude of `workflowsv2/claims_audit/engagements` matched every file of
+    # a target that sits under that path in this repo: 131 of 131
+    # directory-wide greps came back EMPTY across nine audits (cw-site,
+    # 2026-09-19), while a grep of one file worked. Both passes run from the
+    # root, as the git calls above do. Agreed with Jill 2026-09-19.
+    rg_cwd = str(repo_root.resolve())
     # COVERAGE MUST BE KNOWABLE, AND THE BUDGET IS SHARED BY DISTRIBUTION.
     # Two ripgrep passes. The count pass reads no content and returns every
     # matching file with its hit count, so the number of files, the total
@@ -619,7 +627,7 @@ def _tool_grep(repo_root: Path, pattern: str,
     count_cmd = base + ['--count', '--with-filename', '--', pattern, str(target)]
     try:
         cproc = subprocess.run(count_cmd, capture_output=True, text=True,
-                               timeout=20.0, check=False)
+                               timeout=20.0, check=False, cwd=rg_cwd)
     except subprocess.TimeoutExpired:
         return "ERROR: grep timed out (>20s) — narrow the pattern or scope"
     except Exception as e:
@@ -671,7 +679,7 @@ def _tool_grep(repo_root: Path, pattern: str,
     ]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True,
-                              timeout=20.0, check=False)
+                              timeout=20.0, check=False, cwd=rg_cwd)
     except subprocess.TimeoutExpired:
         return "ERROR: grep timed out (>20s) — narrow the pattern or scope"
     except Exception as e:

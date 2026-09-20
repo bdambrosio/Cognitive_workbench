@@ -36,3 +36,17 @@ def test_grep_below_a_checkout_root_searches_everything(tmp_path):
     repo = _repo(tmp_path)
     out = cs._tool_grep(repo / "eng", "needle", None)
     assert "record/merged.json" in out, out
+
+
+def test_an_exclude_is_anchored_at_the_root_not_at_the_working_directory(tmp_path, monkeypatch):
+    """cw-site, 2026-09-19: the target sat at <cwd>/work/engagements/x/target
+    and excluded `work/engagements`, its own location seen from the working
+    directory. Every directory-wide grep came back EMPTY."""
+    target = tmp_path / "work" / "engagements" / "x" / "target"
+    (target / "work" / "engagements" / "old").mkdir(parents=True)
+    (target / "code.py").write_text("needle in code\n")
+    (target / "work" / "engagements" / "old" / "report.md").write_text("needle in an old report\n")
+    monkeypatch.chdir(tmp_path)
+    out = cs._tool_grep(target, "needle", None, ["work/engagements/"])
+    assert "code.py" in out, out
+    assert "report.md" not in out, out
