@@ -42,8 +42,8 @@
    "by": "claude 2026-09-19, rerun under v2.2: tiers as rated, Bruce's 09-17 scrub kept"
   },
   "chain": {
-   "value": "failed",
-   "at": "2026-09-20T00-28-32Z",
+   "value": "done",
+   "at": "2026-09-20T22-44-04Z",
    "by": "job"
   }
  },
@@ -153,6 +153,119 @@
      "label": "materiality",
      "pid": 191288,
      "exit": 1
+    }
+   ]
+  },
+  {
+   "id": "2026-09-20T15-29-11Z",
+   "kind": "chain",
+   "state": "done",
+   "by": "claude 2026-09-20, full rerun on the fixed grep (90e2cadf)",
+   "started": "2026-09-20T15-29-11Z",
+   "ended": "2026-09-20T22-44-04Z",
+   "exit": 0,
+   "error": null,
+   "log": "/home/bruce/Downloads/Cognitive_workbench/workflowsv2/claims_audit/engagements/cw-site/jobs/2026-09-20T15-29-11Z.log",
+   "steps": [
+    {
+     "label": "audit claim_sources/site/how-it-works.md",
+     "pid": 84666,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site/how-it-works.md",
+     "pid": 159401,
+     "exit": 0
+    },
+    {
+     "label": "audit claim_sources/site/index.md",
+     "pid": 184580,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site/index.md",
+     "pid": 211974,
+     "exit": 0
+    },
+    {
+     "label": "audit claim_sources/site/introduction-transcript.md",
+     "pid": 228450,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site/introduction-transcript.md",
+     "pid": 243253,
+     "exit": 0
+    },
+    {
+     "label": "audit claim_sources/site/introduction.md",
+     "pid": 245083,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site/introduction.md",
+     "pid": 245869,
+     "exit": 0
+    },
+    {
+     "label": "audit claim_sources/site/pricing.md",
+     "pid": 248038,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site/pricing.md",
+     "pid": 259949,
+     "exit": 0
+    },
+    {
+     "label": "audit claim_sources/site/demo.md",
+     "pid": 262235,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site/demo.md",
+     "pid": 262978,
+     "exit": 0
+    },
+    {
+     "label": "audit claim_sources/site/about.md",
+     "pid": 263323,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site/about.md",
+     "pid": 264160,
+     "exit": 0
+    },
+    {
+     "label": "audit claim_sources/site/privacy.md",
+     "pid": 264449,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site/privacy.md",
+     "pid": 268489,
+     "exit": 0
+    },
+    {
+     "label": "audit claim_sources/site/contact.md",
+     "pid": 269388,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site/contact.md",
+     "pid": 269716,
+     "exit": 0
+    },
+    {
+     "label": "materiality",
+     "pid": 273143,
+     "exit": 0
+    },
+    {
+     "label": "report",
+     "pid": 275535,
+     "exit": 0
     }
    ]
   }
