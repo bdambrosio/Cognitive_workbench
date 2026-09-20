@@ -35,7 +35,126 @@
    "value": "done",
    "at": "2026-09-18T01-54-58Z",
    "by": "cli"
+  },
+  "surface": {
+   "value": "frozen",
+   "at": "2026-09-19T17-00-10Z",
+   "by": "claude 2026-09-19, rerun under v2.2: tiers as rated, Bruce's 09-17 scrub kept"
+  },
+  "chain": {
+   "value": "failed",
+   "at": "2026-09-20T00-28-32Z",
+   "by": "job"
   }
  },
- "jobs": []
+ "jobs": [
+  {
+   "id": "2026-09-19T17-00-16Z",
+   "kind": "chain",
+   "state": "failed",
+   "by": "claude 2026-09-19, rerun under v2.2",
+   "started": "2026-09-19T17-00-16Z",
+   "ended": "2026-09-20T00-28-32Z",
+   "exit": 1,
+   "error": "materiality exited 1",
+   "log": "workflowsv2/claims_audit/engagements/cw-site/jobs/2026-09-19T17-00-16Z.log",
+   "steps": [
+    {
+     "label": "audit claim_sources/site/how-it-works.md",
+     "pid": 115135,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site/how-it-works.md",
+     "pid": 123676,
+     "exit": 0
+    },
+    {
+     "label": "audit claim_sources/site/index.md",
+     "pid": 126080,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site/index.md",
+     "pid": 134608,
+     "exit": 0
+    },
+    {
+     "label": "audit claim_sources/site/introduction-transcript.md",
+     "pid": 135709,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site/introduction-transcript.md",
+     "pid": 137936,
+     "exit": 0
+    },
+    {
+     "label": "audit claim_sources/site/introduction.md",
+     "pid": 139044,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site/introduction.md",
+     "pid": 139781,
+     "exit": 0
+    },
+    {
+     "label": "audit claim_sources/site/pricing.md",
+     "pid": 140170,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site/pricing.md",
+     "pid": 141350,
+     "exit": 0
+    },
+    {
+     "label": "audit claim_sources/site/demo.md",
+     "pid": 142338,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site/demo.md",
+     "pid": 144664,
+     "exit": 0
+    },
+    {
+     "label": "audit claim_sources/site/about.md",
+     "pid": 148029,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site/about.md",
+     "pid": 148515,
+     "exit": 0
+    },
+    {
+     "label": "audit claim_sources/site/privacy.md",
+     "pid": 149413,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site/privacy.md",
+     "pid": 164938,
+     "exit": 0
+    },
+    {
+     "label": "audit claim_sources/site/contact.md",
+     "pid": 190215,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site/contact.md",
+     "pid": 190592,
+     "exit": 0
+    },
+    {
+     "label": "materiality",
+     "pid": 191288,
+     "exit": 1
+    }
+   ]
+  }
+ ]
 }
