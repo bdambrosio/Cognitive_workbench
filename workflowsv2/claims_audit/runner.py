@@ -1209,8 +1209,10 @@ def main() -> int:
                     help="override chat.react_max_tokens (scenario default "
                          "8192). Reasoning tokens bill against this budget")
     ap.add_argument("--temperature", type=float, default=None,
-                    help="override the action-emission temperature "
-                         "(scenario default 0.7)")
+                    help="override the action-emission temperature, which "
+                         "otherwise is the model's own in "
+                         "src/chat/model_params.py; for an experiment on "
+                         "temperature only")
     ap.add_argument("--batch", type=int, default=10,
                     help="claims per adjudication call at most; batches are "
                          "formed from claims that share evidence (default 10)")
@@ -2033,8 +2035,9 @@ def main() -> int:
         # suppression was applied to: recomputing it here would be the second
         # source that drifts.
         "workflow_suppressed": loop.workflow_suppressed,
-        "react_temperature": (cfg.get("chat") or {}).get(
-            "react_temperature", 0.7),
+        # The --temperature override, or None when there was none; the value
+        # the run used is `resolved_temperature` below.
+        "react_temperature": (cfg.get("chat") or {}).get("react_temperature"),
         "react_max_tokens": (cfg.get("chat") or {}).get(
             "react_max_tokens", 8192),
         # THE SETTINGS THAT ACTUALLY APPLIED, resolved from the model rather
