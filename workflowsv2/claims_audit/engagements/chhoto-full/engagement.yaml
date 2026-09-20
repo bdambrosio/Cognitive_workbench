@@ -1,0 +1,52 @@
+# claims-audit engagement: chhoto-full
+#
+# Created 2026-09-20T23-29-07Z. The practice fills `claim_sources:` (the documents in the
+# target that carry the seller's claims, by path from the target root) and,
+# where the materials are not under target/, `target:`. `transaction:` and
+# `thresholds:` come from the current intake's blocks.yaml, not from here.
+
+target: target
+
+claim_sources:
+  - README.md
+  - docs/CLI.md
+  - docs/INSTALLATION.md
+  - docs/SECURITY.md
+  - docs/TOOLS.md
+  - claim_sources/site_index_html.md
+
+# Who may open this engagement's pages on the client site, by email. The
+# client is the buyer: letter, intake, claim surface, report. The seller
+# supplies and maintains the materials under target/ on the materials page
+# and sees nothing of the client's pages. An address in both lists has both.
+client_emails: []
+seller_emails: []
+
+retention: keep
+
+# The illustrative buyer of the public demo, copied from chhoto-sorted on 2026-09-20.
+# There is no intake for this engagement, so these blocks are what the run is rated against.
+transaction: |
+  Client: an illustrative buyer, written by the practice for the public demo
+  Acting for the client: the practice
+  Counterparty: the project's maintainer, as seller
+  Subject: the source code, to be run as a hosted link-shortening service for the buyer's own customers
+  Price and basis: nominal; the buyer assumes the README is accurate
+  Structure: asset purchase
+  Timetable: none; illustrative
+
+thresholds: |
+  Paying for: a small, private link shortener the buyer can run for its customers at low cost, as the README describes it
+  Would change the price or the terms: any way visitors are logged or tracked beyond the hit count; footprint or resource figures materially worse than stated; a hardening step the README implies is on by default but is not
+  Would end the deal: a licence or ownership problem with the code, or a dependency the buyer cannot run on its own hardware
+
+# Who may open this engagement on the client site, by email.
+
+evidence_excludes:
+  - README.md
+  - docs/CLI.md
+  - docs/INSTALLATION.md
+  - docs/SECURITY.md
+  - docs/TOOLS.md
+  - site/index.html
+  - claim_sources/
