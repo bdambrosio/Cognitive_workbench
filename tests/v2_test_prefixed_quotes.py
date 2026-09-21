@@ -49,3 +49,16 @@ def test_a_prefixed_quote_that_still_does_not_resolve_is_still_a_problem(tmp_pat
     res, quote = _run(tmp_path, "2|Apache Licence\n3|  Version 3.0", [2, 3])
     assert any("quote is not at LICENSE:2-3" in p for p in res["problems"])
     assert quote == "2|Apache Licence\n3|  Version 3.0" and res["figures"]["prefixed_quotes"] == []
+
+
+def test_emphasis_beside_punctuation_does_not_fail_a_faithful_quote():
+    """chhoto-full README claim 53: the closing `**` sits against a comma."""
+    body = ['- **Cookies, newsletters**, "we value your privacy" popups or any of the multiple',
+            "  other ways modern web shows how anti-user it is."]
+    quote = 'Cookies, newsletters, "we value your privacy" popups or any of the multiple other ways modern web shows how anti-user it is.'
+    assert schemas.quote_at(body, 1, 2, quote)[0] == "exact"
+    # what the normalisation already did is unchanged
+    assert schemas.quote_at(["*   **Dyno:** a worker process"], 1, 1, "Dyno: a worker process")[0] == "exact"
+    assert schemas.quote_at(["Set `CHHOTO_PASSWORD` first."], 1, 1, "Set CHHOTO_PASSWORD first.")[0] == "exact"
+    assert schemas.quote_at(["1. First step", "2. Second step"], 1, 2, "First step\nSecond step")[0] in ("exact", "joined")
+    assert schemas.quote_at(["Cookies are used."], 1, 1, "No cookies are used.")[0] == "missing"

@@ -462,7 +462,13 @@ def salvage_findings(text: str) -> Optional[Dict[str, Any]]:
 #: Markdown decoration a quote routinely loses on the way out of a document.
 #: NOT a content filter — every one of these is presentation, and a quote that
 #: differs only by them is the same text.
-_DECORATION = re.compile(r"[*_`]+|^\s*[-*+]\s+|^\s*\d+\.\s+", re.M)
+_DECORATION = re.compile(r"^\s*[-*+]\s+|^\s*\d+\.\s+", re.M)
+#: Emphasis and code ticks sit against the words they mark, so they are removed
+#: and nothing is put in their place. A space in their place turned
+#: `**Cookies, newsletters**, "we value` into `Cookies, newsletters , "we value`,
+#: and the enumerator's faithful quote of that README line was reported as
+#: "nowhere in it" (chhoto-full, README claim 53, 2026-09-20).
+_EMPHASIS = re.compile(r"[*_`]+")
 
 
 _LINE_PREFIX = re.compile(r"^\s*(\d+)\|")
@@ -516,7 +522,7 @@ def _norm(s: str) -> str:
     a correct citation as quoting text found "nowhere in it". Callers join
     source lines with a newline.
     """
-    return re.sub(r"\s+", " ", _DECORATION.sub(" ", s or "")).strip()
+    return re.sub(r"\s+", " ", _EMPHASIS.sub("", _DECORATION.sub(" ", s or ""))).strip()
 
 
 def quote_at(body: List[str], lo: int, hi: int, quote: str
