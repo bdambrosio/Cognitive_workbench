@@ -12,8 +12,9 @@ complete record of any claim, by id, is returned by the `claim` action: its
 finding with every evidence item, the check's outcome, its rating and basis,
 the lines of the report that carry it, and whether each cited quote is at its
 lines in the materials now. For a claim that was listed and not tested (§8),
-it returns the claim's words, its tier and the reason for the tier. The
-deliverable's files, the record and the materials are under `inspect`, which
+it returns the claim's words, its tier and the reason for the tier, and, when
+the practice has tested it after delivery, that result. The deliverable's
+files, the record and the materials are under `inspect`, which
 reaches the engagement's directory.
 
 **The deliverable** — `merged/<run>/report.md`: the client's document, assembled
