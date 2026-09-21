@@ -33,6 +33,10 @@
   summary { cursor:pointer; color:var(--soft); font-size:13px; }
   pre.brief { white-space:pre-wrap; font:13px/1.45 ui-monospace, monospace; background:var(--bg); padding:10px; border-radius:6px; max-height:420px; overflow:auto; }
   .words { color:var(--soft); font-size:12px; }
+  .said { border-left:3px solid var(--line); padding:2px 0 2px 10px; margin:6px 0; white-space:pre-wrap; }
+  .gives { margin:6px 0; padding-left:18px; }
+  .gives li { margin:2px 0; }
+  section.empty { display:none; }
   #note { position:fixed; bottom:14px; left:50%; transform:translateX(-50%); background:var(--ink); color:var(--bg); padding:8px 14px; border-radius:6px; display:none; max-width:90%; }
   #runlog { font:12px/1.4 ui-monospace, monospace; color:var(--soft); white-space:pre-wrap; margin-top:8px; }
   .grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
@@ -46,8 +50,28 @@
 </header>
 <main>
   <section>
+    <h2>Replies</h2>
+    <div id="replies"></div>
+  </section>
+
+  <section>
+    <h2>Follow-up due</h2>
+    <div id="followup"></div>
+  </section>
+
+  <section>
     <h2>Ready to contact</h2>
     <div id="ready"></div>
+  </section>
+
+  <section>
+    <h2>No response to the follow-up</h2>
+    <div id="noresponse"></div>
+  </section>
+
+  <section>
+    <h2>Sent, waiting for a reply</h2>
+    <div id="waiting"></div>
   </section>
 
   <section>
@@ -98,13 +122,55 @@
 const $ = id => document.getElementById(id);
 const esc = s => (s || "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function note(text) { const n = $("note"); n.textContent = text; n.style.display = "block"; setTimeout(() => n.style.display = "none", 4000); }
+// One write at a time: a double click on Close wrote the note twice (2026-09-21).
+let writing = false;
 async function call(path, body) {
-  const r = await fetch(path, body ? {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)} : undefined);
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) { note(j.detail || ("failed: " + r.status)); throw new Error(j.detail || r.status); }
-  return j;
+  if (body && writing) throw new Error("a write is still going");
+  writing = !!body || writing;
+  try {
+    const r = await fetch(path, body ? {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)} : undefined);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { note(j.detail || ("failed: " + r.status)); throw new Error(j.detail || r.status); }
+    return j;
+  } finally { if (body) writing = false; }
 }
 const words = s => (s || "").trim().split(/\s+/).filter(Boolean).length;
+
+const GIVES = {opinion:"Opinion on the need", objection:"Objection", new_use:"New use", introduction:"Introduction",
+               test_case:"Test case offered", meeting:"Meeting", question:"Question", declined:"Declined", other:"Other"};
+
+function exchange(c) {
+  // what was sent and what came back, as recorded in Attio, oldest first
+  const rows = (c.sent || []).slice().sort((a, b) => a.date < b.date ? -1 : 1)
+    .map(n => `<div class="meta" style="margin:8px 0 0">${esc(n.what)}, ${esc(n.date)}</div><div class="said">${esc(n.text)}</div>`).join("");
+  return rows ? `<details><summary>What was sent and received</summary>${rows}</details>` : "";
+}
+function replyBox(i, label) {
+  return `<details><summary>${label}</summary>
+    <textarea id="reply${i}" placeholder="Paste the reply from ${esc(cards[i].name)}, exactly" style="min-height:90px; margin-top:6px"></textarea>
+    <div class="row"><button class="go" onclick="replied(${i})">Record the reply</button></div></details>`;
+}
+function answerBox(c, i, r, isLast) {
+  // the suggested answer to one reply; only the latest reply's answer can be edited and sent
+  const a = r.answer;
+  if (r.answer_sent) return `<div class="meta">Answered ${esc(r.answer_sent)}.</div>`;
+  if (!a || !isLast) return "";
+  const text = r.edited_answer || a.message;
+  return `<div class="meta" style="margin:10px 0 0">Suggested answer</div>
+    ${a.takes_up ? `<div class="why">${esc(a.takes_up)}</div>` : ""}
+    ${a.assumes ? `<div class="flag">Check: ${esc(a.assumes)}</div>` : ""}
+    ${(a.flags || []).map(f => `<div class="flag">Check: ${esc(f)}</div>`).join("")}
+    <textarea class="msg" id="msg${i}" style="min-height:110px" oninput="$('w${i}').textContent = words(this.value) + ' words'">${esc(text)}</textarea>
+    <div class="words" id="w${i}">${words(text)} words</div>
+    <div class="row">
+      <button onclick="copyMsg(${i})">Copy</button>
+      <button onclick="saveMsg(${i}, 'answer', '${esc(r.note_id)}')">Save edit</button>
+      <button class="go" onclick="answerSent(${i}, '${esc(r.note_id)}')">Answer sent</button>
+    </div>`;
+}
+function closeRow(i, placeholder) {
+  return `<input class="grow" id="why${i}" placeholder="${placeholder}"><button class="stop" onclick="skip(${i})">Close</button>`;
+}
 
 function card(c, i) {
   const links = [c.linkedin ? `<a href="${esc(c.linkedin)}" target="_blank" rel="noopener">LinkedIn</a>` : "",
@@ -113,19 +179,71 @@ function card(c, i) {
   const why = c.fit_rationale ? `<div class="why">${esc(c.fit_rationale)}</div>` : "";
   const flags = (c.flags || []).map(f => `<div class="flag">Check: ${esc(f)}</div>`).join("");
   const brief = c.brief ? `<details><summary>Brief and evidence</summary><pre class="brief">${esc(c.brief)}</pre></details>` : "";
-  if (c.stage !== "Ready to contact") return `<div class="card">${head}${why}${flags}${brief}</div>`;
-  return `<div class="card" id="card${i}">${head}${why}${flags}
+  const dates = `<div class="meta">Last contact ${esc(c.last_contact || "not recorded")}${c.due ? " · next look " + esc(c.due) : ""}</div>`;
+
+  if (c.group === "ready") return `<div class="card" id="card${i}">${head}${why}${flags}
     <textarea class="msg" id="msg${i}" oninput="$('w${i}').textContent = words(this.value) + ' words'">${esc(c.message)}</textarea>
     <div class="words" id="w${i}">${words(c.message)} words</div>
     <div class="row">
       <button onclick="copyMsg(${i})">Copy</button>
-      <button onclick="saveMsg(${i})">Save edit</button>
+      <button onclick="saveMsg(${i}, 'draft')">Save edit</button>
       <button class="go" onclick="sent(${i})">Sent</button>
       <input class="grow" id="why${i}" placeholder="Reason, if skipping">
       <button class="stop" onclick="skip(${i})">Skip</button>
       <input id="until${i}" type="date" title="put off until">
       <button onclick="later(${i})">Later</button>
     </div>${brief}</div>`;
+
+  if (c.group === "followup") {
+    const body = c.followup
+      ? `${c.followup_idea ? `<div class="why">${esc(c.followup_idea)}</div>` : ""}${flags}
+         <textarea class="msg" id="msg${i}" style="min-height:100px" oninput="$('w${i}').textContent = words(this.value) + ' words'">${esc(c.followup)}</textarea>
+         <div class="words" id="w${i}">${words(c.followup)} words</div>`
+      : `<div class="flag">No follow-up is drafted yet. "Run today's work" drafts it; or write your own here.</div>
+         <textarea class="msg" id="msg${i}" style="min-height:100px"></textarea>`;
+    return `<div class="card" id="card${i}">${head}${dates}${body}
+      <div class="row">
+        <button onclick="copyMsg(${i})">Copy</button>
+        ${c.followup ? `<button onclick="saveMsg(${i}, 'followup')">Save edit</button>` : ""}
+        <button class="go" onclick="followupSent(${i})">Follow-up sent</button>
+        ${closeRow(i, "Reason, if closing without a follow-up")}
+        <input id="until${i}" type="date" title="put off until">
+        <button onclick="later(${i})">Later</button>
+      </div>${replyBox(i, "They replied")}${exchange(c)}${brief}</div>`;
+  }
+
+  if (c.group === "noresponse") return `<div class="card" id="card${i}">${head}${dates}
+    <div class="row">
+      <input class="grow" id="why${i}" value="No response to the first message or to the follow-up.">
+      <button class="stop" onclick="skip(${i})">Close</button>
+      <input id="until${i}" type="date" title="put off until">
+      <button onclick="later(${i})">Later</button>
+    </div>${replyBox(i, "They replied")}${exchange(c)}${brief}</div>`;
+
+  if (c.group === "waiting") return `<div class="card" id="card${i}">${head}${dates}${replyBox(i, "They replied")}${exchange(c)}</div>`;
+
+  if (c.group === "replies") {
+    const last = (c.replies || []).length - 1;
+    const read = (c.replies || []).map((r, k) => `<div class="meta" style="margin:8px 0 0">Reply of ${esc(r.received)}</div>
+      <ul class="gives">${(r.gives || []).map(g => `<li><b>${esc(GIVES[g.what] || g.what)}.</b> ${esc(g.note)} <span class="meta">"${esc(g.quote)}"</span></li>`).join("")}</ul>
+      ${r.introduced_name ? `<div class="why">Introduces: <b>${esc(r.introduced_name)}</b>. Add them below under "Add a name", with who introduced them.</div>` : ""}
+      ${r.next_step ? `<div class="why"><b>Next step:</b> ${esc(r.next_step)}</div>` : ""}
+      ${(r.flags || []).map(f => `<div class="flag">Check: ${esc(f)}</div>`).join("")}
+      ${answerBox(c, i, r, k === last)}`).join("");
+    const pending = (c.sent || []).filter(n => n.what === "Reply").length > (c.replies || []).length
+      || (c.replies || []).some(r => !r.answer && (r.gives || []).length);
+    const unread = pending
+      ? `<div class="flag">A reply is not read yet, or has no suggested answer yet. If no run is going (see Run, below), press Read now.</div>
+         <div class="row"><button class="go" onclick="readNow()">Read now</button></div>` : "";
+    return `<div class="card" id="card${i}">${head}<div class="meta">${esc(c.stage)} · last contact ${esc(c.last_contact || "not recorded")}</div>
+      ${read}${unread}
+      <div class="row">
+        ${c.stage === "Replied" ? `<button onclick="conversation(${i})" title="the exchange is continuing">Move to Conversation</button>` : ""}
+        ${closeRow(i, "Reason, if closing")}
+      </div>${replyBox(i, "They replied again")}${exchange(c)}${brief}</div>`;
+  }
+
+  return `<div class="card">${head}${why}${flags}${brief}</div>`;
 }
 
 let cards = [];
@@ -133,14 +251,40 @@ async function load() {
   const q = await call("/api/queue");
   cards = q.cards;
   $("counts").textContent = Object.entries(q.counts).map(([k, v]) => `${k}: ${v}`).join("   ") || "the list is empty";
-  const by = s => cards.map((c, i) => c.stage === s ? card(c, i) : "").join("") || `<div class="meta">Nobody.</div>`;
-  $("ready").innerHTML = by("Ready to contact");
-  $("qualified").innerHTML = by("Qualified");
-  $("research").innerHTML = by("Research");
+  // a section about sent messages is hidden while it is empty; the first three kept as they were
+  for (const g of ["replies", "followup", "ready", "noresponse", "waiting", "qualified", "research"]) {
+    const html = cards.map((c, i) => c.group === g ? card(c, i) : "").join("");
+    $(g).innerHTML = html || `<div class="meta">Nobody.</div>`;
+    $(g).parentElement.classList.toggle("empty", !html && !["ready", "qualified", "research"].includes(g));
+  }
   if (!$("r_kind").options.length) $("r_kind").innerHTML = q.kinds.map(k => `<option>${esc(k)}</option>`).join("");
 }
 async function copyMsg(i) { await navigator.clipboard.writeText($("msg" + i).value); note("Copied. Paste it into LinkedIn, then press Sent."); }
-async function saveMsg(i) { await call("/api/edit", {name: cards[i].name, message: $("msg" + i).value}); note("Edit saved."); }
+async function saveMsg(i, which, note_id) { await call("/api/edit", {name: cards[i].name, message: $("msg" + i).value, which, note_id: note_id || ""}); note("Edit saved."); }
+async function answerSent(i, note_id) {
+  const message = $("msg" + i).value.trim();
+  if (!message) { note("There is no answer text to record."); return; }
+  if (!confirm(`Record that this answer was sent to ${cards[i].name}?`)) return;
+  await call("/api/answer_sent", {record_id: cards[i].record_id, name: cards[i].name, note_id, message});
+  note("Recorded as sent."); load();
+}
+async function readNow() { await call("/api/run", {what: "replies"}); note("Reading. The card fills in when it ends."); poll(); }
+async function followupSent(i) {
+  const message = $("msg" + i).value.trim();
+  if (!message) { note("There is no follow-up text to record."); return; }
+  if (!confirm(`Record that this follow-up was sent to ${cards[i].name}?`)) return;
+  await call("/api/followup_sent", {record_id: cards[i].record_id, name: cards[i].name, message});
+  note("Recorded as sent."); load();
+}
+async function replied(i) {
+  const reply = $("reply" + i).value.trim();
+  if (!reply) { note("Paste the reply first."); return; }
+  if (!confirm(`Record this as a reply from ${cards[i].name}?`)) return;
+  const r = await call("/api/replied", {record_id: cards[i].record_id, reply});
+  note(r.reading ? "Recorded. The reply is being read; the card fills in when that ends." : "Recorded. A run is going; the reply is read by the next run.");
+  load(); poll();
+}
+async function conversation(i) { await call("/api/conversation", {record_id: cards[i].record_id}); note("Moved to Conversation."); load(); }
 async function sent(i) {
   if (!confirm(`Record that this message was sent to ${cards[i].name}?`)) return;
   await call("/api/sent", {record_id: cards[i].record_id, name: cards[i].name, message: $("msg" + i).value});

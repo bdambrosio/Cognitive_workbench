@@ -125,9 +125,7 @@ def contact_record(person: Dict[str, Any]) -> str:
         rows.append(f"Task ({'done' if t.get('is_completed') else 'open'}, "
                     f"due {(t.get('deadline_at') or 'no date')[:10]}): "
                     f"{' '.join((t.get('content_plaintext') or '').split())}")
-    notes = _call("GET", "/notes", params={"parent_object": "people", "parent_record_id": rid,
-                                           "limit": 50})["data"]
-    for n in notes:
+    for n in notes(rid):
         rows.append(f"Note of {(n.get('created_at') or '')[:10]}: {n.get('title') or '(untitled)'}")
     return "\n".join(rows)
 
@@ -150,6 +148,29 @@ def contact_for(name: str, firm: str = "", domain: str = "") -> str:
     if company is not None:
         rows.append(colleagues(company, but=person["id"]["record_id"] if person else ""))
     return "\n".join(r for r in rows if r)
+
+
+def notes(record_id: str) -> List[Dict[str, Any]]:
+    """The notes on a person, as Attio returns them."""
+    return _call("GET", "/notes", params={"parent_object": "people", "parent_record_id": record_id,
+                                          "limit": 50})["data"]
+
+
+def note_texts(record_id: str, title: str, among: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, str]]:
+    """The notes on a person whose title starts with `title`, oldest first,
+    each as `{note_id, date, text}`. `among` is the person's notes when the
+    caller has already read them."""
+    out = [{"note_id": (n.get("id") or {}).get("note_id") or "", "date": (n.get("created_at") or "")[:10],
+            "text": (n.get("content_plaintext") or "").strip()}
+           for n in (notes(record_id) if among is None else among) if (n.get("title") or "").startswith(title)]
+    return sorted(out, key=lambda n: n["date"])
+
+
+def due(entry: Dict[str, Any], stage: str, on: str) -> bool:
+    """Whether the entry is at `stage` and its next action date has come. An
+    entry with no such date counts as due: nobody has said when."""
+    when = _first(entry, "next_action_date", "value")
+    return stage_of(entry) == stage and (not when or str(when) <= on)
 
 
 def stage_of(entry: Dict[str, Any]) -> Optional[str]:
@@ -180,6 +201,10 @@ def stages() -> List[str]:
 #: pasted as evidence (a LinkedIn post, an email); the rest of the title says
 #: where it came from.
 EVIDENCE_NOTE = "Evidence"
+#: The notes that record an exchange, by the start of their title; the date
+#: follows. The page writes them with the exact text; the runner reads them.
+SENT_NOTE, FOLLOWUP_NOTE, REPLY_NOTE = "Message sent", "Follow-up sent", "Reply received"
+ANSWER_NOTE = "Answer sent"
 
 
 def candidate_from(entry: Dict[str, Any]) -> Dict[str, Any]:
@@ -208,11 +233,9 @@ def candidate_from(entry: Dict[str, Any]) -> Dict[str, Any]:
         said.append(str(_first(entry, "notes", "value")).strip())
     if said:
         c["relationship"] = "\n".join(said)
-    notes = _call("GET", "/notes", params={"parent_object": "people", "parent_record_id": rid,
-                                           "limit": 50})["data"]
     pasted = [{"source": (n.get("title") or "")[len(EVIDENCE_NOTE):].strip(" :") or "text pasted by the practice",
                "date": (n.get("created_at") or "")[:10], "text": n.get("content_plaintext") or ""}
-              for n in notes if (n.get("title") or "").startswith(EVIDENCE_NOTE)]
+              for n in notes(rid) if (n.get("title") or "").startswith(EVIDENCE_NOTE)]
     if pasted:
         c["pasted"] = pasted
     return c
@@ -254,7 +277,9 @@ def not_pursuing(record_id: str, reason: str, on: str) -> None:
     entry = entry_of(record_id)
     was = ""
     if entry is not None:
+        kind = _first(entry, "category", "option")
         was = (f"\n\nThe entry was at stage '{stage_of(entry)}'. "
+               f"Kind: {kind.get('title') if isinstance(kind, dict) else '(none)'}. "
                f"Fit rationale then: {_first(entry, 'fit_rationale', 'value') or '(none)'}")
     create_note(record_id, f"Not pursuing {on}", reason.strip() + was)
     if entry is not None:

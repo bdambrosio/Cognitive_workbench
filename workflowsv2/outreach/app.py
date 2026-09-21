@@ -13,6 +13,7 @@ It binds to 127.0.0.1 and has no login. It is not part of the client site.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import datetime
 import json
 import logging
@@ -38,8 +39,15 @@ logger = logging.getLogger("outreach.app")
 
 MODEL = REPO / "measure/models/local_qwen38flashnext.yaml"
 RUN_LOG = runner.DATA / "run.log"
-#: The stages shown as cards, in this order.
-SHOWN = ("Ready to contact", "Qualified", "Research")
+#: The sections of the page, in the order they are shown, and the stage each
+#: takes its cards from. A person at a sent stage is in the section of that
+#: stage when the next action date has come, and in "waiting" until then.
+GROUPS = ("replies", "followup", "ready", "noresponse", "waiting", "qualified", "research")
+GROUP_OF = {"Ready to contact": "ready", "Qualified": "qualified", "Research": "research",
+            "Initial sent": "followup", "Follow-up sent": "noresponse",
+            "Replied": "replies", "Conversation": "replies"}
+FOLLOWUP_AFTER_DAYS = 6
+CLOSE_AFTER_DAYS = 7
 
 app = FastAPI()
 _run: Dict[str, Any] = {"proc": None, "what": None, "started": None}
@@ -53,7 +61,8 @@ def _local(name: str) -> Dict[str, Any]:
     """The runner's record of this person, where there is one."""
     d = runner.DATA / runner.slug(name)
     out: Dict[str, Any] = {}
-    for key, f in (("qualification", "qualification.json"), ("draft", "draft.json")):
+    for key, f in (("qualification", "qualification.json"), ("draft", "draft.json"),
+                   ("followup", "followup.json"), ("replies", "replies.json")):
         if (d / f).is_file():
             out[key] = json.loads((d / f).read_text(encoding="utf-8"))
     if (d / "brief.md").is_file():
@@ -76,34 +85,65 @@ def queue() -> Dict[str, Any]:
         entries = attio.entries()
     except attio.AttioError as e:
         raise HTTPException(502, str(e))
-    cards: List[Dict[str, Any]] = []
+    shown: List[tuple] = []
     counts: Dict[str, int] = {}
     for e in entries:
         stage = attio.stage_of(e)
         counts[stage] = counts.get(stage, 0) + 1
-        if stage not in SHOWN:
+        if stage not in GROUP_OF:
             continue
         later = _text(e, "next_action_date")
         if stage == "Ready to contact" and later and later > today():
             counts["(put off)"] = counts.get("(put off)", 0) + 1
             continue
-        person = attio._call("GET", f"/objects/people/records/{e['parent_record_id']}")["data"]
-        name = attio._first(person, "name", "full_name") or "(no name)"
-        local = _local(name)
-        draft = local.get("draft") or {}
-        option = attio._first(e, "category", "option")
-        cards.append({"record_id": e["parent_record_id"], "name": name, "stage": stage,
-                      "title": attio._first(person, "job_title", "value"),
-                      "linkedin": attio._first(person, "linkedin", "value"),
-                      "web_url": person.get("web_url"),
-                      "category": option.get("title") if isinstance(option, dict) else None,
-                      "fit_rationale": _text(e, "fit_rationale"),
-                      "message": draft.get("edited_message") or draft.get("message"),
-                      "flags": (local.get("qualification") or {}).get("flags", []) + draft.get("flags", []),
-                      "brief": local.get("brief")})
-    cards.sort(key=lambda c: SHOWN.index(c["stage"]))
+        group = GROUP_OF[stage]
+        if group in ("followup", "noresponse") and not attio.due(e, stage, today()):
+            group = "waiting"
+        shown.append((e, stage, group))
+    # Each card costs one or two reads of Attio; one after another they took
+    # half a minute for 25 cards.
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            cards = list(pool.map(lambda t: _card(*t), shown))
+    except attio.AttioError as e:
+        raise HTTPException(502, str(e))
+    cards.sort(key=lambda c: GROUPS.index(c["group"]))
     return {"cards": cards, "counts": counts,
             "kinds": [k for k in schemas.TYPES if k != "none"]}
+
+
+def _card(e: Dict[str, Any], stage: str, group: str) -> Dict[str, Any]:
+    """One entry of the outreach list as the page shows it."""
+    later = _text(e, "next_action_date")
+    person = attio._call("GET", f"/objects/people/records/{e['parent_record_id']}")["data"]
+    name = attio._first(person, "name", "full_name") or "(no name)"
+    local = _local(name)
+    draft = local.get("draft") or {}
+    follow = local.get("followup") or {}
+    rid = e["parent_record_id"]
+    got = [] if group in ("ready", "qualified", "research") else attio.notes(rid)
+    sent = [{"what": what, **n} for what, title in (("First message", attio.SENT_NOTE),
+                                                    ("Follow-up", attio.FOLLOWUP_NOTE),
+                                                    ("Reply", attio.REPLY_NOTE),
+                                                    ("Answer", attio.ANSWER_NOTE))
+            for n in attio.note_texts(rid, title, got)]
+    option = attio._first(e, "category", "option")
+    return {"record_id": rid, "name": name, "stage": stage, "group": group,
+            "last_contact": _text(e, "last_contact"), "due": later,
+            "next_action": _text(e, "next_action"),
+            "followup": follow.get("edited_message") or follow.get("message"),
+            "followup_idea": follow.get("idea"), "sent": sent,
+            "replies": local.get("replies") or [],
+            "title": attio._first(person, "job_title", "value"),
+            "linkedin": attio._first(person, "linkedin", "value"),
+            "web_url": person.get("web_url"),
+            "category": option.get("title") if isinstance(option, dict) else None,
+            "fit_rationale": _text(e, "fit_rationale"),
+            "message": draft.get("edited_message") or draft.get("message"),
+            "flags": ((local.get("qualification") or {}).get("flags", []) + draft.get("flags", [])
+                      if group in ("ready", "qualified", "research") else follow.get("flags", [])
+                      if group == "followup" else []),
+            "brief": local.get("brief")}
 
 
 class Sent(BaseModel):
@@ -117,11 +157,104 @@ def sent(body: Sent) -> Dict[str, Any]:
     """The person has sent the message by hand. Record the exact text and move
     the entry to Initial sent."""
     try:
-        attio.create_note(body.record_id, f"Message sent {today()}", body.message)
+        attio.create_note(body.record_id, f"{attio.SENT_NOTE} {today()}", body.message)
         attio.upsert_entry(body.record_id, {"stage": "Initial sent", "last_contact": today(),
                                             "next_action": "Follow up if no response",
-                                            "next_action_date": (datetime.date.today()
-                                                                 + datetime.timedelta(days=6)).isoformat()})
+                                            "next_action_date": (datetime.date.today() + datetime.timedelta(
+                                                days=FOLLOWUP_AFTER_DAYS)).isoformat()})
+    except attio.AttioError as e:
+        raise HTTPException(502, str(e))
+    return {"ok": True}
+
+
+@app.post("/api/followup_sent")
+def followup_sent(body: Sent) -> Dict[str, Any]:
+    """The person has sent the follow-up by hand. It is the only one: the next
+    action is to close the approach if nothing comes back."""
+    try:
+        attio.create_note(body.record_id, f"{attio.FOLLOWUP_NOTE} {today()}", body.message)
+        attio.upsert_entry(body.record_id, {"stage": "Follow-up sent", "last_contact": today(),
+                                            "next_action": "Close if no response",
+                                            "next_action_date": (datetime.date.today() + datetime.timedelta(
+                                                days=CLOSE_AFTER_DAYS)).isoformat()})
+    except attio.AttioError as e:
+        raise HTTPException(502, str(e))
+    return {"ok": True}
+
+
+class Replied(BaseModel):
+    record_id: str
+    reply: str
+
+
+@app.post("/api/replied")
+def replied(body: Replied) -> Dict[str, Any]:
+    """The person has answered. Record their exact words and move the entry to
+    Replied (an entry already in conversation stays there); then have the
+    reply read, unless a run is going, in which case the next run reads it."""
+    if not body.reply.strip():
+        raise HTTPException(422, "paste the reply")
+    try:
+        # compared without regard to spacing: Attio returns a note's text re-spaced
+        if any(n["text"].split() == body.reply.split() for n in attio.note_texts(body.record_id, attio.REPLY_NOTE)):
+            raise HTTPException(409, "this reply is already recorded for this person")
+        entry = attio.entry_of(body.record_id)
+        attio.create_note(body.record_id, f"{attio.REPLY_NOTE} {today()}", body.reply.strip())
+        values: Dict[str, Any] = {"last_contact": today(), "next_action": "Read the reply",
+                                  "next_action_date": today()}
+        if entry is None or attio.stage_of(entry) != "Conversation":
+            values["stage"] = "Replied"
+        attio.upsert_entry(body.record_id, values)
+    except attio.AttioError as e:
+        raise HTTPException(502, str(e))
+    reading = not _running()
+    if reading:
+        _start([[sys.executable, str(HERE / "runner.py"), "replies", "--model", str(MODEL)]], "reading the reply")
+    return {"ok": True, "reading": reading}
+
+
+class Answered(BaseModel):
+    record_id: str
+    name: str
+    note_id: str                       # the reply that is answered
+    message: str
+
+
+@app.post("/api/answer_sent")
+def answer_sent(body: Answered) -> Dict[str, Any]:
+    """The person has sent the answer by hand. Record the exact text; the
+    exchange is now a conversation."""
+    try:
+        attio.create_note(body.record_id, f"{attio.ANSWER_NOTE} {today()}", body.message)
+        attio.upsert_entry(body.record_id, {"stage": "Conversation", "last_contact": today(),
+                                            "next_action": "Wait for their reply",
+                                            "next_action_date": (datetime.date.today() + datetime.timedelta(
+                                                days=CLOSE_AFTER_DAYS)).isoformat()})
+    except attio.AttioError as e:
+        raise HTTPException(502, str(e))
+    _in_reply(body.name, body.note_id, {"answer_sent": today()})
+    return {"ok": True}
+
+
+def _in_reply(name: str, note_id: str, values: Dict[str, Any]) -> None:
+    """Set values in the runner's record of one reply."""
+    f = runner.DATA / runner.slug(name) / "replies.json"
+    have = json.loads(f.read_text(encoding="utf-8")) if f.is_file() else []
+    rec = next((r for r in have if r.get("note_id") == note_id), None)
+    if rec is None:
+        raise HTTPException(404, "no such reply on record for this person")
+    rec.update(values)
+    atomic_write_text(f, json.dumps(have, indent=1, ensure_ascii=False) + "\n")
+
+
+class Record(BaseModel):
+    record_id: str
+
+
+@app.post("/api/conversation")
+def conversation(body: Record) -> Dict[str, Any]:
+    try:
+        attio.upsert_entry(body.record_id, {"stage": "Conversation"})
     except attio.AttioError as e:
         raise HTTPException(502, str(e))
     return {"ok": True}
@@ -158,15 +291,22 @@ def later(body: Later) -> Dict[str, Any]:
 class Edit(BaseModel):
     name: str
     message: str
+    which: str = "draft"               # or "followup", or "answer" with the reply's note_id
+    note_id: str = ""
 
 
 @app.post("/api/edit")
 def edit(body: Edit) -> Dict[str, Any]:
-    """Keep an edited message in the runner's draft record, beside the draft
-    the model wrote."""
-    f = runner.DATA / runner.slug(body.name) / "draft.json"
+    """Keep an edited message in the runner's record of the draft or of the
+    follow-up, beside the text the model wrote."""
+    if body.which == "answer":
+        _in_reply(body.name, body.note_id, {"edited_answer": body.message, "edited_at": today()})
+        return {"ok": True}
+    if body.which not in ("draft", "followup"):
+        raise HTTPException(422, "which must be draft, followup or answer")
+    f = runner.DATA / runner.slug(body.name) / f"{body.which}.json"
     if not f.is_file():
-        raise HTTPException(404, "no draft on record for this person")
+        raise HTTPException(404, f"no {body.which} on record for this person")
     d = json.loads(f.read_text(encoding="utf-8"))
     d["edited_message"], d["edited_at"] = body.message, today()
     atomic_write_text(f, json.dumps(d, indent=1, ensure_ascii=False) + "\n")
@@ -207,8 +347,21 @@ def add(body: Add) -> Dict[str, Any]:
     return {"ok": True, "record_id": rid}
 
 
+def _running() -> bool:
+    return _run["proc"] is not None and _run["proc"].poll() is None
+
+
+def _start(steps: List[List[str]], what: str) -> None:
+    """Start the runner commands, in order, as the one background job."""
+    runner.DATA.mkdir(parents=True, exist_ok=True)
+    cmd = " && ".join(" ".join(f"'{a}'" for a in argv) for argv in steps)
+    out = open(RUN_LOG, "w", encoding="utf-8")
+    _run.update(proc=subprocess.Popen(["bash", "-c", cmd], cwd=str(REPO), stdout=out, stderr=subprocess.STDOUT),
+                what=what, started=datetime.datetime.now().isoformat(timespec="seconds"))
+
+
 class Run(BaseModel):
-    what: str                          # "daily" or "scout"
+    what: str                          # "daily", "scout" or "replies"
     kind: str = ""
     want: int = 5
     firms: bool = False
@@ -217,7 +370,7 @@ class Run(BaseModel):
 @app.post("/api/run")
 def run(body: Run) -> Dict[str, Any]:
     """Start the runner, then the push, as one background job. One at a time."""
-    if _run["proc"] is not None and _run["proc"].poll() is None:
+    if _running():
         raise HTTPException(409, f"a run is going: {_run['what']}")
     py, script = sys.executable, str(HERE / "runner.py")
     if body.what == "scout":
@@ -226,17 +379,15 @@ def run(body: Run) -> Dict[str, Any]:
         first = [py, script, "scout", "--kind", body.kind, "--want", str(body.want), "--attio", "--model", str(MODEL)]
         first += ["--firms"] if body.firms else []
         what = f"scout for {body.kind}" + (", by firm" if body.firms else "")
+    elif body.what == "replies":
+        first = [py, script, "replies", "--model", str(MODEL)]
+        what = "reading replies and drafting answers"
     elif body.what == "daily":
         first = [py, script, "daily", "--want", str(body.want), "--model", str(MODEL)]
         what = "today's work"
     else:
-        raise HTTPException(422, "what must be daily or scout")
-    runner.DATA.mkdir(parents=True, exist_ok=True)
-    steps = [first] + ([[py, script, "push", "--scouted"]] if body.what == "scout" else [])
-    cmd = " && ".join(" ".join(f"'{a}'" for a in argv) for argv in steps)
-    out = open(RUN_LOG, "w", encoding="utf-8")
-    _run.update(proc=subprocess.Popen(["bash", "-c", cmd], cwd=str(REPO), stdout=out, stderr=subprocess.STDOUT),
-                what=what, started=datetime.datetime.now().isoformat(timespec="seconds"))
+        raise HTTPException(422, "what must be daily, scout or replies")
+    _start([first] + ([[py, script, "push", "--scouted"]] if body.what == "scout" else []), what)
     return {"ok": True, "what": what}
 
 
@@ -246,8 +397,8 @@ def run_status() -> Dict[str, Any]:
     lines: List[str] = []
     if RUN_LOG.is_file():
         lines = [x for x in RUN_LOG.read_text(encoding="utf-8", errors="replace").splitlines()
-                 if " outreach " in x or x.startswith(("#", "- **"))][-12:]
-    return {"running": proc is not None and proc.poll() is None, "what": _run["what"],
+                 if " outreach " in x or x.startswith(("#", "- **", "replies:", "followups:"))][-12:]
+    return {"running": _running(), "what": _run["what"],
             "started": _run["started"], "exit": None if proc is None else proc.poll(), "log": lines}
 
 

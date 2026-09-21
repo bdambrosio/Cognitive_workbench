@@ -4,8 +4,10 @@
     python3 workflowsv2/outreach/runner.py daily [--pool 5] [--want 3]
     python3 workflowsv2/outreach/runner.py run --candidates <file.yaml> [--only <slug>]
     python3 workflowsv2/outreach/runner.py research|qualify|draft|brief ...   (one stage)
+    python3 workflowsv2/outreach/runner.py followups|replies               (after a message is sent)
 
-`daily` works on the names waiting at Research in Attio; then, when fewer than
+`daily` works on the names waiting at Research in Attio; reads the replies
+the practice has recorded and drafts the follow-ups that are due; then, when fewer than
 `--pool` people are Ready to contact, scouts for the day's kind (the kinds take turns by date; people
 an earlier scout found of that kind are taken before any new search)
 (`--want` of the people found go on to research); and pushes everything it
@@ -56,6 +58,20 @@ no tools; everything that touches the network is code.
                to approach, with a checked citation that they work there now.
                One candidate per firm; a firm Attio already has is skipped.
 
+    followups  for each person at "Initial sent" whose next action date has
+               come: one emission (§21) drafts the one follow-up, from the first
+               message as the page recorded it in Attio, the contact record, and
+               the qualification and evidence when there are any. No search.
+    replies    for each reply the page recorded in Attio (a note "Reply
+               received <date>") that has not been read: one emission (§22)
+               says what the reply gives and what to do next. The quotes are
+               checked against the reply. The next step goes into the entry's
+               next action, and a note "Reply read <date>" records what it gave.
+               A second emission (§23) drafts the practice's answer, kept in
+               the reply's record for the page to show. The page starts this
+               stage when a reply is recorded; `daily` runs it for whatever is
+               still unread or unanswered.
+
 WITHOUT --candidates the candidates are the entries of the Attio outreach list
 at stage Research: a person adds a name there, with how they know them in the
 entry's Notes and any pasted text in a note titled "Evidence: <source>".
@@ -66,7 +82,7 @@ find is written into the brief for the person to weigh.
 
 THE RECORD is `prospects/<slug>/` (not in git: it holds personal data):
 candidate.yaml, evidence/*.md, research.json, qualification.json, draft.json,
-brief.md, issues.jsonl. A stage whose record exists is not run again unless
+brief.md, followup.json, replies.json, issues.jsonl. A stage whose record exists is not run again unless
 `--redo` is given, because searches cost money and evidence is dated.
 """
 from __future__ import annotations
@@ -512,6 +528,152 @@ def pickup(data: Path) -> List[Dict[str, Any]]:
     return [attio.candidate_from(e) for e in attio.entries() if attio.stage_of(e) == "Research"]
 
 
+# ---- after a message is sent --------------------------------------------------
+
+def _known_dir(c: Dict[str, Any], data: Path) -> Path:
+    """The person's record directory, made when the workflow has none: someone
+    the practice wrote to before the workflow existed."""
+    cand_dir = data / slug(c["name"])
+    if not (cand_dir / "candidate.yaml").is_file():
+        cand_dir.mkdir(parents=True, exist_ok=True)
+        atomic_write_text(cand_dir / "candidate.yaml", yaml.safe_dump(c, allow_unicode=True, sort_keys=False))
+    return cand_dir
+
+
+def sent_block(record_id: str) -> str:
+    """The messages the practice recorded as sent to this person, with their
+    dates, as a prompt states them. Empty when none was recorded."""
+    got = attio.notes(record_id)
+    rows = [f"{label}, sent {n['date']}:\n\n{n['text']}"
+            for label, title in (("The first message", attio.SENT_NOTE), ("The follow-up", attio.FOLLOWUP_NOTE),
+                                 ("An answer to an earlier reply", attio.ANSWER_NOTE))
+            for n in attio.note_texts(record_id, title, got)]
+    return "\n\n".join(rows)
+
+
+def followup(backend, c: Dict[str, Any], cand_dir: Path, contact: str, sent: str) -> Dict[str, Any]:
+    q = _read_json(cand_dir / "qualification.json")
+    files = kept_files(_read_json(cand_dir / "research.json") or {"files": []})
+    shown = {k: q.get(k) for k in ("prospect_type", "relationship", "problem_recognition", "why_person",
+                                   "why_now", "use_case", "concerns")} if q else None
+    user = (f"{candidate_text(c)}\n\nThe contact record: {contact or '(nothing recorded)'}\n\n"
+            f"Today is {today()}.\n\n"
+            + (sent or "The first message: its text was not recorded.") + "\n\n"
+            + (f"The qualification:\n\n{json.dumps(shown, indent=1, ensure_ascii=False)}\n\n" if shown else "")
+            + f"{evidence_block(cand_dir, files)}\n\n"
+            f"This step drafts the follow-up. Emit the answer per PROSPECT.md §21.")
+    for _ in range(2):                                     # asked again once, as `draft` is
+        out = _ask(backend, user, schemas.followup_schema(), 4096)
+        f, flags = schemas.clean_followup(out.get("obj"))
+        if out.get("parse") in ("parsed", "repaired") and f["message"]:
+            break
+    else:
+        flags.append("the follow-up returned nothing usable")
+    rec = {**f, "at": today(), "model": backend.resolved_model(), "first_message_recorded": bool(sent),
+           "flags": flags}
+    _write_json(cand_dir / "followup.json", rec)
+    return rec
+
+
+def followups(backend, data: Path) -> List[str]:
+    """Draft the follow-up for everyone at Initial sent whose date has come
+    and who has none drafted. Returns their names."""
+    names = []
+    for e in attio.entries():
+        if not attio.due(e, "Initial sent", today()):
+            continue
+        c = attio.candidate_from(e)
+        cand_dir = _known_dir(c, data)
+        if (cand_dir / "followup.json").is_file():
+            continue
+        rid = e["parent_record_id"]
+        logger.info("%s: follow-up", c["name"])
+        followup(backend, c, cand_dir, attio.contact_record({"id": {"record_id": rid}}), sent_block(rid))
+        names.append(c["name"])
+    return names
+
+
+REPLY_STAGES = ("Replied", "Conversation")
+
+
+def read_reply(backend, c: Dict[str, Any], sent: str, reply: Dict[str, str]) -> Dict[str, Any]:
+    """What one reply gives (§22), with each quote looked for in the reply."""
+    lines = reply["text"].splitlines()
+    shown, _ = schemas.numbered(lines, PAGE_WORDS)
+    user = (f"{candidate_text(c)}\n\n" + (sent or "The messages the practice sent were not recorded.")
+            + f"\n\nThe person's reply, received {reply['date']}, as the file `{schemas.REPLY_FILE}`, "
+            f"with line numbers:\n\n{shown}\n\n"
+            f"This step records what the reply gives. Emit the answer per PROSPECT.md §22.")
+    out = _ask(backend, user, schemas.reply_schema(), 4096)
+    r, flags = schemas.clean_reply(out.get("obj"), lines)
+    if out.get("parse") not in ("parsed", "repaired") or not r["gives"]:
+        flags.append("the reading of the reply returned nothing usable")
+    return {**r, "note_id": reply["note_id"], "received": reply["date"], "reply": reply["text"],
+            "at": today(), "model": backend.resolved_model(), "flags": flags}
+
+
+def answer(backend, c: Dict[str, Any], cand_dir: Path, sent: str, rec: Dict[str, Any]) -> Dict[str, Any]:
+    """The practice's answer to one reply that has been read (§23)."""
+    shown, _ = schemas.numbered(rec["reply"].splitlines(), PAGE_WORDS)
+    q = _read_json(cand_dir / "qualification.json")
+    gave = {k: rec[k] for k in ("gives", "introduced_name", "next_step")}
+    user = (f"{candidate_text(c)}\n\n" + (sent or "The messages the practice sent were not recorded.")
+            + f"\n\nThe person's reply, received {rec['received']}, with line numbers:\n\n{shown}\n\n"
+            f"What the reply gives, as recorded:\n\n{json.dumps(gave, indent=1, ensure_ascii=False)}\n\n"
+            + (f"The qualification:\n\n" + json.dumps({k: q.get(k) for k in ("prospect_type", "why_person", "use_case")},
+                                                       indent=1, ensure_ascii=False) + "\n\n" if q else "")
+            + "This step drafts the practice's answer to the reply. Emit your output per PROSPECT.md §23.")
+    for _ in range(2):                                     # asked again once, as `draft` is
+        out = _ask(backend, user, schemas.answer_schema(), 4096)
+        a, flags = schemas.clean_answer(out.get("obj"))
+        if out.get("parse") in ("parsed", "repaired") and a["message"]:
+            break
+    else:
+        flags.append("the answer returned nothing usable")
+    return {**a, "at": today(), "model": backend.resolved_model(), "flags": flags}
+
+
+def replies(backend, data: Path) -> List[str]:
+    """Read every recorded reply that has not been read, and draft the answer
+    to every reply that has none. The record is replies.json, one entry per
+    reply; Attio gets the next step as the entry's next action and a note of
+    what it gave. Returns the names of the people something was done for."""
+    names = []
+    for e in attio.entries():
+        if attio.stage_of(e) not in REPLY_STAGES:
+            continue
+        rid = e["parent_record_id"]
+        got = attio.note_texts(rid, attio.REPLY_NOTE)
+        c = attio.candidate_from(e)
+        cand_dir = _known_dir(c, data)
+        log = cand_dir / "replies.json"
+        have = json.loads(log.read_text(encoding="utf-8")) if log.is_file() else []
+        for reply in got:
+            if not reply["text"] or reply["note_id"] in [h["note_id"] for h in have]:
+                continue
+            logger.info("%s: reply of %s", c["name"], reply["date"])
+            rec = read_reply(backend, c, sent_block(rid), reply)
+            have.append(rec)
+            _write_json(log, have)
+            gave = ", ".join(g["what"] for g in rec["gives"]) or "nothing usable"
+            body = "\n".join([f"- **{g['what']}**: {g['note']} (\"{g['quote']}\")" for g in rec["gives"]]
+                             + ([f"\nIntroduces: {rec['introduced_name']}"] if rec["introduced_name"] else [])
+                             + [f"\nNext step: {rec['next_step']}"] + [f"- CHECK: {f}" for f in rec["flags"]])
+            attio.create_note(rid, f"Reply read {today()}: {gave}", body)
+            if rec["next_step"]:
+                attio.upsert_entry(rid, {"next_action": rec["next_step"], "next_action_date": today()})
+            names.append(c["name"])
+        for rec in have:
+            if "answer" in rec or not rec["gives"]:
+                continue
+            logger.info("%s: answer to the reply of %s", c["name"], rec["received"])
+            rec["answer"] = answer(backend, c, cand_dir, sent_block(rid), rec)
+            _write_json(log, have)
+            if c["name"] not in names:
+                names.append(c["name"])
+    return names
+
+
 SCOUT_LOG = "scout_log.jsonl"
 
 
@@ -762,6 +924,7 @@ def next_kind(day: Optional[datetime.date] = None) -> str:
 
 def daily(backend, data: Path, pool: int, want: int) -> str:
     """The whole day's work, in order: the names waiting at Research in Attio;
+    the replies recorded and not yet read, and the follow-ups that are due;
     then, when fewer than `pool` people are Ready to contact, a scout for the
     day's kind. Everything qualified is pushed. Returns what a
     person needs to read."""
@@ -769,8 +932,11 @@ def daily(backend, data: Path, pool: int, want: int) -> str:
     named = pickup(data)
     work(backend, named, STAGES + ("push",), data, use_attio=True)
     work(backend, unpushed(data), ("push",), data, use_attio=True)      # left by an earlier scout
+    read, drafted = replies(backend, data), followups(backend, data)
     ready = sum(1 for e in attio.entries() if attio.stage_of(e) == "Ready to contact")
     lines = [f"Names you added, researched today: {len(named)}.",
+             f"Replies read: {len(read)}{' (' + ', '.join(read) + ')' if read else ''}.",
+             f"Follow-ups drafted: {len(drafted)}{' (' + ', '.join(drafted) + ')' if drafted else ''}.",
              f"Ready to contact before scouting: {ready} (scouting starts below {pool})."]
     scouted: List[Dict[str, Any]] = []
     if ready < pool:
@@ -787,7 +953,7 @@ def daily(backend, data: Path, pool: int, want: int) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("stage", choices=STAGES + ("run", "push", "scout", "daily"))
+    ap.add_argument("stage", choices=STAGES + ("run", "push", "scout", "daily", "followups", "replies"))
     ap.add_argument("--kind", choices=[k for k in schemas.TYPES if k != "none"], default=None,
                     help="for `scout`: the kind of prospect to look for")
     ap.add_argument("--candidates", type=Path, default=None,
@@ -813,6 +979,11 @@ def main() -> int:
     backend = backend_from_model(args.model) if stages not in (("brief",), ("push",)) else None
     if args.stage == "daily":
         print(daily(backend, args.data, args.pool, args.want))
+        return 0
+    if args.stage in ("followups", "replies"):
+        args.data.mkdir(parents=True, exist_ok=True)
+        names = {"followups": followups, "replies": replies}[args.stage](backend, args.data)
+        print(f"{args.stage}: {len(names)}" + (f" ({', '.join(names)})" if names else ""))
         return 0
     if args.stage == "scout":
         if not args.kind:

@@ -85,7 +85,7 @@ def test_qualify_prompt_and_record(tmp_path, monkeypatch):
     user = seen[0]["user"]
     assert "PROSPECT.md §14" in user and "introduced by a friend" in user
     assert "sent 2026-09-01" in user and "   4|Several of our sellers" in user
-    assert "## 21." not in seen[0]["system"]                 # practice sections do not reach the model
+    assert "## 23." in seen[0]["system"] and "## 24." not in seen[0]["system"]   # practice sections do not reach the model
     assert rec["category"] == "strong" and rec["attempts"] == 1 and not rec["flags"]
     assert json.loads((tmp_path / "qualification.json").read_text())["model"] == "fake-model"
 
@@ -426,3 +426,163 @@ def test_an_empty_draft_is_asked_for_once_more(tmp_path, monkeypatch):
     assert len(seen) == 3 and d["message"].startswith("Jane") and not d["flags"]
     monkeypatch.setattr(runner, "emit", _fake([empty, empty], seen))
     assert "the draft returned nothing usable" in runner.draft(Backend(), CAND, tmp_path)["flags"]
+
+
+# ---- after a message is sent ---------------------------------------------------
+
+def _entry(stage, rid="r1", next_date=None):
+    values = {"stage": [{"status": {"title": stage}}]}
+    if next_date:
+        values["next_action_date"] = [{"value": next_date}]
+    return {"parent_record_id": rid, "entry_values": values}
+
+
+def test_attio_due_and_note_texts(monkeypatch):
+    from workflowsv2.outreach import attio
+    assert attio.due(_entry("Initial sent", next_date="2026-09-21"), "Initial sent", "2026-09-21")
+    assert not attio.due(_entry("Initial sent", next_date="2026-09-27"), "Initial sent", "2026-09-21")
+    assert attio.due(_entry("Initial sent"), "Initial sent", "2026-09-21")          # no date: nobody said when
+    assert not attio.due(_entry("Follow-up sent"), "Initial sent", "2026-09-21")
+    monkeypatch.setattr(attio, "notes", lambda rid: [
+        {"id": {"note_id": "n2"}, "title": "Message sent 2026-09-21", "created_at": "2026-09-21T09:00:00Z",
+         "content_plaintext": " second "},
+        {"id": {"note_id": "n0"}, "title": "Outreach brief 2026-09-20", "content_plaintext": "brief"},
+        {"id": {"note_id": "n1"}, "title": "Message sent 2026-09-02", "created_at": "2026-09-02T09:00:00Z",
+         "content_plaintext": "first"}])
+    assert attio.note_texts("r1", attio.SENT_NOTE) == [
+        {"note_id": "n1", "date": "2026-09-02", "text": "first"},
+        {"note_id": "n2", "date": "2026-09-21", "text": "second"}]
+
+
+def test_followup_prompt_record_and_flags(tmp_path, monkeypatch):
+    seen = []
+    empty = {"idea": "", "message": "", "assumes": ""}
+    good = {"idea": "The data-room comparison.", "message": "Jane, one more thought. " * 3, "assumes": ""}
+    monkeypatch.setattr(runner, "emit", _fake([empty, good], seen))
+    rec = runner.followup(Backend(), CAND, tmp_path, "In the outreach list at stage 'Initial sent'.",
+                          "The first message, sent 2026-09-15:\n\nJane, I read your post.")
+    assert len(seen) == 2 and "PROSPECT.md §21" in seen[0]["user"]              # an empty one is asked for again
+    assert "Jane, I read your post." in seen[0]["user"] and "stage 'Initial sent'" in seen[0]["user"]
+    assert rec["first_message_recorded"] and not rec["flags"]
+    assert json.loads((tmp_path / "followup.json").read_text())["message"].startswith("Jane, one more")
+    monkeypatch.setattr(runner, "emit", _fake([{**good, "message": "word " * 70}], seen))
+    rec = runner.followup(Backend(), CAND, tmp_path, "", "")
+    assert "its text was not recorded" in seen[-1]["user"] and not rec["first_message_recorded"]
+    assert rec["flags"] == ["the follow-up is 70 words"]
+
+
+def test_followups_are_drafted_once_for_those_whose_date_has_come(tmp_path, monkeypatch):
+    a = runner.attio
+    monkeypatch.setattr(runner, "today", lambda: "2026-09-21")
+    monkeypatch.setattr(a, "entries", lambda: [_entry("Initial sent", "r1", "2026-09-21"),
+                                               _entry("Initial sent", "r2", "2026-09-27"),
+                                               _entry("Ready to contact", "r3")])
+    monkeypatch.setattr(a, "candidate_from", lambda e: {"name": {"r1": "Ann Due"}[e["parent_record_id"]]})
+    monkeypatch.setattr(a, "contact_record", lambda person: "the record of " + person["id"]["record_id"])
+    monkeypatch.setattr(a, "notes", lambda rid: [])                            # no live call
+    monkeypatch.setattr(a, "note_texts", lambda rid, title, among=None: (
+        [{"note_id": "n1", "date": "2026-09-15", "text": "Ann, I read your post."}] if title == a.SENT_NOTE else []))
+    seen = []
+    monkeypatch.setattr(runner, "emit", _fake([{"idea": "i", "message": "Ann, one more thought.", "assumes": ""}], seen))
+    assert runner.followups(Backend(), tmp_path) == ["Ann Due"]
+    assert "the record of r1" in seen[0]["user"] and "The first message, sent 2026-09-15" in seen[0]["user"]
+    assert (tmp_path / "ann_due" / "candidate.yaml").is_file()                 # someone the workflow had no record of
+    assert runner.followups(Backend(), tmp_path) == [] and len(seen) == 1      # once
+
+
+def test_a_reply_is_read_once_and_its_quotes_are_checked(tmp_path, monkeypatch):
+    a = runner.attio
+    wrote = []
+    reply = "Thanks Bruce.\nHonestly our diligence provider already covers this.\nTalk to Pat Head at Acme, she buys small SaaS."
+    monkeypatch.setattr(a, "entries", lambda: [_entry("Replied", "r1"), _entry("Initial sent", "r2")])
+    monkeypatch.setattr(a, "candidate_from", lambda e: dict(CAND))
+    monkeypatch.setattr(a, "notes", lambda rid: [])                            # no live call
+    monkeypatch.setattr(a, "note_texts", lambda rid, title, among=None: (
+        [{"note_id": "n7", "date": "2026-09-24", "text": reply}] if title == a.REPLY_NOTE else
+        [{"note_id": "n1", "date": "2026-09-21", "text": "Jane, I read your post."}] if title == a.SENT_NOTE else []))
+    monkeypatch.setattr(a, "create_note", lambda rid, title, md: wrote.append(("note", title, md)))
+    monkeypatch.setattr(a, "upsert_entry", lambda rid, v: wrote.append(("entry", rid, v)))
+    seen = []
+    monkeypatch.setattr(runner, "emit", _fake([{"gives": [
+        {"what": "objection", "quote": "our diligence provider already covers this", "note": "Says diligence covers it."},
+        {"what": "introduction", "quote": "You should meet Pat Head", "note": "Suggests Pat Head at Acme."},
+        {"what": "applause", "quote": "Thanks", "note": "not a kind"}],
+        "introduced_name": "Pat Head", "next_step": "Thank her; do not argue. Approach Pat Head as a referral."},
+        {"takes_up": "The objection and the introduction.", "message": "Jane, thank you. May I use your name with Pat?",
+         "assumes": ""}], seen))
+    assert runner.replies(Backend(), tmp_path) == ["Jane Smith"]
+    user = seen[0]["user"]
+    assert "PROSPECT.md §22" in user and "   2|Honestly our diligence" in user and "Jane, I read your post." in user
+    rec = json.loads((tmp_path / "jane_smith" / "replies.json").read_text())[0]
+    assert [(g["what"], g["quote_found"]) for g in rec["gives"]] == [("objection", True), ("introduction", False)]
+    assert rec["flags"] == ["the words quoted for `introduction` are not in the reply"] and rec["note_id"] == "n7"
+    assert wrote[0][1].startswith("Reply read") and "objection, introduction" in wrote[0][1]
+    assert "Introduces: Pat Head" in wrote[0][2] and "CHECK:" in wrote[0][2]
+    assert wrote[1] == ("entry", "r1", {"next_action": rec["next_step"], "next_action_date": runner.today()})
+    assert "PROSPECT.md §23" in seen[1]["user"] and '"what": "objection"' in seen[1]["user"]
+    assert "   2|Honestly our diligence" in seen[1]["user"]
+    assert rec["answer"]["message"].startswith("Jane, thank you.") and not rec["answer"]["flags"]
+    assert runner.replies(Backend(), tmp_path) == [] and len(seen) == 2         # read once, answered once
+
+    # a reply read before answers existed gets its answer on the next run
+    log = tmp_path / "jane_smith" / "replies.json"
+    have = json.loads(log.read_text())
+    del have[0]["answer"]
+    log.write_text(json.dumps(have))
+    monkeypatch.setattr(runner, "emit", _fake([{"takes_up": "t", "message": "word " * 95, "assumes": ""}], seen))
+    assert runner.replies(Backend(), tmp_path) == ["Jane Smith"] and len(wrote) == 2   # nothing more written to Attio
+    assert json.loads(log.read_text())[0]["answer"]["flags"] == ["the answer is 95 words"]
+
+
+def test_the_page_records_a_follow_up_and_a_reply(tmp_path, monkeypatch):
+    from workflowsv2.outreach import app
+    wrote, started = [], []
+    monkeypatch.setattr(app.attio, "create_note", lambda rid, title, md: wrote.append(("note", title, md)))
+    monkeypatch.setattr(app.attio, "upsert_entry", lambda rid, v: wrote.append(("entry", rid, v)))
+    monkeypatch.setattr(app, "today", lambda: "2026-09-27")
+    app.followup_sent(app.Sent(record_id="r1", name="Jane Smith", message="Jane, one more thought."))
+    assert wrote[0] == ("note", "Follow-up sent 2026-09-27", "Jane, one more thought.")
+    assert wrote[1][2]["stage"] == "Follow-up sent" and wrote[1][2]["next_action"] == "Close if no response"
+
+    wrote.clear()
+    monkeypatch.setattr(app, "_running", lambda: False)
+    monkeypatch.setattr(app, "_start", lambda steps, what: started.append(steps[0][2]))
+    monkeypatch.setattr(app.attio, "entry_of", lambda rid: _entry("Follow-up sent"))
+    monkeypatch.setattr(app.attio, "note_texts", lambda rid, title, among=None: [{"text": "Already  here."}])
+    import pytest
+    with pytest.raises(app.HTTPException) as refused:                            # the same words a second time
+        app.replied(app.Replied(record_id="r1", reply="Already here.\n"))
+    assert refused.value.status_code == 409 and not wrote
+    assert app.replied(app.Replied(record_id="r1", reply=" Not for us. "))["reading"]
+    assert wrote[0] == ("note", "Reply received 2026-09-27", "Not for us.")
+    assert wrote[1][2]["stage"] == "Replied" and started == ["replies"]
+    wrote.clear()
+    monkeypatch.setattr(app, "_running", lambda: True)                           # a run is going: read later
+    monkeypatch.setattr(app.attio, "entry_of", lambda rid: _entry("Conversation"))
+    assert not app.replied(app.Replied(record_id="r1", reply="And another thing."))["reading"]
+    assert "stage" not in wrote[1][2] and started == ["replies"]                 # a conversation stays one
+
+    monkeypatch.setattr(app.runner, "DATA", tmp_path)
+    (tmp_path / "jane_smith").mkdir()
+    (tmp_path / "jane_smith" / "followup.json").write_text(json.dumps({"message": "model's text"}))
+    app.edit(app.Edit(name="Jane Smith", message="my text", which="followup"))
+    saved = json.loads((tmp_path / "jane_smith" / "followup.json").read_text())
+    assert saved["message"] == "model's text" and saved["edited_message"] == "my text"
+
+
+def test_the_page_records_an_answer_and_keeps_an_edit(tmp_path, monkeypatch):
+    from workflowsv2.outreach import app
+    wrote = []
+    monkeypatch.setattr(app.attio, "create_note", lambda rid, title, md: wrote.append(("note", title, md)))
+    monkeypatch.setattr(app.attio, "upsert_entry", lambda rid, v: wrote.append(("entry", rid, v)))
+    monkeypatch.setattr(app, "today", lambda: "2026-09-21")
+    monkeypatch.setattr(app.runner, "DATA", tmp_path)
+    (tmp_path / "jane_smith").mkdir()
+    log = tmp_path / "jane_smith" / "replies.json"
+    log.write_text(json.dumps([{"note_id": "n7", "answer": {"message": "model's answer"}}]))
+    app.edit(app.Edit(name="Jane Smith", message="my answer", which="answer", note_id="n7"))
+    assert json.loads(log.read_text())[0]["edited_answer"] == "my answer"
+    app.answer_sent(app.Answered(record_id="r1", name="Jane Smith", note_id="n7", message="my answer"))
+    assert wrote[0] == ("note", "Answer sent 2026-09-21", "my answer") and wrote[1][2]["stage"] == "Conversation"
+    rec = json.loads(log.read_text())[0]
+    assert rec["answer_sent"] == "2026-09-21" and rec["answer"]["message"] == "model's answer"

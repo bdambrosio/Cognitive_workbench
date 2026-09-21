@@ -1,6 +1,6 @@
-"""The output schemas of the four outreach calls, and the checks that run
-after an answer is parsed. PROSPECT.md §12-§15 say what makes a field correct;
-the field names here and there must agree.
+"""The output schemas of the outreach calls, and the checks that run after an
+answer is parsed. PROSPECT.md §12-§23 say what makes a field correct; the
+field names here and there must agree.
 """
 from __future__ import annotations
 
@@ -20,6 +20,15 @@ ABOUT = ("yes", "no", "unsure")
 QUESTIONS = 9
 #: PROSPECT.md §11 asks for about 80 words; a draft over this is flagged.
 MESSAGE_WORDS = 100
+#: PROSPECT.md §21 asks for about 40 words.
+FOLLOWUP_WORDS = 60
+#: PROSPECT.md §23 asks for about 60 words.
+ANSWER_WORDS = 90
+#: What a reply gives, PROSPECT.md §22.
+GIVES = ("opinion", "objection", "new_use", "introduction", "test_case", "meeting", "question",
+         "declined", "other")
+#: The name the reply is shown under, and cited by.
+REPLY_FILE = "reply"
 
 #: Web pages are set with typographic quotes and dashes; a model quoting them
 #: writes the keyboard characters. Eight of eight citations dropped in the first
@@ -97,6 +106,25 @@ def draft_schema() -> Dict[str, Any]:
     return {"type": "object", "properties": {
         "angle": _STR, "message": _STR, "rests_on": _CITATIONS, "assumes": _STR},
         "required": ["angle", "message", "rests_on", "assumes"]}
+
+
+def followup_schema() -> Dict[str, Any]:
+    return {"type": "object", "properties": {"idea": _STR, "message": _STR, "assumes": _STR},
+            "required": ["idea", "message", "assumes"]}
+
+
+def answer_schema() -> Dict[str, Any]:
+    return {"type": "object", "properties": {"takes_up": _STR, "message": _STR, "assumes": _STR},
+            "required": ["takes_up", "message", "assumes"]}
+
+
+def reply_schema() -> Dict[str, Any]:
+    gives = {"type": "object", "properties": {
+        "what": {"type": "string", "enum": list(GIVES)}, "quote": _STR, "note": _STR},
+        "required": ["what", "quote", "note"]}
+    return {"type": "object", "properties": {
+        "gives": {"type": "array", "items": gives}, "introduced_name": _STR, "next_step": _STR},
+        "required": ["gives", "introduced_name", "next_step"]}
 
 
 def check_citations(citations: Any, evidence: Dict[str, List[str]]
@@ -195,6 +223,46 @@ def clean_draft(obj: Any, evidence: Dict[str, List[str]]
         flags.append(f"the message is {words} words")
     return {"angle": str(obj.get("angle") or "").strip(), "message": message,
             "rests_on": kept, "assumes": str(obj.get("assumes") or "").strip()}, bad, flags
+
+
+def clean_message(obj: Any, first: str, limit: int, called: str) -> Tuple[Dict[str, Any], List[str]]:
+    """(message record, flags) for a follow-up or an answer: `first` is the
+    name of its one-sentence field. Nothing is cited, so nothing is checked
+    but length."""
+    obj = obj if isinstance(obj, dict) else {}
+    message = str(obj.get("message") or "").strip()
+    words = len(message.split())
+    flags = [f"the {called} is {words} words"] if words > limit else []
+    return {first: str(obj.get(first) or "").strip(), "message": message,
+            "assumes": str(obj.get("assumes") or "").strip()}, flags
+
+
+def clean_followup(obj: Any) -> Tuple[Dict[str, Any], List[str]]:
+    return clean_message(obj, "idea", FOLLOWUP_WORDS, "follow-up")
+
+
+def clean_answer(obj: Any) -> Tuple[Dict[str, Any], List[str]]:
+    return clean_message(obj, "takes_up", ANSWER_WORDS, "answer")
+
+
+def clean_reply(obj: Any, reply_lines: List[str]) -> Tuple[Dict[str, Any], List[str]]:
+    """(what the reply gives, flags). Each entry's quote is looked for in the
+    reply. An entry whose quote is not there is kept and flagged: what the
+    person said is the practice's to judge, and the reply is on the card."""
+    obj = obj if isinstance(obj, dict) else {}
+    gives: List[Dict[str, Any]] = []
+    flags: List[str] = []
+    for g in obj.get("gives") or []:
+        if not isinstance(g, dict) or g.get("what") not in GIVES:
+            continue
+        kept, _ = check_citations([{"file": REPLY_FILE, "lines": [1, len(reply_lines)], "quote": g.get("quote")}],
+                                  {REPLY_FILE: reply_lines})
+        gives.append({"what": g["what"], "quote": str(g.get("quote") or "").strip(),
+                      "note": str(g.get("note") or "").strip(), "quote_found": bool(kept)})
+        if not kept:
+            flags.append(f"the words quoted for `{g['what']}` are not in the reply")
+    return {"gives": gives, "introduced_name": str(obj.get("introduced_name") or "").strip(),
+            "next_step": str(obj.get("next_step") or "").strip()}, flags
 
 
 def numbered(lines: Sequence[str], max_words: int) -> Tuple[str, bool]:
