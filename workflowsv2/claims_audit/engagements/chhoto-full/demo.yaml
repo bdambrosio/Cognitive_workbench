@@ -1,0 +1,32 @@
+# The public demo over this engagement (src/demo/app.py).
+#
+# `redact` is the list of literal strings that identify the target; every
+# one is replaced by `display_name` in everything the demo page shows. It is
+# the practice's list, not a detector: read the demo page before publishing.
+
+display_name: a self-hosted URL shortener
+model_label: an open-weight model
+
+redact:
+  # The engagement name first: it heads the report, and 'demo-' alone would
+  # survive the shorter match.
+  - chhoto-full
+  - demo-chhoto
+  - chhoto-url
+  - chhoto_url
+  - chhoto url
+  - chhoto
+  - SinTan1729
+  - Sayantan Santra
+  - sintan
+  # The name in Bengali script, and its percent-encoded form in the
+  # Wiktionary link the site and README carry.
+  - "ছোট"
+  - "%E0%A6%9B%E0%A7%8B%E0%A6%9F"
+
+max_live: 8
+max_turns: 20
+max_chars: 2000
+sessions_per_ip_per_hour: 6
+turns_in_flight: 3
+keep_days: 7
