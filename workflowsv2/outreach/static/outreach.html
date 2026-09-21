@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tuuyi outreach</title>
 <style>
-  :root { --ink:#1c2430; --soft:#5b6675; --line:#d9dee6; --bg:#f6f7f9; --card:#fff; --go:#1f6f4a; --warn:#9a5b00; --stop:#8a2f2f; }
+  :root { color-scheme:dark; --ink:#e3e5e8; --soft:#a0a6b0; --line:#474b52; --bg:#2b2d31; --card:#34373c; --field:#2b2d31; --button:#3d4147; --go:#2f8f63; --warn:#e0a44a; --stop:#e89090; }
   * { box-sizing: border-box; }
   body { margin:0; font:15px/1.5 system-ui, sans-serif; color:var(--ink); background:var(--bg); }
   header { padding:14px 20px; background:var(--card); border-bottom:1px solid var(--line); display:flex; gap:18px; align-items:baseline; flex-wrap:wrap; }
@@ -20,12 +20,12 @@
   .meta a { color:inherit; }
   .why { margin:6px 0 10px; }
   .flag { color:var(--warn); font-size:13px; margin:2px 0; }
-  textarea, input, select { font:inherit; width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); }
+  textarea, input, select { font:inherit; width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; background:var(--field); color:var(--ink); }
   textarea.msg { min-height:150px; }
   .row { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; align-items:center; }
   .row > * { flex:0 0 auto; width:auto; }
   .row .grow { flex:1 1 200px; }
-  button { font:inherit; padding:7px 14px; border-radius:6px; border:1px solid var(--line); background:#fff; color:var(--ink); cursor:pointer; }
+  button { font:inherit; padding:7px 14px; border-radius:6px; border:1px solid var(--line); background:var(--button); color:var(--ink); cursor:pointer; }
   button.go { background:var(--go); border-color:var(--go); color:#fff; }
   button.stop { color:var(--stop); }
   button:disabled { opacity:.5; cursor:default; }
@@ -33,7 +33,7 @@
   summary { cursor:pointer; color:var(--soft); font-size:13px; }
   pre.brief { white-space:pre-wrap; font:13px/1.45 ui-monospace, monospace; background:var(--bg); padding:10px; border-radius:6px; max-height:420px; overflow:auto; }
   .words { color:var(--soft); font-size:12px; }
-  #note { position:fixed; bottom:14px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:8px 14px; border-radius:6px; display:none; max-width:90%; }
+  #note { position:fixed; bottom:14px; left:50%; transform:translateX(-50%); background:var(--ink); color:var(--bg); padding:8px 14px; border-radius:6px; display:none; max-width:90%; }
   #runlog { font:12px/1.4 ui-monospace, monospace; color:var(--soft); white-space:pre-wrap; margin-top:8px; }
   .grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   @media (max-width:640px) { .grid { grid-template-columns:1fr; } }
