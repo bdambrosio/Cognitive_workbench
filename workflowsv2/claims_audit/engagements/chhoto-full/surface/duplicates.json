@@ -1,0 +1,1002 @@
+{
+ "at": "2026-09-20T23-54-08Z",
+ "model": "accounts/fireworks/models/glm-5p3-flash",
+ "order": [
+  "README.md",
+  "docs/CLI.md",
+  "docs/INSTALLATION.md",
+  "docs/SECURITY.md",
+  "docs/TOOLS.md",
+  "claim_sources/site_index_html.md"
+ ],
+ "runs": {
+  "README.md": "2026-09-20T23-32-01Z_enum_chhoto-full_readme_md_2026-09-20T23-32-01Z",
+  "docs/CLI.md": "2026-09-20T23-35-40Z_enum_chhoto-full_docs_cli_md_2026-09-20T23-32-01Z",
+  "docs/INSTALLATION.md": "2026-09-20T23-40-05Z_enum_chhoto-full_docs_installation_md_2026-09-20T23-32-01Z",
+  "docs/SECURITY.md": "2026-09-20T23-48-39Z_enum_chhoto-full_docs_security_md_2026-09-20T23-32-01Z",
+  "docs/TOOLS.md": "2026-09-20T23-49-02Z_enum_chhoto-full_docs_tools_md_2026-09-20T23-32-01Z",
+  "claim_sources/site_index_html.md": "2026-09-20T23-50-37Z_enum_chhoto-full_claim_sources_site_index_html_md_2026-09-20T23-32-01Z"
+ },
+ "skipped": [],
+ "emissions": [
+  {
+   "source": "README.md",
+   "claims": [
+    6,
+    9,
+    10,
+    11,
+    17,
+    18,
+    19,
+    20,
+    22,
+    23,
+    24,
+    26,
+    27,
+    28,
+    29,
+    31,
+    32,
+    35,
+    37,
+    39,
+    40,
+    41,
+    44,
+    45,
+    47,
+    48,
+    49,
+    53,
+    54,
+    55
+   ],
+   "proposed": 1,
+   "same": 1,
+   "within": 0,
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "source": "README.md",
+   "claims": [
+    57,
+    60,
+    61,
+    62
+   ],
+   "proposed": 0,
+   "same": 0,
+   "within": 0,
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "source": "docs/CLI.md",
+   "claims": [
+    1,
+    3,
+    4,
+    6,
+    7,
+    8,
+    9,
+    10,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    22,
+    24,
+    25,
+    26,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36
+   ],
+   "proposed": 2,
+   "same": 0,
+   "within": 1,
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "source": "docs/CLI.md",
+   "claims": [
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    47,
+    48,
+    50,
+    51,
+    52,
+    53,
+    54,
+    56,
+    57,
+    58,
+    59,
+    61,
+    62,
+    63,
+    66
+   ],
+   "proposed": 3,
+   "same": 2,
+   "within": 1,
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "source": "docs/INSTALLATION.md",
+   "claims": [
+    2,
+    3,
+    4,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    32,
+    33,
+    34,
+    35
+   ],
+   "proposed": 4,
+   "same": 0,
+   "within": 3,
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "source": "docs/INSTALLATION.md",
+   "claims": [
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    54,
+    55,
+    56,
+    59,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68
+   ],
+   "proposed": 7,
+   "same": 5,
+   "within": 1,
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "source": "docs/INSTALLATION.md",
+   "claims": [
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98
+   ],
+   "proposed": 3,
+   "same": 0,
+   "within": 3,
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "source": "docs/INSTALLATION.md",
+   "claims": [
+    99,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    111,
+    113,
+    115,
+    118,
+    119,
+    120,
+    121,
+    122,
+    126,
+    128,
+    129,
+    131,
+    134,
+    135,
+    136,
+    137,
+    139,
+    140,
+    141,
+    146
+   ],
+   "proposed": 3,
+   "same": 1,
+   "within": 2,
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "source": "docs/INSTALLATION.md",
+   "claims": [
+    147,
+    149,
+    150,
+    153,
+    154,
+    155,
+    156
+   ],
+   "proposed": 0,
+   "same": 0,
+   "within": 0,
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "source": "docs/SECURITY.md",
+   "claims": [
+    1,
+    3,
+    4
+   ],
+   "proposed": 1,
+   "same": 0,
+   "within": 1,
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "source": "docs/TOOLS.md",
+   "claims": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13
+   ],
+   "proposed": 5,
+   "same": 2,
+   "within": 1,
+   "parse": "parsed",
+   "parse_error": null
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "claims": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    31
+   ],
+   "proposed": 29,
+   "same": 10,
+   "within": 16,
+   "parse": "parsed",
+   "parse_error": null
+  }
+ ],
+ "pairs": [
+  {
+   "source": "README.md",
+   "id": 24,
+   "statement": "The target contains a hit-counting mechanism that records a count for each short link.",
+   "similarity": 0.744,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 13,
+    "statement": "The software includes hit counting as one of its features."
+   }
+  },
+  {
+   "source": "docs/CLI.md",
+   "id": 43,
+   "statement": "The /api/all endpoint implements an alternative pagination method via the page_no parameter.",
+   "similarity": 0.962,
+   "relation": "same",
+   "other": {
+    "source": "docs/CLI.md",
+    "id": 42,
+    "statement": "The /api/all endpoint supports a page_no query parameter as an alternative way of doing pagination."
+   }
+  },
+  {
+   "source": "docs/CLI.md",
+   "id": 66,
+   "statement": "Pagination requests to /api/all that use the page_no parameter complete more slowly than pagination requests that use page_after.",
+   "similarity": 0.93,
+   "relation": "same",
+   "other": {
+    "source": "docs/CLI.md",
+    "id": 65,
+    "statement": "Pagination requests to /api/all that use the page_after parameter complete faster than pagination requests that use the alternative method."
+   }
+  },
+  {
+   "source": "docs/INSTALLATION.md",
+   "id": 36,
+   "statement": "The service handles password authentication without providing encryption for the password in transport.",
+   "similarity": 0.83,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 49,
+    "statement": "The authentication is not encrypted in transport."
+   }
+  },
+  {
+   "source": "docs/INSTALLATION.md",
+   "id": 39,
+   "statement": "The frontend contains code that converts punycode entered for CHHOTO_SITE_URL into unicode.",
+   "similarity": 0.802,
+   "relation": "same",
+   "other": {
+    "source": "docs/INSTALLATION.md",
+    "id": 38,
+    "statement": "The frontend is written to use CHHOTO_SITE_URL, when it is set, for copying to clipboard and for QR code generation."
+   }
+  },
+  {
+   "source": "docs/INSTALLATION.md",
+   "id": 41,
+   "statement": "The service checks the provided API key at startup and, when it is considered weak, generates a strong API key and prints it to the logs.",
+   "similarity": 0.751,
+   "relation": "same",
+   "other": {
+    "source": "docs/CLI.md",
+    "id": 9,
+    "statement": "When the configured API key is insecure, the server outputs a warning together with a generated API key that can be used."
+   }
+  },
+  {
+   "source": "docs/INSTALLATION.md",
+   "id": 47,
+   "statement": "The database is configured to run in WAL journal mode when CHHOTO_SQLITE_USE_WAL_MODE is set to True.",
+   "similarity": 0.935,
+   "relation": "same",
+   "other": {
+    "source": "docs/INSTALLATION.md",
+    "id": 45,
+    "statement": "Setting the environment variable CHHOTO_SQLITE_USE_WAL_MODE to True enables WAL journal mode for the database."
+   }
+  },
+  {
+   "source": "docs/INSTALLATION.md",
+   "id": 54,
+   "statement": "With default configuration the database is ACID (restatement of the ACID-compliance claim of claim 54 for the default case).",
+   "similarity": 0.781,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 42,
+    "statement": "The SQLite database is configured to be ACID by default."
+   }
+  },
+  {
+   "source": "docs/INSTALLATION.md",
+   "id": 108,
+   "statement": "By default only http, https, ftp, and magnet link protocols are allowed for long links.",
+   "similarity": 0.874,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 58,
+    "statement": "By default, the target accepts only https, http, ftp, and magnet protocols for long links, rejecting other protocols."
+   }
+  },
+  {
+   "source": "docs/TOOLS.md",
+   "id": 3,
+   "statement": "The official Chhoto URL CLI application (the referent of \"It\", from the heading above) is maintained by the seller.",
+   "similarity": 0.836,
+   "relation": "same",
+   "other": {
+    "source": "docs/CLI.md",
+    "id": 2,
+    "statement": "The seller maintains the official CLI app."
+   }
+  },
+  {
+   "source": "docs/TOOLS.md",
+   "id": 4,
+   "statement": "The seller does not commit to providing proper support for the official CLI application.",
+   "similarity": 0.947,
+   "relation": "same",
+   "other": {
+    "source": "docs/CLI.md",
+    "id": 3,
+    "statement": "The seller does not promise proper support for the CLI app."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 1,
+   "statement": "The product is a self-hosted URL shortener — the core function of the category exists (the 'blazingly fast' adjective is puffery and not part of what is tested).",
+   "similarity": 0.883,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 4,
+    "statement": "The product is a self-hosted URL shortener — the core function of the category exists."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 2,
+   "statement": "The software is written in Rust.",
+   "similarity": 0.813,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 12,
+    "statement": "The software the buyer would acquire is written in Rust, being the maintainer's rewrite of the simply-shorten project."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 3,
+   "statement": "Restatement that the software is written in Rust.",
+   "similarity": 0.813,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 12,
+    "statement": "The software the buyer would acquire is written in Rust, being the maintainer's rewrite of the simply-shorten project."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 4,
+   "statement": "The product can be deployed self-hosted and provides the core tools needed to create and manage short links on the deployer's own infrastructure.",
+   "similarity": 0.767,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 4,
+    "statement": "The product is a self-hosted URL shortener — the core function of the category exists."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 6,
+   "statement": "The frontend is written in HTML, CSS and vanilla JavaScript, with no frontend framework.",
+   "similarity": 0.836,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 47,
+    "statement": "The frontend is written in plain HTML and vanilla JavaScript, styled with Pure CSS."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 7,
+   "statement": "Link data is stored in an SQLite database.",
+   "similarity": 0.959,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 41,
+    "statement": "Links are stored in an SQLite database."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 9,
+   "statement": "The service uses less than 10 MB of RAM under regular load.",
+   "similarity": 0.927,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 7,
+    "statement": "The service uses under 10 MB of RAM in ordinary operation."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 11,
+   "statement": "The project is maintained by SinTan1729.",
+   "similarity": 0.843,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 1,
+    "statement": "The maintainer of the chhoto-url project is SinTan1729."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 26,
+   "statement": "Short links configured with a duration expire automatically in operation once that duration has elapsed.",
+   "similarity": 0.816,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 60,
+    "statement": "Short links in the running service stop working on their own once their expiry time has passed."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 27,
+   "statement": "As short links are used in operation, the hit count kept for each link reflects how many times that link has been used.",
+   "similarity": 0.824,
+   "relation": "same",
+   "other": {
+    "source": "README.md",
+    "id": 62,
+    "statement": "When a short link is visited in the running service, the visit is counted and the hit count for that link increases."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 5,
+   "statement": "The compressed size of the scratch-variant Docker image is under 4.5 MB.",
+   "similarity": 0.856,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 8,
+    "statement": "The compressed container image is below 4.5 MB for the scratch variant and below 8.5 MB for the alpine variant."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 6,
+   "statement": "The compressed size of the alpine-variant Docker image is under 8.5 MB.",
+   "similarity": 0.848,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 8,
+    "statement": "The compressed container image is below 4.5 MB for the scratch variant and below 8.5 MB for the alpine variant."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 15,
+   "statement": "The target contains a shortening path that accepts a submitted long URL and stores or returns a short link generated at random.",
+   "similarity": 0.842,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 13,
+    "statement": "The target contains code that accepts a URL for shortening and creates a short link for it, using either an automatically generated slug or a user-chosen custom alias."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 17,
+   "statement": "The target contains expiry logic that marks or removes short links once their expiry time passes.",
+   "similarity": 0.855,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 14,
+    "statement": "The target contains code that lets a duration be set for a short link and that expires the link once that duration has passed."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 18,
+   "statement": "The expiry time for a link can be chosen (by the user) rather than being fixed.",
+   "similarity": 0.782,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 14,
+    "statement": "The target contains code that lets a duration be set for a short link and that expires the link once that duration has passed."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 19,
+   "statement": "Optionally, the user can choose a custom short URL instead of the randomly generated one.",
+   "similarity": 0.796,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 13,
+    "statement": "The target contains code that accepts a URL for shortening and creates a short link for it, using either an automatically generated slug or a user-chosen custom alias."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 27,
+   "statement": "Custom notes can be attached to each short link.",
+   "similarity": 0.78,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 17,
+    "statement": "The target provides a way to attach notes to links and a filter in the web UI that narrows the links by those notes."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 29,
+   "statement": "The service can generate QR codes for short links.",
+   "similarity": 0.825,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 18,
+    "statement": "The target contains code that generates a QR code for a short link and exposes an API through which the service can be used programmatically."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 30,
+   "statement": "The service can be operated using an API key.",
+   "similarity": 0.761,
+   "relation": "within",
+   "other": {
+    "source": "docs/CLI.md",
+    "id": 7,
+    "statement": "The server supports API key validation, enabled by setting the CHHOTO_API_KEY environment variable."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 36,
+   "statement": "A public mode exists in which anyone can add links without authenticating.",
+   "similarity": 0.786,
+   "relation": "within",
+   "other": {
+    "source": "docs/INSTALLATION.md",
+    "id": 89,
+    "statement": "Chhoto URL provides a public mode which, when CHHOTO_PUBLIC_MODE is set to `Enable`, allows links to be submitted without authentication."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 39,
+   "statement": "An expiry time can be forced for links on public instances.",
+   "similarity": 0.796,
+   "relation": "within",
+   "other": {
+    "source": "docs/INSTALLATION.md",
+    "id": 92,
+    "statement": "Chhoto URL applies the CHHOTO_PUBLIC_MODE_EXPIRY_DELAY setting to links submitted in public mode, scheduling them to expire."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 40,
+   "statement": "The URL of the website can be configured.",
+   "similarity": 0.757,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 20,
+    "statement": "The application is configured through environment variables covering the site URL, credentials and storage."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 44,
+   "statement": "The software is distributed as a Docker container.",
+   "similarity": 0.759,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 19,
+    "statement": "The product is deployable as an OCI-compatible container, including via Docker and Podman."
+   }
+  },
+  {
+   "source": "README.md",
+   "id": 59,
+   "statement": "When a URL is submitted to the running service, it returns a randomly generated short link for that URL.",
+   "similarity": 0.754,
+   "relation": "within",
+   "other": {
+    "source": "docs/CLI.md",
+    "id": 61,
+    "statement": "When a link is created without a shortlink value, the target supplies an automatically generated short link for it."
+   }
+  },
+  {
+   "source": "docs/CLI.md",
+   "id": 3,
+   "statement": "The seller does not promise proper support for the CLI app.",
+   "similarity": 0.701,
+   "relation": "within",
+   "other": {
+    "source": "docs/TOOLS.md",
+    "id": 5,
+    "statement": "The tools listed in this document are third-party and are not officially supported by the seller."
+   }
+  },
+  {
+   "source": "docs/CLI.md",
+   "id": 61,
+   "statement": "When a link is created without a shortlink value, the target supplies an automatically generated short link for it.",
+   "similarity": 0.739,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 25,
+    "statement": "When a URL is submitted for shortening, the product creates a short URL for it using either a generated slug or a custom alias."
+   }
+  },
+  {
+   "source": "docs/INSTALLATION.md",
+   "id": 3,
+   "statement": "The repository contains a sample compose.yaml file at deploy/compose.yaml.",
+   "similarity": 0.775,
+   "relation": "within",
+   "other": {
+    "source": "README.md",
+    "id": 45,
+    "statement": "A Docker compose file is provided with the distribution."
+   }
+  },
+  {
+   "source": "docs/INSTALLATION.md",
+   "id": 15,
+   "statement": "The container images are built as OCI images that Podman and other OCI-compatible container engines can pull and run.",
+   "similarity": 0.808,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 19,
+    "statement": "The product is deployable as an OCI-compatible container, including via Docker and Podman."
+   }
+  },
+  {
+   "source": "docs/INSTALLATION.md",
+   "id": 26,
+   "statement": "The access password is configured through the CHHOTO_PASSWORD environment variable.",
+   "similarity": 0.729,
+   "relation": "within",
+   "other": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 20,
+    "statement": "The application is configured through environment variables covering the site URL, credentials and storage."
+   }
+  },
+  {
+   "source": "docs/INSTALLATION.md",
+   "id": 27,
+   "statement": "The target stores its data in a SQLite database file, named urls.sqlite by default.",
+   "similarity": 0.818,
+   "relation": "within",
+   "other": {
+    "source": "README.md",
+    "id": 41,
+    "statement": "Links are stored in an SQLite database."
+   }
+  },
+  {
+   "source": "docs/INSTALLATION.md",
+   "id": 29,
+   "statement": "The database file location is configured through the CHHOTO_DB_URL environment variable.",
+   "similarity": 0.84,
+   "relation": "within",
+   "other": {
+    "source": "docs/INSTALLATION.md",
+    "id": 16,
+    "statement": "The software supports configuring a custom database location via CHHOTO_DB_URL and supports WAL mode."
+   }
+  },
+  {
+   "source": "docs/INSTALLATION.md",
+   "id": 40,
+   "statement": "The provided API key is checked for strength when the service starts.",
+   "similarity": 0.723,
+   "relation": "within",
+   "other": {
+    "source": "docs/CLI.md",
+    "id": 9,
+    "statement": "When the configured API key is insecure, the server outputs a warning together with a generated API key that can be used."
+   }
+  },
+  {
+   "source": "docs/INSTALLATION.md",
+   "id": 81,
+   "statement": "Setting CHHOTO_ALLOW_CAPITAL_LETTERS to True also enables capital letters in auto-generated UID slugs, when UID slugs are enabled.",
+   "similarity": 0.883,
+   "relation": "within",
+   "other": {
+    "source": "docs/INSTALLATION.md",
+    "id": 79,
+    "statement": "Setting CHHOTO_ALLOW_CAPITAL_LETTERS to True enables the use of capital letters in shortlinks."
+   }
+  },
+  {
+   "source": "docs/INSTALLATION.md",
+   "id": 129,
+   "statement": "The Helm chart files exist in the repository at `deploy/helm-chart`.",
+   "similarity": 0.818,
+   "relation": "within",
+   "other": {
+    "source": "docs/INSTALLATION.md",
+    "id": 128,
+    "statement": "The Helm chart ships a values file at `deploy/helm-chart/values.yaml` with configurable `password`, `fqdn` and `letsencryptmail` fields."
+   }
+  },
+  {
+   "source": "docs/INSTALLATION.md",
+   "id": 130,
+   "statement": "When run under Podman and other OCI-compatible container engines, the container images work as intended.",
+   "similarity": 0.71,
+   "relation": "within",
+   "other": {
+    "source": "docs/INSTALLATION.md",
+    "id": 131,
+    "statement": "When deployed on anything that supports OCI images, such as docker or podman quadlets, Chhoto URL runs."
+   }
+  },
+  {
+   "source": "docs/SECURITY.md",
+   "id": 3,
+   "statement": "Vulnerability reports can be submitted as GitHub security advisories at the linked repository URL.",
+   "similarity": 0.768,
+   "relation": "within",
+   "other": {
+    "source": "docs/SECURITY.md",
+    "id": 1,
+    "statement": "A vulnerability reporting process exists for Chhoto URL and accepts reports through the channels listed below it."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 5,
+   "statement": "The backend is written in async Rust using the Actix Web framework.",
+   "similarity": 0.969,
+   "relation": "within",
+   "other": {
+    "source": "README.md",
+    "id": 46,
+    "statement": "The backend is written in Rust using the Actix Web framework."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 17,
+   "statement": "The target provides a way to attach notes to links and a filter in the web UI that narrows the links by those notes.",
+   "similarity": 0.828,
+   "relation": "within",
+   "other": {
+    "source": "README.md",
+    "id": 28,
+    "statement": "The UI supports filtering links by short link, long link, and notes."
+   }
+  },
+  {
+   "source": "claim_sources/site_index_html.md",
+   "id": 20,
+   "statement": "The application is configured through environment variables covering the site URL, credentials and storage.",
+   "similarity": 0.723,
+   "relation": "within",
+   "other": {
+    "source": "docs/INSTALLATION.md",
+    "id": 31,
+    "statement": "All configuration of the target is done via environment variables (no config files or other mechanisms)."
+   }
+  }
+ ]
+}

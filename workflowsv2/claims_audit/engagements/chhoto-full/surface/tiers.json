@@ -1,0 +1,1624 @@
+{
+ "sources": {
+  "README.md": {
+   "at": "2026-09-20T23-57-37Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 62,
+   "claims_from": "runs/2026-09-20T23-32-01Z_enum_chhoto-full_readme_md_2026-09-20T23-32-01Z/claims.json",
+   "reliance_statement": "2026-09-20T23-54-59Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 3,
+     "basis": "The identity of the maintainer appears in no threshold and under no function the buyer relies on; the buyer is acquiring the code, not the person. Rated on the scale alone."
+    },
+    {
+     "claim_id": 2,
+     "tier": 3,
+     "basis": "That releases are published on GitHub changes nothing about what the buyer is paying for or the terms; the buyer's stated end-the-deal conditions do not reach it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 3,
+     "tier": 1,
+     "basis": "The buyer's price and its decision to close rest on clean ownership under the MIT licence, and the licence document is the fact the buyer relies on; if the claim were false the deal would not proceed. Rated against the buyer's stated threshold: \"a licence or ownership problem with the code\"."
+    },
+    {
+     "claim_id": 4,
+     "tier": 1,
+     "basis": "Shortening is the core of what the buyer is buying; if the product were not a working self-hosted shortener, there is nothing for the buyer's staff to patch and no bargain left. Rated against the buyer's stated threshold: \"a small, private link shortener the buyer can run for its customers\"."
+    },
+    {
+     "claim_id": 5,
+     "tier": 2,
+     "basis": "The footprint threshold reaches this claim, but a single image-size figure, even if worse than stated, is too small on its own for the buyer to go back to the seller over; a reader choosing between image variants and sizing storage would act on the figure. Rated against the buyer's stated threshold: \"footprint or resource figures materially worse than stated\"."
+    },
+    {
+     "claim_id": 6,
+     "tier": 2,
+     "basis": "The footprint threshold reaches this claim, but one compressed image figure alone is too small to reopen the price over; a reader choosing the alpine variant would act on the figure when picking hardware and storage. Rated against the buyer's stated threshold: \"footprint or resource figures materially worse than stated\"."
+    },
+    {
+     "claim_id": 7,
+     "tier": 2,
+     "basis": "The resource-figure threshold reaches this claim, but one RAM figure, even if false, is too small alone to send the buyer back to the seller over; a reader planning the instance's hosting would act on it. Rated against the buyer's stated threshold: \"footprint or resource figures materially worse than stated\"."
+    },
+    {
+     "claim_id": 8,
+     "tier": 3,
+     "basis": "The buyer acquires source code it can run and, if need be, maintain itself; no threshold names the project's being finished or alive, and the claim is the maintainer's characterisation rather than a commitment the buyer's plan depends on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 9,
+     "tier": 3,
+     "basis": "A decision not to add features costs the buyer nothing; the buyer is buying the tool as described, and no threshold or plan item reaches a refusal of new features. Rated on the scale alone."
+    },
+    {
+     "claim_id": 10,
+     "tier": 3,
+     "basis": "The upkeep commitments sit under an item the buyer's plan only uses, on the practice's inference, and no stated threshold names bug fixing; if the promise were not kept, staff would carry fixes in a small codebase, which is costly but does not reopen the price or the terms on its own. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 11,
+     "tier": 3,
+     "basis": "Security upkeep sits under an item the buyer's plan only uses, on the practice's inference, and no stated threshold names it; if the promise were not kept, staff would track and apply vulnerability fixes themselves, a running cost that does not by itself change the price or the terms. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 12,
+     "tier": 3,
+     "basis": "The implementation language reaches no threshold and no item the buyer depends on; it bears only on how easily staff could patch, which the reliance statement treats as the practice's inference. Rated on the scale alone."
+    },
+    {
+     "claim_id": 13,
+     "tier": 1,
+     "basis": "The hit count is the one piece of visitor data the buyer's price assumes it gets, the outer edge of what recording it will accept; if the software included no hit counting, that condition is breached and the buyer could not restore it by configuration. Rated against the buyer's stated threshold: \"any way visitors are logged or tracked beyond the hit count\"."
+    },
+    {
+     "claim_id": 14,
+     "tier": 3,
+     "basis": "The seller's demo instance sits under an item the buyer's plan does not use at all; the buyer is acquiring the code and would never touch the hosted demo. Rated on the scale alone."
+    },
+    {
+     "claim_id": 15,
+     "tier": 1,
+     "basis": "The shortening path is the core of the service the buyer is buying; if it did not exist as described, the one thing the purchase is for fails and nothing the buyer's staff could do in configuration restores it. Rated against the buyer's stated threshold: \"a small, private link shortener the buyer can run for its customers\"."
+    },
+    {
+     "claim_id": 16,
+     "tier": 3,
+     "basis": "If false, shortening still works for ordinary URLs and the buyer loses only the absence of a length cap, a restriction its staff would rarely meet in normal link-shortening use. No stated threshold or reliance item names URL length, and the failure would not defeat the core shortening the buyer depends on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 17,
+     "tier": 3,
+     "basis": "If expiry logic were absent, the buyer's staff could remove stale links by hand, which the reliance statement treats as a cheap substitution while the service is small. The expiry item is one the buyer uses, not one it depends on. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 18,
+     "tier": 3,
+     "basis": "If the expiry time could not be chosen per link, links would die or persist on a fixed schedule, and staff could manage the difference manually at small cost. This falls under an item the buyer uses, not one it depends on, and no stated threshold names expiry. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 19,
+     "tier": 1,
+     "basis": "Custom aliases are named in the item the buyer depends on — shortening with a generated slug or a customer-chosen custom alias — and the buyer is offering the service to its own customers, for whom chosen addresses are a visible part of the product. If the claim were false, the buyer would go back over a missing feature of the core service it is paying for. Rated against the buyer's stated threshold: \"a small, private link shortener the buyer can run for its customers\"."
+    },
+    {
+     "claim_id": 20,
+     "tier": 1,
+     "basis": "The redirect path is the other half of the service's core, and its failure would leave every link the buyer's customers share failing or misleading, with no repair in the buyer's staff's power. This defeats an item the buyer depends on outright. Rated against the buyer's stated threshold: \"a small, private link shortener the buyer can run for its customers\"."
+    },
+    {
+     "claim_id": 21,
+     "tier": 1,
+     "basis": "The reliance statement's depends item covers redirecting the visitor straight to the destination; an intermediate redirection page would defeat that and degrade or mislead every shared link. If the claim were false the buyer would go back over the behaviour of the service's core path. Rated against the buyer's stated threshold: \"a small, private link shortener the buyer can run for its customers\"."
+    },
+    {
+     "claim_id": 22,
+     "tier": 1,
+     "basis": "The ~6MB figure is the stated footprint the buyer's price is recorded against, and the buyer said materially worse footprint figures change the price or the terms. If the claim were false the buyer would go back to the seller over this figure alone. Rated against the buyer's stated threshold: \"footprint or resource figures materially worse than stated\"."
+    },
+    {
+     "claim_id": 23,
+     "tier": 1,
+     "basis": "The sub-5MB RAM figure is a stated resource figure the price assumes is accurate, and materially worse figures are a named price condition. If the claim were false the buyer would go back to the seller over this figure alone. Rated against the buyer's stated threshold: \"footprint or resource figures materially worse than stated\"."
+    },
+    {
+     "claim_id": 25,
+     "tier": 1,
+     "basis": "This claim draws exactly the boundary the buyer set for what may be recorded about visitors, and the reliance statement marks it as depended on. If it were false, the buyer's stated condition on visitor recording would be breached and the terms would have to be revisited. Rated against the buyer's stated threshold: \"any way visitors are logged or tracked beyond the hit count\"."
+    },
+    {
+     "claim_id": 26,
+     "tier": 3,
+     "basis": "If links could not be edited after creation, staff would fall back to deletion and recreation or to direct database access, a workable but irritrating substitution for a small service. This falls under an item the buyer uses, not one it depends on, and no stated threshold names link editing. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 27,
+     "tier": 3,
+     "basis": "If notes could not be attached, staff would keep link annotations outside the service, a cheap substitution that touches nothing the buyer depends on. The editing-and-listing item is one the buyer uses, and no stated threshold reaches notes. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 28,
+     "tier": 3,
+     "basis": "If filtering were absent, staff would find links by paging or by querying the database directly, which is slower but workable at the scale of a small private service. The web administration interface is an item the buyer uses, not one it depends on. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 29,
+     "tier": 3,
+     "basis": "If QR code generation were absent, staff or customers could produce QR codes from the short link with any outside tool at no cost. The web interface is an item the buyer uses, and no stated threshold reaches QR codes. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 30,
+     "tier": 2,
+     "basis": "API key operation is a documented authentication mechanism a person writing against the API or scripting administrative tasks would act on directly, and its absence would change how set-up and automation are done. It does not by itself defeat the authentication item the buyer depends on, since password-based access would remain. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 31,
+     "tier": 2,
+     "basis": "Supplying hashed credentials is a set-up detail a person deploying the service would act on — the form in which the password and API key are provided — though its absence would not by itself defeat the privacy or access control the buyer depends on. It is the kind of documented configuration fact the buyer, operating the software from its documentation, relies on alongside others of its kind. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 32,
+     "tier": 2,
+     "basis": "A buyer integrating with the service programmatically would write different code depending on whether the API is JSON-RPC style, so this is documented detail a reader of the API reference would act on. On its own the buyer would not reopen terms, but with other API claims its falsity would undermine relying on the documented interface. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 33,
+     "tier": 3,
+     "basis": "If false, staff would use the interface from a desktop or patch the plain HTML frontend, a cheap repair for this buyer. Nothing in the stated thresholds reaches mobile usability. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 34,
+     "tier": 3,
+     "basis": "If false, the interface would simply stay in one theme, which costs nothing beyond appearance for a small private service. No stated threshold reaches this. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 35,
+     "tier": 3,
+     "basis": "If false, the buyer would fall back to the built-in interface, which costs nothing beyond appearance. No stated threshold reaches this. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 36,
+     "tier": 3,
+     "basis": "The buyer runs a private service and would leave public mode off; nothing in its plan touches this feature, so its falsity changes nothing. No stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 37,
+     "tier": 1,
+     "basis": "If false, the service would not be private: listing and deletion would be open, defeating the privacy the buyer is paying for and engaging its threshold on hardening that is implied but absent. Repair by fronting the service with a separate gate is costly beside the nominal price. Rated against the buyer's stated threshold: \"a small, private link shortener the buyer can run for its customers\"."
+    },
+    {
+     "claim_id": 38,
+     "tier": 3,
+     "basis": "If false, the buyer would use the built-in interface, which costs nothing beyond appearance. No stated threshold reaches this. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 39,
+     "tier": 3,
+     "basis": "The buyer runs a private service, not a public instance, so its falsity changes nothing for the buyer's plan. No stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 40,
+     "tier": 3,
+     "basis": "If false, the configured site URL behind QR codes and copied links could be handled another way at negligible cost for a small service. No stated threshold reaches this. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 41,
+     "tier": 3,
+     "basis": "If links were stored differently, staff operating the instance would adapt to a known, cheap change in how they back up and maintain the data. No stated threshold reaches the storage engine, only dependencies that cannot run on the buyer's own hardware. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 42,
+     "tier": 3,
+     "basis": "If the database were not ACID by default, staff could restore from the software's backups or reconfigure the journal mode, a known and cheap operation, though lost links would be gone. No stated threshold reaches durability settings. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 43,
+     "tier": 3,
+     "basis": "If false, staff would tune the database by other means or not at all, at negligible cost for a small service. No stated threshold reaches this. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 44,
+     "tier": 1,
+     "basis": "If false, the buyer's stated end-the-deal condition on a dependency it cannot run on its own hardware is engaged: rebuilding from the Containerfile is plausible for its staff but not free, and there is no repair that costs nothing. Rated against the buyer's stated threshold: \"a dependency the buyer cannot run on its own hardware\"."
+    },
+    {
+     "claim_id": 45,
+     "tier": 2,
+     "basis": "The threshold reaches the self-hosting item, but a missing compose file alone would not make the service unrunnable: the Docker image remains and staff could write their own compose file, so the failure is too small to reopen terms. A person setting the software up would, however, do something differently without it, which fits the detail a documentation reader relies on. Rated against the buyer's stated threshold: \"a dependency the buyer cannot run on its own hardware\"."
+    },
+    {
+     "claim_id": 46,
+     "tier": 3,
+     "basis": "If the backend were written in something else, the buyer would still acquire working source it can compile and run on its own hardware, with no material change to price or terms. No stated threshold reaches the implementation language, only dependencies that cannot run on the buyer's own hardware. Rated on the scale alone."
+    },
+    {
+     "claim_id": 47,
+     "tier": 3,
+     "basis": "The stack of the admin frontend matters to the buyer only as the practice's inferred reason to expect cheap repair of the interface; if the frontend were not plain HTML and vanilla JavaScript the staff could still patch it, at somewhat higher cost. No stated threshold reaches the frontend stack. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 48,
+     "tier": 1,
+     "basis": "If the provided-password authentication were absent or did not hold, the service could not be kept private, which is what the buyer is paying for, and fronting it with the buyer's own gate would be a costly change beside the nominal price. Rated against the buyer's stated threshold: \"a small, private link shortener the buyer can run for its customers\"."
+    },
+    {
+     "claim_id": 49,
+     "tier": 3,
+     "basis": "The claim discloses a weakness rather than a benefit; if it were false the transport would be safer than described and the buyer would lose nothing. No stated threshold names transport encryption. Rated on the scale alone."
+    },
+    {
+     "claim_id": 50,
+     "tier": 1,
+     "basis": "The buyer's price condition draws the line at the hit count, and tracking or spying of any kind would cross it and force the price or terms to be reopened. Rated against the buyer's stated threshold: \"any way visitors are logged or tracked beyond the hit count\"."
+    },
+    {
+     "claim_id": 51,
+     "tier": 1,
+     "basis": "If logging existed beyond the simple debugging logs, some of it would necessarily record visitor activity and cross the boundary the buyer set on recording, so the buyer would go back to the seller over this claim alone. Rated against the buyer's stated threshold: \"any way visitors are logged or tracked beyond the hit count\"."
+    },
+    {
+     "claim_id": 52,
+     "tier": 2,
+     "basis": "The buyer depends on the private single-admin model, and this claim is the documented access model an operator relies on when deploying: a person setting the service up would act differently if multiple users were in fact supported. On its own its falsity would not make the service public, but with others of its kind it would undermine reliance on the documented access design. Rated against the buyer's stated threshold: \"a small, private link shortener the buyer can run for its customers\"."
+    },
+    {
+     "claim_id": 53,
+     "tier": 1,
+     "basis": "Cookies, newsletters and consent mechanisms are exactly what the buyer's price condition excludes, and the reliance statement lists them under an item the buyer depends on, whose failure would send the buyer back to the seller over the terms. Rated against the buyer's stated threshold: \"any way visitors are logged or tracked beyond the hit count\"."
+    },
+    {
+     "claim_id": 54,
+     "tier": 3,
+     "basis": "A paywall or donation message would be a cosmetic irritation in an interface the buyer's staff control, with no bearing on the price, the terms or the operation of the service. No stated threshold reaches it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 55,
+     "tier": 3,
+     "basis": "The provenance of the word list changes nothing in how the buyer deploys, operates or relies on the service, and the slugs work the same either way. No stated threshold reaches it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 56,
+     "tier": 3,
+     "basis": "A mangled database is remedied by restoring the backups the software keeps, which the reliance statement calls a known, cheap operation for whoever runs the instance, and no stated threshold names data loss or corruption. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 57,
+     "tier": 2,
+     "basis": "This is documented guidance on the slug style and length parameters a deployer chooses, including the capacity limit past which new links fail; a person setting the service up would act on it when picking those parameters. The remedy, switching style or length, is a configuration change. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 58,
+     "tier": 2,
+     "basis": "The allowed-protocol list is a documented default that a person setting the service up, or accepting links on behalf of customers, acts on directly, since links outside the list are rejected. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 59,
+     "tier": 1,
+     "basis": "Shortening is the core of what the buyer is buying; if submitting a URL did not return a working short link, the service could not do the one thing purchased, and the reliance statement records no cheap repair for the buyer's staff. Rated against the buyer's stated threshold: \"a small, private link shortener the buyer can run for its customers\"."
+    },
+    {
+     "claim_id": 60,
+     "tier": 3,
+     "basis": "Expiry sits under an item the buyer only uses on the practice's inference; if it failed, staff could delete stale links by hand, which is cheap while the service is small, and no stated threshold names expiry behaviour. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 61,
+     "tier": 1,
+     "basis": "Redirect resolution is the other half of the core; if a visited short link did not redirect to the correct destination, every link the buyer's customers share would fail or mislead, which the buyer's staff cannot repair in the source at acceptable cost. Rated against the buyer's stated threshold: \"a small, private link shortener the buyer can run for its customers\"."
+    },
+    {
+     "claim_id": 62,
+     "tier": 1,
+     "basis": "If hit counting did not work, the buyer would lose the one piece of visitor data its price assumes it gets, and the buyer's threshold treats the hit count as the boundary of acceptable recording. The reliance statement marks hit counting as depends, and no repair short of fixing the code would restore it. Rated against the buyer's stated threshold: \"any way visitors are logged or tracked beyond the hit count\"."
+    },
+    {
+     "claim_id": 63,
+     "tier": 3,
+     "basis": "If the claim were false and the capacity limit bit earlier or harder than stated, the buyer's staff could switch slug style or length through configuration, which the reliance statement treats as a cheap restart-level change for a small service. No stated threshold reaches slug capacity: it is neither a logging or tracking matter nor a footprint or resource figure. Rated on the practice's reading of the buyer's plan."
+    }
+   ],
+   "unrated": []
+  },
+  "docs/CLI.md": {
+   "at": "2026-09-20T23-59-16Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 64,
+   "claims_from": "runs/2026-09-20T23-35-40Z_enum_chhoto-full_docs_cli_md_2026-09-20T23-32-01Z/claims.json",
+   "reliance_statement": "2026-09-20T23-54-59Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 3,
+     "basis": "If the claim were false, the buyer's staff would drive the service through the web interface or curl against the API instead, a substitution the buyer can make cheaply. The claim falls under the official CLI item, which the buyer uses but does not depend on. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 2,
+     "tier": 3,
+     "basis": "If the seller did not maintain the CLI, the buyer loses nothing it is paying for, since the CLI is a convenience the buyer's plan does not depend on and the seller separately disclaims support for it. Nothing in the buyer's stated thresholds reaches the CLI. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 3,
+     "tier": 3,
+     "basis": "This claim is a disclaimer in the seller's favour; its being false would give the buyer more support than promised, not less, so nothing in the buyer's plan or thresholds would change. It concerns a tool the buyer uses but does not depend on. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 4,
+     "tier": 3,
+     "basis": "If the HTTP API did not exist or could not be driven from a terminal, the buyer's staff would fall back to the web administration interface, which the reliance statement treats as a workable substitution. The API is an item the buyer uses, not one it depends on, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 5,
+     "tier": 2,
+     "basis": "A person writing against the API would call these routes and parse their responses, and would act differently if the paths or their returns differed. On its own the failure would cost a small scripting correction, not a change to price or terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 6,
+     "tier": 2,
+     "basis": "A script that fetches the version or site URL without authenticating would fail or need alteration if this were false. The exposure is of version and site URL only, so no stated threshold about logging, tracking or hardening reaches it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 7,
+     "tier": 1,
+     "basis": "The API key is named in the authentication and access control item, on which the buyer's privacy depends: without key validation the buyer cannot keep its private service private for programmatic and administrative use, and the stated remedy of fronting the service with a gate is costly beside a nominal price. The buyer said it is paying for \"a small, private link shortener\". Rated against the buyer's stated threshold: \"a small, private link shortener\"."
+    },
+    {
+     "claim_id": 8,
+     "tier": 2,
+     "basis": "This is a documented default that decides how a person configures and calls the API, and they would act differently if the default differed. On its own the failure is a configuration correction, not a change to price or terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 9,
+     "tier": 3,
+     "basis": "If this behaviour were absent, the buyer's staff would simply set a strong key themselves, which is what the documented mechanism invites in any case. No stated threshold reaches it and the authentication the buyer depends on does not rest on this warning. Rated on the scale alone."
+    },
+    {
+     "claim_id": 10,
+     "tier": 2,
+     "basis": "A person writing against the API parses every response and would build to a different format if this were false. The failure is a parsing correction across scripts, not something that reopens price or terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 11,
+     "tier": 2,
+     "basis": "The documented status codes are part of the API's contract, and a person handling errors programmatically would act differently if the set differed. On its own the failure costs revised error handling, not price or terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 12,
+     "tier": 2,
+     "basis": "Field names are exactly the detail a person integrating against the API acts on, and the inconsistency would change how they write every request and parser. The failure is an integration irritation, not something the buyer would reopen the deal over. Rated on the scale alone."
+    },
+    {
+     "claim_id": 13,
+     "tier": 2,
+     "basis": "A person creating links programmatically would act directly on this endpoint, its method, header and body fields, and would do differently if any differed. If programmatic creation failed entirely the buyer would fall back to the web interface, since the API is an item the buyer uses rather than depends on and link creation itself remains available. Rated on the scale alone."
+    },
+    {
+     "claim_id": 14,
+     "tier": 2,
+     "basis": "A script writer would rely on being able to omit the shortlink field and would act differently if the fallback did not exist. The failure costs supplying a slug explicitly, not price or terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 15,
+     "tier": 2,
+     "basis": "The unit of expiry_delay is a parameter format a person building requests would act on, and mistaking it changes every expiry their scripts set. The failure is a correction in the caller's code, not a change to the bargain. Rated on the scale alone."
+    },
+    {
+     "claim_id": 16,
+     "tier": 2,
+     "basis": "A capped parameter range is exactly the kind of documented detail a buyer configuring expiry from the documentation would act on: staff setting expiry_delay would choose values differently if the cap were false. On its own, however, no price or term would change, since expiry handling is an item the buyer merely uses and the failure is remedied through configuration. Rated on the scale alone."
+    },
+    {
+     "claim_id": 17,
+     "tier": 2,
+     "basis": "This is a documented default of the expiry_delay parameter: a person setting up links and expecting a missing or zero value to disable expiry would act differently if it were false. If it failed, staff could still delete or edit stale links by hand, so nothing in the price or terms changes on its own. Rated on the scale alone."
+    },
+    {
+     "claim_id": 18,
+     "tier": 2,
+     "basis": "The JSON shape of a success reply is a field name and format a person writing against the API relies on directly; code built against a different shape would break. On its own the buyer's price and terms would not change, as the API is an item the buyer uses and could work around through the web interface. Rated on the scale alone."
+    },
+    {
+     "claim_id": 19,
+     "tier": 2,
+     "basis": "The error reply's fields are API surface a person scripting against /api/new would act on, so a false claim here changes how the documentation is used. The failure alone would not reopen the price or the terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 20,
+     "tier": 2,
+     "basis": "Batch creation is documented API behaviour a person integrating with the endpoint would rely on; if false, their request design would differ. The buyer loses only automation it may build, a cost the practice reads as growing over time but not changing the bargain on its own. Rated on the scale alone."
+    },
+    {
+     "claim_id": 21,
+     "tier": 2,
+     "basis": "The ordering and shape of batch responses is detail a person parsing batch results would act on directly. On its own its falsity would not change the price or the terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 22,
+     "tier": 2,
+     "basis": "The documented status-code behaviour is precisely the kind of API detail a person writing a client would act on, since error handling would be built differently if other codes were returned. Its failure alone would not reopen the price or terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 23,
+     "tier": 2,
+     "basis": "An endpoint's existence, path and authentication header are route and parameter detail a person calling the API from the documentation would act on. Its falsity alone would not change the price or the terms, as staff could inspect backends another way. Rated on the scale alone."
+    },
+    {
+     "claim_id": 24,
+     "tier": 3,
+     "basis": "This claim concerns behaviour in public mode, an item the buyer's plan does not use: the buyer runs a private service and would simply leave the mode off, so the claim being false changes nothing for this buyer. No stated threshold reaches unauthenticated config access in a mode the buyer never enables. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 25,
+     "tier": 2,
+     "basis": "The field names and contents of the getconfig reply are configuration detail a person writing against the API would act on directly. Its failure alone would not change the price or the terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 26,
+     "tier": 2,
+     "basis": "The error response format for this endpoint is API detail a person handling failures in a client would act on. On its own the buyer's price and terms would not change. Rated on the scale alone."
+    },
+    {
+     "claim_id": 27,
+     "tier": 2,
+     "basis": "An endpoint's existence and its authentication header are documented API detail a person calling it would act on; if false, their integration would differ. The failure alone would not change the price or the terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 28,
+     "tier": 2,
+     "basis": "The possible reply values of the whoami endpoint are API detail a person scripting against the service would rely on, touching also on how the single-admin design presents itself through the API. On its own the failure would not reopen the price or the terms, since the buyer's staff control access at the deployment anyway. Rated on the scale alone."
+    },
+    {
+     "claim_id": 29,
+     "tier": 2,
+     "basis": "The edit endpoint's method, path, header and request fields are API surface a person building tooling against the documentation would act on directly. Its failure alone would not change the price or the terms, since staff could edit links through the web interface or database. Rated on the scale alone."
+    },
+    {
+     "claim_id": 30,
+     "tier": 2,
+     "basis": "Which request fields are optional is parameter detail a person constructing edit requests from the documentation would act on; a false claim here would break requests built to the documented shape. On its own the price and terms would not change. Rated on the scale alone."
+    },
+    {
+     "claim_id": 31,
+     "tier": 2,
+     "basis": "A buyer integrating with the edit endpoint would rely on unchanged values for omitted optional fields when deciding which fields to send; its falsity would mislead a person writing against the API but would not, alone, move the price or terms, and no stated threshold reaches edit-request field behaviour. Rated on the scale alone."
+    },
+    {
+     "claim_id": 32,
+     "tier": 2,
+     "basis": "The names and presence of the success, error and reason fields are exactly the detail a person parsing the edit reply writes code against, so their falsity would break an integration script while leaving the buyer's stated thresholds untouched. Rated on the scale alone."
+    },
+    {
+     "claim_id": 33,
+     "tier": 2,
+     "basis": "A documented route's existence is what a developer building automation against the API would act on, and its absence would cost an automation path the buyer uses but does not depend on, at a nominal price with no threshold naming API surface. Rated on the scale alone."
+    },
+    {
+     "claim_id": 34,
+     "tier": 2,
+     "basis": "The field names and shapes of the expand reply are detail a person consuming the endpoint writes parsing code against, so their falsity would mislead that person without, on its own, changing the price or terms; no stated threshold reaches reply field names. Rated on the scale alone."
+    },
+    {
+     "claim_id": 35,
+     "tier": 2,
+     "basis": "The failure reply's fields and flags are what a developer's error handling is written against, a documentation-level detail whose falsity would not, alone, move the price or terms and which no stated threshold reaches. Rated on the scale alone."
+    },
+    {
+     "claim_id": 36,
+     "tier": 2,
+     "basis": "A developer choosing how to authenticate against expand would act on the statement that cookie validation does not work there and use the API key instead; its falsity would change what that person does but admits no access or privacy failure and reaches no stated threshold. Rated on the scale alone."
+    },
+    {
+     "claim_id": 37,
+     "tier": 2,
+     "basis": "The existence of a documented listing route is detail a person building automation or administration scripts against the API acts on; its falsity would cost a path the buyer uses but does not depend on, and no stated threshold names API endpoints. Rated on the scale alone."
+    },
+    {
+     "claim_id": 38,
+     "tier": 2,
+     "basis": "A parameter's name, purpose and validity condition are what a developer paginating through links writes code against, and its falsity would change what that person does while leaving the buyer's price basis and thresholds untouched. Rated on the scale alone."
+    },
+    {
+     "claim_id": 39,
+     "tier": 2,
+     "basis": "A developer choosing between the two pagination mechanisms would act on the claim that the offset path is the faster, preferred one, so its falsity would change what that person does; the performance difference on a small private instance would not, alone, reopen the price or terms, and no stated threshold reaches pagination. Rated on the scale alone."
+    },
+    {
+     "claim_id": 40,
+     "tier": 2,
+     "basis": "The existence and meaning of the page_size parameter is detail a person writing paginated requests against the API relies on, a documentation-level item whose falsity would not, on its own, change the price or terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 41,
+     "tier": 2,
+     "basis": "A documented default value is the paradigm case of detail a reader of the documentation acts on: a developer would size their handling of responses around it, while its falsity would not, alone, reopen the price or terms or reach any stated threshold. Rated on the scale alone."
+    },
+    {
+     "claim_id": 42,
+     "tier": 2,
+     "basis": "An alternative pagination parameter's existence is detail a developer integrating with the listing endpoint would act on, and its falsity would change what that person writes without, on its own, moving the price or terms or reaching a stated threshold. Rated on the scale alone."
+    },
+    {
+     "claim_id": 44,
+     "tier": 2,
+     "basis": "Which fields the filter searches is what a developer building filtered listings writes queries against, so its falsity would change that person's behaviour; on its own it would not reopen the price or terms, and no stated threshold reaches filter behaviour. Rated on the scale alone."
+    },
+    {
+     "claim_id": 45,
+     "tier": 2,
+     "basis": "A parameter's format constraint — ASCII, minimum length — is detail a person constructing filter queries must act on to avoid empty responses, a documentation-level item whose falsity would not, alone, change the price or terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 46,
+     "tier": 2,
+     "basis": "How the filter treats non-alphanumeric characters is detail a developer writing filter expressions against the API would act on, so its falsity would change what that person does while leaving the buyer's thresholds and nominal price basis untouched. Rated on the scale alone."
+    },
+    {
+     "claim_id": 47,
+     "tier": 2,
+     "basis": "A person writing against the /api/all endpoint would build their request differently if parameter optionality were other than stated, and the HTTP API is an item the buyer's plan uses. This is documented parameter behaviour of exactly the kind a script would act on. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 48,
+     "tier": 2,
+     "basis": "The default result of a parameterless /api/all call determines what a script receives and would change how the buyer's staff write against the endpoint. It is a documented default on the API surface the buyer's plan uses. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 49,
+     "tier": 2,
+     "basis": "The stated value type of the /api/all parameters is a format a person scripting against the endpoint must honour, and getting it wrong would make their calls fail. The HTTP API is an item the buyer's plan uses. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 50,
+     "tier": 2,
+     "basis": "Pagination behaviour on /api/all determines which links a script sees, so a person writing against the API would act differently if the default page were other than stated. This is documented parameter behaviour on the API surface the buyer's plan uses. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 51,
+     "tier": 2,
+     "basis": "The JSON field names and array shape of the /api/all reply are exactly the format detail a script must be written against, and the buyer's plan uses the HTTP API. If the shape were different, every script reading the reply would break. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 52,
+     "tier": 2,
+     "basis": "The existence and method of the /api/del/{shortlink} route is a documented route a person scripting deletions would call directly; if it were other than stated their requests would fail. Deletion itself sits under an item the buyer only uses, so nothing in the price or terms turns on it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 53,
+     "tier": 3,
+     "basis": "If the server's console output on API access were other than stated, the buyer would lose nothing it pays for: the claim concerns operational log messages, not visitor recording, and no stated threshold reaches server-side output of this kind. No reliance item depends on it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 54,
+     "tier": 2,
+     "basis": "The /api/login route, its method and its cookie behaviour are the mechanism a script must use to authenticate when a password is set, so a person writing against the API would act differently if this were other than stated. The HTTP API is an item the buyer's plan uses. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 55,
+     "tier": 2,
+     "basis": "The documented success message is the response text a script checking login success would match on, so a person writing against the API would act on it. It is a response-format detail on the API surface the buyer's plan uses. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 56,
+     "tier": 2,
+     "basis": "Whether API methods accept cookie authentication by default determines how the buyer's staff authenticate every scripted call, so they would write against the API differently if this were other than stated. It is a documented default on the API surface the buyer's plan uses. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 57,
+     "tier": 2,
+     "basis": "This is a documented default of the deployment: a person starting the image would act directly on whether a missing CHHOTO_PASSWORD variable leaves authentication off. The buyer's staff will set a password, so no term turns on it, but the default is exactly what the setup reader relies on. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 58,
+     "tier": 3,
+     "basis": "The claim describes the consequence of running without authentication, a mode the buyer's private service will not use since its staff will set the admin password. If it were false, nothing in the buyer's plan or price would change, and no stated threshold reaches it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 59,
+     "tier": 1,
+     "basis": "A no-logs claim sits squarely under the buyer's price condition on recording: if the service in fact kept logs, the bargain the nominal price assumes would be breached and the buyer would go back to the seller over this claim alone. It is a boundary claim whose failure would admit exactly what the buyer said it would not pay for. Rated against the buyer's stated threshold: \"any way visitors are logged or tracked beyond the hit count\"."
+    },
+    {
+     "claim_id": 60,
+     "tier": 2,
+     "basis": "The /api/new endpoint and its request body are the route and format a person scripting link creation would write against directly; if the call did not add the link, their automation would fail. Link creation through the web interface would remain, so nothing in the price or terms turns on this claim alone. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 61,
+     "tier": 2,
+     "basis": "This is a documented default: whether an omitted shortlink yields an automatically generated one changes what a script must send to /api/new. A person writing against the API would act differently if it were other than stated. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 62,
+     "tier": 2,
+     "basis": "If false, links would expire or persist against the operator's intent, but a person creating links through the API acts directly on this parameter's behaviour, and staff could set an explicit expiry value or manage links by hand, which the reliance statement treats as cheap for the expiry item. No stated threshold reaches expiry behaviour. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 63,
+     "tier": 2,
+     "basis": "If false, a caller sending an array to /api/new would create fewer links than expected, and anyone writing against the API would do so differently on the strength of this documented request format. Failure on its own changes nothing about price or terms, and the API is an item the buyer only uses on the practice's inference. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 64,
+     "tier": 2,
+     "basis": "If false, a developer integrating against the service would handle status codes differently, since the documented status-code behaviour is exactly the kind of API surface a documentation-reliant buyer codes against. No stated threshold reaches HTTP status behaviour, and the API itself is an item the buyer uses on the practice's inference. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 65,
+     "tier": 3,
+     "basis": "If false, the buyer loses nothing: both pagination methods work, and the claim only says one is faster and preferred, so a developer choosing between them is inconvenienced at most. Neither the buyer's stated thresholds nor any reliance item turns on relative pagination speed. Rated on the scale alone."
+    }
+   ],
+   "unrated": []
+  },
+  "docs/INSTALLATION.md": {
+   "at": "2026-09-21T00-06-02Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 150,
+   "claims_from": "runs/2026-09-20T23-40-05Z_enum_chhoto-full_docs_installation_md_2026-09-20T23-32-01Z/claims.json",
+   "reliance_statement": "2026-09-20T23-54-59Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 3,
+     "basis": "A copyright line on the installation document changes nothing about what the buyer is paying for or how it will run the service; the ownership the buyer relies on is that of the code, which this header neither establishes nor defeats. Rated on the scale alone."
+    },
+    {
+     "claim_id": 2,
+     "tier": 1,
+     "basis": "The buyer is acquiring the source on the assumption that it is MIT-licensed, and a licence statement in the acquired material that proved wrong is exactly the kind of problem the buyer said would end the deal; there is no repair the buyer could make itself. Rated against the buyer's stated threshold: \"a licence or ownership problem with the code\"."
+    },
+    {
+     "claim_id": 3,
+     "tier": 2,
+     "basis": "The sample compose file is the deployment path the buyer's staff are told to use; if it did not exist where documented, a person setting the service up would act differently, though they could write their own compose file cheaply and the Helm chart remains. The failure alone is too small to reopen the price or terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 4,
+     "tier": 2,
+     "basis": "The buyer's staff will deploy from this file believing it complete; if it were not, the first deployment would fail and they would have to repair the file themselves, a small cost beside the nominal price. The claim is documentation a person setting the service up acts on, though its failure alone would not send the buyer back to the seller. Rated on the scale alone."
+    },
+    {
+     "claim_id": 5,
+     "tier": 3,
+     "basis": "Which workflow builds the images changes nothing about how the buyer deploys or operates the service, and its failure would admit nothing that touches the buyer's plan or thresholds. Rated on the scale alone."
+    },
+    {
+     "claim_id": 6,
+     "tier": 3,
+     "basis": "The number of image flavors does not change which image the buyer's staff pull or how the service runs; a reader would simply choose from whatever flavors exist. Rated on the scale alone."
+    },
+    {
+     "claim_id": 7,
+     "tier": 2,
+     "basis": "The base image of the default tag is what the buyer's staff rely on when choosing between the default and the -alpine image, and the minimal scratch base is part of the small-footprint account the price assumes. The buyer's footprint threshold reaches this kind of failure, but a base-image difference alone would be too small for the buyer to go back to the seller over, since pulling a different tag is a cheap remedy. Rated against the buyer's stated threshold: \"footprint or resource figures materially worse than stated\"."
+    },
+    {
+     "claim_id": 8,
+     "tier": 2,
+     "basis": "The base of the -alpine tags determines what the buyer's staff get when they pick that tag, for example expecting debugging tools; a person setting the service up would act differently if this were false. The failure alone is too small to reopen the price or terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 9,
+     "tier": 2,
+     "basis": "The included Unix tools are the practical reason to choose the alpine image when inspecting the container; a person deploying or debugging would act differently if they were absent. The failure alone is too small to reopen the price or terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 10,
+     "tier": 3,
+     "basis": "Dev tags play no part in the buyer's plan, which is to run a stable image in production; which base they are built on changes nothing for this buyer. Rated on the scale alone."
+    },
+    {
+     "claim_id": 11,
+     "tier": 2,
+     "basis": "Tag synonymy determines what a pinned pull delivers; if latest were not the scratch image, a person deploying would receive something other than the documented default and would act differently. The failure alone is too small to reopen the price or terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 12,
+     "tier": 2,
+     "basis": "The registries named are where the buyer's staff will pull the image from; if an image were missing from a documented registry the deployment would fail at the first step, though switching registries is a cheap substitution. The failure alone is too small to reopen the price or terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 13,
+     "tier": 3,
+     "basis": "Dev builds play no part in the buyer's plan; where they are published does not affect the service the buyer acquires or runs. Rated on the scale alone."
+    },
+    {
+     "claim_id": 14,
+     "tier": 1,
+     "basis": "The buyer will run the service on its own hardware, and if the images are not built for the architecture of that hardware the buyer cannot deploy at all, which no repair in the buyer's power makes cheap. The buyer's architecture is not stated, so the claim's failure could admit exactly that outcome. Rated against the buyer's stated threshold: \"a dependency the buyer cannot run on its own hardware\"."
+    },
+    {
+     "claim_id": 15,
+     "tier": 2,
+     "basis": "Podman compatibility is part of how the buyer's staff may choose to run the image, and a person selecting a container engine would act differently if the images were not OCI-compatible. The failure alone would not defeat self-hosting, since the documented Docker path remains, so it is too small to reopen the price or terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 16,
+     "tier": 2,
+     "basis": "If the documented database-location variable or WAL support did not exist, staff configuring persistence would follow instructions that fail, though the remedy is reconfiguration rather than loss of the service. This falls under the SQLite storage item, which the buyer uses on the practice's inference. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 17,
+     "tier": 3,
+     "basis": "This is a caution about a corruption risk when mounting a custom WAL-mode location; if it were false there would be less risk, not more, and the buyer mounts the directory as instructed either way. No stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 18,
+     "tier": 1,
+     "basis": "The buyer takes the code to run as its own hosted service, and the OCI packaging with the compose and container samples is the documented path for that; if it were false the buyer could not run the dependency on its own hardware as documented. That reaches the buyer's end-the-deal condition. Rated against the buyer's stated threshold: \"a dependency the buyer cannot run on its own hardware\"."
+    },
+    {
+     "claim_id": 19,
+     "tier": 3,
+     "basis": "The sample quadlet file is an extra convenience beside the documented compose path the buyer's plan follows; its absence would cost nothing for a buyer deploying with the compose file. No stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 20,
+     "tier": 1,
+     "basis": "The buyer's deployment plan runs the seller's Docker and Podman images on its own hardware, and the price assumes the documentation's account is accurate; if that official support did not exist, the buyer's runtime dependency would be unsupported at the source it relies on. That reaches the buyer's end-the-deal condition. Rated against the buyer's stated threshold: \"a dependency the buyer cannot run on its own hardware\"."
+    },
+    {
+     "claim_id": 21,
+     "tier": 3,
+     "basis": "The default build target matters only to someone compiling the image from source, which is not the buyer's documented deployment path; its falsity would change nothing in how the buyer runs the service. No stated threshold reaches it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 22,
+     "tier": 2,
+     "basis": "Building from the repository's Containerfile is the buyer's stated fallback if the published images fail, so a person following the documentation would build differently if this path did not work as described. Its failure alone would not defeat the buyer's deployment, since the published images remain. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 23,
+     "tier": 2,
+     "basis": "Cross-building for arm64, arm/v7 or riscv64 is a documented build path a person deploying on such hardware would act on; its falsity would change how they build, though the buyer's plan does not state which architecture it runs. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 24,
+     "tier": 3,
+     "basis": "This is a claim about the Makefile as a document, pointing readers to cross-compilation instructions; the buyer's plan does not rest on the Makefile, and the architectures themselves are claimed elsewhere. Rated on the scale alone."
+    },
+    {
+     "claim_id": 25,
+     "tier": 2,
+     "basis": "The published port is part of the documented run instructions a person deploying the service would follow; if it were wrong the service would not be reachable as documented, but the remedy is a one-flag change in the run command. This falls under the self-hosting item on the practice's inference. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 26,
+     "tier": 1,
+     "basis": "The buyer is paying for a private service operated by its own staff, and the documented password variable is the mechanism that secures the admin surface; if it did not work as documented, the single-admin access control the buyer depends on could not be configured as the README describes. The price assumes the README's account is accurate, so the buyer would reopen the terms over this alone. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 27,
+     "tier": 3,
+     "basis": "The database file's default name is incidental to the buyer's plan; if it were different, the documented touch step would be harmless and nothing about how the service runs would change. No stated threshold reaches it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 28,
+     "tier": 1,
+     "basis": "Persistence by mounting a host directory is what keeps the buyer's customers' links across container restarts; if the documented mount did not achieve it, every link would be lost on restart and the service could not be run as bought. The price assumes the README's account is accurate, so the buyer would go back to the seller over this alone. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 29,
+     "tier": 2,
+     "basis": "The database-location variable is a documented configuration key a person deploying would set; if it were not honoured, staff would need another mechanism for placement, though the SQLite storage item the buyer uses allows a known, cheap reconfiguration. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 30,
+     "tier": 3,
+     "basis": "Which container engine the seller uses for its own testing has no bearing on what the buyer runs or pays for. No stated threshold reaches it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 31,
+     "tier": 2,
+     "basis": "How configuration is supplied is exactly the kind of detail a buyer deploying and operating the service from its documentation acts on; if false, the buyer's staff would configure through some other mechanism and the documentation could not be relied on for setup. Nothing in the stated thresholds or price turns on the configuration mechanism by itself. Rated on the scale alone."
+    },
+    {
+     "claim_id": 32,
+     "tier": 2,
+     "basis": "The existence of a named configuration option is detail a person setting the software up acts on directly, and its falsity would undermine reliance on the documentation for anyone intending to enable WAL mode. No stated threshold reaches this option by itself. Rated on the scale alone."
+    },
+    {
+     "claim_id": 33,
+     "tier": 2,
+     "basis": "A configuration key that sets where the database lives is the kind of documented parameter a buyer operating from the documentation relies on when deploying; if false, the staff would configure storage in the wrong place or not at all. On its own this changes no price or term. Rated on the scale alone."
+    },
+    {
+     "claim_id": 34,
+     "tier": 2,
+     "basis": "A documented default value for the database location is detail a deploying operator acts on, and its falsity would leave the database somewhere other than the operator expects. On its own nothing in the price or terms would change. Rated on the scale alone."
+    },
+    {
+     "claim_id": 35,
+     "tier": 3,
+     "basis": "Assumed false, this claim would mean the service is more restrictive than documented, not less private, so the buyer loses nothing it is paying for; a buyer running a private service sets an admin password regardless, and no stated threshold reaches authentication defaults. Rated on the scale alone."
+    },
+    {
+     "claim_id": 37,
+     "tier": 2,
+     "basis": "Whether a configuration variable must be set for links to work is a documented requirement a deploying operator acts on; if false, links the buyer's customers share would fail until the variable is set. The failure is a setup detail, not a defeat of shortening or redirecting, which is what the buyer depends on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 38,
+     "tier": 3,
+     "basis": "This concerns how the web interface's convenience features build URLs; if false, QR codes or copied links could carry the wrong address, but the interface is one the buyer merely uses and the plain frontend is cheap for its staff to patch. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 40,
+     "tier": 2,
+     "basis": "The buyer's stated condition that no hardening step the README implies is on by default turns out to be absent reaches this claim, since the README presents the strength check as happening automatically at start; but its failure alone is a missing advisory warning the buyer's staff can substitute for by choosing a strong key themselves, too small to reopen the price or terms. A person provisioning an API key would act on this claim in deciding whether to validate the key themselves. Rated against the buyer's stated threshold: \"a hardening step the README implies is on by default but is not\"."
+    },
+    {
+     "claim_id": 42,
+     "tier": 3,
+     "basis": "Assumed false, the operative API key would differ from the one the operator supplied, which shows itself immediately at setup and is remedied by setting a new key, a cheap irritation; no stated threshold reaches API key handling, and the buyer's privacy is not reduced by the service hardening a key it was told would be kept. Rated on the scale alone."
+    },
+    {
+     "claim_id": 43,
+     "tier": 3,
+     "basis": "Assumed false, the website would demand an API key it is documented not to, which restricts access further rather than reducing the privacy the buyer is paying for, and the buyer's staff would supply the key they would set anyway; no stated threshold reaches this. Rated on the scale alone."
+    },
+    {
+     "claim_id": 44,
+     "tier": 3,
+     "basis": "The command-line application is one the buyer merely uses and can cheaply replace with the web interface or direct calls; if this claim were false the staff would supply the API key to the CLI, a setup-level inconvenience. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 45,
+     "tier": 2,
+     "basis": "Which value of a configuration parameter activates it is precisely the format detail a buyer configuring from the documentation relies on; if false, staff would set the variable and journal mode would not change as documented. On its own nothing in the price or terms would change. Rated on the scale alone."
+    },
+    {
+     "claim_id": 46,
+     "tier": 2,
+     "basis": "The accepted values of a configuration parameter are format detail an operator configuring from the documentation acts on; if false, a value the staff believed enabled WAL mode would silently do nothing. On its own this changes no price or term. Rated on the scale alone."
+    },
+    {
+     "claim_id": 48,
+     "tier": 3,
+     "basis": "If false, writes to the database would block reads, which for a small, low-cost single instance is negligible in practice; the storage item is one the buyer merely uses and the stated remedy, restoring or reconfiguring the journal mode, is a known, cheap operation for the staff who run the instance. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 49,
+     "tier": 2,
+     "basis": "A documented default journal mode is exactly the kind of default a buyer deploying from the documentation acts on, since it tells the staff they must set WAL mode explicitly rather than assume it is already on. On its own nothing in the price or terms would change. Rated on the scale alone."
+    },
+    {
+     "claim_id": 50,
+     "tier": 2,
+     "basis": "If the synchronous pragma in the default journal mode were not EXTRA, the durability a buyer operating from the documentation assumes would differ without any visible sign, though no stated threshold reaches the pragma value. It is a documented default that a buyer running the service from its documentation relies on, and with other durability claims its falsity would undermine that account. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 51,
+     "tier": 2,
+     "basis": "If WAL mode did not use FULL synchronous as documented, the durability trade-off between the two journal modes would differ from what a reader of the documentation assumes, though no stated threshold reaches the pragma value. It is a documented default within the durability configuration the buyer uses. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 52,
+     "tier": 3,
+     "basis": "If the database were not fully ACID in both journal modes, links could be lost or corrupted on a crash; the buyer's staff could restore from the automatic backups or reconfigure the journal mode, which the plan treats as a known and cheap operation, and no stated threshold reaches durability. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 53,
+     "tier": 3,
+     "basis": "A performance cost of ACID compliance is a general caveat: if false, nothing in the buyer's plan changes, since the buyer does not configure the pragma and no stated threshold reaches performance beyond footprint figures. Rated on the scale alone."
+    },
+    {
+     "claim_id": 55,
+     "tier": 2,
+     "basis": "A buyer weighing throughput against durability would set this variable in reliance on the documented effect and would act differently if the setting did not relax durability as described. It is a documented configuration key and its effect. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 56,
+     "tier": 2,
+     "basis": "If values other than the exact False also relaxed durability, staff setting the variable loosely could shed durability without intending to; as documented, only the exact value matters, which is parameter semantics a reader acts on. No stated threshold reaches this setting. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 57,
+     "tier": 2,
+     "basis": "If partial data loss could occur in cases other than system failure or power loss, a buyer enabling relaxed durability on this assurance would accept more risk than the documentation admits. It is documented behaviour of the setting that a reader deciding whether to enable it acts on, and no stated threshold reaches durability. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 58,
+     "tier": 2,
+     "basis": "If committed writes were not persisted across an application crash even with durability relaxed, the assurance a reader relies on when choosing the relaxed setting would fail in the most common failure case. It is documented behaviour of the setting, and no stated threshold reaches durability. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 59,
+     "tier": 2,
+     "basis": "If the extent of data loss were not limited to writes after the last sync, a buyer enabling relaxed durability could lose more than the documentation states. It is documented behaviour of the setting that a reader acts on when deciding to enable it, and no stated threshold reaches durability. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 60,
+     "tier": 2,
+     "basis": "If the variable did not control the redirect used, staff could not choose between temporary and permanent redirects through configuration, though the redirect path itself would still resolve and the default would apply, so the item the buyer's plan depends on is not defeated. It is a documented configuration key a reader acts on. No stated threshold reaches the choice of redirect method. Rated on the scale alone."
+    },
+    {
+     "claim_id": 61,
+     "tier": 2,
+     "basis": "If the values did not select 307 and 308 as documented, a buyer configuring redirect behaviour would emit a different status code than intended, which affects how browsers and caches treat the buyer's customers' links. It is documented parameter semantics. Rated on the scale alone."
+    },
+    {
+     "claim_id": 62,
+     "tier": 2,
+     "basis": "If the default were not PERMANENT, or invalid values were not ignored, a buyer who omitted or misspelled the variable would get redirect behaviour different from the documentation without any error. It is a documented default a reader acts on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 63,
+     "tier": 2,
+     "basis": "If the variable did not control slug style, staff could not switch styles through configuration as the plan assumes, though the default style would still work and no stated threshold reaches slug generation. It is a documented configuration key. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 64,
+     "tier": 2,
+     "basis": "If Pair and UID were not the accepted values, a buyer configuring slugs from the documentation would set the variable to no effect. It is documented parameter semantics that a reader configuring slug generation acts on. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 65,
+     "tier": 2,
+     "basis": "If the default were not Pair, or invalid values were not ignored, a buyer omitting or misspelling the variable would get slug behaviour different from the documentation without any error. It is a documented default a reader acts on. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 66,
+     "tier": 2,
+     "basis": "If false, a buyer's staff choosing a slug style when configuring the service would pick differently, since the documented appearance of auto-generated links in Pair mode would not be what they get. On its own nothing in the price or terms would change, but it is detail a reader setting the software up from its documentation would act on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 67,
+     "tier": 2,
+     "basis": "If false, staff choosing between slug styles would configure the service differently, since UID mode would not produce a random slug as documented. On its own nothing in the price or terms would change, but it is detail a reader setting the software up acts on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 68,
+     "tier": 2,
+     "basis": "If false, a person setting the slug length would use the wrong configuration key and get a different length than intended. On its own nothing in the price or terms would change, but it is a configuration key a documentation reader acts on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 69,
+     "tier": 2,
+     "basis": "If false, staff setting a shorter slug length would configure a value the software does not accept and would have to diagnose the failure. On its own nothing in the price or terms would change, but it is a documented supported range a reader acts on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 70,
+     "tier": 2,
+     "basis": "If false, a deployment left at the default would produce slugs of an unexpected length, which staff would notice and configure around. On its own nothing in the price or terms would change, but it is a documented default a reader relies on when deciding whether to set the variable at all. Rated on the scale alone."
+    },
+    {
+     "claim_id": 71,
+     "tier": 2,
+     "basis": "If false, an operator relying on collision retries would get different slug behaviour than configured and links could fail to create where the documentation says they succeed. On its own nothing in the price or terms would change, but it is configuration-dependent behaviour a reader acts on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 72,
+     "tier": 2,
+     "basis": "If false, an operator expecting the documented retry suffix format would see different slugs than described, affecting how staff recognise and manage retried links. On its own nothing in the price or terms would change, but it is detail a reader of the documentation acts on when operating the service. Rated on the scale alone."
+    },
+    {
+     "claim_id": 73,
+     "tier": 2,
+     "basis": "If false, an operator counting on the documented default retry would see collisions behave differently and would configure the variable they thought they did not need. On its own nothing in the price or terms would change, but it is a documented default a reader acts on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 74,
+     "tier": 2,
+     "basis": "If false, an operator relying on the documented default retry would get longer slugs than expected on collision, contradicting what the documentation led them to configure around. On its own nothing in the price or terms would change, but it is default behaviour a reader acts on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 75,
+     "tier": 2,
+     "basis": "If false, staff binding the service to a chosen network address would use the wrong configuration key and the service would listen where they did not intend. On its own nothing in the price or terms would change, but it is a configuration key a person deploying the software acts on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 76,
+     "tier": 2,
+     "basis": "If false, a deployment left at the default would bind to an interface other than the operator expected, which staff would discover and correct with an explicit setting. On its own nothing in the price or terms would change; the buyer's threshold reaches hardening steps implied as default, but a bind address default is not such a step and its failure alone is too small to reopen the deal. Rated on the scale alone."
+    },
+    {
+     "claim_id": 77,
+     "tier": 2,
+     "basis": "If false, staff pointing the service or its reverse proxy at the intended port would use the wrong configuration key and the service would listen elsewhere. On its own nothing in the price or terms would change, but it is a configuration key a person deploying the software acts on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 78,
+     "tier": 2,
+     "basis": "If false, a deployment left at the default would listen on a port other than documented, and staff wiring the service into their setup would connect to the wrong port. On its own nothing in the price or terms would change, but it is a documented default a reader acts on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 79,
+     "tier": 2,
+     "basis": "If false, staff wanting capital letters in shortlinks would set the variable as documented and not get the behaviour they configured for. On its own nothing in the price or terms would change, but it is a configuration key and its effect a reader acts on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 80,
+     "tier": 2,
+     "basis": "If false, an operator setting a value other than True and expecting it to be honoured, or expecting a non-True value to be ignored, would configure the variable differently. On its own nothing in the price or terms would change, but it is the documented value format of a parameter a reader acts on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 81,
+     "tier": 2,
+     "basis": "A reader configuring slug generation from the documentation would act on this setting, and its falsity would only mean choosing a different slug style through configuration, a cheap change for staff. It is documented parameter behaviour, not something the buyer's price or terms rest on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 82,
+     "tier": 2,
+     "basis": "The scope of a configuration variable's effect is exactly the detail a reader setting up slug generation would rely on, and its failure would cost nothing beyond a surprised re-read of the documentation. The slug styles remain configurable either way. Rated on the scale alone."
+    },
+    {
+     "claim_id": 83,
+     "tier": 2,
+     "basis": "The claim concerns the name and documented purpose of a configuration variable for hashed credentials, which staff setting up the private service would follow from the documentation. Its failure would not on its own defeat the authentication the buyer depends on, since the password and API key still gate access. Rated on the scale alone."
+    },
+    {
+     "claim_id": 84,
+     "tier": 2,
+     "basis": "The set of supported values is documented detail a reader configuring hashed credentials would act on; if false, a chosen algorithm would simply fail to take effect and staff would set the variable accordingly. The buyer can run on Argon2 regardless, so nothing in the bargain changes. Rated on the scale alone."
+    },
+    {
+     "claim_id": 85,
+     "tier": 3,
+     "basis": "A statement of the seller's future intent has no place in what the buyer is buying today; the buyer's plan runs on the algorithms that exist now. Nothing in the stated thresholds or the reliance statement turns on it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 86,
+     "tier": 2,
+     "basis": "Documented behaviour of unsupported configuration values is detail a reader would rely on when writing a compose file, and its falsity would mean an unexpected start-up failure or silently different behaviour that staff would trace and correct. It does not touch the buyer's thresholds on its own. Rated on the scale alone."
+    },
+    {
+     "claim_id": 87,
+     "tier": 3,
+     "basis": "If the claim were false, the buyer would get credential handling without the documented latency, which is a gain and not a loss; the claim describes a cost the buyer accepts, not a feature the buyer pays for. No stated threshold reaches latency. Rated on the scale alone."
+    },
+    {
+     "claim_id": 88,
+     "tier": 3,
+     "basis": "The buyer's stated threshold 'footprint or resource figures materially worse than stated' reaches claims about resource use, but this claim's falsity would mean the service uses fewer resources than documented, not materially worse figures, so the threshold cannot be breached by its failure. Rated on the buyer's stated threshold: 'footprint or resource figures materially worse than stated'."
+    },
+    {
+     "claim_id": 89,
+     "tier": 3,
+     "basis": "The buyer runs a private service and would never set CHHOTO_PUBLIC_MODE to Enable, so nothing in its plan is touched by the existence or absence of the mode. The reliance statement marks public mode as not used, and no stated threshold names it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 90,
+     "tier": 3,
+     "basis": "The claim governs who may list and delete links inside public mode, a mode the buyer would leave off entirely; the reliance statement marks public mode as not used. The buyer's own admin-only deletion in private operation is a separate matter and this claim does not carry it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 91,
+     "tier": 3,
+     "basis": "The parsing behaviour of a setting the buyer would never enable cannot affect a plan that does not use it; the reliance statement marks public mode as not used. No stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 92,
+     "tier": 3,
+     "basis": "The expiry-delay mechanism applies only to links submitted in public mode, which the buyer would not enable; the reliance statement marks public mode as not used. Its failure would change nothing for a service running in private operation. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 93,
+     "tier": 3,
+     "basis": "The claim describes a choice available to anonymous submitters in public mode, a mode the reliance statement marks as not used by this buyer. Nothing in the buyer's stated thresholds reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 94,
+     "tier": 3,
+     "basis": "The claim concerns the expiry delay's effect on an admin operating in public mode, which the buyer would not enable and the reliance statement marks as not used. The buyer's own staff act as the single admin in private operation, where this setting is beside the point. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 95,
+     "tier": 2,
+     "basis": "A documented configuration switch is detail a reader deploying the service would act on, and its failure would leave staff with the built-in interface as a cheap fallback rather than any change to the bargain. The buyer has not said it intends to disable the frontend. Rated on the scale alone."
+    },
+    {
+     "claim_id": 96,
+     "tier": 2,
+     "basis": "The custom landing page is an item the buyer uses on the practice's reading, and its failure would cost nothing beyond falling back to the built-in interface. The setting is a configuration key that a person setting the service up from its documentation would act on. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 97,
+     "tier": 2,
+     "basis": "This is a setup step under the custom-landing item the buyer uses on the practice's inference; if false, the buyer's staff would simply find the feature not working until the mount is added. A person deploying under Docker would act on this instruction when arranging the container. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 98,
+     "tier": 2,
+     "basis": "The admin page path is a route detail under the custom-landing item the buyer uses on the practice's inference; nothing in the buyer's thresholds reaches it. A person operating the service from its documentation would need the correct path to reach administration. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 99,
+     "tier": 2,
+     "basis": "This documented behaviour sits under the custom-landing item the buyer uses on the practice's inference; its falsity would cost nothing a cheap rearrangement of files could not fix. A person arranging landing-page files would act on this warning when deciding where to place them. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 100,
+     "tier": 2,
+     "basis": "This is a documented default under the Cache-Control item the buyer uses on the practice's inference; no stated threshold reaches caching behaviour. A person configuring response headers from the documentation would act on knowing the default state. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 101,
+     "tier": 2,
+     "basis": "This is a configuration key under the Cache-Control item the buyer uses on the practice's inference; its falsity would cost nothing beyond losing an optional header. A person setting the service up from its documentation would act on this variable's existence and name. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 102,
+     "tier": 2,
+     "basis": "This is a parameter's format under the Cache-Control item the buyer uses on the practice's inference; getting it wrong costs only a corrected value. A person writing a value for this variable would act on the documented format. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 103,
+     "tier": 2,
+     "basis": "This is documented configuration behaviour under the Cache-Control item the buyer uses on the practice's inference; if false, the buyer would lose only an optional header setting, at no cost to its plan. A person wanting to disable caching through configuration would act on this documented value. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 104,
+     "tier": 2,
+     "basis": "This is a configuration key under the web administration item the buyer uses on the practice's inference; its falsity would cost nothing material to the buyer's plan. A person configuring the frontend's pagination from the documentation would act on this variable. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 105,
+     "tier": 3,
+     "basis": "This is a scope remark about one variable's reach; whether it is accurate, no setup or operational step the buyer's staff would take changes, and no threshold reaches it. Nothing in the buyer's plan rests on the variable's backend effect. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 106,
+     "tier": 2,
+     "basis": "This is a documented default under the web administration item the buyer uses on the practice's inference; no stated threshold reaches pagination. A person configuring or predicting the frontend's behaviour from the documentation would act on the default value. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 107,
+     "tier": 2,
+     "basis": "This is a configuration key under the allowed-protocols item the buyer uses on the practice's inference; the reliance statement notes a person should ask about it, but its failure would cost only a configuration change the statement calls cheap. A person needing to accept a customer's link protocol would act on this variable's existence. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 109,
+     "tier": 3,
+     "basis": "This is a parsing detail about malformed entries in one variable; whether it is accurate, no step the buyer's staff would take in setup or operation changes, and no stated threshold reaches protocol handling. The buyer's plan does not rest on how bad values are handled. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 110,
+     "tier": 2,
+     "basis": "This is a configuration key a person debugging or operating the service from its documentation would act on. No stated threshold reaches it — the buyer's threshold concerns what is logged about visitors, not the verbosity level — and the reliance statement has no item for logging configuration. Rated on the scale alone."
+    },
+    {
+     "claim_id": 111,
+     "tier": 3,
+     "basis": "This is an implementation detail about which crate produces the logs; whether it is accurate, no setup, configuration or operational step the buyer's staff would take changes, and no stated threshold reaches it — the buyer's threshold concerns what is recorded about visitors, not how logging is implemented. Rated on the scale alone."
+    },
+    {
+     "claim_id": 112,
+     "tier": 1,
+     "basis": "If this boundary claim were false, visitors' personal data would be recorded by a service the buyer runs for its own customers, defeating the item the reliance statement marks as depends and breaching the condition the price is stated to assume. Rated against the buyer's stated threshold: \"any way visitors are logged or tracked beyond the hit count\"."
+    },
+    {
+     "claim_id": 113,
+     "tier": 2,
+     "basis": "A documented default value for log levels: a person configuring or reading the service's output would act differently if the default were not what is stated. Rated on the scale alone."
+    },
+    {
+     "claim_id": 114,
+     "tier": 3,
+     "basis": "A historical note about past naming of configuration variables; nothing in the buyer's plan or thresholds turns on it, and its falsity would change nothing for a buyer deploying the current version. Rated on the scale alone."
+    },
+    {
+     "claim_id": 115,
+     "tier": 2,
+     "basis": "A claim about configuration key compatibility: a person setting up or migrating the software using the old variable names would act differently if they did not still work. Rated on the scale alone."
+    },
+    {
+     "claim_id": 116,
+     "tier": 3,
+     "basis": "A statement of the seller's future intention about a compatibility shim the buyer need not use; if the intention lapsed or changed, nothing in the buyer's deployment or thresholds would change. Rated on the scale alone."
+    },
+    {
+     "claim_id": 117,
+     "tier": 3,
+     "basis": "If init backups were not created, the buyer's staff could back up the data directory on their own schedule, a cheap and routine substitution under the reliance statement's item for automatic backups. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 118,
+     "tier": 3,
+     "basis": "If the daily backup job did not run, staff could substitute their own scheduled backup of the data directory, a cheap and routine operation for whoever runs the instance. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 119,
+     "tier": 2,
+     "basis": "A file's location: a person restoring or inspecting backups would act differently if the files were written elsewhere than the stated `backups` directory beside the database. Rated on the scale alone."
+    },
+    {
+     "claim_id": 120,
+     "tier": 2,
+     "basis": "A file's format: a person restoring or verifying a backup would act differently if the files were not SQLite databases as documented. Rated on the scale alone."
+    },
+    {
+     "claim_id": 121,
+     "tier": 2,
+     "basis": "A documented file-naming convention: a person identifying and selecting backup files by type and suffix would act differently if the naming did not match. Rated on the scale alone."
+    },
+    {
+     "claim_id": 122,
+     "tier": 3,
+     "basis": "If old backups were not purged, backup files would accumulate until staff delete them by hand, a cheap and routine substitution under the reliance statement's item for automatic backups. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 123,
+     "tier": 2,
+     "basis": "A documented retention parameter: a person planning restores or provisioning backup storage would act differently if the kept-backup counts were not 3 init and 7 daily. Rated on the scale alone."
+    },
+    {
+     "claim_id": 124,
+     "tier": 3,
+     "basis": "A qualitative remark on the chart's design; whether the Helm values are sparse or plentiful changes nothing in the buyer's plan, which can fall back to the compose file. Rated on the scale alone."
+    },
+    {
+     "claim_id": 125,
+     "tier": 2,
+     "basis": "A documented storage figure: a person deploying via the Helm chart would act differently when sizing the volume if the claim did not allocate 100Mi. Rated on the scale alone."
+    },
+    {
+     "claim_id": 126,
+     "tier": 2,
+     "basis": "A documented volume type: a person deploying via the Helm chart would act differently, since a host path volume constrains where the service can run, if the claim were false. Rated on the scale alone."
+    },
+    {
+     "claim_id": 127,
+     "tier": 2,
+     "basis": "If the chart did not need cert-manager, a buyer deploying on Kubernetes would set TLS up differently, but the buyer's documented basic path is the compose file and the Helm chart is only an item the plan uses. The failure alone would not reopen the price or the terms. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 128,
+     "tier": 2,
+     "basis": "A person deploying the chart would copy this file and adjust these fields, so its falsity changes what they do at setup. The failure alone is too small to reopen the price or terms. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 129,
+     "tier": 3,
+     "basis": "A claim about where files sit in the repository, not the licence or ownership document the buyer relies on; the buyer can see the files at acquisition. If false, nothing in the buyer's plan changes. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 130,
+     "tier": 2,
+     "basis": "The buyer's end-the-deal threshold reaches deployment on its own hardware, but this failure alone is too small for it, since the Docker path the buyer depends on remains and Podman is an alternative engine. A person choosing Podman would act on the claim at setup. Rated against the buyer's stated threshold: \"a dependency the buyer cannot run on its own hardware\"."
+    },
+    {
+     "claim_id": 131,
+     "tier": 2,
+     "basis": "The buyer's end-the-deal threshold reaches the ability to run the service on its own hardware, but the failure of this broad compatibility claim alone is too small for it while the documented Docker path works. A reader picking an OCI engine would act on the claim. Rated against the buyer's stated threshold: \"a dependency the buyer cannot run on its own hardware\"."
+    },
+    {
+     "claim_id": 132,
+     "tier": 2,
+     "basis": "The buyer's end-the-deal threshold reaches running the service on its own hardware, but a wrong or unreachable documented port is discovered immediately at first use and does not leave the buyer unable to run the service. A person deploying would open and test exactly this port. Rated against the buyer's stated threshold: \"a dependency the buyer cannot run on its own hardware\"."
+    },
+    {
+     "claim_id": 133,
+     "tier": 2,
+     "basis": "The buyer's stated thresholds reach logging, footprint and implied hardening defaults, none of which this claim about the empty-password default falls under. A person deploying a private service would act on it by setting a password, and an error here surfaces at first use. Rated on the scale alone."
+    },
+    {
+     "claim_id": 134,
+     "tier": 2,
+     "basis": "A deployer would act on this disclosure by putting the service behind TLS before exposing it to customers, so its falsity changes setup behaviour. The failure alone would not reopen the price or terms, and no stated threshold reaches transport encryption. Rated on the scale alone."
+    },
+    {
+     "claim_id": 135,
+     "tier": 2,
+     "basis": "Whether the site URL must be configured is a setup decision a deployer acts on; if false, they would configure or skip it differently. The failure alone is a configuration detail. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 136,
+     "tier": 2,
+     "basis": "A deployer wanting correct copied links and QR codes for customers would set this variable on the strength of the claim, so its falsity changes setup behaviour. The failure alone would not reopen the price or terms. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 137,
+     "tier": 3,
+     "basis": "A purely cosmetic display behaviour in the admin frontend with nothing a deployer or operator acts on. The buyer loses nothing measurable if it is false. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 138,
+     "tier": 2,
+     "basis": "An operator who supplies a weak key would check the logs for the generated strong key, so the claim's falsity changes what they do at setup. The failure alone would not reopen the price or terms, and no stated threshold reaches key generation. Rated on the scale alone."
+    },
+    {
+     "claim_id": 139,
+     "tier": 2,
+     "basis": "An operator must know whether the weak key they supplied is still active, since the claim's falsity changes whether they rotate it before customers arrive. The failure surfaces immediately at setup and would not reopen the price or terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 140,
+     "tier": 2,
+     "basis": "A deployer would act on the claim by deciding whether an API key is required before exposing the service. The failure alone would not reopen the price or terms. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 141,
+     "tier": 3,
+     "basis": "A subjective remark about convenience with no behaviour a deployer or operator would act on differently. The buyer's plan does not rest on the CLI. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 142,
+     "tier": 3,
+     "basis": "If WAL mode gave no boost under high load, the buyer's small, low-cost instance would lose little, and the remedy is reconfiguring the journal mode, which the practice judges cheap for whoever runs the instance. The buyer's plan does not reach high-load throughput. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 143,
+     "tier": 3,
+     "basis": "If writes blocked reads in WAL mode, the buyer's staff would see contention and could reconfigure or restore from backups, a known, cheap operation for the operator. The buyer's plan does not depend on this behaviour. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 144,
+     "tier": 3,
+     "basis": "If disabling CHHOTO_SQLITE_ENSURE_ACID bought no throughput, the buyer loses nothing, since the buyer has no stated plan to trade durability away and the practice judges the buyer keeps durability on. The claim is a tradeoff of an option the buyer is not relying on. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 145,
+     "tier": 3,
+     "basis": "If durability failed across a crash, the buyer's staff could restore from the backups the software keeps, though lost links would be gone; the buyer has named no threshold about durability or data loss. The failure is a small operational cost for a service of this size. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 146,
+     "tier": 3,
+     "basis": "If hashed credentials added no latency, the buyer loses nothing; if the true cost were larger than stated, it is a minor overhead on a small service and would not by itself send the buyer back to the seller. The buyer's stated thresholds do not reach request latency. Rated on the scale alone."
+    },
+    {
+     "claim_id": 147,
+     "tier": 3,
+     "basis": "The buyer's price condition covers resource figures materially worse than stated, and this claim bears on resource use when hashed credentials are enabled; but the failure of this one figure, an incremental cost of hashing, is too small on its own to change the hardware the buyer runs or reopen the price. The buyer enables hashing regardless, since a private service is what it is paying for. Rated against the buyer's stated threshold: \"footprint or resource figures materially worse than stated\"."
+    },
+    {
+     "claim_id": 148,
+     "tier": 3,
+     "basis": "The buyer runs a private service and does not use public mode, so if this claim were false nothing in the buyer's plan is touched. No stated threshold names public mode. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 149,
+     "tier": 3,
+     "basis": "This is the forced expiry behaviour of public mode, which the buyer does not use and would simply leave off. Its falsity changes nothing for the buyer's plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 150,
+     "tier": 3,
+     "basis": "If the disable-frontend switch did not work, the buyer would fall back to the built-in interface, which the practice judges costs nothing beyond appearance, or patch the plain HTML and JavaScript frontend cheaply. The buyer has named no threshold about the frontend. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 151,
+     "tier": 3,
+     "basis": "If the custom landing page were not served, the buyer would fall back to the built-in interface at no cost beyond appearance, and could fix the frontend itself cheaply. No stated threshold reaches the landing page. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 152,
+     "tier": 3,
+     "basis": "If configured Cache-Control headers were not sent, the practical effect for a private link shortener is negligible and the remedy is a configuration change or a small patch. The buyer has named no threshold about response headers. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 153,
+     "tier": 3,
+     "basis": "If caching were not disabled by this setting, the buyer's staff could change the configuration or patch the behaviour, a cheap restart-level remedy for a single small instance. No stated threshold reaches caching behaviour. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 154,
+     "tier": 3,
+     "basis": "If no backup were created at initialisation, the buyer's staff could back up the data directory on their own schedule, which the practice judges a cheap and routine substitution. The buyer's plan uses backups but does not depend on them. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 155,
+     "tier": 3,
+     "basis": "If the daily backup window did not happen, the buyer's staff could substitute their own scheduled backup of the data directory, a cheap and routine operation. The buyer's plan uses backups but does not depend on them. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 156,
+     "tier": 3,
+     "basis": "If old backups were not pruned automatically, the buyer's staff would delete them by hand or add a scheduled cleanup, a cheap and routine substitution. The buyer's plan uses backups but does not depend on them. Rated on the practice's reading of the buyer's plan."
+    }
+   ],
+   "unrated": []
+  },
+  "docs/SECURITY.md": {
+   "at": "2026-09-21T00-06-26Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 4,
+   "claims_from": "runs/2026-09-20T23-48-39Z_enum_chhoto-full_docs_security_md_2026-09-20T23-32-01Z/claims.json",
+   "reliance_statement": "2026-09-20T23-54-59Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 3,
+     "basis": "If the reporting process did not exist, the buyer would fall back to public issue tracking for flagging flaws in a codebase it operates itself — a small practical cost that would not reopen the price or terms. No stated threshold names a vulnerability reporting route. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 2,
+     "tier": 3,
+     "basis": "The failure would cost the buyer one channel among those listed for reporting a flaw, in a purchase of source code the buyer's own staff run; no repair, price or term rests on this address alone. No stated threshold reaches the reporting channels. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 3,
+     "tier": 3,
+     "basis": "Losing the GitHub security-advisory route would leave the buyer the other listed channels and public issue tracking, a small practical cost beside a nominal-price asset purchase. No stated threshold reaches the reporting channels. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 4,
+     "tier": 3,
+     "basis": "If the support-scope promise were not kept, the buyer's staff would carry fixes for a small Rust codebase themselves or accept the risk — a cost under a commitment the buyer uses rather than depends on, with no stated threshold naming seller support. It is not the kind of documented detail a reader of the documentation acts on, so tier 2 does not fit. Rated on the practice's reading of the buyer's plan."
+    }
+   ],
+   "unrated": []
+  },
+  "docs/TOOLS.md": {
+   "at": "2026-09-21T00-06-37Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 11,
+   "claims_from": "runs/2026-09-20T23-49-02Z_enum_chhoto-full_docs_tools_md_2026-09-20T23-32-01Z/claims.json",
+   "reliance_statement": "2026-09-20T23-54-59Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 1,
+     "basis": "The document is a notice of ownership, stating who holds the copyright in the project's files; if that attribution were false, the ownership of the code the buyer is purchasing would be in question, with no repair the buyer could make itself. The buyer's reliance statement records clean ownership as a depend-on item for the purchase. Rated against the buyer's stated threshold: \"a licence or ownership problem with the code\"."
+    },
+    {
+     "claim_id": 2,
+     "tier": 2,
+     "basis": "The licence identifier in a source file states the code is MIT-licensed, which is the fact the buyer relies on for the acquisition; if the file were not under that licence, an ownership and licensing question would open across the codebase. The buyer's reliance statement records the MIT licence and clean ownership as a depend-on item triggering the deal-ending condition. Rated against the buyer's stated threshold: \"a licence or ownership problem with the code\"."
+    },
+    {
+     "claim_id": 5,
+     "tier": 3,
+     "basis": "If the tools were in fact officially supported rather than unsupported, the buyer loses nothing and would if anything gain a support route it does not rely on. No stated threshold reaches the third-party tools, and the reliance statement marks the buyer's use of them as the practice's inference. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 6,
+     "tier": 3,
+     "basis": "If the browser extension did not exist, the buyer would shorten links through the web interface or API at no cost, since it does not rely on the extension in its plan. No stated threshold reaches the third-party tools, and the reliance statement marks the buyer's use of them as the practice's inference. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 7,
+     "tier": 3,
+     "basis": "If the extension's maintainership were other than stated, the buyer loses nothing, as the buyer's plan does not touch the extension and the seller does not support it in any case. No stated threshold reaches the third-party tools, and the reliance statement marks the buyer's use of them as the practice's inference. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 8,
+     "tier": 3,
+     "basis": "If the Raycast extension did not exist, the buyer would shorten links through the web interface or API at no cost, since it does not rely on the extension in its plan. No stated threshold reaches the third-party tools, and the reliance statement marks the buyer's use of them as the practice's inference. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 9,
+     "tier": 3,
+     "basis": "If the extension's maintainership were other than stated, the buyer loses nothing, as the buyer's plan does not touch the extension and the seller does not support it in any case. No stated threshold reaches the third-party tools, and the reliance statement marks the buyer's use of them as the practice's inference. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 10,
+     "tier": 3,
+     "basis": "If the FreeBSD port did not exist, the buyer would install through the published images on its own hardware at no cost, since it does not rely on the port in its plan. No stated threshold reaches the third-party tools, and the reliance statement marks the buyer's use of them as the practice's inference. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 11,
+     "tier": 3,
+     "basis": "If the port's maintainership were other than stated, the buyer loses nothing, as the buyer's plan does not touch the port and the seller does not support it in any case. No stated threshold reaches the third-party tools, and the reliance statement marks the buyer's use of them as the practice's inference. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 12,
+     "tier": 3,
+     "basis": "If the NixOS package did not exist, the buyer would install through the published images on its own hardware at no cost, since it does not rely on the package in its plan. No stated threshold reaches the third-party tools, and the reliance statement marks the buyer's use of them as the practice's inference. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 13,
+     "tier": 3,
+     "basis": "If the package's maintainership were other than stated, the buyer loses nothing, as the buyer's plan does not touch the package and the seller does not support it in any case. No stated threshold reaches the third-party tools, and the reliance statement marks the buyer's use of them as the practice's inference. Rated on the practice's reading of the buyer's plan."
+    }
+   ],
+   "unrated": []
+  },
+  "claim_sources/site_index_html.md": {
+   "at": "2026-09-21T00-07-24Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 21,
+   "claims_from": "runs/2026-09-20T23-50-37Z_enum_chhoto-full_claim_sources_site_index_html_md_2026-09-20T23-32-01Z/claims.json",
+   "reliance_statement": "2026-09-20T23-54-59Z",
+   "tiers": [
+    {
+     "claim_id": 5,
+     "tier": 3,
+     "basis": "The buyer is acquiring the source to run a small service and its staff would maintain whatever language and framework it is written in; which framework the backend uses is not something any stated threshold or reliance item turns on, and its falsity would not reopen the price or the terms. Rated on the scale alone."
+    },
+    {
+     "claim_id": 8,
+     "tier": 1,
+     "basis": "The buyer's stated price condition is that \"footprint or resource figures materially worse than stated\" would change the price or the terms, and the reliance statement says the price assumes the README's account of footprint is accurate; if these compressed image sizes were false, the buyer would go back to the seller over the footprint figures alone. Rated against the buyer's stated threshold: \"footprint or resource figures materially worse than stated\"."
+    },
+    {
+     "claim_id": 10,
+     "tier": 1,
+     "basis": "The buyer's stated end-the-deal condition is \"a licence or ownership problem with the code\", and the reliance item for the MIT licence and clean ownership is marked depends with no repair available to the buyer; if the claim were false the buyer would not close. Rated against the buyer's stated threshold: \"a licence or ownership problem with the code\"."
+    },
+    {
+     "claim_id": 12,
+     "tier": 1,
+     "basis": "This is a boundary claim of absence whose failure would admit exactly what the buyer's threshold names; the buyer's stated price condition is \"any way visitors are logged or tracked beyond the hit count\" and the reliance item is marked depends, so its falsity would send the buyer back to the seller over the terms. Rated against the buyer's stated threshold: \"any way visitors are logged or tracked beyond the hit count\"."
+    },
+    {
+     "claim_id": 13,
+     "tier": 1,
+     "basis": "Shortening is the core the reliance statement marks as depends — the one thing the buyer is buying the service for — and if the claim were false the buyer would not close at any price on these terms. Rated against the buyer's stated threshold: \"a small, private link shortener the buyer can run for its customers\"."
+    },
+    {
+     "claim_id": 14,
+     "tier": 3,
+     "basis": "The reliance item for expiry is marked uses on the practice's inference, and its stated failure mode — staff deleting stale links by hand — is cheap while the service is small; no stated threshold reaches expiry. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 15,
+     "tier": 1,
+     "basis": "The hit count is the boundary of the buyer's stated price condition — \"any way visitors are logged or tracked beyond the hit count\" — and the reliance item for counting hits is marked depends, so if the claim were false the buyer would lose the one piece of visitor data its price assumes and would reopen the price. Rated against the buyer's stated threshold: \"any way visitors are logged or tracked beyond the hit count\"."
+    },
+    {
+     "claim_id": 16,
+     "tier": 3,
+     "basis": "The reliance item for editing and managing links is marked uses on the practice's inference; its falsity would leave staff managing links against the database by hand, which is costly as a routine but is not a stated threshold and would not alone reopen the price or the terms. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 17,
+     "tier": 3,
+     "basis": "Notes and filtering sit under the reliance item for link management marked uses on the practice's inference, with a workable fallback through the API or database; no stated threshold reaches this detail. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 18,
+     "tier": 3,
+     "basis": "QR codes and the API sit under reliance items marked uses on the practice's inference, each with a stated cheap substitution; no stated threshold reaches either. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 19,
+     "tier": 1,
+     "basis": "The buyer's stated end-the-deal condition is \"a dependency the buyer cannot run on its own hardware\" and the reliance item for self-hosting via Docker, Podman and compose is marked depends; if the claim were false the buyer would not close. Rated against the buyer's stated threshold: \"a dependency the buyer cannot run on its own hardware\"."
+    },
+    {
+     "claim_id": 20,
+     "tier": 3,
+     "basis": "The reliance item for configuration through environment variables is marked uses on the practice's inference and calls its failure a cheap irritation, since staff must set container configuration in any case; no stated threshold reaches the configuration mechanism. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 21,
+     "tier": 3,
+     "basis": "The web interface sits under a reliance item marked uses on the practice's inference, whose failure leaves staff working through the API or database with a frontend a competent engineer could patch cheaply; no stated threshold reaches the interface. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 22,
+     "tier": 3,
+     "basis": "A claim about the maintainer's profession does not touch the code, the licence, the footprint or any upkeep promise the reliance statement records, and no stated threshold reaches the seller's background. Rated on the scale alone."
+    },
+    {
+     "claim_id": 23,
+     "tier": 3,
+     "basis": "The languages the maintainer codes in have no bearing on any stated threshold or reliance item, which concern the code's behaviour, footprint, licensing and self-hosting rather than the seller's skills. Rated on the scale alone."
+    },
+    {
+     "claim_id": 24,
+     "tier": 3,
+     "basis": "The maintainer's research field has no bearing on the code, the service the buyer will run, or any stated threshold, and the reliance statement does not touch it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 25,
+     "tier": 1,
+     "basis": "If this were false, the service could not do the one thing the buyer is buying it for, and the reliance statement marks shortening with a generated slug or custom alias as depends, with no acceptable repair. Rated against the buyer's stated threshold: \"a small, private link shortener the buyer can run for its customers\"."
+    },
+    {
+     "claim_id": 28,
+     "tier": 1,
+     "basis": "If editing did not take effect, staff would manage links by hand against the database or patch the code, which the reliance statement calls costly as a routine practice for a buyer who paid for a finished tool, and the price assumes the README's account is accurate. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 29,
+     "tier": 3,
+     "basis": "Notes and filtering are conveniences; if they failed, staff would simply not attach or filter by notes, at no cost to the service the buyer's customers use. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 30,
+     "tier": 3,
+     "basis": "QR codes are a convenience of the web interface, and the API's documented failure leaves the web interface and direct calls as cheap substitutions, so neither loss reaches a stated threshold or an item the buyer depends on. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 31,
+     "tier": 1,
+     "basis": "If the web interface could not create, edit and manage short URLs on the buyer's own instance, the buyer's customers and staff would lose the primary way they use the service day to day, which is what the buyer said it is paying for. Rated against the buyer's stated threshold: \"a small, private link shortener the buyer can run for its customers\"."
+    }
+   ],
+   "unrated": []
+  }
+ }
+}

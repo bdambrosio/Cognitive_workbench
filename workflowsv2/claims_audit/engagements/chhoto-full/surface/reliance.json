@@ -1,0 +1,182 @@
+{
+ "at": "2026-09-20T23-54-59Z",
+ "model": "accounts/fireworks/models/glm-5p3-flash",
+ "use": "The buyer will take the source code and run it as its own hosted link-shortening service for its own customers: a small, private link shortener the buyer can run for its customers at low cost, as the README describes it. The buyer's own staff will deploy and operate the single instance; the buyer's customers will create short links through the service and share them, and visitors will follow those links. The buyer is paying for the service to behave as the documentation describes, and the price assumes the README's account of footprint, logging and defaults is accurate.",
+ "items": [
+  {
+   "item": "Shortening a submitted long URL into a short link, with a generated slug or a customer-chosen custom alias",
+   "reliance": "depends",
+   "if_it_failed": "The service cannot do the one thing the buyer is buying it for, and this is not something the buyer's staff can patch in the source at acceptable cost, since shortening is the product's core.",
+   "source": "buyer",
+   "buyer_words": "a small, private link shortener the buyer can run for its customers"
+  },
+  {
+   "item": "Resolving a short link by redirecting the visitor straight to the destination, including the choice of temporary or permanent redirect",
+   "reliance": "depends",
+   "if_it_failed": "Every link the buyer's customers share would fail or mislead, which the buyer cannot repair in its staff's power to fix, as the redirect path is the service's other half of its core.",
+   "source": "buyer",
+   "buyer_words": "a small, private link shortener the buyer can run for its customers"
+  },
+  {
+   "item": "Choosing and enforcing an expiry time for links, including links that never expire",
+   "reliance": "uses",
+   "if_it_failed": "Links would outlive or die earlier than the buyer's staff intends; staff could delete stale links by hand, which is cheap while the service is small and costly only if it grows.",
+   "source": "inference",
+   "buyer_words": ""
+  },
+  {
+   "item": "Counting hits per short link",
+   "reliance": "depends",
+   "if_it_failed": "The buyer would lose the one piece of visitor data its price assumes it gets, since the buyer's threshold treats the hit count as the boundary of acceptable recording; it could not restore counting without fixing the code.",
+   "source": "buyer",
+   "buyer_words": "any way visitors are logged or tracked beyond the hit count"
+  },
+  {
+   "item": "The promise that nothing about visitors is logged or tracked beyond the hit count, with no cookies, newsletters, consent popups or other mechanisms",
+   "reliance": "depends",
+   "if_it_failed": "The buyer's stated price condition would be breached and the deal terms would have to be revisited; the buyer could strip or disable offending code itself, but only at a cost that changes the bargain.",
+   "source": "buyer",
+   "buyer_words": "any way visitors are logged or tracked beyond the hit count"
+  },
+  {
+   "item": "The small resource footprint: compressed image sizes and RAM use in ordinary operation",
+   "reliance": "depends",
+   "if_it_failed": "The buyer's stated price condition would be breached, since materially worse footprint figures change the terms; the buyer could move to bigger hardware, which it may or may not regard as cheap given it bought the tool for low cost.",
+   "source": "buyer",
+   "buyer_words": "footprint or resource figures materially worse than stated"
+  },
+  {
+   "item": "The MIT licence and clean ownership of the code",
+   "reliance": "depends",
+   "if_it_failed": "The buyer's stated end-the-deal condition would be triggered and the purchase would not proceed; there is no repair the buyer could make itself.",
+   "source": "buyer",
+   "buyer_words": "a licence or ownership problem with the code"
+  },
+  {
+   "item": "Self-hosting on the buyer's own hardware: the Docker and Podman images, the provided compose file, the published architectures and the service reachable on its port",
+   "reliance": "depends",
+   "if_it_failed": "The buyer's stated end-the-deal condition, a dependency it cannot run on its own hardware, would be triggered; the buyer could rebuild the image from the repository's Containerfile, which is plausible for staff who run containers but not free.",
+   "source": "buyer",
+   "buyer_words": "a dependency the buyer cannot run on its own hardware"
+  },
+  {
+   "item": "SQLite storage with ACID behaviour, WAL mode and the durability settings, including the risk that updates mangle the database",
+   "reliance": "uses",
+   "if_it_failed": "The buyer's staff would restore from the backups the software keeps or reconfigure the journal mode, which is a known, cheap operation for whoever operates the instance, though any lost links are gone.",
+   "source": "inference",
+   "buyer_words": ""
+  },
+  {
+   "item": "Automatic database backups at start-up and daily, with old backups pruned",
+   "reliance": "uses",
+   "if_it_failed": "The buyer's staff could back up the data directory itself on a schedule, a cheap and routine substitution.",
+   "source": "inference",
+   "buyer_words": ""
+  },
+  {
+   "item": "Slug generation: the Pair and UID styles, slug length, collision retries, capital letters, and the capacity limit past which new links start failing",
+   "reliance": "uses",
+   "if_it_failed": "Staff would switch the slug style or length through configuration, which is a cheap restart-level change; if the few-thousand-link ceiling were hit, the same configuration path is the remedy and is cheap for a small service.",
+   "source": "inference",
+   "buyer_words": ""
+  },
+  {
+   "item": "The allowed protocols for long links and the option to enable extra protocols",
+   "reliance": "uses",
+   "if_it_failed": "Some customer links would be rejected; staff could add the needed protocol through configuration, which appears cheap. The buyer has not said; a person should ask.",
+   "source": "inference",
+   "buyer_words": ""
+  },
+  {
+   "item": "Authentication and access control: the admin password, the API key, hashed credentials, admin-only listing and deletion, and the single-admin design with no user management",
+   "reliance": "depends",
+   "if_it_failed": "The service would not be private, which is what the buyer said it is paying for, and the buyer's threshold about hardening that is implied but absent would be engaged; staff could front the service with their own gate, a costly change beside the nominal price.",
+   "source": "buyer",
+   "buyer_words": "a small, private link shortener"
+  },
+  {
+   "item": "Editing, deleting and listing existing links, with notes, filtering and pagination",
+   "reliance": "uses",
+   "if_it_failed": "Staff would manage links by hand against the database, which a competent engineer can do but which is costly as a routine practice; a code fix is the realistic remedy.",
+   "source": "inference",
+   "buyer_words": ""
+  },
+  {
+   "item": "The web administration interface, including mobile and dark mode, QR codes, copyable links and the configured site URL behind them",
+   "reliance": "uses",
+   "if_it_failed": "Staff would work through the API or direct database access instead, which is workable but slow; the frontend is plain HTML and JavaScript that a competent engineer could patch in a day, so repair is cheap for this buyer.",
+   "source": "inference",
+   "buyer_words": ""
+  },
+  {
+   "item": "Serving a custom landing page, disabling the frontend, and configuring Cache-Control headers",
+   "reliance": "uses",
+   "if_it_failed": "The buyer would fall back to the built-in interface, which costs nothing beyond appearance. The buyer has not said; a person should ask.",
+   "source": "inference",
+   "buyer_words": ""
+  },
+  {
+   "item": "The HTTP API for programmatic use: the endpoints, their JSON shapes, batch creation, cookie and API key authentication, and the documented status-code behaviour",
+   "reliance": "uses",
+   "if_it_failed": "Staff would use the web interface alone and lose any automation they build, at a cost that grows with how much the buyer comes to depend on scripted link management; the API is the backend's own surface, so repair is realistic.",
+   "source": "inference",
+   "buyer_words": ""
+  },
+  {
+   "item": "Public mode, in which anyone can add links without authenticating, with the forced public expiry delay",
+   "reliance": "does_not_use",
+   "if_it_failed": "Nothing in the buyer's plan touches it; the buyer runs a private service and would simply leave the mode off.",
+   "source": "inference",
+   "buyer_words": "a small, private link shortener the buyer can run for its customers"
+  },
+  {
+   "item": "The Helm chart for deploying on Kubernetes, with its persistent volume and cert-manager dependency",
+   "reliance": "uses",
+   "if_it_failed": "The buyer would deploy with the compose file instead, which is the documented basic path and cheap. The buyer has not said; a person should ask.",
+   "source": "inference",
+   "buyer_words": ""
+  },
+  {
+   "item": "The official command-line application for driving the service from a terminal",
+   "reliance": "uses",
+   "if_it_failed": "Staff would use the web interface or curl directly, which is a cheap substitution. The buyer has not said; a person should ask.",
+   "source": "inference",
+   "buyer_words": ""
+  },
+  {
+   "item": "The third-party tools: the browser extension, the Raycast extension, the FreeBSD port and the NixOS package",
+   "reliance": "uses",
+   "if_it_failed": "The buyer would use the service without them, at no cost, since the seller does not officially support them in any case. The buyer has not said; a person should ask.",
+   "source": "inference",
+   "buyer_words": ""
+  },
+  {
+   "item": "The maintainer's upkeep commitments: fixing reported bugs, keeping the project updated against vulnerabilities, supporting only the latest release, and adding no new features",
+   "reliance": "uses",
+   "if_it_failed": "The buyer's staff would carry security and bug fixes themselves or accept risk, which for a small Rust codebase a competent engineer might manage but which is costly for a buyer who bought a finished tool to run cheaply.",
+   "source": "inference",
+   "buyer_words": "as the README describes it"
+  },
+  {
+   "item": "The vulnerability reporting process and its channels",
+   "reliance": "uses",
+   "if_it_failed": "The buyer would have no route to report a flaw and would rely on public issue tracking, a small practical cost. The buyer has not said; a person should ask.",
+   "source": "inference",
+   "buyer_words": ""
+  },
+  {
+   "item": "Configuration entirely through environment variables, including the old variable names still being honoured",
+   "reliance": "uses",
+   "if_it_failed": "Staff would set configuration in the compose file or container invocation as they already must, so failure here would mean learning another mechanism, a cheap irritation.",
+   "source": "inference",
+   "buyer_words": ""
+  },
+  {
+   "item": "The seller's hosted demonstration instance, whose database is cleared every 15 minutes",
+   "reliance": "does_not_use",
+   "if_it_failed": "Nothing in the buyer's plan touches it; the buyer is acquiring the code to run its own instance and would not use the seller's demo at all.",
+   "source": "inference",
+   "buyer_words": "the buyer can run for its customers"
+  }
+ ]
+}

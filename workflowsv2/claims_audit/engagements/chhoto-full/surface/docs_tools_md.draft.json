@@ -1,0 +1,137 @@
+{
+ "claim_source": "docs/TOOLS.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "SPDX-FileCopyrightText: 2023-2026 Sayantan Santra <sayantan.santra689@gmail.com>",
+   "lines": [
+    1,
+    1
+   ],
+   "statement": "This document states a copyright of 2023-2026 held by Sayantan Santra.",
+   "about": "document",
+   "tier": 1,
+   "tier_basis": "The document is a notice of ownership, stating who holds the copyright in the project's files; if that attribution were false, the ownership of the code the buyer is purchasing would be in question, with no repair the buyer could make itself. The buyer's reliance statement records clean ownership as a depend-on item for the purchase. Rated against the buyer's stated threshold: \"a licence or ownership problem with the code\"."
+  },
+  {
+   "id": 2,
+   "quote": "SPDX-License-Identifier: MIT",
+   "lines": [
+    2,
+    2
+   ],
+   "statement": "This document is MIT-licensed.",
+   "about": "document",
+   "tier": 2,
+   "tier_basis": "The licence identifier in a source file states the code is MIT-licensed, which is the fact the buyer relies on for the acquisition; if the file were not under that licence, an ownership and licensing question would open across the codebase. The buyer's reliance statement records the MIT licence and clean ownership as a depend-on item triggering the deal-ending condition. Rated against the buyer's stated threshold: \"a licence or ownership problem with the code\"."
+  },
+  {
+   "id": 5,
+   "quote": "The following tools are 3rd party, and are not supported officially.",
+   "lines": [
+    13,
+    13
+   ],
+   "statement": "The tools listed in this document are third-party and are not officially supported by the seller.",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "If the tools were in fact officially supported rather than unsupported, the buyer loses nothing and would if anything gain a support route it does not rely on. No stated threshold reaches the third-party tools, and the reliance statement marks the buyer's use of them as the practice's inference. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 6,
+   "quote": "There's an unofficial browser extension maintained by [@SolninjaA](https://github.com/SolninjaA/Chhoto-URL-Extension) for shortening URLs easily using Chhoto URL.",
+   "lines": [
+    18,
+    18
+   ],
+   "statement": "A browser extension for shortening URLs using Chhoto URL exists.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the browser extension did not exist, the buyer would shorten links through the web interface or API at no cost, since it does not rely on the extension in its plan. No stated threshold reaches the third-party tools, and the reliance statement marks the buyer's use of them as the practice's inference. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 7,
+   "quote": "maintained by [@SolninjaA](https://github.com/SolninjaA/Chhoto-URL-Extension)",
+   "lines": [
+    18,
+    18
+   ],
+   "statement": "The browser extension is maintained by a third party, @SolninjaA, rather than the seller (described as unofficial).",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the extension's maintainership were other than stated, the buyer loses nothing, as the buyer's plan does not touch the extension and the seller does not support it in any case. No stated threshold reaches the third-party tools, and the reliance statement marks the buyer's use of them as the practice's inference. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 8,
+   "quote": "There's an unofficial Raycast extension maintained by [@paranoidPhantom](https://github.com/paranoidPhantom) for shortening URLs efficiently using Chhoto URL.",
+   "lines": [
+    23,
+    23
+   ],
+   "statement": "A Raycast extension for shortening URLs using Chhoto URL exists.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the Raycast extension did not exist, the buyer would shorten links through the web interface or API at no cost, since it does not rely on the extension in its plan. No stated threshold reaches the third-party tools, and the reliance statement marks the buyer's use of them as the practice's inference. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 9,
+   "quote": "maintained by [@paranoidPhantom](https://github.com/paranoidPhantom)",
+   "lines": [
+    23,
+    23
+   ],
+   "statement": "The Raycast extension is maintained by a third party, @paranoidPhantom, rather than the seller (described as unofficial).",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the extension's maintainership were other than stated, the buyer loses nothing, as the buyer's plan does not touch the extension and the seller does not support it in any case. No stated threshold reaches the third-party tools, and the reliance statement marks the buyer's use of them as the practice's inference. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 10,
+   "quote": "There's an unofficial FreeBSD port maintained by [@jcpsantiago](https://github.com/jcpsantiago) for installing Chhoto URL.",
+   "lines": [
+    28,
+    28
+   ],
+   "statement": "A FreeBSD port for installing Chhoto URL exists.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the FreeBSD port did not exist, the buyer would install through the published images on its own hardware at no cost, since it does not rely on the port in its plan. No stated threshold reaches the third-party tools, and the reliance statement marks the buyer's use of them as the practice's inference. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 11,
+   "quote": "maintained by [@jcpsantiago](https://github.com/jcpsantiago)",
+   "lines": [
+    28,
+    28
+   ],
+   "statement": "The FreeBSD port is maintained by a third party, @jcpsantiago, rather than the seller (described as unofficial).",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the port's maintainership were other than stated, the buyer loses nothing, as the buyer's plan does not touch the port and the seller does not support it in any case. No stated threshold reaches the third-party tools, and the reliance statement marks the buyer's use of them as the practice's inference. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 12,
+   "quote": "There's an unoffical NixOS package maintained by [@Defelo](https://github.com/Defelo) for Chhoto URL.",
+   "lines": [
+    34,
+    34
+   ],
+   "statement": "A NixOS package for Chhoto URL exists.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the NixOS package did not exist, the buyer would install through the published images on its own hardware at no cost, since it does not rely on the package in its plan. No stated threshold reaches the third-party tools, and the reliance statement marks the buyer's use of them as the practice's inference. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 13,
+   "quote": "maintained by [@Defelo](https://github.com/Defelo)",
+   "lines": [
+    34,
+    34
+   ],
+   "statement": "The NixOS package is maintained by a third party, @Defelo, rather than the seller (described as unofficial).",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the package's maintainership were other than stated, the buyer loses nothing, as the buyer's plan does not touch the package and the seller does not support it in any case. No stated threshold reaches the third-party tools, and the reliance statement marks the buyer's use of them as the practice's inference. Rated on the practice's reading of the buyer's plan."
+  }
+ ]
+}

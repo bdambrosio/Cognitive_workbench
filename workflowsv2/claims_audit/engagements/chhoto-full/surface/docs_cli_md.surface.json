@@ -1,0 +1,801 @@
+{
+ "claim_source": "docs/CLI.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "There's an official CLI app for Linux.",
+   "lines": [
+    6,
+    6
+   ],
+   "statement": "The product has an official command-line app that runs on Linux, hosted separately from the main source.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the claim were false, the buyer's staff would drive the service through the web interface or curl against the API instead, a substitution the buyer can make cheaply. The claim falls under the official CLI item, which the buyer uses but does not depend on. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 2,
+   "quote": "It's maintained by me",
+   "lines": [
+    6,
+    6
+   ],
+   "statement": "The seller maintains the official CLI app.",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "If the seller did not maintain the CLI, the buyer loses nothing it is paying for, since the CLI is a convenience the buyer's plan does not depend on and the seller separately disclaims support for it. Nothing in the buyer's stated thresholds reaches the CLI. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 3,
+   "quote": "even though I cannot promise to provide proper support",
+   "lines": [
+    6,
+    6
+   ],
+   "statement": "The seller does not promise proper support for the CLI app.",
+   "about": "seller",
+   "within": {
+    "source": "docs/TOOLS.md",
+    "id": 5,
+    "statement": "The tools listed in this document are third-party and are not officially supported by the seller."
+   },
+   "tier": 3,
+   "tier_basis": "This claim is a disclaimer in the seller's favour; its being false would give the buyer more support than promised, not less, so nothing in the buyer's plan or thresholds would change. It concerns a tool the buyer uses but does not depend on. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 4,
+   "quote": "The application can be used from the terminal using something like `curl`.",
+   "lines": [
+    11,
+    12
+   ],
+   "statement": "The application exposes an HTTP API that can be exercised from a terminal with a tool like curl.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the HTTP API did not exist or could not be driven from a terminal, the buyer's staff would fall back to the web administration interface, which the reliance statement treats as a workable substitution. The API is an item the buyer uses, not one it depends on, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 5,
+   "quote": "You can get the version of `chhoto-url` the server is running using `curl http://localhost:4567/api/version` and\nget the siteurl using `curl http://localhost:4567/api/siteurl`.",
+   "lines": [
+    14,
+    15
+   ],
+   "statement": "The server exposes an /api/version route returning the running version and an /api/siteurl route returning the site URL.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A person writing against the API would call these routes and parse their responses, and would act differently if the paths or their returns differed. On its own the failure would cost a small scripting correction, not a change to price or terms. Rated on the scale alone."
+  },
+  {
+   "id": 6,
+   "quote": "These routes are accessible without any authentication.",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "The /api/version and /api/siteurl routes require no authentication.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A script that fetches the version or site URL without authenticating would fail or need alteration if this were false. The exposure is of version and site URL only, so no stated threshold about logging, tracking or hardening reaches it. Rated on the scale alone."
+  },
+  {
+   "id": 7,
+   "quote": "In order to use API key validation, set the [`CHHOTO_API_KEY`](./INSTALLATION.md#chhoto_api_key) environment variable.",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "The server supports API key validation, enabled by setting the CHHOTO_API_KEY environment variable.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The API key is named in the authentication and access control item, on which the buyer's privacy depends: without key validation the buyer cannot keep its private service private for programmatic and administrative use, and the stated remedy of fronting the service with a gate is costly beside a nominal price. The buyer said it is paying for \"a small, private link shortener\". Rated against the buyer's stated threshold: \"a small, private link shortener\"."
+  },
+  {
+   "id": 8,
+   "quote": "If this is not set,\nthe API will default to cookie validation (see section above).",
+   "lines": [
+    21,
+    22
+   ],
+   "statement": "When CHHOTO_API_KEY is unset, the API's default authentication is cookie validation.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "This is a documented default that decides how a person configures and calls the API, and they would act differently if the default differed. On its own the failure is a configuration correction, not a change to price or terms. Rated on the scale alone."
+  },
+  {
+   "id": 9,
+   "quote": "If the API key is insecure, a warning will be outputted along with a generated\nAPI key which may be used.",
+   "lines": [
+    22,
+    23
+   ],
+   "statement": "When the configured API key is insecure, the server outputs a warning together with a generated API key that can be used.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If this behaviour were absent, the buyer's staff would simply set a strong key themselves, which is what the documented mechanism invites in any case. No stated threshold reaches it and the authentication the buyer depends on does not rest on this warning. Rated on the scale alone."
+  },
+  {
+   "id": 10,
+   "quote": "**All responses for requests using API key are JSON encoded.**",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "Every response to a request authenticated with an API key is JSON encoded.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A person writing against the API parses every response and would build to a different format if this were false. The failure is a parsing correction across scripts, not something that reopens price or terms. Rated on the scale alone."
+  },
+  {
+   "id": 11,
+   "quote": "For each response, the response code will be `200`, `401`, `400`, `500`, or `404`, depending on the context.",
+   "lines": [
+    29,
+    29
+   ],
+   "statement": "The API's responses use only the status codes 200, 401, 400, 500 and 404.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The documented status codes are part of the API's contract, and a person handling errors programmatically would act differently if the set differed. On its own the failure costs revised error handling, not price or terms. Rated on the scale alone."
+  },
+  {
+   "id": 12,
+   "quote": "Some of the requests/responses use `shorturl` and `longurl`, while some use `shortlink` and `longlink`.",
+   "lines": [
+    33,
+    33
+   ],
+   "statement": "The API inconsistently uses two field-naming conventions: some requests/responses use shorturl/longurl and some use shortlink/longlink.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Field names are exactly the detail a person integrating against the API acts on, and the inconsistency would change how they write every request and parser. The failure is an integration irritation, not something the buyer would reopen the deal over. Rated on the scale alone."
+  },
+  {
+   "id": 13,
+   "quote": "To add a link:\n\ncurl -X POST \\\n    -H \"X-API-Key: <YOUR_API_KEY>\" \\\n    -d '{ \\\n        \"shortlink\":\"<shortlink>\", \\\n        \"longlink\":\"<longlink>\", \\\n        \"expiry_delay\": <expiry_delay>, \\\n        \"notes\": \"<notes>\" \\\n        }' \\\n    http://localhost:4567/api/new",
+   "lines": [
+    39,
+    50
+   ],
+   "statement": "The target implements a /api/new endpoint whose handler accepts a POST request with an API key header and a JSON body carrying shortlink, longlink, expiry_delay and notes fields.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A person creating links programmatically would act directly on this endpoint, its method, header and body fields, and would do differently if any differed. If programmatic creation failed entirely the buyer would fall back to the web interface, since the API is an item the buyer uses rather than depends on and link creation itself remains available. Rated on the scale alone."
+  },
+  {
+   "id": 14,
+   "quote": "If `<shortlink>` is empty or omitted, one will be generated automatically.",
+   "lines": [
+    53,
+    53
+   ],
+   "statement": "The target's link-creation logic includes a fallback that generates a short link when the shortlink field is empty or omitted.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A script writer would rely on being able to omit the shortlink field and would act differently if the fallback did not exist. The failure costs supplying a slug explicitly, not price or terms. Rated on the scale alone."
+  },
+  {
+   "id": 15,
+   "quote": "The `<expiry_delay>` is specified in seconds.",
+   "lines": [
+    54,
+    54
+   ],
+   "statement": "The expiry_delay request field is interpreted as a number of seconds.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The unit of expiry_delay is a parameter format a person building requests would act on, and mistaking it changes every expiry their scripts set. The failure is a correction in the caller's code, not a change to the bargain. Rated on the scale alone."
+  },
+  {
+   "id": 16,
+   "quote": "It is capped to a maximum of 5 years.",
+   "lines": [
+    54,
+    54
+   ],
+   "statement": "The expiry_delay value is capped at a maximum of 5 years.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A capped parameter range is exactly the kind of documented detail a buyer configuring expiry from the documentation would act on: staff setting expiry_delay would choose values differently if the cap were false. On its own, however, no price or term would change, since expiry handling is an item the buyer merely uses and the failure is remedied through configuration. Rated on the scale alone."
+  },
+  {
+   "id": 17,
+   "quote": "A missing `<expiry_delay>` or a value of 0 will disable\nexpiry.",
+   "lines": [
+    54,
+    55
+   ],
+   "statement": "The target's expiry handling treats a missing expiry_delay value, or a value of 0, as a case in which no expiry is set on the link.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "This is a documented default of the expiry_delay parameter: a person setting up links and expecting a missing or zero value to disable expiry would act differently if it were false. If it failed, staff could still delete or edit stale links by hand, so nothing in the price or terms changes on its own. Rated on the scale alone."
+  },
+  {
+   "id": 18,
+   "quote": "The server will reply in the following format.\n\n```json\n{\n    \"success\": true,\n    \"error\": false,\n    \"shorturl\": \"<shortlink>\",\n    \"expiry_time\": <expiry_time>\n}\n```",
+   "lines": [
+    57,
+    66
+   ],
+   "statement": "On success, /api/new replies with a JSON object containing the fields success, error, shorturl and expiry_time.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The JSON shape of a success reply is a field name and format a person writing against the API relies on directly; code built against a different shape would break. On its own the buyer's price and terms would not change, as the API is an item the buyer uses and could work around through the web interface. Rated on the scale alone."
+  },
+  {
+   "id": 19,
+   "quote": "or\n\n```json\n{\n  \"success\": false,\n  \"error\": true,\n  \"reason\": \"<reason>\"\n}\n```",
+   "lines": [
+    68,
+    76
+   ],
+   "statement": "On failure, /api/new replies with a JSON object containing success set to false, error set to true, and a reason field.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The error reply's fields are API surface a person scripting against /api/new would act on, so a false claim here changes how the documentation is used. The failure alone would not reopen the price or the terms. Rated on the scale alone."
+  },
+  {
+   "id": 20,
+   "quote": "Multiple links can be created in a single request by sending an array of objects like the example below.",
+   "lines": [
+    78,
+    78
+   ],
+   "statement": "The target's /api/new endpoint accepts a JSON array of link objects in the request body and processes each element.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Batch creation is documented API behaviour a person integrating with the endpoint would rely on; if false, their request design would differ. The buyer loses only automation it may build, a cost the practice reads as growing over time but not changing the bargain on its own. Rated on the scale alone."
+  },
+  {
+   "id": 21,
+   "quote": "In that case, the response is an array containing one\nresult per input object (in order), each in one of the formats shown above.",
+   "lines": [
+    102,
+    103
+   ],
+   "statement": "For a batch creation request, the response is an array with one result per input object, in the same order, each in one of the single-link response formats.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The ordering and shape of batch responses is detail a person parsing batch results would act on directly. On its own its falsity would not change the price or the terms. Rated on the scale alone."
+  },
+  {
+   "id": 22,
+   "quote": "Except for malformed requests or internal server errors, the HTTP status code is always `200`.",
+   "lines": [
+    105,
+    105
+   ],
+   "statement": "The target's request handling assigns HTTP status 200 to responses, with distinct handling only for malformed requests and internal server errors.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The documented status-code behaviour is precisely the kind of API detail a person writing a client would act on, since error handling would be built differently if other codes were returned. Its failure alone would not reopen the price or terms. Rated on the scale alone."
+  },
+  {
+   "id": 23,
+   "quote": "To get the config for the backend:\n\n```bash\ncurl -H \"X-API-Key: <YOUR_API_KEY>\" \\\n-d '<shortlink>' http://localhost:4567/api/getconfig\n```",
+   "lines": [
+    110,
+    114
+   ],
+   "statement": "The /api/getconfig endpoint returns the configuration for a given short link's backend, accessed by sending the short link with an API key header.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "An endpoint's existence, path and authentication header are route and parameter detail a person calling the API from the documentation would act on. Its falsity alone would not change the price or the terms, as staff could inspect backends another way. Rated on the scale alone."
+  },
+  {
+   "id": 24,
+   "quote": "(This would work without authentication in public mode.)",
+   "lines": [
+    117,
+    117
+   ],
+   "statement": "The /api/getconfig endpoint works without authentication when the server is in public mode.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "This claim concerns behaviour in public mode, an item the buyer's plan does not use: the buyer runs a private service and would simply leave the mode off, so the claim being false changes nothing for this buyer. No stated threshold reaches unauthenticated config access in a mode the buyer never enables. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 25,
+   "quote": "The server will reply in the following format.\n\n```json\n{\n    \"version\": \"<version>\",\n    \"site_url\": \"<site_url>\",\n    \"allow_capital_letters\": true/false,\n    \"public_mode\": true/false,\n    \"public_mode_expiry_delay\": \"<delay>\",\n    \"slug_style\": \"<style>\",\n    \"slug_length\": \"<len>\",\n    \"try_longer_slug\": true/false\n}\n```",
+   "lines": [
+    118,
+    131
+   ],
+   "statement": "A successful /api/getconfig reply is JSON containing the fields version, site_url, allow_capital_letters, public_mode, public_mode_expiry_delay, slug_style, slug_length and try_longer_slug.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The field names and contents of the getconfig reply are configuration detail a person writing against the API would act on directly. Its failure alone would not change the price or the terms. Rated on the scale alone."
+  },
+  {
+   "id": 26,
+   "quote": "```json\n{\n  \"success\": false,\n  \"error\": true,\n  \"reason\": \"<reason>\"\n}\n```",
+   "lines": [
+    133,
+    139
+   ],
+   "statement": "On error, /api/getconfig replies with JSON containing success set to false, error set to true, and a reason field.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The error response format for this endpoint is API detail a person handling failures in a client would act on. On its own the buyer's price and terms would not change. Rated on the scale alone."
+  },
+  {
+   "id": 27,
+   "quote": "To get the current user role:\n\n```bash\ncurl -H \"X-API-Key: <YOUR_API_KEY>\" http://localhost:4567/api/whoami\n```",
+   "lines": [
+    143,
+    147
+   ],
+   "statement": "The /api/whoami endpoint returns the current user's role, accessed with an API key header.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "An endpoint's existence and its authentication header are documented API detail a person calling it would act on; if false, their integration would differ. The failure alone would not change the price or the terms. Rated on the scale alone."
+  },
+  {
+   "id": 28,
+   "quote": "The server will reply with `admin` if admin access is granted, `public` if admin access is not granted but public mode is enabled,\nand `nobody` if no access is granted.",
+   "lines": [
+    149,
+    150
+   ],
+   "statement": "The /api/whoami reply is `admin` when admin access is granted, `public` when admin access is not granted but public mode is enabled, and `nobody` when no access is granted.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The possible reply values of the whoami endpoint are API detail a person scripting against the service would rely on, touching also on how the single-admin design presents itself through the API. On its own the failure would not reopen the price or the terms, since the buyer's staff control access at the deployment anyway. Rated on the scale alone."
+  },
+  {
+   "id": 29,
+   "quote": "To edit an existing short link:\n\n```bash\ncurl -X PUT \\\n-H \"X-API-Key: <YOUR_API_KEY>\" \\\n-d '{ \\\n    \"shortlink\":\"<shortlink>\", \\\n    \"longlink\":\"<longlink>\", \\\n    \"reset_hits\": <bool>, \\\n    \"expiry_time\": <time>, \\\n    \"notes\": <notes> \\\n    }' \\\nhttp://localhost:4567/api/edit\n```",
+   "lines": [
+    154,
+    166
+   ],
+   "statement": "An existing short link can be edited via a PUT to /api/edit with an API key header, sending shortlink, longlink, reset_hits, expiry_time and notes fields.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The edit endpoint's method, path, header and request fields are API surface a person building tooling against the documentation would act on directly. Its failure alone would not change the price or the terms, since staff could edit links through the web interface or database. Rated on the scale alone."
+  },
+  {
+   "id": 30,
+   "quote": "The fields `expiry_time` and `notes` are optional.",
+   "lines": [
+    169,
+    169
+   ],
+   "statement": "In the /api/edit request, the expiry_time and notes fields are optional.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Which request fields are optional is parameter detail a person constructing edit requests from the documentation would act on; a false claim here would break requests built to the documented shape. On its own the price and terms would not change. Rated on the scale alone."
+  },
+  {
+   "id": 31,
+   "quote": "The existing values will be kept in the database if nothing is provided.",
+   "lines": [
+    169,
+    169
+   ],
+   "statement": "When optional /api/edit fields are not provided, the existing values are kept in the database unchanged.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A buyer integrating with the edit endpoint would rely on unchanged values for omitted optional fields when deciding which fields to send; its falsity would mislead a person writing against the API but would not, alone, move the price or terms, and no stated threshold reaches edit-request field behaviour. Rated on the scale alone."
+  },
+  {
+   "id": 32,
+   "quote": "The server will reply in the following format.\n\n```json\n{\n    \"success\": true/false,\n    \"error\": false/true,\n    \"reason\": \"<reason\"\n}\n```",
+   "lines": [
+    171,
+    179
+   ],
+   "statement": "The /api/edit reply is JSON containing success, error and reason fields.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The names and presence of the success, error and reason fields are exactly the detail a person parsing the edit reply writes code against, so their falsity would break an integration script while leaving the buyer's stated thresholds untouched. Rated on the scale alone."
+  },
+  {
+   "id": 33,
+   "quote": "#### `/api/expand`\n\nTo get information about a single short link:",
+   "lines": [
+    181,
+    183
+   ],
+   "statement": "The API exposes a /api/expand endpoint that returns information about a single short link.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A documented route's existence is what a developer building automation against the API would act on, and its absence would cost an automation path the buyer uses but does not depend on, at a nominal price with no threshold naming API surface. Rated on the scale alone."
+  },
+  {
+   "id": 34,
+   "quote": "The server will reply in the following format.\n\n```json\n{\n    \"success\": true,\n    \"error\": false,\n    \"longurl\": \"<longurl>\",\n    \"hits\": \"<hits>\",\n    \"expiry_time\": <expiry_time>,\n    \"notes\": \"<notes>\"\n}\n```",
+   "lines": [
+    190,
+    201
+   ],
+   "statement": "A successful /api/expand reply is JSON with the fields success, error, longurl, hits, expiry_time and notes.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The field names and shapes of the expand reply are detail a person consuming the endpoint writes parsing code against, so their falsity would mislead that person without, on its own, changing the price or terms; no stated threshold reaches reply field names. Rated on the scale alone."
+  },
+  {
+   "id": 35,
+   "quote": "or\n\n```json\n{\n  \"success\": false,\n  \"error\": true,\n  \"reason\": \"<reason>\"\n}\n```",
+   "lines": [
+    203,
+    211
+   ],
+   "statement": "A failed /api/expand reply is JSON with success set to false, error set to true, and a reason field.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The failure reply's fields and flags are what a developer's error handling is written against, a documentation-level detail whose falsity would not, alone, move the price or terms and which no stated threshold reaches. Rated on the scale alone."
+  },
+  {
+   "id": 36,
+   "quote": "(This route is not accessible using cookie validation.)",
+   "lines": [
+    213,
+    213
+   ],
+   "statement": "The /api/expand route cannot be accessed using cookie validation.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A developer choosing how to authenticate against expand would act on the statement that cookie validation does not work there and use the API key instead; its falsity would change what that person does but admits no access or privacy failure and reaches no stated threshold. Rated on the scale alone."
+  },
+  {
+   "id": 37,
+   "quote": "#### `/api/all?{params}`\n\nTo get a list of all the currently available links:",
+   "lines": [
+    215,
+    217
+   ],
+   "statement": "The API exposes a /api/all endpoint that returns a list of all the currently available links.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The existence of a documented listing route is detail a person building automation or administration scripts against the API acts on; its falsity would cost a path the buyer uses but does not depend on, and no stated threshold names API endpoints. Rated on the scale alone."
+  },
+  {
+   "id": 38,
+   "quote": "1. `page_after`: An offset where to start pagination after. It should be a valid shortlink, or an empty response will be received.",
+   "lines": [
+    225,
+    225
+   ],
+   "statement": "The /api/all endpoint supports a page_after query parameter: an offset to start pagination after, which should be a valid shortlink or an empty response is received.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A parameter's name, purpose and validity condition are what a developer paginating through links writes code against, and its falsity would change what that person does while leaving the buyer's price basis and thresholds untouched. Rated on the scale alone."
+  },
+  {
+   "id": 39,
+   "quote": "This is faster, and the preferred way of doing pagination.",
+   "lines": [
+    226,
+    226
+   ],
+   "statement": "The /api/all endpoint implements pagination by an offset via the page_after parameter, provided as the primary pagination path in the code.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A developer choosing between the two pagination mechanisms would act on the claim that the offset path is the faster, preferred one, so its falsity would change what that person does; the performance difference on a small private instance would not, alone, reopen the price or terms, and no stated threshold reaches pagination. Rated on the scale alone."
+  },
+  {
+   "id": 40,
+   "quote": "1. `page_size`: The size of a returned page in number of shortlinks.",
+   "lines": [
+    227,
+    227
+   ],
+   "statement": "The /api/all endpoint supports a page_size query parameter giving the size of a returned page in number of shortlinks.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The existence and meaning of the page_size parameter is detail a person writing paginated requests against the API relies on, a documentation-level item whose falsity would not, on its own, change the price or terms. Rated on the scale alone."
+  },
+  {
+   "id": 41,
+   "quote": "Default value is 10.",
+   "lines": [
+    227,
+    227
+   ],
+   "statement": "The default value of page_size is 10.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A documented default value is the paradigm case of detail a reader of the documentation acts on: a developer would size their handling of responses around it, while its falsity would not, alone, reopen the price or terms or reach any stated threshold. Rated on the scale alone."
+  },
+  {
+   "id": 42,
+   "quote": "1. `page_no`: Alternative way of doing pagination.",
+   "lines": [
+    228,
+    228
+   ],
+   "statement": "The /api/all endpoint supports a page_no query parameter as an alternative way of doing pagination.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "An alternative pagination parameter's existence is detail a developer integrating with the listing endpoint would act on, and its falsity would change what that person writes without, on its own, moving the price or terms or reaching a stated threshold. Rated on the scale alone."
+  },
+  {
+   "id": 44,
+   "quote": "The filter is applied on `shorturl`, `longurl`, and `notes` fields.",
+   "lines": [
+    229,
+    229
+   ],
+   "statement": "The filter query parameter is applied on the shorturl, longurl and notes fields.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Which fields the filter searches is what a developer building filtered listings writes queries against, so its falsity would change that person's behaviour; on its own it would not reopen the price or terms, and no stated threshold reaches filter behaviour. Rated on the scale alone."
+  },
+  {
+   "id": 45,
+   "quote": "Must be ASCII, and at least 3\n   characters long.",
+   "lines": [
+    229,
+    230
+   ],
+   "statement": "The filter must be ASCII and at least 3 characters long.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A parameter's format constraint — ASCII, minimum length — is detail a person constructing filter queries must act on to avoid empty responses, a documentation-level item whose falsity would not, alone, change the price or terms. Rated on the scale alone."
+  },
+  {
+   "id": 46,
+   "quote": "Only alphanumeric characters are used for the filtering. Everything else is treated as a separator.",
+   "lines": [
+    230,
+    230
+   ],
+   "statement": "Only alphanumeric characters are used for the filtering; everything else is treated as a separator.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "How the filter treats non-alphanumeric characters is detail a developer writing filter expressions against the API would act on, so its falsity would change what that person does while leaving the buyer's thresholds and nominal price basis untouched. Rated on the scale alone."
+  },
+  {
+   "id": 47,
+   "quote": "None of the parameters are required.",
+   "lines": [
+    232,
+    232
+   ],
+   "statement": "None of the /api/all query parameters are required.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A person writing against the /api/all endpoint would build their request differently if parameter optionality were other than stated, and the HTTP API is an item the buyer's plan uses. This is documented parameter behaviour of exactly the kind a script would act on. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 48,
+   "quote": "In absence of all of those, all shortlinks are returned.",
+   "lines": [
+    232,
+    232
+   ],
+   "statement": "When none of the /api/all query parameters are given, all shortlinks are returned.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The default result of a parameterless /api/all call determines what a script receives and would change how the buyer's staff write against the endpoint. It is a documented default on the API surface the buyer's plan uses. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 49,
+   "quote": "The entries should be positive integers.",
+   "lines": [
+    232,
+    232
+   ],
+   "statement": "The /api/all parameter entries should be positive integers.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The stated value type of the /api/all parameters is a format a person scripting against the endpoint must honour, and getting it wrong would make their calls fail. The HTTP API is an item the buyer's plan uses. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 50,
+   "quote": "If only `page_size` is provided, the first page is returned.",
+   "lines": [
+    233,
+    233
+   ],
+   "statement": "If only page_size is provided to /api/all, the first page is returned.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Pagination behaviour on /api/all determines which links a script sees, so a person writing against the API would act differently if the default page were other than stated. This is documented parameter behaviour on the API surface the buyer's plan uses. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 51,
+   "quote": "A successful reply would be an array and look like the following.\n\n```json\n[\n    ...\n  {\n    \"shortlink\": \"<shortlink>\",\n    \"longlink\": \"<longlink>\",\n    \"hits\": <hits>,\n    \"expiry_time\": <expiry_time>,\n    \"notes\": \"<notes>\"\n  },\n    ...\n]\n```",
+   "lines": [
+    235,
+    249
+   ],
+   "statement": "A successful /api/all reply is an array whose entries contain the fields shortlink, longlink, hits, expiry_time and notes.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The JSON field names and array shape of the /api/all reply are exactly the format detail a script must be written against, and the buyer's plan uses the HTTP API. If the shape were different, every script reading the reply would break. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 52,
+   "quote": "#### `/api/del/{shortlink}`\n\nTo delete a link:\n\n```bash\ncurl -X DELETE -H \"X-API-Key: <YOUR_API_KEY>\" http://localhost:4567/api/del/<shortlink>\n```",
+   "lines": [
+    251,
+    257
+   ],
+   "statement": "The API exposes a /api/del/{shortlink} endpoint that deletes a link, called with a DELETE request.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The existence and method of the /api/del/{shortlink} route is a documented route a person scripting deletions would call directly; if it were other than stated their requests would fail. Deletion itself sits under an item the buyer only uses, so nothing in the price or terms turns on it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 53,
+   "quote": "The server will output when the instance is accessed over API, when an incorrect API key is received, etc.",
+   "lines": [
+    262,
+    262
+   ],
+   "statement": "The server outputs log messages when the instance is accessed over the API, when an incorrect API key is received, and similar events.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the server's console output on API access were other than stated, the buyer would lose nothing it pays for: the claim concerns operational log messages, not visitor recording, and no stated threshold reaches server-side output of this kind. No reliance item depends on it. Rated on the scale alone."
+  },
+  {
+   "id": 54,
+   "quote": "If you have set up a password, first do the following to get an authentication cookie and store it in a file.\n\n```bash\ncurl -X POST -d \"<your-password>\" -c cookie.txt http://localhost:4567/api/login\n```",
+   "lines": [
+    266,
+    270
+   ],
+   "statement": "A /api/login endpoint accepts the configured password by POST and returns an authentication cookie that can be stored and reused.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The /api/login route, its method and its cookie behaviour are the mechanism a script must use to authenticate when a password is set, so a person writing against the API would act differently if this were other than stated. The HTTP API is an item the buyer's plan uses. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 55,
+   "quote": "You should receive \"Correct password!\" if the provided password was correct.",
+   "lines": [
+    272,
+    272
+   ],
+   "statement": "The server responds with the message \"Correct password!\" when the provided password is correct.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The documented success message is the response text a script checking login success would match on, so a person writing against the API would act on it. It is a response-format detail on the API surface the buyer's plan uses. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 56,
+   "quote": "Unless specified, all API methods should work with cookies.",
+   "lines": [
+    273,
+    273
+   ],
+   "statement": "By default, all API methods work with cookie authentication; only where specified do they not.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Whether API methods accept cookie authentication by default determines how the buyer's staff authenticate every scripted call, so they would write against the API differently if this were other than stated. It is a documented default on the API surface the buyer's plan uses. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 57,
+   "quote": "If you do not define a [`CHHOTO_PASSWORD`](./INSTALLATION.md#chhoto_password) environment variable when starting the docker\nimage, authentication will be disabled.",
+   "lines": [
+    277,
+    278
+   ],
+   "statement": "If the CHHOTO_PASSWORD environment variable is not defined when starting the docker image, authentication is disabled.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "This is a documented default of the deployment: a person starting the image would act directly on whether a missing CHHOTO_PASSWORD variable leaves authentication off. The buyer's staff will set a password, so no term turns on it, but the default is exactly what the setup reader relies on. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 58,
+   "quote": "This if not recommended in actual use however, as it will allow anyone to create new links and delete\nold ones.",
+   "lines": [
+    280,
+    281
+   ],
+   "statement": "When authentication is disabled, anyone can create new links and delete old ones.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim describes the consequence of running without authentication, a mode the buyer's private service will not use since its staff will set the admin password. If it were false, nothing in the buyer's plan or price would change, and no stated threshold reaches it. Rated on the scale alone."
+  },
+  {
+   "id": 59,
+   "quote": "Since there are no logs, it's impossible to prove that those links aren't created by you.",
+   "lines": [
+    282,
+    282
+   ],
+   "statement": "There are no logs; the service keeps no logs from which link creation could be attributed.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "A no-logs claim sits squarely under the buyer's price condition on recording: if the service in fact kept logs, the bargain the nominal price assumes would be breached and the buyer would go back to the seller over this claim alone. It is a boundary claim whose failure would admit exactly what the buyer said it would not pay for. Rated against the buyer's stated threshold: \"any way visitors are logged or tracked beyond the hit count\"."
+  },
+  {
+   "id": 60,
+   "quote": "To add a link:\n\ncurl -X POST \\\n    -H \"X-API-Key: <YOUR_API_KEY>\" \\\n    -d '{ \\\n        \"shortlink\":\"<shortlink>\", \\\n        \"longlink\":\"<longlink>\", \\\n        \"expiry_delay\": <expiry_delay>, \\\n        \"notes\": \"<notes>\" \\\n        }' \\\n    http://localhost:4567/api/new",
+   "lines": [
+    39,
+    50
+   ],
+   "statement": "When such a POST request is sent to /api/new, the target adds the link described by the request body.",
+   "about": "target",
+   "implied_by": 13,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "The /api/new endpoint and its request body are the route and format a person scripting link creation would write against directly; if the call did not add the link, their automation would fail. Link creation through the web interface would remain, so nothing in the price or terms turns on this claim alone. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 61,
+   "quote": "If `<shortlink>` is empty or omitted, one will be generated automatically.",
+   "lines": [
+    53,
+    53
+   ],
+   "statement": "When a link is created without a shortlink value, the target supplies an automatically generated short link for it.",
+   "about": "target",
+   "implied_by": 14,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "within": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 25,
+    "statement": "When a URL is submitted for shortening, the product creates a short URL for it using either a generated slug or a custom alias."
+   },
+   "tier": 2,
+   "tier_basis": "This is a documented default: whether an omitted shortlink yields an automatically generated one changes what a script must send to /api/new. A person writing against the API would act differently if it were other than stated. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 62,
+   "quote": "A missing `<expiry_delay>` or a value of 0 will disable\nexpiry.",
+   "lines": [
+    54,
+    55
+   ],
+   "statement": "Links created with expiry_delay omitted or set to 0 do not expire.",
+   "about": "target",
+   "implied_by": 17,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "If false, links would expire or persist against the operator's intent, but a person creating links through the API acts directly on this parameter's behaviour, and staff could set an explicit expiry value or manage links by hand, which the reliance statement treats as cheap for the expiry item. No stated threshold reaches expiry behaviour. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 63,
+   "quote": "Multiple links can be created in a single request by sending an array of objects like the example below.",
+   "lines": [
+    78,
+    78
+   ],
+   "statement": "A single request to /api/new carrying an array of objects results in multiple links being created.",
+   "about": "target",
+   "implied_by": 20,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "If false, a caller sending an array to /api/new would create fewer links than expected, and anyone writing against the API would do so differently on the strength of this documented request format. Failure on its own changes nothing about price or terms, and the API is an item the buyer only uses on the practice's inference. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 64,
+   "quote": "Except for malformed requests or internal server errors, the HTTP status code is always `200`.",
+   "lines": [
+    105,
+    105
+   ],
+   "statement": "In operation, every request the target receives receives HTTP status 200, except malformed requests and those causing internal server errors.",
+   "about": "target",
+   "implied_by": 22,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "If false, a developer integrating against the service would handle status codes differently, since the documented status-code behaviour is exactly the kind of API surface a documentation-reliant buyer codes against. No stated threshold reaches HTTP status behaviour, and the API itself is an item the buyer uses on the practice's inference. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 65,
+   "quote": "This is faster, and the preferred way of doing pagination.",
+   "lines": [
+    226,
+    226
+   ],
+   "statement": "Pagination requests to /api/all that use the page_after parameter complete faster than pagination requests that use the alternative method.",
+   "about": "target",
+   "implied_by": 39,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If false, the buyer loses nothing: both pagination methods work, and the claim only says one is faster and preferred, so a developer choosing between them is inconvenienced at most. Neither the buyer's stated thresholds nor any reliance item turns on relative pagination speed. Rated on the scale alone."
+  }
+ ]
+}

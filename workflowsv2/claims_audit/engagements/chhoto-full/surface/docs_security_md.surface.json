@@ -1,0 +1,58 @@
+{
+ "claim_source": "docs/SECURITY.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "If you believe you have found a vulnerability in Chhoto URL you can report it using one of the following ways:",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "A vulnerability reporting process exists for Chhoto URL and accepts reports through the channels listed below it.",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "If the reporting process did not exist, the buyer would fall back to public issue tracking for flagging flaws in a codebase it operates itself — a small practical cost that would not reopen the price or terms. No stated threshold names a vulnerability reporting route. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 2,
+   "quote": "Contact me at [mail@sayantansantra.com](mailto:mail@sayantansantra.com).",
+   "lines": [
+    5,
+    5
+   ],
+   "statement": "Vulnerability reports can be sent to the seller by email at mail@sayantansantra.com.",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "The failure would cost the buyer one channel among those listed for reporting a flaw, in a purchase of source code the buyer's own staff run; no repair, price or term rests on this address alone. No stated threshold reaches the reporting channels. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 3,
+   "quote": "Create a [security advisory](https://github.com/SinTan1729/chhoto-url/security/advisories).",
+   "lines": [
+    6,
+    6
+   ],
+   "statement": "Vulnerability reports can be submitted as GitHub security advisories at the linked repository URL.",
+   "about": "seller",
+   "within": {
+    "source": "docs/SECURITY.md",
+    "id": 1,
+    "statement": "A vulnerability reporting process exists for Chhoto URL and accepts reports through the channels listed below it."
+   },
+   "tier": 3,
+   "tier_basis": "Losing the GitHub security-advisory route would leave the buyer the other listed channels and public issue tracking, a small practical cost beside a nominal-price asset purchase. No stated threshold reaches the reporting channels. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 4,
+   "quote": "Only the [latest version](https://github.com/SinTan1729/chhoto-url/releases/latest) is supported.",
+   "lines": [
+    12,
+    12
+   ],
+   "statement": "The seller supports only the latest release of Chhoto URL; no earlier version receives support.",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "If the support-scope promise were not kept, the buyer's staff would carry fixes for a small Rust codebase themselves or accept the risk — a cost under a commitment the buyer uses rather than depends on, with no stated threshold naming seller support. It is not the kind of documented detail a reader of the documentation acts on, so tier 2 does not fit. Rated on the practice's reading of the buyer's plan."
+  }
+ ]
+}

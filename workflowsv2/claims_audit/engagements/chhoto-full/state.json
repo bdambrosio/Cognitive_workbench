@@ -1,0 +1,204 @@
+{
+ "current_intake": null,
+ "current_run": {},
+ "cancelled": {
+  "intakes": [],
+  "runs": []
+ },
+ "stages": {
+  "created": {
+   "value": "done",
+   "at": "2026-09-20T23-29-07Z",
+   "by": null
+  },
+  "sorting": {
+   "value": "confirmed",
+   "at": "2026-09-20T23-31-09Z",
+   "by": "claude 2026-09-20, for Bruce: all six descriptions as proposed; nothing outside the target (illustrative buyer)"
+  },
+  "enumeration": {
+   "value": "done",
+   "at": "2026-09-21T00-07-24Z",
+   "by": "job"
+  },
+  "surface": {
+   "value": "frozen",
+   "at": "2026-09-21T00-07-56Z",
+   "by": "claude 2026-09-20, for Bruce: tiers as rated, repeated claims left out as the surface page does, no scrub by a person"
+  },
+  "chain": {
+   "value": "done",
+   "at": "2026-09-21T02-17-29Z",
+   "by": "job"
+  }
+ },
+ "jobs": [
+  {
+   "id": "2026-09-20T23-29-30Z",
+   "kind": "sort",
+   "state": "done",
+   "by": "claude 2026-09-20, full chhoto run for the demo",
+   "started": "2026-09-20T23-29-30Z",
+   "ended": "2026-09-20T23-30-49Z",
+   "exit": 0,
+   "error": null,
+   "log": "/home/bruce/Downloads/Cognitive_workbench/workflowsv2/claims_audit/engagements/chhoto-full/jobs/2026-09-20T23-29-30Z.log",
+   "steps": [
+    {
+     "label": "sort the materials",
+     "pid": 278375,
+     "exit": 0
+    }
+   ]
+  },
+  {
+   "id": "2026-09-20T23-31-21Z",
+   "kind": "enumerate",
+   "state": "failed",
+   "by": "claude 2026-09-20, full chhoto run for the demo",
+   "started": "2026-09-20T23-31-21Z",
+   "ended": "2026-09-20T23-31-21Z",
+   "exit": 1,
+   "error": "enumerate README.md exited 1",
+   "log": "/home/bruce/Downloads/Cognitive_workbench/workflowsv2/claims_audit/engagements/chhoto-full/jobs/2026-09-20T23-31-21Z.log",
+   "steps": [
+    {
+     "label": "enumerate README.md",
+     "pid": 278561,
+     "exit": 1
+    }
+   ]
+  },
+  {
+   "id": "2026-09-20T23-32-01Z",
+   "kind": "enumerate",
+   "state": "done",
+   "by": "claude 2026-09-20, full chhoto run for the demo",
+   "started": "2026-09-20T23-32-01Z",
+   "ended": "2026-09-21T00-07-24Z",
+   "exit": 0,
+   "error": null,
+   "log": "/home/bruce/Downloads/Cognitive_workbench/workflowsv2/claims_audit/engagements/chhoto-full/jobs/2026-09-20T23-32-01Z.log",
+   "steps": [
+    {
+     "label": "enumerate README.md",
+     "pid": 278681,
+     "exit": 0
+    },
+    {
+     "label": "enumerate docs/CLI.md",
+     "pid": 278925,
+     "exit": 0
+    },
+    {
+     "label": "enumerate docs/INSTALLATION.md",
+     "pid": 279106,
+     "exit": 0
+    },
+    {
+     "label": "enumerate docs/SECURITY.md",
+     "pid": 279386,
+     "exit": 0
+    },
+    {
+     "label": "enumerate docs/TOOLS.md",
+     "pid": 279500,
+     "exit": 0
+    },
+    {
+     "label": "enumerate claim_sources/site_index_html.md",
+     "pid": 279647,
+     "exit": 0
+    },
+    {
+     "label": "mark repeated claims",
+     "pid": 280344,
+     "exit": 0
+    },
+    {
+     "label": "state what the buyer relies on",
+     "pid": 280470,
+     "exit": 0
+    },
+    {
+     "label": "rate the claims into tiers",
+     "pid": 280475,
+     "exit": 0
+    }
+   ]
+  },
+  {
+   "id": "2026-09-21T00-08-04Z",
+   "kind": "chain",
+   "state": "done",
+   "by": "claude 2026-09-20, full chhoto run for the demo: tier 1 = 38 of 312 frozen claims",
+   "started": "2026-09-21T00-08-04Z",
+   "ended": "2026-09-21T02-17-29Z",
+   "exit": 0,
+   "error": null,
+   "log": "/home/bruce/Downloads/Cognitive_workbench/workflowsv2/claims_audit/engagements/chhoto-full/jobs/2026-09-21T00-08-04Z.log",
+   "steps": [
+    {
+     "label": "audit README.md",
+     "pid": 283606,
+     "exit": 0
+    },
+    {
+     "label": "review README.md",
+     "pid": 284964,
+     "exit": 0
+    },
+    {
+     "label": "audit docs/CLI.md",
+     "pid": 285575,
+     "exit": 0
+    },
+    {
+     "label": "review docs/CLI.md",
+     "pid": 286188,
+     "exit": 0
+    },
+    {
+     "label": "audit docs/INSTALLATION.md",
+     "pid": 286486,
+     "exit": 0
+    },
+    {
+     "label": "review docs/INSTALLATION.md",
+     "pid": 287062,
+     "exit": 0
+    },
+    {
+     "label": "audit docs/TOOLS.md",
+     "pid": 287670,
+     "exit": 0
+    },
+    {
+     "label": "review docs/TOOLS.md",
+     "pid": 287896,
+     "exit": 0
+    },
+    {
+     "label": "audit claim_sources/site_index_html.md",
+     "pid": 291333,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site_index_html.md",
+     "pid": 292077,
+     "exit": 0
+    },
+    {
+     "label": "materiality",
+     "pid": 292511,
+     "exit": 0
+    },
+    {
+     "label": "report",
+     "pid": 292671,
+     "exit": 0
+    }
+   ]
+  }
+ ]
+}

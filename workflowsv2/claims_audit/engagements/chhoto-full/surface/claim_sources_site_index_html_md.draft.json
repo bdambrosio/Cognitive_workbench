@@ -1,0 +1,287 @@
+{
+ "claim_source": "claim_sources/site_index_html.md",
+ "claims": [
+  {
+   "id": 5,
+   "quote": "It's written in async Rust, using Actix Web as the backend",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The backend is written in async Rust using the Actix Web framework.",
+   "about": "target",
+   "within": {
+    "source": "README.md",
+    "id": 46,
+    "statement": "The backend is written in Rust using the Actix Web framework."
+   },
+   "tier": 3,
+   "tier_basis": "The buyer is acquiring the source to run a small service and its staff would maintain whatever language and framework it is written in; which framework the backend uses is not something any stated threshold or reliance item turns on, and its falsity would not reopen the price or the terms. Rated on the scale alone."
+  },
+  {
+   "id": 8,
+   "quote": "It's distributed in a tiny container image (<4.5 MB for the scratch image and <8.5 MB for the alpine image, both compressed)",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The compressed container image is below 4.5 MB for the scratch variant and below 8.5 MB for the alpine variant.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The buyer's stated price condition is that \"footprint or resource figures materially worse than stated\" would change the price or the terms, and the reliance statement says the price assumes the README's account of footprint is accurate; if these compressed image sizes were false, the buyer would go back to the seller over the footprint figures alone. Rated against the buyer's stated threshold: \"footprint or resource figures materially worse than stated\"."
+  },
+  {
+   "id": 10,
+   "quote": "It’s free and open source, released under the MIT license",
+   "lines": [
+    13,
+    13
+   ],
+   "statement": "The software is free and open source, released under the MIT licence.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The buyer's stated end-the-deal condition is \"a licence or ownership problem with the code\", and the reliance item for the MIT licence and clean ownership is marked depends with no repair available to the buyer; if the claim were false the buyer would not close. Rated against the buyer's stated threshold: \"a licence or ownership problem with the code\"."
+  },
+  {
+   "id": 12,
+   "quote": "No tracking.",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "The service does no tracking of its users — a boundary claim of absence.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "This is a boundary claim of absence whose failure would admit exactly what the buyer's threshold names; the buyer's stated price condition is \"any way visitors are logged or tracked beyond the hit count\" and the reliance item is marked depends, so its falsity would send the buyer back to the seller over the terms. Rated against the buyer's stated threshold: \"any way visitors are logged or tracked beyond the hit count\"."
+  },
+  {
+   "id": 13,
+   "quote": "Create short URLs with generated slugs or custom aliases.",
+   "lines": [
+    29,
+    29
+   ],
+   "statement": "The target contains code that accepts a URL for shortening and creates a short link for it, using either an automatically generated slug or a user-chosen custom alias.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "Shortening is the core the reliance statement marks as depends — the one thing the buyer is buying the service for — and if the claim were false the buyer would not close at any price on these terms. Rated against the buyer's stated threshold: \"a small, private link shortener the buyer can run for its customers\"."
+  },
+  {
+   "id": 14,
+   "quote": "Set short links to expire automatically after a chosen duration.",
+   "lines": [
+    33,
+    33
+   ],
+   "statement": "The target contains code that lets a duration be set for a short link and that expires the link once that duration has passed.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The reliance item for expiry is marked uses on the practice's inference, and its stated failure mode — staff deleting stale links by hand — is cheap while the service is small; no stated threshold reaches expiry. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 15,
+   "quote": "Track how many times a short link has been used.",
+   "lines": [
+    37,
+    37
+   ],
+   "statement": "The target contains code that records a hit each time a short link is used and keeps a per-link count.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The hit count is the boundary of the buyer's stated price condition — \"any way visitors are logged or tracked beyond the hit count\" — and the reliance item for counting hits is marked depends, so if the claim were false the buyer would lose the one piece of visitor data its price assumes and would reopen the price. Rated against the buyer's stated threshold: \"any way visitors are logged or tracked beyond the hit count\"."
+  },
+  {
+   "id": 16,
+   "quote": "Update existing links and manage their metadata.",
+   "lines": [
+    41,
+    41
+   ],
+   "statement": "The target contains code that allows an existing short link and its metadata to be updated.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The reliance item for editing and managing links is marked uses on the practice's inference; its falsity would leave staff managing links against the database by hand, which is costly as a routine but is not a stated threshold and would not alone reopen the price or the terms. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 17,
+   "quote": "Attach notes to links and filter them in the web UI.",
+   "lines": [
+    45,
+    45
+   ],
+   "statement": "The target provides a way to attach notes to links and a filter in the web UI that narrows the links by those notes.",
+   "about": "target",
+   "within": {
+    "source": "README.md",
+    "id": 28,
+    "statement": "The UI supports filtering links by short link, long link, and notes."
+   },
+   "tier": 3,
+   "tier_basis": "Notes and filtering sit under the reliance item for link management marked uses on the practice's inference, with a workable fallback through the API or database; no stated threshold reaches this detail. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 18,
+   "quote": "Generate QR codes and integrate with the service programmatically.",
+   "lines": [
+    49,
+    49
+   ],
+   "statement": "The target contains code that generates a QR code for a short link and exposes an API through which the service can be used programmatically.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "QR codes and the API sit under reliance items marked uses on the practice's inference, each with a stated cheap substitution; no stated threshold reaches either. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 19,
+   "quote": "Run Chhoto URL with Docker, Podman, or another OCI-compatible container workflow.",
+   "lines": [
+    61,
+    61
+   ],
+   "statement": "The product is deployable as an OCI-compatible container, including via Docker and Podman.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The buyer's stated end-the-deal condition is \"a dependency the buyer cannot run on its own hardware\" and the reliance item for self-hosting via Docker, Podman and compose is marked depends; if the claim were false the buyer would not close. Rated against the buyer's stated threshold: \"a dependency the buyer cannot run on its own hardware\"."
+  },
+  {
+   "id": 20,
+   "quote": "Set the required environment variables for the site URL, credentials, and storage configuration.",
+   "lines": [
+    65,
+    65
+   ],
+   "statement": "The application is configured through environment variables covering the site URL, credentials and storage.",
+   "about": "target",
+   "within": {
+    "source": "docs/INSTALLATION.md",
+    "id": 31,
+    "statement": "All configuration of the target is done via environment variables (no config files or other mechanisms)."
+   },
+   "tier": 3,
+   "tier_basis": "The reliance item for configuration through environment variables is marked uses on the practice's inference and calls its failure a cheap irritation, since staff must set container configuration in any case; no stated threshold reaches the configuration mechanism. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 21,
+   "quote": "Use the web interface to create, edit, and manage short URLs on your own instance.",
+   "lines": [
+    69,
+    69
+   ],
+   "statement": "The target serves a web interface for administering short links.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The web interface sits under a reliance item marked uses on the practice's inference, whose failure leaves staff working through the API or database with a frontend a competent engineer could patch cheaply; no stated threshold reaches the interface. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 22,
+   "quote": "I’m a Mathematics researcher and do some programming as a hobby",
+   "lines": [
+    75,
+    75
+   ],
+   "statement": "The maintainer is a mathematics researcher who programs as a hobby.",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "A claim about the maintainer's profession does not touch the code, the licence, the footprint or any upkeep promise the reliance statement records, and no stated threshold reaches the seller's background. Rated on the scale alone."
+  },
+  {
+   "id": 23,
+   "quote": "I mostly code in Rust, Go, Python, and Bash",
+   "lines": [
+    75,
+    75
+   ],
+   "statement": "The maintainer mostly codes in Rust, Go, Python and Bash.",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "The languages the maintainer codes in have no bearing on any stated threshold or reliance item, which concern the code's behaviour, footprint, licensing and self-hosting rather than the seller's skills. Rated on the scale alone."
+  },
+  {
+   "id": 24,
+   "quote": "For my research, I work in Algebraic and Computational Number Theory.",
+   "lines": [
+    75,
+    75
+   ],
+   "statement": "The maintainer's research field is algebraic and computational number theory.",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "The maintainer's research field has no bearing on the code, the service the buyer will run, or any stated threshold, and the reliance statement does not touch it. Rated on the scale alone."
+  },
+  {
+   "id": 25,
+   "quote": "Create short URLs with generated slugs or custom aliases.",
+   "lines": [
+    29,
+    29
+   ],
+   "statement": "When a URL is submitted for shortening, the product creates a short URL for it using either a generated slug or a custom alias.",
+   "about": "target",
+   "implied_by": 13,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "If this were false, the service could not do the one thing the buyer is buying it for, and the reliance statement marks shortening with a generated slug or custom alias as depends, with no acceptable repair. Rated against the buyer's stated threshold: \"a small, private link shortener the buyer can run for its customers\"."
+  },
+  {
+   "id": 28,
+   "quote": "Update existing links and manage their metadata.",
+   "lines": [
+    41,
+    41
+   ],
+   "statement": "When an existing link is edited, the changes take effect and the link's stored details and metadata reflect them.",
+   "about": "target",
+   "implied_by": 16,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "If editing did not take effect, staff would manage links by hand against the database or patch the code, which the reliance statement calls costly as a routine practice for a buyer who paid for a finished tool, and the price assumes the README's account is accurate. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 29,
+   "quote": "Attach notes to links and filter them in the web UI.",
+   "lines": [
+    45,
+    45
+   ],
+   "statement": "In the running web UI, notes attached to links are present on them and filtering by notes returns the matching links.",
+   "about": "target",
+   "implied_by": 17,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "Notes and filtering are conveniences; if they failed, staff would simply not attach or filter by notes, at no cost to the service the buyer's customers use. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 30,
+   "quote": "Generate QR codes and integrate with the service programmatically.",
+   "lines": [
+    49,
+    49
+   ],
+   "statement": "When requested, the product produces a QR code for a short link, and requests made through its API are served.",
+   "about": "target",
+   "implied_by": 18,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "QR codes are a convenience of the web interface, and the API's documented failure leaves the web interface and direct calls as cheap substitutions, so neither loss reaches a stated threshold or an item the buyer depends on. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 31,
+   "quote": "Use the web interface to create, edit, and manage short URLs on your own instance.",
+   "lines": [
+    69,
+    69
+   ],
+   "statement": "Through that web interface on a running instance, a user can create, edit and manage short URLs.",
+   "about": "target",
+   "implied_by": 21,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "If the web interface could not create, edit and manage short URLs on the buyer's own instance, the buyer's customers and staff would lose the primary way they use the service day to day, which is what the buyer said it is paying for. Rated against the buyer's stated threshold: \"a small, private link shortener the buyer can run for its customers\"."
+  }
+ ]
+}

@@ -1,0 +1,1985 @@
+{
+ "claim_source": "docs/INSTALLATION.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "SPDX-FileCopyrightText: 2023-2026 Sayantan Santra <sayantan.santra689@gmail.com>",
+   "lines": [
+    1,
+    1
+   ],
+   "statement": "The document is copyrighted 2023-2026 by Sayantan Santra.",
+   "about": "document",
+   "tier": 3,
+   "tier_basis": "A copyright line on the installation document changes nothing about what the buyer is paying for or how it will run the service; the ownership the buyer relies on is that of the code, which this header neither establishes nor defeats. Rated on the scale alone."
+  },
+  {
+   "id": 2,
+   "quote": "SPDX-License-Identifier: MIT",
+   "lines": [
+    2,
+    2
+   ],
+   "statement": "The document is licensed under the MIT licence.",
+   "about": "document",
+   "tier": 1,
+   "tier_basis": "The buyer is acquiring the source on the assumption that it is MIT-licensed, and a licence statement in the acquired material that proved wrong is exactly the kind of problem the buyer said would end the deal; there is no repair the buyer could make itself. Rated against the buyer's stated threshold: \"a licence or ownership problem with the code\"."
+  },
+  {
+   "id": 3,
+   "quote": "The repository includes a [sample `compose.yaml` file](../deploy/compose.yaml).",
+   "lines": [
+    8,
+    8
+   ],
+   "statement": "The repository contains a sample compose.yaml file at deploy/compose.yaml.",
+   "about": "target",
+   "within": {
+    "source": "README.md",
+    "id": 45,
+    "statement": "A Docker compose file is provided with the distribution."
+   },
+   "tier": 2,
+   "tier_basis": "The sample compose file is the deployment path the buyer's staff are told to use; if it did not exist where documented, a person setting the service up would act differently, though they could write their own compose file cheaply and the Helm chart remains. The failure alone is too small to reopen the price or terms. Rated on the scale alone."
+  },
+  {
+   "id": 4,
+   "quote": "It contains everything needed for a basic deployment.",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The sample compose.yaml file contains everything needed for a basic deployment.",
+   "about": "document",
+   "tier": 2,
+   "tier_basis": "The buyer's staff will deploy from this file believing it complete; if it were not, the first deployment would fail and they would have to repair the file themselves, a small cost beside the nominal price. The claim is documentation a person setting the service up acts on, though its failure alone would not send the buyer back to the seller. Rated on the scale alone."
+  },
+  {
+   "id": 5,
+   "quote": "Starting with version 6.2.6, OCI images are built by a GitHub Actions workflow.",
+   "lines": [
+    10,
+    10
+   ],
+   "statement": "Since version 6.2.6, the OCI container images are built by a GitHub Actions workflow.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Which workflow builds the images changes nothing about how the buyer deploys or operates the service, and its failure would admit nothing that touches the buyer's plan or thresholds. Rated on the scale alone."
+  },
+  {
+   "id": 6,
+   "quote": "The container images come in two flavors.",
+   "lines": [
+    13,
+    13
+   ],
+   "statement": "The container images come in exactly two flavors.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The number of image flavors does not change which image the buyer's staff pull or how the service runs; a reader would simply choose from whatever flavors exist. Rated on the scale alone."
+  },
+  {
+   "id": 7,
+   "quote": "The default image is built from [`scratch`](https://hub.docker.com/_/scratch)",
+   "lines": [
+    13,
+    13
+   ],
+   "statement": "The default container image is built from the scratch base image.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Make sure that the desired target is a `musl` one, since the docker image is built from `scratch`.",
+     "lines": [
+      53,
+      53
+     ]
+    }
+   ],
+   "tier": 2,
+   "tier_basis": "The base image of the default tag is what the buyer's staff rely on when choosing between the default and the -alpine image, and the minimal scratch base is part of the small-footprint account the price assumes. The buyer's footprint threshold reaches this kind of failure, but a base-image difference alone would be too small for the buyer to go back to the seller over, since pulling a different tag is a cheap remedy. Rated against the buyer's stated threshold: \"footprint or resource figures materially worse than stated\"."
+  },
+  {
+   "id": 8,
+   "quote": "The tags with the `-alpine` suffix are built on top of [`alpine`](https://hub.docker.com/_/alpine).",
+   "lines": [
+    14,
+    14
+   ],
+   "statement": "Image tags carrying the -alpine suffix are built on top of the alpine base image.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The base of the -alpine tags determines what the buyer's staff get when they pick that tag, for example expecting debugging tools; a person setting the service up would act differently if this were false. The failure alone is too small to reopen the price or terms. Rated on the scale alone."
+  },
+  {
+   "id": 9,
+   "quote": "include basic Unix tools that can be useful for debugging or for inspecting the container interactively",
+   "lines": [
+    15,
+    16
+   ],
+   "statement": "The alpine-based images include basic Unix tools for debugging and interactive inspection.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The included Unix tools are the practical reason to choose the alpine image when inspecting the container; a person deploying or debugging would act differently if they were absent. The failure alone is too small to reopen the price or terms. Rated on the scale alone."
+  },
+  {
+   "id": 10,
+   "quote": "The `dev` tags are always built on top of `alpine`",
+   "lines": [
+    16,
+    16
+   ],
+   "statement": "The dev tags are always built on top of alpine.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Dev tags play no part in the buyer's plan, which is to run a stable image in production; which base they are built on changes nothing for this buyer. Rated on the scale alone."
+  },
+  {
+   "id": 11,
+   "quote": "The tags `latest` and `scratch` are synonymous, as are `latest-alpine` and `alpine`.",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "The tag latest is synonymous with scratch, and latest-alpine with alpine.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Tag synonymy determines what a pinned pull delivers; if latest were not the scratch image, a person deploying would receive something other than the documented default and would act differently. The failure alone is too small to reopen the price or terms. Rated on the scale alone."
+  },
+  {
+   "id": 12,
+   "quote": "All of these images are available both on the Docker Hub (recommended) and GHCR",
+   "lines": [
+    19,
+    19
+   ],
+   "statement": "All the described images are published to both Docker Hub and GHCR.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The registries named are where the buyer's staff will pull the image from; if an image were missing from a documented registry the deployment would fail at the first step, though switching registries is a cheap substitution. The failure alone is too small to reopen the price or terms. Rated on the scale alone."
+  },
+  {
+   "id": 13,
+   "quote": "except for `dev` builds, which are published only to GHCR.",
+   "lines": [
+    19,
+    20
+   ],
+   "statement": "Dev builds are published only to GHCR and not to Docker Hub.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Dev builds play no part in the buyer's plan; where they are published does not affect the service the buyer acquires or runs. Rated on the scale alone."
+  },
+  {
+   "id": 14,
+   "quote": "They are built for Linux on the `linux/amd64`, `linux/arm64`, `linux/arm/v7`, and `linux/riscv64` architectures.",
+   "lines": [
+    20,
+    20
+   ],
+   "statement": "The images are built for linux/amd64, linux/arm64, linux/arm/v7 and linux/riscv64.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The buyer will run the service on its own hardware, and if the images are not built for the architecture of that hardware the buyer cannot deploy at all, which no repair in the buyer's power makes cheap. The buyer's architecture is not stated, so the claim's failure could admit exactly that outcome. Rated against the buyer's stated threshold: \"a dependency the buyer cannot run on its own hardware\"."
+  },
+  {
+   "id": 15,
+   "quote": "The images should also work with Podman and other OCI-compatible container engines.",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "The container images are built as OCI images that Podman and other OCI-compatible container engines can pull and run.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "All of this pretty much works exactly the same if you replace `docker` with `podman`. In fact,\nthat's what I use for testing.",
+     "lines": [
+      78,
+      79
+     ]
+    }
+   ],
+   "within": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 19,
+    "statement": "The product is deployable as an OCI-compatible container, including via Docker and Podman."
+   },
+   "tier": 2,
+   "tier_basis": "Podman compatibility is part of how the buyer's staff may choose to run the image, and a person selecting a container engine would act differently if the images were not OCI-compatible. The failure alone would not defeat self-hosting, since the documented Docker path remains, so it is too small to reopen the price or terms. Rated on the scale alone."
+  },
+  {
+   "id": 16,
+   "quote": "If you're using a custom location for the [`CHHOTO_DB_URL`](#chhoto_db_url), and using WAL mode, make sure to mount a whole directory instead of a folder.",
+   "lines": [
+    29,
+    29
+   ],
+   "statement": "The software supports configuring a custom database location via CHHOTO_DB_URL and supports WAL mode.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "make sure that you mount either a whole directory, or a named volume, and have the database inside it.",
+     "lines": [
+      132,
+      133
+     ]
+    }
+   ],
+   "tier": 2,
+   "tier_basis": "If the documented database-location variable or WAL support did not exist, staff configuring persistence would follow instructions that fail, though the remedy is reconfiguration rather than loss of the service. This falls under the SQLite storage item, which the buyer uses on the practice's inference. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 17,
+   "quote": "If this is not done, there will be a low, but non-zero chance of data corruption.",
+   "lines": [
+    30,
+    30
+   ],
+   "statement": "If a custom WAL-mode database location is not mounted as a whole directory, there is a low but non-zero chance of data corruption.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "DO NOT mount a single file, as there will be a small chance of partial data loss in that case.",
+     "lines": [
+      133,
+      134
+     ]
+    }
+   ],
+   "tier": 3,
+   "tier_basis": "This is a caution about a corruption risk when mounting a custom WAL-mode location; if it were false there would be less risk, not more, and the buyer mounts the directory as instructed either way. No stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 18,
+   "quote": "It should be possible to run Chhoto URL with pretty much anything that supports OCI images e.g. `docker`, `podman quadlets`",
+   "lines": [
+    32,
+    32
+   ],
+   "statement": "The software is packaged as an OCI image whose configuration files, such as the compose.yaml and chhoto-url.container samples, support running it with OCI-compatible engines.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The buyer takes the code to run as its own hosted service, and the OCI packaging with the compose and container samples is the documented path for that; if it were false the buyer could not run the dependency on its own hardware as documented. That reaches the buyer's end-the-deal condition. Rated against the buyer's stated threshold: \"a dependency the buyer cannot run on its own hardware\"."
+  },
+  {
+   "id": 19,
+   "quote": "the repo contains a sample `chhoto-url.container` file for using with `quadlets`",
+   "lines": [
+    33,
+    33
+   ],
+   "statement": "The repository contains a sample chhoto-url.container file for use with quadlets.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "A sample file for podman quadlets is provided at\n[`chhoto-url.container`](../deploy/chhoto-url.container)",
+     "lines": [
+      79,
+      80
+     ]
+    }
+   ],
+   "tier": 3,
+   "tier_basis": "The sample quadlet file is an extra convenience beside the documented compose path the buyer's plan follows; its absence would cost nothing for a buyer deploying with the compose file. No stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 20,
+   "quote": "Official support is only provided for `docker` and `podman`",
+   "lines": [
+    33,
+    34
+   ],
+   "statement": "Official support is provided only for docker and podman.",
+   "about": "seller",
+   "tier": 1,
+   "tier_basis": "The buyer's deployment plan runs the seller's Docker and Podman images on its own hardware, and the price assumes the documentation's account is accurate; if that official support did not exist, the buyer's runtime dependency would be unsupported at the source it relies on. That reaches the buyer's end-the-deal condition. Rated against the buyer's stated threshold: \"a dependency the buyer cannot run on its own hardware\"."
+  },
+  {
+   "id": 21,
+   "quote": "(Only if you really want to) Build the image for the default `x86_64-unknown-linux-musl` target:",
+   "lines": [
+    41,
+    41
+   ],
+   "statement": "The default build target for the container image is x86_64-unknown-linux-musl.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The default build target matters only to someone compiling the image from source, which is not the buyer's documented deployment path; its falsity would change nothing in how the buyer runs the service. No stated threshold reaches it. Rated on the scale alone."
+  },
+  {
+   "id": 22,
+   "quote": "docker build -f build/Containerfile . -t chhoto-url",
+   "lines": [
+    44,
+    44
+   ],
+   "statement": "The image can be built from the repository using docker build with the Containerfile at build/Containerfile.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Building from the repository's Containerfile is the buyer's stated fallback if the published images fail, so a person following the documentation would build differently if this path did not work as described. Its failure alone would not defeat the buyer's deployment, since the published images remain. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 23,
+   "quote": "For building on `arm64`, `arm/v7`, or `riscv64`, use the following:\n\n```\ndocker build -f build/Containerfile . -t chhoto-url --build-arg target=<desired-target>\n```",
+   "lines": [
+    47,
+    51
+   ],
+   "statement": "The image can be built for arm64, arm/v7, or riscv64 by passing --build-arg target=<desired-target> to the same Containerfile build.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Cross-building for arm64, arm/v7 or riscv64 is a documented build path a person deploying on such hardware would act on; its falsity would change how they build, though the buyer's plan does not state which architecture it runs. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 24,
+   "quote": "For cross-compilation, take a look at the `Makefile`. It has instructions to build the architectures\nmentioned above.",
+   "lines": [
+    54,
+    55
+   ],
+   "statement": "The Makefile contains cross-compilation instructions for the architectures listed above (arm64, arm/v7, riscv64).",
+   "about": "document",
+   "tier": 3,
+   "tier_basis": "This is a claim about the Makefile as a document, pointing readers to cross-compilation instructions; the buyer's plan does not rest on the Makefile, and the architectures themselves are claimed elsewhere. Rated on the scale alone."
+  },
+  {
+   "id": 25,
+   "quote": "docker run -p 4567:4567",
+   "lines": [
+    60,
+    60
+   ],
+   "statement": "The target's container is configured to publish port 4567 to the host's port 4567.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The published port is part of the documented run instructions a person deploying the service would follow; if it were wrong the service would not be reachable as documented, but the remedy is a one-flag change in the run command. This falls under the self-hosting item on the practice's inference. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 26,
+   "quote": "-e CHHOTO_PASSWORD=\"password\"",
+   "lines": [
+    62,
+    62
+   ],
+   "statement": "The access password is configured through the CHHOTO_PASSWORD environment variable.",
+   "about": "target",
+   "within": {
+    "source": "claim_sources/site_index_html.md",
+    "id": 20,
+    "statement": "The application is configured through environment variables covering the site URL, credentials and storage."
+   },
+   "tier": 1,
+   "tier_basis": "The buyer is paying for a private service operated by its own staff, and the documented password variable is the mechanism that secures the admin surface; if it did not work as documented, the single-admin access control the buyer depends on could not be configured as the README describes. The price assumes the README's account is accurate, so the buyer would reopen the terms over this alone. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 27,
+   "quote": "touch ./urls.sqlite",
+   "lines": [
+    69,
+    69
+   ],
+   "statement": "The target stores its data in a SQLite database file, named urls.sqlite by default.",
+   "about": "target",
+   "within": {
+    "source": "README.md",
+    "id": 41,
+    "statement": "Links are stored in an SQLite database."
+   },
+   "tier": 3,
+   "tier_basis": "The database file's default name is incidental to the buyer's plan; if it were different, the documented touch step would be harmless and nothing about how the service runs would change. No stated threshold reaches it. Rated on the scale alone."
+  },
+  {
+   "id": 28,
+   "quote": "-v ./data:/data",
+   "lines": [
+    73,
+    73
+   ],
+   "statement": "Database persistence is achieved by mounting a host directory into the container at /data.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "Persistence by mounting a host directory is what keeps the buyer's customers' links across container restarts; if the documented mount did not achieve it, every link would be lost on restart and the service could not be run as bought. The price assumes the README's account is accurate, so the buyer would go back to the seller over this alone. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 29,
+   "quote": "-e CHHOTO_DB_URL=/data/urls.sqlite",
+   "lines": [
+    74,
+    74
+   ],
+   "statement": "The database file location is configured through the CHHOTO_DB_URL environment variable.",
+   "about": "target",
+   "within": {
+    "source": "docs/INSTALLATION.md",
+    "id": 16,
+    "statement": "The software supports configuring a custom database location via CHHOTO_DB_URL and supports WAL mode."
+   },
+   "tier": 2,
+   "tier_basis": "The database-location variable is a documented configuration key a person deploying would set; if it were not honoured, staff would need another mechanism for placement, though the SQLite storage item the buyer uses allows a known, cheap reconfiguration. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 30,
+   "quote": "In fact,\nthat's what I use for testing.",
+   "lines": [
+    78,
+    79
+   ],
+   "statement": "The seller uses podman for testing the target.",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "Which container engine the seller uses for its own testing has no bearing on what the buyer runs or pays for. No stated threshold reaches it. Rated on the scale alone."
+  },
+  {
+   "id": 31,
+   "quote": "All the configuration is done using environmental variables.",
+   "lines": [
+    84,
+    84
+   ],
+   "statement": "All configuration of the target is done via environment variables (no config files or other mechanisms).",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "How configuration is supplied is exactly the kind of detail a buyer deploying and operating the service from its documentation acts on; if false, the buyer's staff would configure through some other mechanism and the documentation could not be relied on for setup. Nothing in the stated thresholds or price turns on the configuration mechanism by itself. Rated on the scale alone."
+  },
+  {
+   "id": 32,
+   "quote": "especially [`CHHOTO_SQLITE_USE_WAL_MODE`](#chhoto_sqlite_use_wal_mode).",
+   "lines": [
+    85,
+    85
+   ],
+   "statement": "The target supports a CHHOTO_SQLITE_USE_WAL_MODE configuration option (enabling SQLite WAL mode), flagged as important.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The existence of a named configuration option is detail a person setting the software up acts on directly, and its falsity would undermine reliance on the documentation for anyone intending to enable WAL mode. No stated threshold reaches this option by itself. Rated on the scale alone."
+  },
+  {
+   "id": 33,
+   "quote": "Location for the database file.",
+   "lines": [
+    92,
+    92
+   ],
+   "statement": "The CHHOTO_DB_URL environment variable sets the location of the database file.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A configuration key that sets where the database lives is the kind of documented parameter a buyer operating from the documentation relies on when deploying; if false, the staff would configure storage in the wrong place or not at all. On its own this changes no price or term. Rated on the scale alone."
+  },
+  {
+   "id": 34,
+   "quote": "Defaults to\n`urls.sqlite`.",
+   "lines": [
+    92,
+    93
+   ],
+   "statement": "CHHOTO_DB_URL defaults to `urls.sqlite` if not set.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A documented default value for the database location is detail a deploying operator acts on, and its falsity would leave the database somewhere other than the operator expects. On its own nothing in the price or terms would change. Rated on the scale alone."
+  },
+  {
+   "id": 35,
+   "quote": "If kept empty, anyone can access the website.",
+   "lines": [
+    102,
+    102
+   ],
+   "statement": "When CHHOTO_PASSWORD is left empty, the service's code serves the website without requiring any authentication.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Assumed false, this claim would mean the service is more restrictive than documented, not less private, so the buyer loses nothing it is paying for; a buyer running a private service sets an admin password regardless, and no stated threshold reaches authentication defaults. Rated on the scale alone."
+  },
+  {
+   "id": 37,
+   "quote": "This is optional, as the link will work at any URL as long as Chhoto URL\nis accessible there.",
+   "lines": [
+    110,
+    111
+   ],
+   "statement": "The service does not require CHHOTO_SITE_URL to be set in order to generate working short links.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Whether a configuration variable must be set for links to work is a documented requirement a deploying operator acts on; if false, links the buyer's customers share would fail until the variable is set. The failure is a setup detail, not a defeat of shortening or redirecting, which is what the buyer depends on. Rated on the scale alone."
+  },
+  {
+   "id": 38,
+   "quote": "copying to clipboard, QR code generation will\nuse it if available",
+   "lines": [
+    111,
+    112
+   ],
+   "statement": "The frontend is written to use CHHOTO_SITE_URL, when it is set, for copying to clipboard and for QR code generation.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "This concerns how the web interface's convenience features build URLs; if false, QR codes or copied links could carry the wrong address, but the interface is one the buyer merely uses and the plain frontend is cheap for its staff to patch. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 40,
+   "quote": "It'll be checked at start for security.",
+   "lines": [
+    118,
+    118
+   ],
+   "statement": "The provided API key is checked for strength when the service starts.",
+   "about": "target",
+   "within": {
+    "source": "docs/CLI.md",
+    "id": 9,
+    "statement": "When the configured API key is insecure, the server outputs a warning together with a generated API key that can be used."
+   },
+   "tier": 2,
+   "tier_basis": "The buyer's stated condition that no hardening step the README implies is on by default turns out to be absent reaches this claim, since the README presents the strength check as happening automatically at start; but its failure alone is a missing advisory warning the buyer's staff can substitute for by choosing a strong key themselves, too small to reopen the price or terms. A person provisioning an API key would act on this claim in deciding whether to validate the key themselves. Rated against the buyer's stated threshold: \"a hardening step the README implies is on by default but is not\"."
+  },
+  {
+   "id": 42,
+   "quote": "the weak one will be used for the time being.",
+   "lines": [
+    119,
+    119
+   ],
+   "statement": "The service's code keeps the provided API key in use rather than replacing it with the generated strong key.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Assumed false, the operative API key would differ from the one the operator supplied, which shows itself immediately at setup and is remedied by setting a new key, a cheap irritation; no stated threshold reaches API key handling, and the buyer's privacy is not reduced by the service hardening a key it was told would be kept. Rated on the scale alone."
+  },
+  {
+   "id": 43,
+   "quote": "If no API key is provided, the website will still work",
+   "lines": [
+    123,
+    123
+   ],
+   "statement": "The service's website does not require an API key to be provided in order to run.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Assumed false, the website would demand an API key it is documented not to, which restricts access further rather than reducing the privacy the buyer is paying for, and the buyer's staff would supply the key they would set anyway; no stated threshold reaches this. Rated on the scale alone."
+  },
+  {
+   "id": 44,
+   "quote": "it'll be a significantly worse experience if you try\nto use Chhoto URL from the CLI.",
+   "lines": [
+    123,
+    124
+   ],
+   "statement": "The service provides CLI functionality that operates without an API key.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The command-line application is one the buyer merely uses and can cheaply replace with the web interface or direct calls; if this claim were false the staff would supply the API key to the CLI, a setup-level inconvenience. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 45,
+   "quote": "If set to `True`, enables [`WAL` journal mode](https://sqlite.org/wal.html).",
+   "lines": [
+    131,
+    131
+   ],
+   "statement": "Setting the environment variable CHHOTO_SQLITE_USE_WAL_MODE to True enables WAL journal mode for the database.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Which value of a configuration parameter activates it is precisely the format detail a buyer configuring from the documentation relies on; if false, staff would set the variable and journal mode would not change as documented. On its own nothing in the price or terms would change. Rated on the scale alone."
+  },
+  {
+   "id": 46,
+   "quote": "Any other value is ignored.",
+   "lines": [
+    131,
+    131
+   ],
+   "statement": "Any value of CHHOTO_SQLITE_USE_WAL_MODE other than True is ignored, i.e. only the exact value True activates WAL mode.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The accepted values of a configuration parameter are format detail an operator configuring from the documentation acts on; if false, a value the staff believed enabled WAL mode would silently do nothing. On its own this changes no price or term. Rated on the scale alone."
+  },
+  {
+   "id": 48,
+   "quote": "write will no longer block reads",
+   "lines": [
+    136,
+    136
+   ],
+   "statement": "The database is configured to run in WAL journal mode.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If false, writes to the database would block reads, which for a small, low-cost single instance is negligible in practice; the storage item is one the buyer merely uses and the stated remedy, restoring or reconfiguring the journal mode, is a known, cheap operation for the staff who run the instance. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 49,
+   "quote": "`DELETE` journal mode is used by default",
+   "lines": [
+    137,
+    137
+   ],
+   "statement": "The default journal mode of the database is DELETE.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A documented default journal mode is exactly the kind of default a buyer deploying from the documentation acts on, since it tells the staff they must set WAL mode explicitly rather than assume it is already on. On its own nothing in the price or terms would change. Rated on the scale alone."
+  },
+  {
+   "id": 50,
+   "quote": "along with [`EXTRA` synchronous](https://sqlite.org/pragma.html#pragma_synchronous) pragma",
+   "lines": [
+    137,
+    138
+   ],
+   "statement": "In the default (DELETE journal mode) configuration, the synchronous pragma is set to EXTRA.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If the synchronous pragma in the default journal mode were not EXTRA, the durability a buyer operating from the documentation assumes would differ without any visible sign, though no stated threshold reaches the pragma value. It is a documented default that a buyer running the service from its documentation relies on, and with other durability claims its falsity would undermine that account. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 51,
+   "quote": "In `WAL` mode, `FULL` synchronous pragma is used instead.",
+   "lines": [
+    138,
+    138
+   ],
+   "statement": "When WAL mode is enabled, the synchronous pragma is set to FULL.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If WAL mode did not use FULL synchronous as documented, the durability trade-off between the two journal modes would differ from what a reader of the documentation assumes, though no stated threshold reaches the pragma value. It is a documented default within the durability configuration the buyer uses. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 52,
+   "quote": "In both cases, we have full ACID compliance",
+   "lines": [
+    140,
+    140
+   ],
+   "statement": "The database has full ACID compliance in both journal modes (default DELETE and WAL).",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the database were not fully ACID in both journal modes, links could be lost or corrupted on a crash; the buyer's staff could restore from the automatic backups or reconfigure the journal mode, which the plan treats as a known and cheap operation, and no stated threshold reaches durability. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 53,
+   "quote": "but it does cost a bit of performance",
+   "lines": [
+    140,
+    140
+   ],
+   "statement": "ACID compliance comes at a cost to performance.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "This is done by setting the [synchronous pragma](https://sqlite.org/pragma.html#pragma_synchronous) to `FULL` in `WAL` [journal mode](https://sqlite.org/pragma.html#pragma_journal_mode), and to `EXTRA` in `DELETE` journal mode.",
+     "lines": [
+      149,
+      150
+     ]
+    }
+   ],
+   "tier": 3,
+   "tier_basis": "A performance cost of ACID compliance is a general caveat: if false, nothing in the buyer's plan changes, since the buyer does not configure the pragma and no stated threshold reaches performance beyond footprint figures. Rated on the scale alone."
+  },
+  {
+   "id": 55,
+   "quote": "If you'd like to let go of durability for an increase in throughput, set this to `False`.",
+   "lines": [
+    147,
+    147
+   ],
+   "statement": "Setting CHHOTO_SQLITE_ENSURE_ACID to False configures the database with a relaxed durability setting (a lower synchronous pragma) instead of the default full-durability configuration.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A buyer weighing throughput against durability would set this variable in reliance on the documented effect and would act differently if the setting did not relax durability as described. It is a documented configuration key and its effect. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 56,
+   "quote": "Any other value will be ignored.",
+   "lines": [
+    147,
+    147
+   ],
+   "statement": "Any value of CHHOTO_SQLITE_ENSURE_ACID other than False is ignored, i.e. only the exact value False relaxes durability.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If values other than the exact False also relaxed durability, staff setting the variable loosely could shed durability without intending to; as documented, only the exact value matters, which is parameter semantics a reader acts on. No stated threshold reaches this setting. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 57,
+   "quote": "There might be partial data loss only in case of system failure or power loss.",
+   "lines": [
+    152,
+    152
+   ],
+   "statement": "With durability relaxed, partial data loss can occur only in the case of system failure or power loss, and in no other case.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If partial data loss could occur in cases other than system failure or power loss, a buyer enabling relaxed durability on this assurance would accept more risk than the documentation admits. It is documented behaviour of the setting that a reader deciding whether to enable it acts on, and no stated threshold reaches durability. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 58,
+   "quote": "Durability is maintained across application crashes.",
+   "lines": [
+    152,
+    153
+   ],
+   "statement": "Even with durability relaxed, the code sets the database's synchronous pragma to a level that persists committed writes when the application process dies.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If committed writes were not persisted across an application crash even with durability relaxed, the assurance a reader relies on when choosing the relaxed setting would fail in the most common failure case. It is documented behaviour of the setting, and no stated threshold reaches durability. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 59,
+   "quote": "If you do have data loss, you should only lose the data stored after the last sync with the database file.",
+   "lines": [
+    153,
+    154
+   ],
+   "statement": "If data loss occurs, its extent is limited to data stored after the last sync with the database file.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If the extent of data loss were not limited to writes after the last sync, a buyer enabling relaxed durability could lose more than the documentation states. It is documented behaviour of the setting that a reader acts on when deciding to enable it, and no stated threshold reaches durability. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 60,
+   "quote": "Sets which redirection is used when a shortlink is resolved.",
+   "lines": [
+    161,
+    161
+   ],
+   "statement": "The CHHOTO_REDIRECT_METHOD variable controls which redirection is used when a shortlink is resolved.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If the variable did not control the redirect used, staff could not choose between temporary and permanent redirects through configuration, though the redirect path itself would still resolve and the default would apply, so the item the buyer's plan depends on is not defeated. It is a documented configuration key a reader acts on. No stated threshold reaches the choice of redirect method. Rated on the scale alone."
+  },
+  {
+   "id": 61,
+   "quote": "Can be set to `TEMPORARY` or `PERMANENT`, which will enable Temporary 307 or Permanent 308 redirects.",
+   "lines": [
+    163,
+    163
+   ],
+   "statement": "CHHOTO_REDIRECT_METHOD accepts the values TEMPORARY and PERMANENT, which select 307 and 308 redirects respectively.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If the values did not select 307 and 308 as documented, a buyer configuring redirect behaviour would emit a different status code than intended, which affects how browsers and caches treat the buyer's customers' links. It is documented parameter semantics. Rated on the scale alone."
+  },
+  {
+   "id": 62,
+   "quote": "Any other value\nwill be ignored, and a default of `PERMANENT` will be used.",
+   "lines": [
+    163,
+    164
+   ],
+   "statement": "Any CHHOTO_REDIRECT_METHOD value other than TEMPORARY or PERMANENT is ignored, and PERMANENT is the default.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If the default were not PERMANENT, or invalid values were not ignored, a buyer who omitted or misspelled the variable would get redirect behaviour different from the documentation without any error. It is a documented default a reader acts on. Rated on the scale alone."
+  },
+  {
+   "id": 63,
+   "quote": "Sets the style of slug used when auto-generating shortlinks.",
+   "lines": [
+    168,
+    168
+   ],
+   "statement": "The CHHOTO_SLUG_STYLE variable controls the style of slug used when auto-generating shortlinks.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If the variable did not control slug style, staff could not switch styles through configuration as the plan assumes, though the default style would still work and no stated threshold reaches slug generation. It is a documented configuration key. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 64,
+   "quote": "Can be set to either `Pair` or `UID`.",
+   "lines": [
+    170,
+    170
+   ],
+   "statement": "CHHOTO_SLUG_STYLE accepts the values Pair and UID.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If Pair and UID were not the accepted values, a buyer configuring slugs from the documentation would set the variable to no effect. It is documented parameter semantics that a reader configuring slug generation acts on. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 65,
+   "quote": "Any other value will be ignored, and a default value of `Pair` will be used.",
+   "lines": [
+    170,
+    170
+   ],
+   "statement": "Any CHHOTO_SLUG_STYLE value other than Pair or UID is ignored, and Pair is the default.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If the default were not Pair, or invalid values were not ignored, a buyer omitting or misspelling the variable would get slug behaviour different from the documentation without any error. It is a documented default a reader acts on. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 66,
+   "quote": "In pair mode, adjective-name pairs are used for auto-generated links e.g. `gifted-ramanujan`.",
+   "lines": [
+    171,
+    171
+   ],
+   "statement": "In Pair mode, auto-generated links use adjective-name pairs such as gifted-ramanujan.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If false, a buyer's staff choosing a slug style when configuring the service would pick differently, since the documented appearance of auto-generated links in Pair mode would not be what they get. On its own nothing in the price or terms would change, but it is detail a reader setting the software up from its documentation would act on. Rated on the scale alone."
+  },
+  {
+   "id": 67,
+   "quote": "In UID mode, a randomly\ngenerated slug is used.",
+   "lines": [
+    171,
+    172
+   ],
+   "statement": "In UID mode, auto-generated links use a randomly generated slug.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If false, staff choosing between slug styles would configure the service differently, since UID mode would not produce a random slug as documented. On its own nothing in the price or terms would change, but it is detail a reader setting the software up acts on. Rated on the scale alone."
+  },
+  {
+   "id": 68,
+   "quote": "If UID slugs are enabled, the length of the slug can be set using this.",
+   "lines": [
+    176,
+    176
+   ],
+   "statement": "When UID slugs are enabled, CHHOTO_SLUG_LENGTH sets the length of the generated slug.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If false, a person setting the slug length would use the wrong configuration key and get a different length than intended. On its own nothing in the price or terms would change, but it is a configuration key a documentation reader acts on. Rated on the scale alone."
+  },
+  {
+   "id": 69,
+   "quote": "A minimum of 4 is supported",
+   "lines": [
+    176,
+    176
+   ],
+   "statement": "CHHOTO_SLUG_LENGTH supports a minimum value of 4.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If false, staff setting a shorter slug length would configure a value the software does not accept and would have to diagnose the failure. On its own nothing in the price or terms would change, but it is a documented supported range a reader acts on. Rated on the scale alone."
+  },
+  {
+   "id": 70,
+   "quote": "it defaults to 16",
+   "lines": [
+    176,
+    176
+   ],
+   "statement": "CHHOTO_SLUG_LENGTH defaults to 16.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If false, a deployment left at the default would produce slugs of an unexpected length, which staff would notice and configure around. On its own nothing in the price or terms would change, but it is a documented default a reader relies on when deciding whether to set the variable at all. Rated on the scale alone."
+  },
+  {
+   "id": 71,
+   "quote": "In the event of a collision, this variable will result in a single retry attempt using a UID four digits longer than\n[`CHHOTO_SLUG_LENGTH`](#chhoto_slug_length).",
+   "lines": [
+    183,
+    184
+   ],
+   "statement": "When CHHOTO_TRY_LONGER_SLUG is set, a UID collision results in a single retry attempt using a UID four digits longer than CHHOTO_SLUG_LENGTH.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If false, an operator relying on collision retries would get different slug behaviour than configured and links could fail to create where the documentation says they succeed. On its own nothing in the price or terms would change, but it is configuration-dependent behaviour a reader acts on. Rated on the scale alone."
+  },
+  {
+   "id": 72,
+   "quote": "For adjective-name slugs, a four digit suffix is added e.g.\n`gifted-ramanujan-1729`.",
+   "lines": [
+    184,
+    185
+   ],
+   "statement": "On a retry for adjective-name slugs, a four digit suffix is added, e.g. gifted-ramanujan-1729.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If false, an operator expecting the documented retry suffix format would see different slugs than described, affecting how staff recognise and manage retried links. On its own nothing in the price or terms would change, but it is detail a reader of the documentation acts on when operating the service. Rated on the scale alone."
+  },
+  {
+   "id": 73,
+   "quote": "If not set, one retry will be attempted, just like adjective-name slugs.",
+   "lines": [
+    187,
+    187
+   ],
+   "statement": "If CHHOTO_TRY_LONGER_SLUG is not set, one retry is attempted on a collision.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If false, an operator counting on the documented default retry would see collisions behave differently and would configure the variable they thought they did not need. On its own nothing in the price or terms would change, but it is a documented default a reader acts on. Rated on the scale alone."
+  },
+  {
+   "id": 74,
+   "quote": "But it would use the same slug length.",
+   "lines": [
+    187,
+    187
+   ],
+   "statement": "That default retry uses the same slug length rather than a longer one.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If false, an operator relying on the documented default retry would get longer slugs than expected on collision, contradicting what the documentation led them to configure around. On its own nothing in the price or terms would change, but it is default behaviour a reader acts on. Rated on the scale alone."
+  },
+  {
+   "id": 75,
+   "quote": "The address Chhoto URL will bind to.",
+   "lines": [
+    191,
+    191
+   ],
+   "statement": "The CHHOTO_LISTEN_ADDRESS environment variable configures the network address Chhoto URL binds to.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If false, staff binding the service to a chosen network address would use the wrong configuration key and the service would listen where they did not intend. On its own nothing in the price or terms would change, but it is a configuration key a person deploying the software acts on. Rated on the scale alone."
+  },
+  {
+   "id": 76,
+   "quote": "Defaults to `0.0.0.0`.",
+   "lines": [
+    191,
+    191
+   ],
+   "statement": "The default bind address is 0.0.0.0.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If false, a deployment left at the default would bind to an interface other than the operator expected, which staff would discover and correct with an explicit setting. On its own nothing in the price or terms would change; the buyer's threshold reaches hardening steps implied as default, but a bind address default is not such a step and its failure alone is too small to reopen the deal. Rated on the scale alone."
+  },
+  {
+   "id": 77,
+   "quote": "The port Chhoto URL will listen to.",
+   "lines": [
+    201,
+    201
+   ],
+   "statement": "The CHHOTO_LISTEN_PORT environment variable configures the port Chhoto URL listens on.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If false, staff pointing the service or its reverse proxy at the intended port would use the wrong configuration key and the service would listen elsewhere. On its own nothing in the price or terms would change, but it is a configuration key a person deploying the software acts on. Rated on the scale alone."
+  },
+  {
+   "id": 78,
+   "quote": "Defaults to `4567`.",
+   "lines": [
+    201,
+    201
+   ],
+   "statement": "The default listen port is 4567.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If false, a deployment left at the default would listen on a port other than documented, and staff wiring the service into their setup would connect to the wrong port. On its own nothing in the price or terms would change, but it is a documented default a reader acts on. Rated on the scale alone."
+  },
+  {
+   "id": 79,
+   "quote": "If you want to use capital letters in the shortlink, set the [`CHHOTO_ALLOW_CAPITAL_LETTERS`](#chhoto_allow_capital_letters)\nvariable to `True`.",
+   "lines": [
+    205,
+    206
+   ],
+   "statement": "Setting CHHOTO_ALLOW_CAPITAL_LETTERS to True enables the use of capital letters in shortlinks.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If false, staff wanting capital letters in shortlinks would set the variable as documented and not get the behaviour they configured for. On its own nothing in the price or terms would change, but it is a configuration key and its effect a reader acts on. Rated on the scale alone."
+  },
+  {
+   "id": 80,
+   "quote": "Any other value is ignored.",
+   "lines": [
+    206,
+    206
+   ],
+   "statement": "Values of CHHOTO_ALLOW_CAPITAL_LETTERS other than True have no effect.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If false, an operator setting a value other than True and expecting it to be honoured, or expecting a non-True value to be ignored, would configure the variable differently. On its own nothing in the price or terms would change, but it is the documented value format of a parameter a reader acts on. Rated on the scale alone."
+  },
+  {
+   "id": 81,
+   "quote": "This will also allow capital letters in UID slugs, if those are enabled.",
+   "lines": [
+    208,
+    208
+   ],
+   "statement": "Setting CHHOTO_ALLOW_CAPITAL_LETTERS to True also enables capital letters in auto-generated UID slugs, when UID slugs are enabled.",
+   "about": "target",
+   "within": {
+    "source": "docs/INSTALLATION.md",
+    "id": 79,
+    "statement": "Setting CHHOTO_ALLOW_CAPITAL_LETTERS to True enables the use of capital letters in shortlinks."
+   },
+   "tier": 2,
+   "tier_basis": "A reader configuring slug generation from the documentation would act on this setting, and its falsity would only mean choosing a different slug style through configuration, a cheap change for staff. It is documented parameter behaviour, not something the buyer's price or terms rest on. Rated on the scale alone."
+  },
+  {
+   "id": 82,
+   "quote": "It has no effect for adjective-name slugs.",
+   "lines": [
+    208,
+    208
+   ],
+   "statement": "CHHOTO_ALLOW_CAPITAL_LETTERS has no effect on auto-generated adjective-name slugs.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The scope of a configuration variable's effect is exactly the detail a reader setting up slug generation would rely on, and its failure would cost nothing beyond a surprised re-read of the documentation. The slug styles remain configurable either way. Rated on the scale alone."
+  },
+  {
+   "id": 83,
+   "quote": "If you want to provided hashed password and API Key, name a supported algorithm here.",
+   "lines": [
+    215,
+    215
+   ],
+   "statement": "The CHHOTO_HASH_ALGORITHM environment variable sets the hash algorithm used for hashed passwords and API keys.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The claim concerns the name and documented purpose of a configuration variable for hashed credentials, which staff setting up the private service would follow from the documentation. Its failure would not on its own defeat the authentication the buyer depends on, since the password and API key still gate access. Rated on the scale alone."
+  },
+  {
+   "id": 84,
+   "quote": "For now, the supported\nvalues are: `Argon2`.",
+   "lines": [
+    215,
+    216
+   ],
+   "statement": "The only hash algorithm currently supported by CHHOTO_HASH_ALGORITHM is Argon2.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The set of supported values is documented detail a reader configuring hashed credentials would act on; if false, a chosen algorithm would simply fail to take effect and staff would set the variable accordingly. The buyer can run on Argon2 regardless, so nothing in the bargain changes. Rated on the scale alone."
+  },
+  {
+   "id": 85,
+   "quote": "More algorithms may be added later.",
+   "lines": [
+    216,
+    216
+   ],
+   "statement": "The seller intends to add more hash algorithms in the future.",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "A statement of the seller's future intent has no place in what the buyer is buying today; the buyer's plan runs on the algorithms that exist now. Nothing in the stated thresholds or the reliance statement turns on it. Rated on the scale alone."
+  },
+  {
+   "id": 86,
+   "quote": "Unsupported values are ignored.",
+   "lines": [
+    216,
+    216
+   ],
+   "statement": "Values of CHHOTO_HASH_ALGORITHM that are not supported are ignored.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Documented behaviour of unsupported configuration values is detail a reader would rely on when writing a compose file, and its falsity would mean an unexpected start-up failure or silently different behaviour that staff would trace and correct. It does not touch the buyer's thresholds on its own. Rated on the scale alone."
+  },
+  {
+   "id": 87,
+   "quote": "It will add some latency to some of your requests",
+   "lines": [
+    220,
+    220
+   ],
+   "statement": "When hashed passwords and API keys are configured, Chhoto URL contains code that verifies credentials by hashing them as part of handling requests.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the claim were false, the buyer would get credential handling without the documented latency, which is a gain and not a loss; the claim describes a cost the buyer accepts, not a feature the buyer pays for. No stated threshold reaches latency. Rated on the scale alone."
+  },
+  {
+   "id": 88,
+   "quote": "use more resources in general",
+   "lines": [
+    220,
+    220
+   ],
+   "statement": "When hashed passwords and API keys are configured, Chhoto URL performs hashing computations during its general operation.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The buyer's stated threshold 'footprint or resource figures materially worse than stated' reaches claims about resource use, but this claim's falsity would mean the service uses fewer resources than documented, not materially worse figures, so the threshold cannot be breached by its failure. Rated on the buyer's stated threshold: 'footprint or resource figures materially worse than stated'."
+  },
+  {
+   "id": 89,
+   "quote": "To enable public mode, set [`CHHOTO_PUBLIC_MODE`](#chhoto_public_mode) to `Enable`. With this, anyone will be able to add links.",
+   "lines": [
+    232,
+    233
+   ],
+   "statement": "Chhoto URL provides a public mode which, when CHHOTO_PUBLIC_MODE is set to `Enable`, allows links to be submitted without authentication.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The buyer runs a private service and would never set CHHOTO_PUBLIC_MODE to Enable, so nothing in its plan is touched by the existence or absence of the mode. The reliance statement marks public mode as not used, and no stated threshold names it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 90,
+   "quote": "Listing existing links or deleting links will need admin access using the password.",
+   "lines": [
+    233,
+    234
+   ],
+   "statement": "In public mode, listing and deleting links remain restricted to admin access authenticated by the password.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim governs who may list and delete links inside public mode, a mode the buyer would leave off entirely; the reliance statement marks public mode as not used. The buyer's own admin-only deletion in private operation is a separate matter and this claim does not carry it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 91,
+   "quote": "Any other values are ignored.",
+   "lines": [
+    234,
+    234
+   ],
+   "statement": "Values of CHHOTO_PUBLIC_MODE other than `Enable` are ignored.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The parsing behaviour of a setting the buyer would never enable cannot affect a plan that does not use it; the reliance statement marks public mode as not used. No stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 92,
+   "quote": "If [`CHHOTO_PUBLIC_MODE`](#chhoto_public_mode) is enabled, and [`CHHOTO_PUBLIC_MODE_EXPIRY_DELAY`](#chhoto_public_mode_expiry_delay) is set to a positive value, submitted links will expire in that given time (in seconds).",
+   "lines": [
+    238,
+    240
+   ],
+   "statement": "Chhoto URL applies the CHHOTO_PUBLIC_MODE_EXPIRY_DELAY setting to links submitted in public mode, scheduling them to expire.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The expiry-delay mechanism applies only to links submitted in public mode, which the buyer would not enable; the reliance statement marks public mode as not used. Its failure would change nothing for a service running in private operation. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 93,
+   "quote": "The user can still choose a shorter expiry delay.",
+   "lines": [
+    240,
+    240
+   ],
+   "statement": "A user submitting a link in public mode may choose an expiry delay shorter than the configured one.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim describes a choice available to anonymous submitters in public mode, a mode the reliance statement marks as not used by this buyer. Nothing in the buyer's stated thresholds reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 94,
+   "quote": "It will have no effect for a logged in user i.e. the admin.",
+   "lines": [
+    242,
+    242
+   ],
+   "statement": "CHHOTO_PUBLIC_MODE_EXPIRY_DELAY has no effect on links submitted by a logged-in admin.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns the expiry delay's effect on an admin operating in public mode, which the buyer would not enable and the reliance statement marks as not used. The buyer's own staff act as the single admin in private operation, where this setting is beside the point. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 95,
+   "quote": "Set this to `True` to completely disable the frontend.",
+   "lines": [
+    246,
+    246
+   ],
+   "statement": "Chhoto URL provides a CHHOTO_DISABLE_FRONTEND setting which, when set to `True`, turns off serving of the frontend.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A documented configuration switch is detail a reader deploying the service would act on, and its failure would leave staff with the built-in interface as a cheap fallback rather than any change to the bargain. The buyer has not said it intends to disable the frontend. Rated on the scale alone."
+  },
+  {
+   "id": 96,
+   "quote": "If you want to serve a custom landing page, put all your site related files, along with a valid `index.html` file in a directory, and set this to the path of the directory.",
+   "lines": [
+    250,
+    251
+   ],
+   "statement": "Chhoto URL supports a CHHOTO_CUSTOM_LANDING_DIRECTORY setting that makes the server serve the files of the configured directory, including its `index.html`, as the site's landing page.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The custom landing page is an item the buyer uses on the practice's reading, and its failure would cost nothing beyond falling back to the built-in interface. The setting is a configuration key that a person setting the service up from its documentation would act on. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 97,
+   "quote": "If using docker, you need to first mount the directory inside the container.",
+   "lines": [
+    251,
+    252
+   ],
+   "statement": "When running under Docker, the custom landing directory must be mounted inside the container for the feature to work.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "This is a setup step under the custom-landing item the buyer uses on the practice's inference; if false, the buyer's staff would simply find the feature not working until the mount is added. A person deploying under Docker would act on this instruction when arranging the container. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 98,
+   "quote": "The admin page will then be located at `/admin/manage`.",
+   "lines": [
+    252,
+    252
+   ],
+   "statement": "When a custom landing directory is configured, the admin page is served at the path `/admin/manage`.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The admin page path is a route detail under the custom-landing item the buyer uses on the practice's inference; nothing in the buyer's thresholds reaches it. A person operating the service from its documentation would need the correct path to reach administration. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 99,
+   "quote": "_Warning: Put anything except the `index.html` file inside some directory, because naked filenames will be treated as shortlinks._",
+   "lines": [
+    254,
+    255
+   ],
+   "statement": "In the custom landing directory, files other than `index.html` placed as naked filenames (not inside a subdirectory) will be treated as shortlinks rather than served as site files.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "This documented behaviour sits under the custom-landing item the buyer uses on the practice's inference; its falsity would cost nothing a cheap rearrangement of files could not fix. A person arranging landing-page files would act on this warning when deciding where to place them. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 100,
+   "quote": "By default, the server sends no Cache-Control headers.",
+   "lines": [
+    259,
+    259
+   ],
+   "statement": "By default, the server sends no Cache-Control headers.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "This is a documented default under the Cache-Control item the buyer uses on the practice's inference; no stated threshold reaches caching behaviour. A person configuring response headers from the documentation would act on knowing the default state. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 101,
+   "quote": "You can set custom headers here to send your desired headers.",
+   "lines": [
+    259,
+    260
+   ],
+   "statement": "Chhoto URL supports a CHHOTO_CACHE_CONTROL_HEADER setting whose value is attached as Cache-Control headers to the server's responses.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "This is a configuration key under the Cache-Control item the buyer uses on the practice's inference; its falsity would cost nothing beyond losing an optional header. A person setting the service up from its documentation would act on this variable's existence and name. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 102,
+   "quote": "It must be a comma separated list of valid [RFC 7234 §5.2](https://datatracker.ietf.org/docs/html/rfc7234#section-5.2) headers.",
+   "lines": [
+    260,
+    261
+   ],
+   "statement": "The value of CHHOTO_CACHE_CONTROL_HEADER must be a comma-separated list of valid RFC 7234 §5.2 headers.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "This is a parameter's format under the Cache-Control item the buyer uses on the practice's inference; getting it wrong costs only a corrected value. A person writing a value for this variable would act on the documented format. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 103,
+   "quote": "you can set it to `no-cache, private` to disable caching.",
+   "lines": [
+    262,
+    262
+   ],
+   "statement": "Chhoto URL can be configured with CHHOTO_CACHE_CONTROL_HEADER set to `no-cache, private`, causing it to send those Cache-Control headers on its responses.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "This is documented configuration behaviour under the Cache-Control item the buyer uses on the practice's inference; if false, the buyer would lose only an optional header setting, at no cost to its plan. A person wanting to disable caching through configuration would act on this documented value. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 104,
+   "quote": "This can be used to set the number of items shown per page in the frontend.",
+   "lines": [
+    267,
+    267
+   ],
+   "statement": "The CHHOTO_FRONTEND_PAGE_SIZE variable sets the number of items shown per page in the frontend.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "This is a configuration key under the web administration item the buyer uses on the practice's inference; its falsity would cost nothing material to the buyer's plan. A person configuring the frontend's pagination from the documentation would act on this variable. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 105,
+   "quote": "This does not have any effect on the backend code.",
+   "lines": [
+    267,
+    267
+   ],
+   "statement": "CHHOTO_FRONTEND_PAGE_SIZE has no effect on the backend code.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "This is a scope remark about one variable's reach; whether it is accurate, no setup or operational step the buyer's staff would take changes, and no threshold reaches it. Nothing in the buyer's plan rests on the variable's backend effect. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 106,
+   "quote": "Defaults to 10.",
+   "lines": [
+    268,
+    268
+   ],
+   "statement": "CHHOTO_FRONTEND_PAGE_SIZE defaults to 10 items per page.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "This is a documented default under the web administration item the buyer uses on the practice's inference; no stated threshold reaches pagination. A person configuring or predicting the frontend's behaviour from the documentation would act on the default value. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 107,
+   "quote": "Use this to allow extra protocols for longlinks.",
+   "lines": [
+    272,
+    272
+   ],
+   "statement": "The CHHOTO_EXTRA_PROTOCOLS variable enables allowing link protocols beyond the built-in ones.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "This is a configuration key under the allowed-protocols item the buyer uses on the practice's inference; the reliance statement notes a person should ask about it, but its failure would cost only a configuration change the statement calls cheap. A person needing to accept a customer's link protocol would act on this variable's existence. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 109,
+   "quote": "Malformed protocols will be skipped.",
+   "lines": [
+    273,
+    273
+   ],
+   "statement": "Malformed protocol entries in CHHOTO_EXTRA_PROTOCOLS are skipped rather than causing an error.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "This is a parsing detail about malformed entries in one variable; whether it is accurate, no step the buyer's staff would take in setup or operation changes, and no stated threshold reaches protocol handling. The buyer's plan does not rest on how bad values are handled. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 110,
+   "quote": "It controls the level of logging.",
+   "lines": [
+    277,
+    277
+   ],
+   "statement": "The RUST_LOG variable controls the logging level.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "This is a configuration key a person debugging or operating the service from its documentation would act on. No stated threshold reaches it — the buyer's threshold concerns what is logged about visitors, not the verbosity level — and the reliance statement has no item for logging configuration. Rated on the scale alone."
+  },
+  {
+   "id": 111,
+   "quote": "Logging is done using the `env_logger` crate.",
+   "lines": [
+    279,
+    279
+   ],
+   "statement": "The application's logging is implemented using the env_logger crate.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "This is an implementation detail about which crate produces the logs; whether it is accurate, no setup, configuration or operational step the buyer's staff would take changes, and no stated threshold reaches it — the buyer's threshold concerns what is recorded about visitors, not how logging is implemented. Rated on the scale alone."
+  },
+  {
+   "id": 112,
+   "quote": "No personal information of the end user is ever logged, nor will it ever supported.",
+   "lines": [
+    279,
+    280
+   ],
+   "statement": "No personal information of end users is ever logged, and such logging will never be supported.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If this boundary claim were false, visitors' personal data would be recorded by a service the buyer runs for its own customers, defeating the item the reliance statement marks as depends and breaching the condition the price is stated to assume. Rated against the buyer's stated threshold: \"any way visitors are logged or tracked beyond the hit count\"."
+  },
+  {
+   "id": 113,
+   "quote": "By default,\nthe value is set to the following.\n\n```\nwarn,chhoto_url=info,actix_session::middleware=error\n```",
+   "lines": [
+    280,
+    285
+   ],
+   "statement": "The default RUST_LOG value is `warn,chhoto_url=info,actix_session::middleware=error`.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A documented default value for log levels: a person configuring or reading the service's output would act differently if the default were not what is stated. Rated on the scale alone."
+  },
+  {
+   "id": 114,
+   "quote": "The config variables used to have different names up to commit 228eb7a, after which they were changed to adhere to norms for config variable\nnaming.",
+   "lines": [
+    295,
+    296
+   ],
+   "statement": "The configuration variables carried different names until commit 228eb7a, after which they were renamed to follow naming norms.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "A historical note about past naming of configuration variables; nothing in the buyer's plan or thresholds turns on it, and its falsity would change nothing for a buyer deploying the current version. Rated on the scale alone."
+  },
+  {
+   "id": 115,
+   "quote": "The old names will keep working for now",
+   "lines": [
+    296,
+    296
+   ],
+   "statement": "The pre-228eb7a configuration variable names still work in the current version.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A claim about configuration key compatibility: a person setting up or migrating the software using the old variable names would act differently if they did not still work. Rated on the scale alone."
+  },
+  {
+   "id": 116,
+   "quote": "support for these\nwill eventually be dropped in some future major release",
+   "lines": [
+    296,
+    297
+   ],
+   "statement": "The seller intends to drop support for the old configuration variable names in some future major release.",
+   "about": "seller",
+   "tier": 3,
+   "tier_basis": "A statement of the seller's future intention about a compatibility shim the buyer need not use; if the intention lapsed or changed, nothing in the buyer's deployment or thresholds would change. Rated on the scale alone."
+  },
+  {
+   "id": 117,
+   "quote": "Database backups are created during init",
+   "lines": [
+    301,
+    301
+   ],
+   "statement": "The application's initialisation routine creates a backup of the database.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If init backups were not created, the buyer's staff could back up the data directory on their own schedule, a cheap and routine substitution under the reliance statement's item for automatic backups. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 118,
+   "quote": "along with daily backups taken between 3am and 4am",
+   "lines": [
+    301,
+    301
+   ],
+   "statement": "The application runs a scheduled job that creates daily database backups.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If the daily backup job did not run, staff could substitute their own scheduled backup of the data directory, a cheap and routine operation for whoever runs the instance. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 119,
+   "quote": "The backup files are created in a directory\ncalled `backups`, which is in the same directory as the database file.",
+   "lines": [
+    301,
+    302
+   ],
+   "statement": "Backup files are written to a `backups` directory located in the same directory as the database file.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A file's location: a person restoring or inspecting backups would act differently if the files were written elsewhere than the stated `backups` directory beside the database. Rated on the scale alone."
+  },
+  {
+   "id": 120,
+   "quote": "The backups are SQLite files",
+   "lines": [
+    302,
+    302
+   ],
+   "statement": "The backup files are SQLite database files.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A file's format: a person restoring or verifying a backup would act differently if the files were not SQLite databases as documented. Rated on the scale alone."
+  },
+  {
+   "id": 121,
+   "quote": "and are named using the original\ndatabase file name, and backup type. Daily backups have `.daily1`, `.daily2` etc. as the suffix, whereas the init backups have\n`.init1`, `.init2` etc. as the suffix.",
+   "lines": [
+    302,
+    304
+   ],
+   "statement": "Backup files are named after the original database file plus backup type, with `.dailyN` suffixes for daily backups and `.initN` suffixes for init backups.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A documented file-naming convention: a person identifying and selecting backup files by type and suffix would act differently if the naming did not match. Rated on the scale alone."
+  },
+  {
+   "id": 122,
+   "quote": "Backups are automatically purged",
+   "lines": [
+    306,
+    306
+   ],
+   "statement": "The application contains a routine that deletes old database backup files.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "If old backups were not purged, backup files would accumulate until staff delete them by hand, a cheap and routine substitution under the reliance statement's item for automatic backups. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 123,
+   "quote": "keeping up to 3 init backups, and 7 daily backups at any time",
+   "lines": [
+    306,
+    306
+   ],
+   "statement": "Backup retention keeps up to 3 init backups and 7 daily backups at any time.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A documented retention parameter: a person planning restores or provisioning backup storage would act differently if the kept-backup counts were not 3 init and 7 daily. Rated on the scale alone."
+  },
+  {
+   "id": 124,
+   "quote": "The helm values are very sparse to keep it simple.",
+   "lines": [
+    311,
+    311
+   ],
+   "statement": "The Helm chart exposes only a small number of configurable values.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "A qualitative remark on the chart's design; whether the Helm values are sparse or plentiful changes nothing in the buyer's plan, which can fall back to the compose file. Rated on the scale alone."
+  },
+  {
+   "id": 125,
+   "quote": "The PVC allocates 100Mi",
+   "lines": [
+    313,
+    313
+   ],
+   "statement": "The Helm chart's persistent volume claim allocates 100Mi of storage.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A documented storage figure: a person deploying via the Helm chart would act differently when sizing the volume if the claim did not allocate 100Mi. Rated on the scale alone."
+  },
+  {
+   "id": 126,
+   "quote": "the PV is using a host path volume",
+   "lines": [
+    313,
+    313
+   ],
+   "statement": "The Helm chart's persistent volume uses a host path volume.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A documented volume type: a person deploying via the Helm chart would act differently, since a host path volume constrains where the service can run, if the claim were false. Rated on the scale alone."
+  },
+  {
+   "id": 127,
+   "quote": "The helm chart assumes you have [cert manager](https://github.com/jetstack/cert-manager) deployed to have TLS\ncertificates managed easily in your cluster.",
+   "lines": [
+    315,
+    316
+   ],
+   "statement": "The Helm chart depends on cert-manager being deployed in the cluster for TLS certificate management.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If the chart did not need cert-manager, a buyer deploying on Kubernetes would set TLS up differently, but the buyer's documented basic path is the compose file and the Helm chart is only an item the plan uses. The failure alone would not reopen the price or the terms. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 128,
+   "quote": "`cp deploy/helm-chart/values.yaml deploy/helm-chart/my-values.yaml` and adjust `password`, `fqdn`\nand `letsencryptmail` in your new `my-values.yaml`",
+   "lines": [
+    320,
+    321
+   ],
+   "statement": "The Helm chart ships a values file at `deploy/helm-chart/values.yaml` with configurable `password`, `fqdn` and `letsencryptmail` fields.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A person deploying the chart would copy this file and adjust these fields, so its falsity changes what they do at setup. The failure alone is too small to reopen the price or terms. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 129,
+   "quote": "[All the related files can be found here.](../deploy/helm-chart)",
+   "lines": [
+    323,
+    323
+   ],
+   "statement": "The Helm chart files exist in the repository at `deploy/helm-chart`.",
+   "about": "document",
+   "within": {
+    "source": "docs/INSTALLATION.md",
+    "id": 128,
+    "statement": "The Helm chart ships a values file at `deploy/helm-chart/values.yaml` with configurable `password`, `fqdn` and `letsencryptmail` fields."
+   },
+   "tier": 3,
+   "tier_basis": "A claim about where files sit in the repository, not the licence or ownership document the buyer relies on; the buyer can see the files at acquisition. If false, nothing in the buyer's plan changes. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 130,
+   "quote": "The images should also work with Podman and other OCI-compatible container engines.",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "When run under Podman and other OCI-compatible container engines, the container images work as intended.",
+   "about": "target",
+   "implied_by": 15,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "within": {
+    "source": "docs/INSTALLATION.md",
+    "id": 131,
+    "statement": "When deployed on anything that supports OCI images, such as docker or podman quadlets, Chhoto URL runs."
+   },
+   "tier": 2,
+   "tier_basis": "The buyer's end-the-deal threshold reaches deployment on its own hardware, but this failure alone is too small for it, since the Docker path the buyer depends on remains and Podman is an alternative engine. A person choosing Podman would act on the claim at setup. Rated against the buyer's stated threshold: \"a dependency the buyer cannot run on its own hardware\"."
+  },
+  {
+   "id": 131,
+   "quote": "It should be possible to run Chhoto URL with pretty much anything that supports OCI images e.g. `docker`, `podman quadlets`",
+   "lines": [
+    32,
+    32
+   ],
+   "statement": "When deployed on anything that supports OCI images, such as docker or podman quadlets, Chhoto URL runs.",
+   "about": "target",
+   "implied_by": 18,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "The buyer's end-the-deal threshold reaches the ability to run the service on its own hardware, but the failure of this broad compatibility claim alone is too small for it while the documented Docker path works. A reader picking an OCI engine would act on the claim. Rated against the buyer's stated threshold: \"a dependency the buyer cannot run on its own hardware\"."
+  },
+  {
+   "id": 132,
+   "quote": "docker run -p 4567:4567",
+   "lines": [
+    60,
+    60
+   ],
+   "statement": "When the target's container is run, the application serves requests on host port 4567 and is reachable there.",
+   "about": "target",
+   "implied_by": 25,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "The buyer's end-the-deal threshold reaches running the service on its own hardware, but a wrong or unreachable documented port is discovered immediately at first use and does not leave the buyer unable to run the service. A person deploying would open and test exactly this port. Rated against the buyer's stated threshold: \"a dependency the buyer cannot run on its own hardware\"."
+  },
+  {
+   "id": 133,
+   "quote": "If kept empty, anyone can access the website.",
+   "lines": [
+    102,
+    102
+   ],
+   "statement": "When CHHOTO_PASSWORD is left empty, anyone can access the website without authenticating.",
+   "about": "target",
+   "implied_by": 35,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "The buyer's stated thresholds reach logging, footprint and implied hardening defaults, none of which this claim about the empty-password default falls under. A person deploying a private service would act on it by setting a password, and an error here surfaces at first use. Rated on the scale alone."
+  },
+  {
+   "id": 134,
+   "quote": "password is not encrypted in\ntransport",
+   "lines": [
+    102,
+    103
+   ],
+   "statement": "The authentication password is transmitted to the service unencrypted.",
+   "about": "target",
+   "implied_by": 36,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "A deployer would act on this disclosure by putting the service behind TLS before exposing it to customers, so its falsity changes setup behaviour. The failure alone would not reopen the price or terms, and no stated threshold reaches transport encryption. Rated on the scale alone."
+  },
+  {
+   "id": 135,
+   "quote": "This is optional, as the link will work at any URL as long as Chhoto URL\nis accessible there.",
+   "lines": [
+    110,
+    111
+   ],
+   "statement": "Short links work at any URL at which Chhoto URL is accessible.",
+   "about": "target",
+   "implied_by": 37,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "Whether the site URL must be configured is a setup decision a deployer acts on; if false, they would configure or skip it differently. The failure alone is a configuration detail. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 136,
+   "quote": "copying to clipboard, QR code generation will\nuse it if available",
+   "lines": [
+    111,
+    112
+   ],
+   "statement": "When CHHOTO_SITE_URL is set, copied links and generated QR codes use that URL.",
+   "about": "target",
+   "implied_by": 38,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "A deployer wanting correct copied links and QR codes for customers would set this variable on the strength of the claim, so its falsity changes setup behaviour. The failure alone would not reopen the price or terms. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 137,
+   "quote": "It'll be automatically\nconverted to the correct unicode in the frontend.",
+   "lines": [
+    113,
+    114
+   ],
+   "statement": "Punycode entered for CHHOTO_SITE_URL is displayed as the correct unicode in the frontend.",
+   "about": "target",
+   "implied_by": 39,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "A purely cosmetic display behaviour in the admin frontend with nothing a deployer or operator acts on. The buyer loses nothing measurable if it is false. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 138,
+   "quote": "a strong API\nkey will be generated and printed in the logs",
+   "lines": [
+    118,
+    119
+   ],
+   "statement": "When a weak API key is provided, a strong API key is generated and appears in the service's logs.",
+   "about": "target",
+   "implied_by": 41,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "An operator who supplies a weak key would check the logs for the generated strong key, so the claim's falsity changes what they do at setup. The failure alone would not reopen the price or terms, and no stated threshold reaches key generation. Rated on the scale alone."
+  },
+  {
+   "id": 139,
+   "quote": "the weak one will be used for the time being.",
+   "lines": [
+    119,
+    119
+   ],
+   "statement": "When a weak API key is provided, the weak key remains the key in use even after the stronger key is generated and logged.",
+   "about": "target",
+   "implied_by": 42,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "An operator must know whether the weak key they supplied is still active, since the claim's falsity changes whether they rotate it before customers arrive. The failure surfaces immediately at setup and would not reopen the price or terms. Rated on the scale alone."
+  },
+  {
+   "id": 140,
+   "quote": "If no API key is provided, the website will still work",
+   "lines": [
+    123,
+    123
+   ],
+   "statement": "The website functions when no API key is provided.",
+   "about": "target",
+   "implied_by": 43,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "A deployer would act on the claim by deciding whether an API key is required before exposing the service. The failure alone would not reopen the price or terms. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 141,
+   "quote": "it'll be a significantly worse experience if you try\nto use Chhoto URL from the CLI.",
+   "lines": [
+    123,
+    124
+   ],
+   "statement": "Without an API key, using Chhoto URL from the CLI is a significantly worse experience.",
+   "about": "target",
+   "implied_by": 44,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "A subjective remark about convenience with no behaviour a deployer or operator would act on differently. The buyer's plan does not rest on the CLI. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 142,
+   "quote": "If this is enabled, there'll be a significant boost in performance under high load",
+   "lines": [
+    136,
+    136
+   ],
+   "statement": "Under high load, the software performs significantly better when WAL mode is enabled than it does without it.",
+   "about": "target",
+   "implied_by": 47,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If WAL mode gave no boost under high load, the buyer's small, low-cost instance would lose little, and the remedy is reconfiguring the journal mode, which the practice judges cheap for whoever runs the instance. The buyer's plan does not reach high-load throughput. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 143,
+   "quote": "write will no longer block reads",
+   "lines": [
+    136,
+    136
+   ],
+   "statement": "While the software is running with WAL mode enabled, write operations do not block read operations carried out at the same time.",
+   "about": "target",
+   "implied_by": 48,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If writes blocked reads in WAL mode, the buyer's staff would see contention and could reconfigure or restore from backups, a known, cheap operation for the operator. The buyer's plan does not depend on this behaviour. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 144,
+   "quote": "If you'd like to let go of durability for an increase in throughput, set this to `False`.",
+   "lines": [
+    147,
+    147
+   ],
+   "statement": "With CHHOTO_SQLITE_ENSURE_ACID set to False, the software handles a higher rate of read and write operations than it does with durability fully enforced.",
+   "about": "target",
+   "implied_by": 55,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If disabling CHHOTO_SQLITE_ENSURE_ACID bought no throughput, the buyer loses nothing, since the buyer has no stated plan to trade durability away and the practice judges the buyer keeps durability on. The claim is a tradeoff of an option the buyer is not relying on. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 145,
+   "quote": "Durability is maintained across application crashes.",
+   "lines": [
+    152,
+    153
+   ],
+   "statement": "After an application crash, the data written before the crash is still present in the database and available once the software runs again.",
+   "about": "target",
+   "implied_by": 58,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If durability failed across a crash, the buyer's staff could restore from the backups the software keeps, though lost links would be gone; the buyer has named no threshold about durability or data loss. The failure is a small operational cost for a service of this size. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 146,
+   "quote": "It will add some latency to some of your requests",
+   "lines": [
+    220,
+    220
+   ],
+   "statement": "When hashed passwords and API keys are used, some requests to Chhoto URL take longer than they otherwise would.",
+   "about": "target",
+   "implied_by": 87,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If hashed credentials added no latency, the buyer loses nothing; if the true cost were larger than stated, it is a minor overhead on a small service and would not by itself send the buyer back to the seller. The buyer's stated thresholds do not reach request latency. Rated on the scale alone."
+  },
+  {
+   "id": 147,
+   "quote": "use more resources in general",
+   "lines": [
+    220,
+    220
+   ],
+   "statement": "When hashed passwords and API keys are used, Chhoto URL consumes more computing resources overall than it otherwise would.",
+   "about": "target",
+   "implied_by": 88,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "The buyer's price condition covers resource figures materially worse than stated, and this claim bears on resource use when hashed credentials are enabled; but the failure of this one figure, an incremental cost of hashing, is too small on its own to change the hardware the buyer runs or reopen the price. The buyer enables hashing regardless, since a private service is what it is paying for. Rated against the buyer's stated threshold: \"footprint or resource figures materially worse than stated\"."
+  },
+  {
+   "id": 148,
+   "quote": "To enable public mode, set [`CHHOTO_PUBLIC_MODE`](#chhoto_public_mode) to `Enable`. With this, anyone will be able to add links.",
+   "lines": [
+    232,
+    233
+   ],
+   "statement": "While public mode is enabled, people without admin authentication can successfully add links.",
+   "about": "target",
+   "implied_by": 89,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "The buyer runs a private service and does not use public mode, so if this claim were false nothing in the buyer's plan is touched. No stated threshold names public mode. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 149,
+   "quote": "If [`CHHOTO_PUBLIC_MODE`](#chhoto_public_mode) is enabled, and [`CHHOTO_PUBLIC_MODE_EXPIRY_DELAY`](#chhoto_public_mode_expiry_delay) is set to a positive value, submitted links will expire in that given time (in seconds).",
+   "lines": [
+    238,
+    240
+   ],
+   "statement": "Links submitted in public mode stop working after the configured number of seconds.",
+   "about": "target",
+   "implied_by": 92,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "This is the forced expiry behaviour of public mode, which the buyer does not use and would simply leave off. Its falsity changes nothing for the buyer's plan. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 150,
+   "quote": "Set this to `True` to completely disable the frontend.",
+   "lines": [
+    246,
+    246
+   ],
+   "statement": "With CHHOTO_DISABLE_FRONTEND set to `True`, the server serves no frontend pages.",
+   "about": "target",
+   "implied_by": 95,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If the disable-frontend switch did not work, the buyer would fall back to the built-in interface, which the practice judges costs nothing beyond appearance, or patch the plain HTML and JavaScript frontend cheaply. The buyer has named no threshold about the frontend. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 151,
+   "quote": "If you want to serve a custom landing page, put all your site related files, along with a valid `index.html` file in a directory, and set this to the path of the directory.",
+   "lines": [
+    250,
+    251
+   ],
+   "statement": "Requests to the site receive the custom landing page served from the configured directory.",
+   "about": "target",
+   "implied_by": 96,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If the custom landing page were not served, the buyer would fall back to the built-in interface at no cost beyond appearance, and could fix the frontend itself cheaply. No stated threshold reaches the landing page. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 152,
+   "quote": "You can set custom headers here to send your desired headers.",
+   "lines": [
+    259,
+    260
+   ],
+   "statement": "Responses from the server include the Cache-Control headers configured through CHHOTO_CACHE_CONTROL_HEADER.",
+   "about": "target",
+   "implied_by": 101,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If configured Cache-Control headers were not sent, the practical effect for a private link shortener is negligible and the remedy is a configuration change or a small patch. The buyer has named no threshold about response headers. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 153,
+   "quote": "you can set it to `no-cache, private` to disable caching.",
+   "lines": [
+    262,
+    262
+   ],
+   "statement": "Caching of the server's responses is disabled.",
+   "about": "target",
+   "implied_by": 103,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If caching were not disabled by this setting, the buyer's staff could change the configuration or patch the behaviour, a cheap restart-level remedy for a single small instance. No stated threshold reaches caching behaviour. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 154,
+   "quote": "Database backups are created during init",
+   "lines": [
+    301,
+    301
+   ],
+   "statement": "When the application initialises, a database backup file is actually created.",
+   "about": "target",
+   "implied_by": 117,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If no backup were created at initialisation, the buyer's staff could back up the data directory on their own schedule, which the practice judges a cheap and routine substitution. The buyer's plan uses backups but does not depend on them. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 155,
+   "quote": "along with daily backups taken between 3am and 4am",
+   "lines": [
+    301,
+    301
+   ],
+   "statement": "While the application runs, a database backup is taken each day between 3am and 4am.",
+   "about": "target",
+   "implied_by": 118,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If the daily backup window did not happen, the buyer's staff could substitute their own scheduled backup of the data directory, a cheap and routine operation. The buyer's plan uses backups but does not depend on them. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 156,
+   "quote": "Backups are automatically purged",
+   "lines": [
+    306,
+    306
+   ],
+   "statement": "As the application runs, old backups are deleted automatically, without any manual step.",
+   "about": "target",
+   "implied_by": 122,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "If old backups were not pruned automatically, the buyer's staff would delete them by hand or add a scheduled cleanup, a cheap and routine substitution. The buyer's plan uses backups but does not depend on them. Rated on the practice's reading of the buyer's plan."
+  }
+ ]
+}
