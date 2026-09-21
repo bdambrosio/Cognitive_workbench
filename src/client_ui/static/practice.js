@@ -159,6 +159,8 @@
         const [what, a, val] = b.dataset.site.split(":");
         const path = "api/engagements/" + encodeURIComponent(e.name) + (what === "job" ? "/jobs/" + a : "/stage");
         if (what === "job" && !confirm("Start the " + a + " job for " + e.name + "?")) return;
+        // Releasing is signing. The words are signoff.STATEMENT; the server records them with the report's hash.
+        if (what === "stage" && a === "release" && !confirm("Release the report for " + e.name + " to the client?\n\nReleasing signs it in your name:\n\n\"I have read this report, the ratings marked borderline, the citations the check flagged and the findings the independent check questioned. I release it to the client and answer for it on behalf of the practice.\"")) return;
         const j = await api(path, what === "job" ? {} : {stage: a, value: val});
         if (j) { data = j.engagements || j; render(); }
       });

@@ -31,6 +31,7 @@ class FakeSession:
         self.intake_dir.mkdir(parents=True, exist_ok=True)
         self.form = {"identify": {"client": "Acme"}}
         self.hist = []
+        self.merged_dir = getattr(type(self), "merged_dir", eng_dir / "merged" / "none")
 
     def open(self):
         self.hist.append({"who": "agent", "text": "hello"}); return "hello"
@@ -268,6 +269,16 @@ def test_report_is_gated_on_release(env):
     assert r.status_code == 200
     assert mail.sent[-1]["to"] == [CLIENT] and "/e/e1/report/" in mail.sent[-1]["body"]
     assert c.get("/e/e1/report/" + _as(CLIENT)).status_code == 200
+    # releasing is signing: who, the statement, and the hash of the report released
+    import hashlib
+    signed = json.loads((merged / "signoff.json").read_text())
+    assert signed["by"] == PRACTICE and signed["run"] == merged.name and "I have read this report" in signed["statement"]
+    assert signed["report_sha256"] == hashlib.sha256(b"# r\n").hexdigest()
+    assert (merged / "report.md").read_text() == "# r\n"                  # the text that was read is not changed
+    assert "Sign-off" in (merged / "report.html").read_text() and PRACTICE in (merged / "report.html").read_text()
+    FakeSession.merged_dir = merged                    # the real post session knows the run it shows
+    doc = c.get("/e/e1/report/api/document" + _as(CLIENT)).json()
+    assert "Sign-off" in doc["html"] and doc["signoff"]["by"] == PRACTICE
     with c.websocket_connect("/e/e1/report/ws" + _as(CLIENT)) as ws:
         assert [ws.receive_json()["type"] for _ in range(3)] == ["history", "document", "status"]
     s = c.get("/e/e1/api/status" + _as(CLIENT)).json()

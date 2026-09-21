@@ -619,6 +619,14 @@ def make_site_app(access: Access, model: Optional[Path] = None,
             d["finish"] = {"allowed": bool(check.get("filled")) or not check.get("empty"),
                            "done": state.stage_value(eng_dir, "intake") == "done",
                            "empty": check.get("empty") or {}}
+        else:
+            # The report the client reads ends with who read and released it.
+            from workflowsv2.audit_report import printable, signoff
+            # The run this session shows, which is the run that was released.
+            rec = signoff.load(e["session"].merged_dir)
+            if rec and d.get("html"):
+                d["html"] += printable.to_body(signoff.block_md(rec))
+                d["signoff"] = rec
         return d
 
     async def _turn(kind: str, name: str, text: str) -> None:
@@ -891,6 +899,10 @@ def make_site_app(access: Access, model: Optional[Path] = None,
             cur = state.current_run(eng_dir, state.current_intake(eng_dir))
             if not (cur and (cur / "report.md").is_file()):
                 raise HTTPException(status_code=400, detail="no report to release")
+            # Releasing is signing: the person's name, the statement and the
+            # report's hash are written beside the report before the stage moves.
+            from workflowsv2.audit_report import signoff
+            _act(signoff.sign, cur, email)
         state.set_stage(eng_dir, body.stage, body.value, email)
         if body.stage == "release":
             mail.send(state.client_emails(eng_dir), f"Tuuyi: the report for {name} is ready",
