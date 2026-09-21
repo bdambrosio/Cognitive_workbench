@@ -167,3 +167,40 @@ def test_a_claim_listed_and_not_tested_is_returned_as_such(tmp_path):
     assert out["status"] == "error" and "give `source`" in out["text"]
     # A tier 1 claim on a surface is not among the claims not tested.
     assert rec.invoke({"ids": [3], "source": "CLI.md"})["status"] == "error"
+
+
+def test_a_listed_claim_tested_after_delivery_shows_the_result_only_once_approved(tmp_path):
+    eng = tmp_path / "eng"
+    target = eng / "target"; target.mkdir(parents=True)
+    (target / "cli.rs").write_text("fn main() {}\nfn load_config() {}\n")
+    merged_dir = eng / "merged" / "run"; merged_dir.mkdir(parents=True)
+    (eng / "surface").mkdir()
+    (eng / "surface" / "cli_md.surface.json").write_text(json.dumps({
+        "claim_source": "CLI.md", "claims": [
+            {"id": 1, "quote": "q", "lines": [3, 3], "statement": "a detail", "about": "target",
+             "tier": 2, "tier_basis": "Cheap to correct."}]}))
+
+    def supplement(name, **over):
+        d = eng / "supplements" / name; d.mkdir(parents=True)
+        (d / "supplement.json").write_text(json.dumps({
+            "claim_source": "CLI.md", "claim": {"id": 1}, "delivered_run": "run", "at": "2026-09-21T21-02-30Z",
+            "error": None, "approved": {"by": "Bruce", "at": "2026-09-22T00-00-00Z"},
+            "finding": {"claim_id": 1, "adjudication": {"verdict": "real"}, "evidence": [
+                {"form": "citation", "document": "cli.rs", "lines": [2, 2], "quote": "fn load_config() {}",
+                 "shows": "The CLI loads a config file."}]},
+            "review": {"holds": False, "adverse_observations": ["verdict_calibration"], "standing": "not retested"},
+            **over}))
+
+    supplement("a_not_approved", approved=None)
+    supplement("b_other_run", delivered_run="an earlier run")
+    supplement("c_failed", error="the review exited 1")
+    text = record.ClaimRecord(_merged(), merged_dir, target).invoke({"ids": [1], "source": "CLI.md"})["text"]
+    assert "Tested after delivery" not in text and "no finding" in text
+
+    supplement("d_approved")
+    text = record.ClaimRecord(_merged(), merged_dir, target).invoke({"ids": [1], "source": "CLI.md"})["text"]
+    assert "listed, not tested (tier 2)" in text and "The review did not test this claim" in text   # still true of the review
+    assert "Tested after delivery, on 2026-09-21, by the practice. Not part of the delivered report" in text
+    assert "verdict: real" in text and "check: does not hold (observations: verdict_calibration); retest: not retested" in text
+    assert "citation cli.rs:2-2" in text and "the quote is at cli.rs:2-2" in text             # resolved against the materials now
+

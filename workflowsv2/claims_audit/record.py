@@ -159,6 +159,13 @@ class ClaimRecord:
             key = (str(c.get("claim_source")), int(c.get("id")))
             if key not in self.findings:
                 self.not_tested[key] = c
+        # A listed claim the practice tested after delivery (supplement.py):
+        # only a result a person approved, and only one made for this run.
+        from workflowsv2.claims_audit.supplement import records
+        self.supplements: Dict[Key, Dict[str, Any]] = {}
+        for rec in records(merged_dir.resolve().parents[1]):
+            if rec.get("approved") and not rec.get("error") and rec.get("delivered_run") == merged_dir.resolve().name:
+                self.supplements[(str(rec["claim_source"]), int(rec["claim"]["id"]))] = rec
         self.sources = sorted({k[0] for k in self.findings} | {k[0] for k in self.not_tested})
 
     # -- one citation, against the materials now ---------------------------
@@ -223,7 +230,50 @@ class ClaimRecord:
                    "evidence, no check and no rating for it.")
         refs = self.report.get(key) or []
         out.append("  in report.md: " + ("; ".join(refs) if refs else "not named"))
+        rec = self.supplements.get(key)
+        if rec:
+            adj = (rec.get("finding") or {}).get("adjudication") or {}
+            rev = rec.get("review") or {}
+            obs = rev.get("adverse_observations") or []
+            out.append(f"  Tested after delivery, on {str(rec.get('at'))[:10]}, by the practice. Not part of "
+                       f"the delivered report, and not rated for materiality.")
+            out.append(f"    verdict: {adj.get('verdict')}")
+            if adj.get("gap"):
+                out.append("    gap:\n" + _indent(adj.get("gap"), "      "))
+            if adj.get("unresolved_because"):
+                out.append(f"    unresolved because: {adj.get('unresolved_because')}")
+            out.append("    check: " + ("holds" if rev.get("holds") else "does not hold")
+                       + (f" (observations: {', '.join(map(str, obs))})" if obs else "")
+                       + (f"; retest: {rev.get('standing')}" if rev.get("standing") else ""))
+            out += ["  " + ln for ln in self._evidence_lines((rec.get("finding") or {}).get("evidence") or [])]
         return "\n".join(out)
+
+    def _evidence_lines(self, ev: List[Dict[str, Any]]) -> List[str]:
+        """A finding's evidence items as the record's text, each citation
+        with what the materials hold at its lines now."""
+        out = [f"  evidence ({len(ev)} items):"]
+        for i, e in enumerate(ev, 1):
+            form = e.get("form")
+            if form == "citation":
+                ln = e.get("lines")
+                rng = f"{ln[0]}-{ln[1]}" if isinstance(ln, list) and len(ln) == 2 else repr(ln)
+                out.append(f"    {i}. citation {e.get('document')}:{rng}")
+                out.append("      quote:\n" + _indent(e.get("quote"), "        "))
+                if e.get("shows"):
+                    out.append(f"      shows: {e.get('shows')}")
+                out.append("      " + self.citation_now(e))
+            elif form == "search":
+                out.append(f"    {i}. search ({e.get('kind')})")
+                out.append(f"      performed: {e.get('performed')}")
+                out.append(f"      result: {e.get('result')}")
+                if e.get("candidates"):
+                    out.append("      candidates: " + ", ".join(map(str, e["candidates"])))
+            else:
+                out.append(f"    {i}. {form or 'derived'}")
+                for k in ("derivation", "consequence"):
+                    if e.get(k):
+                        out.append(f"      {k}: {e.get(k)}")
+        return out
 
     def text(self, key: Key) -> str:
         if key in self.not_tested:
@@ -258,29 +308,7 @@ class ClaimRecord:
         if f.get("citation_problems"):
             out.append("  citation problems recorded at delivery:\n"
                        + _indent("\n".join(map(str, f["citation_problems"])), "    "))
-        ev = f.get("evidence") or []
-        out.append(f"  evidence ({len(ev)} items):")
-        for i, e in enumerate(ev, 1):
-            form = e.get("form")
-            if form == "citation":
-                ln = e.get("lines")
-                rng = f"{ln[0]}-{ln[1]}" if isinstance(ln, list) and len(ln) == 2 else repr(ln)
-                out.append(f"    {i}. citation {e.get('document')}:{rng}")
-                out.append("      quote:\n" + _indent(e.get("quote"), "        "))
-                if e.get("shows"):
-                    out.append(f"      shows: {e.get('shows')}")
-                out.append("      " + self.citation_now(e))
-            elif form == "search":
-                out.append(f"    {i}. search ({e.get('kind')})")
-                out.append(f"      performed: {e.get('performed')}")
-                out.append(f"      result: {e.get('result')}")
-                if e.get("candidates"):
-                    out.append("      candidates: " + ", ".join(map(str, e["candidates"])))
-            else:
-                out.append(f"    {i}. {form or 'derived'}")
-                for k in ("derivation", "consequence"):
-                    if e.get(k):
-                        out.append(f"      {k}: {e.get(k)}")
+        out += self._evidence_lines(f.get("evidence") or [])
         r = self.ratings.get(key)
         if r:
             kind = "materiality" if "materiality" in r else "exposure"

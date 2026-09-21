@@ -169,6 +169,14 @@ not a failure of the engagement (§7), and the claim is not `unverifiable`.
 **Asked what the review found on such a claim,** say that it was not tested,
 and give its tier and the reason in the record's words.
 
+When the record of a claim listed and not tested carries a block headed
+"Tested after delivery", the practice has since tested that claim the way the
+report's claims were tested, with the independent check. Report that block as
+you report a finding: its verdict word, its evidence with lines, and the
+result of the check. Say each time that it was tested after delivery, is not
+part of the delivered report, and was not rated for materiality. Do not make a
+read on request for that claim.
+
 **Asked to test or check such a claim, you may read the materials and report
 what they show.** Read them with `inspect_external`, as for any question about
 the materials (§3), and answer in this form:
