@@ -9,28 +9,40 @@ test. The practice runs it, after delivery, when a client asks for it.
 then the review runner on that audit, both unchanged and with the arguments
 the chain job gives them, and writes what they found as a record:
 
-    <engagement>/supplements/<stamp>_<claim source>_<N>/
+    <stamp>_<claim source>_<N>/
         surface.json      the one claim (and its parent, when it has one)
         run.log           the two runners' output
         supplement.json   the record
         supplement.md     the record, for a person to read
+        audit_run/        the audit's run directory, with the review inside it
 
-The audit run itself lands in <engagement>/runs/ like any other. Nothing is
-written under <engagement>/merged/, so the delivered run stays the current
-run and the delivered report does not change. There is no materiality rating.
+UNTIL IT IS APPROVED THE RESULT IS KEPT OUTSIDE THE ENGAGEMENT'S DIRECTORY, in
+workflowsv2/claims_audit/supplements_pending/<engagement>/. The post-delivery
+agent's `inspect` reaches the whole engagement directory, and it reads what it
+finds there to a client: on 2026-09-21 it reported an unapproved result, and
+quoted the line saying the result was not approved. The audit runner writes
+its run into <engagement>/runs/, so the run is moved out as soon as the audit
+ends and the review is run on it where it then is. `approve` moves the record
+to <engagement>/supplements/ and the audit run to <engagement>/runs/.
+
+Nothing is written under <engagement>/merged/, so the delivered run stays the
+current run and the delivered report does not change. There is no materiality
+rating.
 
 The model is the one the delivered audit of that claim source ran on, so the
 result can be set beside the report's; `--model` names another, and the
 record says so. No temperature is passed: it resolves per model, as in the
 chain (src/chat/model_params.py).
 
-`approve` records who read the result and when. A supplement that is not
-approved is never shown to a client (record.py reads only approved ones).
+`approve` records who read the result and when, and releases it as above.
+record.py shows a client only a result that is in the engagement's directory
+and approved.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -48,6 +60,14 @@ from utils.file_utils import atomic_write_text, read_jsonl               # noqa:
 
 SUPPLEMENTS = "supplements"
 RECORD = "supplement.json"
+AUDIT_RUN = "audit_run"
+
+
+def pending_dir(eng_dir: Path) -> Path:
+    """Where an engagement's results wait for approval: beside the
+    engagements directory, so neither an engagement's `inspect` nor the list
+    of engagements reaches it."""
+    return state.ENGAGEMENTS.parent / "supplements_pending" / eng_dir.name
 
 
 class Refused(Exception):
@@ -62,13 +82,19 @@ def _write(path: Path, obj: Any) -> None:
     atomic_write_text(path, json.dumps(obj, indent=1, ensure_ascii=False) + "\n")
 
 
+def _records(parent: Path) -> List[Dict[str, Any]]:
+    return [{**_read(f), "dir": f.parent.name} for f in sorted(parent.glob(f"*/{RECORD}"))]
+
+
 def records(eng_dir: Path) -> List[Dict[str, Any]]:
-    """Every supplement record of the engagement, oldest first, each with
-    `dir`, the name of its directory."""
-    out = []
-    for f in sorted((eng_dir / SUPPLEMENTS).glob(f"*/{RECORD}")):
-        out.append({**_read(f), "dir": f.parent.name})
-    return out
+    """The released supplement records of the engagement, oldest first, each
+    with `dir`, the name of its directory."""
+    return _records(eng_dir / SUPPLEMENTS)
+
+
+def pending(eng_dir: Path) -> List[Dict[str, Any]]:
+    """The records waiting for approval, and those of tests that failed."""
+    return _records(pending_dir(eng_dir))
 
 
 def delivered_run(eng_dir: Path) -> Path:
@@ -189,7 +215,7 @@ def markdown(rec: Dict[str, Any]) -> str:
     rows += ["", f"Audit run: `{rec.get('audit_run')}`", "",
              "Not rated for materiality. The delivered report is unchanged. "
              + (f"Approved by {rec['approved']['by']} on {rec['approved']['at']}." if rec.get("approved")
-                else "NOT APPROVED: not shown to the client until `supplement.py approve`.")]
+                else "NOT APPROVED: kept outside the engagement's directory until `supplement.py approve`.")]
     return "\n".join(rows) + "\n"
 
 
@@ -199,10 +225,11 @@ def run(eng_dir: Path, claim_source: str, cid: int, by: str, model: Optional[str
     if job:
         raise Refused(f"a {job.get('kind')} job is running for this engagement; wait for it to end")
     merged = delivered_run(eng_dir)
-    for rec in records(eng_dir):
+    for rec in records(eng_dir) + pending(eng_dir):
         if (rec["claim_source"], rec["claim"]["id"], rec["delivered_run"]) == (claim_source, cid, merged.name) \
                 and not rec.get("error"):
-            raise Refused(f"this claim was already tested after delivery: {SUPPLEMENTS}/{rec['dir']}")
+            raise Refused(f"this claim was already tested after delivery: {rec['dir']} "
+                          f"({'released' if rec.get('approved') else 'waiting for approval'})")
     frozen = jobs.surface_file(eng_dir, claim_source)
     if not frozen.is_file():
         raise Refused(f"no frozen surface for {claim_source!r}")
@@ -213,7 +240,7 @@ def run(eng_dir: Path, claim_source: str, cid: int, by: str, model: Optional[str
     model = model or own
 
     ts = state.stamp()
-    out = eng_dir / SUPPLEMENTS / f"{ts}_{jobs.slug(claim_source)}_{cid}"
+    out = pending_dir(eng_dir) / f"{ts}_{jobs.slug(claim_source)}_{cid}"
     out.mkdir(parents=True)
     _write(out / "surface.json", one)
     world = f"supp_{eng_dir.name}_{jobs.slug(claim_source)}_{cid}_{ts}"
@@ -226,10 +253,15 @@ def run(eng_dir: Path, claim_source: str, cid: int, by: str, model: Optional[str
     log = out / "run.log"
     code = _step(audit_command(eng_dir.name, claim_source, out / "surface.json", model, world), log)
     run_dir = jobs._newest(eng_dir / "runs", world)
+    if run_dir is not None:
+        # Out of the engagement's directory before anything else is done with
+        # it, whether or not the audit finished.
+        rec["audit_run_name"] = run_dir.name
+        run_dir = Path(shutil.move(str(run_dir), str(out / AUDIT_RUN)))
+        rec["audit_run"] = str(run_dir)
     if code != 0 or run_dir is None:
         rec["error"] = f"the audit exited {code}" if code else "the audit left no run directory"
     else:
-        rec["audit_run"] = str(run_dir)
         code = _step(review_command(run_dir, model, world), log)
         if code != 0:
             rec["error"] = f"the review exited {code}"
@@ -242,15 +274,27 @@ def run(eng_dir: Path, claim_source: str, cid: int, by: str, model: Optional[str
 
 
 def approve(eng_dir: Path, name: str, by: str) -> Dict[str, Any]:
-    f = eng_dir / SUPPLEMENTS / name / RECORD
-    if not f.is_file():
-        raise Refused(f"no supplement {name!r} in this engagement")
-    rec = _read(f)
+    """Record the approval and release the result into the engagement's
+    directory: the audit run to runs/, the record to supplements/."""
+    src = pending_dir(eng_dir) / name
+    if not (src / RECORD).is_file():
+        if (eng_dir / SUPPLEMENTS / name / RECORD).is_file():
+            raise Refused(f"{name} is already approved")
+        raise Refused(f"no supplement {name!r} waiting for approval in this engagement")
+    rec = _read(src / RECORD)
     if rec.get("error") or not rec.get("finding") or not rec.get("review"):
         raise Refused("this test did not finish with a finding and a check; it cannot be approved")
+    home = eng_dir / "runs" / rec["audit_run_name"]
+    if home.exists():
+        raise Refused(f"{home} exists; the audit run cannot be put back")
     rec["approved"] = {"by": by, "at": state.stamp()}
-    _write(f, rec)
-    atomic_write_text(f.parent / "supplement.md", markdown(rec))
+    rec["audit_run"] = str(home)
+    _write(src / RECORD, rec)
+    atomic_write_text(src / "supplement.md", markdown(rec))
+    home.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(src / AUDIT_RUN), str(home))
+    (eng_dir / SUPPLEMENTS).mkdir(exist_ok=True)
+    shutil.move(str(src), str(eng_dir / SUPPLEMENTS / name))
     return rec
 
 
@@ -269,10 +313,11 @@ def main() -> int:
         raise SystemExit(f"no engagement {args.engagement!r}")
     try:
         if args.what == "list":
-            for rec in records(eng_dir):
+            for rec in records(eng_dir) + pending(eng_dir):
                 v = ((rec.get("finding") or {}).get("adjudication") or {}).get("verdict")
-                print(f"{rec['dir']}  {rec['claim_source']} #{rec['claim']['id']}  "
-                      f"{rec.get('error') or v}  {'approved' if rec.get('approved') else 'not approved'}")
+                print(f"{rec['dir']}  {rec['claim_source']} #{rec['claim']['id']}  {rec.get('error') or v}  "
+                      + (f"approved by {rec['approved']['by']}" if rec.get("approved")
+                         else f"waiting for approval in {pending_dir(eng_dir)}"))
             return 0
         if not args.by:
             raise SystemExit("--by is needed: the record says who ran or approved the test")

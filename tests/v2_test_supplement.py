@@ -35,7 +35,7 @@ def _json(path: Path, obj) -> None:
 @pytest.fixture
 def eng(tmp_path, monkeypatch):
     """An engagement with a delivered run, a frozen surface and no job."""
-    d = tmp_path / "e1"
+    d = tmp_path / "engagements" / "e1"
     delivered_audit = d / "runs" / "2026-09-01T00-00-00Z_audit_e1_docs_cli_md_T"
     _json(delivered_audit / "run_meta.json", {"model_config": "measure/models/the_engagements.yaml"})
     merged = d / "merged" / "2026-09-01T01-00-00Z_chain_T"
@@ -43,16 +43,18 @@ def eng(tmp_path, monkeypatch):
     (merged / "report.md").write_text("# report\n")
     _json(d / "surface" / "docs_cli_md.surface.json", {"claim_source": SRC, "claims": CLAIMS})
     _json(d / "state.json", {})
-    monkeypatch.setattr(state, "ENGAGEMENTS", tmp_path)
+    monkeypatch.setattr(state, "ENGAGEMENTS", tmp_path / "engagements")
     return d
 
 
-def _fake_runners(monkeypatch, eng, calls, audit_exit=0, review_exit=0, verdict="real", holds=True):
+def _fake_runners(monkeypatch, eng, calls, audit_exit=0, review_exit=0, verdict="real", holds=True, partial=False):
     """`_step` replaced: records each command and writes what the real
     runner would leave behind."""
     def step(argv, log):
         calls.append(argv)
         if "workflowsv2/claims_audit/runner.py" in argv[1]:
+            if partial:                                   # an audit that died after making its run directory
+                (eng / "runs" / f"2026-09-21T00-00-00Z_{argv[argv.index('--world') + 1]}").mkdir()
             if audit_exit == 0:
                 world = argv[argv.index("--world") + 1]
                 run = eng / "runs" / f"2026-09-21T00-00-00Z_{world}"
@@ -104,7 +106,8 @@ def test_run_asks_the_two_runners_as_the_chain_does_and_records_what_they_found(
     assert world.startswith("supp_e1_docs_cli_md_2_")
     assert audit[2:] == ["--engagement", "e1", "--world", world, "--claim-source", SRC,
                          "--surface", str(out / "surface.json"), "--model", "measure/models/the_engagements.yaml"]
-    assert review[2:] == ["--run", str(eng / "runs" / f"2026-09-21T00-00-00Z_{world}"),
+    assert out.parent == eng.parents[1] / "supplements_pending" / "e1"   # not in the engagement's directory
+    assert review[2:] == ["--run", str(out / "audit_run"),                # the review runs on the run where it was moved to
                           "--model", "measure/models/the_engagements.yaml", "--world", f"review_{world}"]
     assert "--temperature" not in audit + review                      # temperature resolves per model, never here
 
@@ -120,6 +123,11 @@ def test_run_asks_the_two_runners_as_the_chain_does_and_records_what_they_found(
 
     assert state.current_run(eng, None) == before                     # the delivered run is still the current run
     assert sorted(p.name for p in (eng / "merged").iterdir()) == [before.name]
+    # until it is approved, nothing of the test is inside the engagement's directory
+    assert not (eng / "supplements").exists() and supplement.records(eng) == []
+    assert [p.name for p in (eng / "runs").iterdir()] == ["2026-09-01T00-00-00Z_audit_e1_docs_cli_md_T"]
+    assert rec["audit_run"] == str(out / "audit_run") and (out / "audit_run" / "review" / "outcomes.json").is_file()
+    assert [r["dir"] for r in supplement.pending(eng)] == [out.name]
 
 
 def test_what_is_refused(eng, monkeypatch):
@@ -157,9 +165,11 @@ def test_a_failed_audit_is_recorded_the_review_is_not_run_and_the_test_can_be_ru
     assert len(calls) == 1 and rec["error"] == "the audit exited 3" and rec["audit_run"] is None
     with pytest.raises(supplement.Refused, match="did not finish"):
         supplement.approve(eng, out.name, by="Bruce")
-    _fake_runners(monkeypatch, eng, calls)
+    _fake_runners(monkeypatch, eng, calls, audit_exit=1, partial=True)
     monkeypatch.setattr(state, "stamp", lambda: "2026-09-22T00-00-00Z")          # a second directory
-    assert supplement.run(eng, SRC, 2, by="Bruce") != out                        # a failed test does not block another
+    died = supplement.run(eng, SRC, 2, by="Bruce")                               # a failed test does not block another
+    assert died != out and (died / "audit_run").is_dir()                         # its partial run is moved out too
+    assert [p.name for p in (eng / "runs").iterdir()] == ["2026-09-01T00-00-00Z_audit_e1_docs_cli_md_T"]
 
 
 def test_approve_records_who_and_when_and_a_check_that_does_not_hold_is_shown(eng, monkeypatch):
@@ -167,7 +177,17 @@ def test_approve_records_who_and_when_and_a_check_that_does_not_hold_is_shown(en
     out = supplement.run(eng, SRC, 2, by="Bruce")
     rec = supplement.approve(eng, out.name, by="Bruce D'Ambrosio")
     assert rec["approved"]["by"] == "Bruce D'Ambrosio" and rec["approved"]["at"]
-    text = (out / "supplement.md").read_text()
+    # approval releases it: the record to supplements/, the audit run to runs/ under its own name
+    released = eng / "supplements" / out.name
+    assert not out.exists() and supplement.pending(eng) == []
+    assert rec["audit_run"] == str(eng / "runs" / rec["audit_run_name"])
+    assert (Path(rec["audit_run"]) / "review" / "outcomes.json").is_file() and not (released / "audit_run").exists()
+    assert json.loads((released / "supplement.json").read_text())["audit_run"] == rec["audit_run"]
+    with pytest.raises(supplement.Refused, match="already approved"):
+        supplement.approve(eng, out.name, by="Bruce")
+    with pytest.raises(supplement.Refused, match="already tested after delivery.*released"):
+        supplement.run(eng, SRC, 2, by="Bruce")
+    text = (released / "supplement.md").read_text()
     assert "does not hold (evidence_supports); retest: control" in text and "Approved by Bruce D'Ambrosio" in text
     run_dir = Path(rec["audit_run"])
     (run_dir / "review" / "outcomes.json").write_text(json.dumps({

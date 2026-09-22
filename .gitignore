@@ -146,6 +146,7 @@ scratch/
 targets/
 workflowsv2/claims_audit/engagements/*/merged/
 workflowsv2/claims_audit/engagements/*/supplements/
+workflowsv2/claims_audit/supplements_pending/
 
 # An engagement's materials and the client's uploads live in its directory and are never committed
 workflowsv2/claims_audit/engagements/*/target/
