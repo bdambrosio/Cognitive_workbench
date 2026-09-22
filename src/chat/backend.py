@@ -440,9 +440,16 @@ class _ChatBackend:
         for _ in range(self._PARAM_ADAPT_MAX):
             if resp.ok or resp.status_code != 400:
                 return resp
+            # Same rule as the retry-after lookup above: read a link only
+            # when it is a dict. xAI sends "error" as a string, and
+            # err.get on it raised AttributeError where the 400 itself
+            # should have reached the caller (2026-09-22).
             try:
-                err = (resp.json() or {}).get('error') or {}
+                payload = resp.json()
             except ValueError:
+                return resp
+            err = payload.get('error') if isinstance(payload, dict) else None
+            if not isinstance(err, dict):
                 return resp
             # unsupported_parameter: the field itself is rejected — rename it
             # if we know an equivalent, else drop it.
