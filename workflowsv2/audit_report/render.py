@@ -62,8 +62,13 @@ def load(merged_dir: Path) -> Dict[str, Any]:
     merged_dir = Path(merged_dir)
     merged = json.loads((merged_dir / "merged.json").read_text(encoding="utf-8"))
     ratings = json.loads((merged_dir / "materiality.json").read_text(encoding="utf-8"))
+    from workflowsv2.composition import scan as composition
     return {"merged": merged, "ratings": ratings, "dir": merged_dir,
-            "covered": covered_by(merged_dir), "not_tested": not_tested(merged_dir)}
+            "covered": covered_by(merged_dir), "not_tested": not_tested(merged_dir),
+            # None unless the engagement enables composition analysis and has
+            # a scan (<engagement>/composition/); the merged directory sits
+            # at <engagement>/merged/<name>.
+            "composition": composition.latest(merged_dir.resolve().parents[1])}
 
 
 def not_tested(merged_dir: Path) -> List[Dict[str, Any]]:
@@ -688,6 +693,9 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
             out.append(f"| {c.get('claim_source')} | {c.get('id')} | "
                        f"{_lines_bare(c.get('lines'))} | {_md_safe(c.get('quote'))[:120]} | "
                        f"{c.get('tier')} | {_md_safe(c.get('tier_basis'))} |")
+    if record.get("composition"):
+        from workflowsv2.composition import appendix
+        out += [""] + appendix.render(record["composition"])
     return "\n".join(out).rstrip() + "\n"
 
 

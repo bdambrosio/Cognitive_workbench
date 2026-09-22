@@ -186,6 +186,12 @@ class Chain:
         return len(split_by_tier(doc.get("claims") or [])[0])
 
     def steps(self) -> "Iterator[Step]":                       # noqa: F821
+        from workflowsv2.composition import scan as composition
+        if composition.enabled(self.eng_dir):
+            # An optional, extra-cost part of the engagement: the components
+            # the dependency files declare, shown as a report appendix.
+            yield ("scan the components", _py(
+                "workflowsv2/composition/scan.py", "--engagement", self.eng_dir.name))
         for src in self.sources:
             if not self.tested(src):
                 # Every claim of this source was rated tier 2 or 3. An audit

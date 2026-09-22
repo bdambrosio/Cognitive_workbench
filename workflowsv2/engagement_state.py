@@ -258,12 +258,14 @@ def evidence_excludes(eng_dir: Path) -> List[str]:
 #: a yaml dump of demo-chhoto's file on 2026-09-05 dropped the practice's
 #: notes and reformatted the transaction block.
 SETTABLE = ("claim_sources", "client_emails", "seller_emails", "target", "retention",
-            "evidence_excludes")
+            "evidence_excludes", "composition")
 
 
 def _render_key(key: str, value: Any) -> str:
     if isinstance(value, list):
         return f"{key}:" + ("".join(f"\n  - {v}" for v in value) if value else " []") + "\n"
+    if isinstance(value, bool):
+        return f"{key}: {'true' if value else 'false'}\n"
     return f"{key}: {value}\n"
 
 
@@ -313,6 +315,8 @@ def update_engagement(eng_dir: Path, **fields: Any) -> Dict[str, Any]:
             continue
         if k in ("claim_sources", "client_emails", "seller_emails", "evidence_excludes"):
             v = [str(x).strip() for x in v if str(x).strip()]
+        elif isinstance(v, bool):
+            pass
         else:
             v = str(v).strip()
         text = _replace_key(text, k, _render_key(k, v))

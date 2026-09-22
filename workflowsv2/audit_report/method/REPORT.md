@@ -70,7 +70,7 @@ Seven, each one field of the output. The document is assembled in this order, an
 8. **`not_examined_note`** — one to three sentences before the unexamined claims: that the searches named files nobody opened, that these claims are the first thing a further pass would settle, and that they are ordered by exposure. Empty when the document has no such claims.
 9. The claims that hold, the questions for the seller, the unclaimed observations, and the coverage figures, copied or computed.
 10. **`limitations`** — one paragraph. What this document is not: not a penetration test, not a code-quality review, not legal advice, not a judgement on claims it did not resolve. The facts about scope come from the document itself; add nothing it does not state. The client's process adds the inherent limitations it states in every report.
-11. The appendix of every tested claim and its verdict, and the appendix of claims listed and not tested, computed.
+11. The appendix of every tested claim and its verdict, and the appendix of claims listed and not tested, computed. When the engagement included composition analysis, a third appendix follows: the components the target's dependency files declare, with their declared licences and a count of known vulnerabilities matched by version, computed from a scan and not reviewed.
 
 ## 7. The output
 

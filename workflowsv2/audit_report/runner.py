@@ -239,6 +239,7 @@ def main() -> int:
         "model_config": str(args.model) if args.model else None,
         "resolved_model": loop.backend.resolved_model(),
         "classes": {k: len(v) for k, v in classes.items()},
+        "composition_scan": (record.get("composition") or {}).get("dir"),
         "call": {k: v for k, v in call.items() if k not in ("raw", "obj")},
         "prose_check": check, "wall_clock_s": wall, "error": error,
         "transient_events": getattr(loop, "transient_events", None),
