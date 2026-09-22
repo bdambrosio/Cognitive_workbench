@@ -52,6 +52,9 @@ MODEL_TEMPERATURE: Dict[str, float] = {
     "gpt-5.6-luna": 0.2,
     "gpt-5.6-terra": 0.1,      # the pinned grader; NOT exempt from TOP_P
     "grok-4.6": 0.5,           # xAI publishes no agentic recommendation
+    # grok-4.7 (released 2026-09-21). xAI's model page publishes no
+    # temperature, as for 4.6; Bruce chose 0.5 on 2026-09-22, the 4.6 value.
+    "grok-4.7": 0.5,
     # Local.
     #
     # NARROWED 2026-08-26 from the bare `Qwen3.8`. That key matched every

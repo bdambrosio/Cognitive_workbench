@@ -35,6 +35,7 @@ numbers are trusted.**
 | `gpt-5.6-luna` | 0.2 | Bruce, 2026-08-24 |
 | `gpt-5.6-terra` (grader) | 0.1 | Bruce, 2026-08-24 — kept from the prior hardcoded value |
 | `grok-4.6` | 0.5 | Bruce, 2026-08-24. **xAI publishes no recommendation** — checked the model page and the 4.6 docs page; the "0.7/0.95" seen in search results is third-party example code, not xAI guidance |
+| `grok-4.7` | 0.5 | Bruce, 2026-09-22, the grok-4.6 value. **xAI publishes no recommendation**: checked the grok-4.7 model page on docs.x.ai the day after release |
 | `Qwen3.8-27B` (local) | 0.25 | Bruce, 2026-08-24. Key **narrowed** from the bare `Qwen3.8` on 2026-08-26: that spelling also matched `qwen3.8-flash` and `qwen3.8-max`, handing each a temperature nobody chose |
 | `gemma-4-31B` | 0.25 | Bruce, 2026-08-24 |
 | `DeepSeek-V4-Flash` | 1.0 | publisher, for agentic scenarios |

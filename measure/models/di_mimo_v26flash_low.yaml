@@ -1,0 +1,27 @@
+# Xiaomi MiMo-V2.6-Flash served by DeepInfra directly, added 2026-09-22
+# (the model's release day).
+#
+# Prescreened 2026-09-22 with the real payload (measure/prescreen.py probe,
+# direct URL): schema-valid 15/15 across low, none-sent and medium; 68-304
+# completion tokens in 0.5-2.3 s at 105-158 tok/s. reasoning_effort had no
+# visible effect on this route (the three settings overlap). A required
+# field the prompt never mentioned appeared 4/4 under additionalProperties
+# false, so the schema is enforced here. Fireworks does not serve the model;
+# OpenRouter's one endpoint (Xiaomi first party) was 14-18 s a call; Xiaomi's
+# own API takes no json_schema.
+#
+# EFFORT `low`, Bruce's choice 2026-09-22 for the full chhoto run, after the
+# medium run stopped on a 300 s read timeout in a behaviour-split call.
+#
+# QUANTIZATION fp8, declared by DeepInfra's model listing.
+#
+# TEMPERATURE resolves through src/chat/model_params.py ("mimo-v2.6-flash"
+# -> 1.0, the publisher's value; Bruce confirmed 2026-09-22).
+llm_config:
+  server: local
+  model: "XiaomiMiMo/MiMo-V2.6-Flash"
+  vllm_url: https://api.deepinfra.com
+  # NAME of the env var holding the bearer token, not the token.
+  api_key: DEEPINFRA
+  is_reasoning_model: true
+  reasoning_effort: low

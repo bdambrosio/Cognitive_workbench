@@ -1,0 +1,19 @@
+# grok-4.7 on xAI, direct, added 2026-09-22 (released 2026-09-21).
+#
+# Prescreened 2026-09-22 with the real payload (measure/prescreen.py probe,
+# direct URL): schema-valid 6/6 at low and medium, 58-84 completion tokens
+# in 5.6-11.5 s. Effort levels on xAI: low, medium, high (default), xhigh.
+#
+# EFFORT `medium`. medium for the full chhoto comparison run; low for its
+# duplicates step, as the other models in that comparison.
+#
+# TEMPERATURE resolves through src/chat/model_params.py ("grok-4.7" -> 0.5;
+# xAI publishes none; Bruce chose 0.5 on 2026-09-22).
+llm_config:
+  server: local
+  model: "grok-4.7"
+  vllm_url: https://api.x.ai/v1
+  # NAME of the env var holding the bearer token, not the token.
+  api_key: XAI_API_KEY
+  is_reasoning_model: true
+  reasoning_effort: medium
