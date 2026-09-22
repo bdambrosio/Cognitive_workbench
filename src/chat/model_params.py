@@ -145,6 +145,12 @@ MODEL_TEMPERATURE: Dict[str, float] = {
     # operating point and needs its own conversation, not a silent reuse of
     # this number.
     "qwen3.8-flash-next": 1.0,
+    # Xiaomi MiMo-V2.6-Flash on DeepInfra (XiaomiMiMo/MiMo-V2.6-Flash, fp8).
+    # Xiaomi's hyperparameter page (read 2026-09-22, release day) gives
+    # temperature 1.0 and top_p 0.95, and says thinking mode forces both to
+    # those values whatever is sent. Bruce confirmed 2026-09-22. The key does
+    # not match the retired `mimo-v2.5`.
+    "mimo-v2.6-flash": 1.0,
 }
 
 # Retired deliberately, so a stale config naming one fails with a reason
