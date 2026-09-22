@@ -825,6 +825,15 @@ def main() -> int:
         raise SystemExit(f"{out}: already reviewed. A reviewer whose `inspect` "
                          f"can see a previous review is not independent of it.")
     out.mkdir(exist_ok=True)
+    # The review had no log file of its own; its progress went to stderr only.
+    fh = logging.FileHandler(out / "run.log", encoding="utf-8")
+    fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    logger.addHandler(fh)
+    # One line per model call into the same log, as the audit runner does,
+    # so a stage's calls and tokens can be counted from its own record.
+    _ul = logging.getLogger("chat.backend.usage")
+    _ul.setLevel(logging.INFO)
+    _ul.addHandler(fh)
 
     meta = json.loads((run / "run_meta.json").read_text())
     target = Path(meta.get("external_repo") or ".")

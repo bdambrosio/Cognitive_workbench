@@ -359,6 +359,11 @@ def main() -> int:
     fh = logging.FileHandler(out / "run.log", encoding="utf-8")
     fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     logger.addHandler(fh)
+    # One line per model call into the same log, as the audit runner does,
+    # so a stage's calls and tokens can be counted from its own record.
+    _ul = logging.getLogger("chat.backend.usage")
+    _ul.setLevel(logging.INFO)
+    _ul.addHandler(fh)
 
     # ---- part one: merge ----------------------------------------------------
     merged = merging.merge(args.run)
