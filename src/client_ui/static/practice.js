@@ -84,6 +84,7 @@
     h += btn("job:enumerate", "Run enumeration", v("materials") === "ready" && v("sorting") === "confirmed" && !job && v("surface") !== "frozen");
     h += btn("job:chain", "Run the review", v("surface") === "frozen" && !job && v("chain") !== "done");
     h += btn("stage:release:released", "Release to the client", v("chain") === "done" && e.report_exists && v("release") !== "released");
+    h += btn("sign::", "Sign the report", v("release") === "released" && e.report_exists && !e.signed);
     h += btn("stage:closed:closed", "Close the engagement", v("release") === "released" && v("closed") !== "closed");
     h += "</div>";
     h += '<div class="pages">';
@@ -157,11 +158,17 @@
     for (const b of document.querySelectorAll("#detail button[data-site]")) {
       b.addEventListener("click", async () => {
         const [what, a, val] = b.dataset.site.split(":");
-        const path = "api/engagements/" + encodeURIComponent(e.name) + (what === "job" ? "/jobs/" + a : "/stage");
+        const path = "api/engagements/" + encodeURIComponent(e.name) + (what === "job" ? "/jobs/" + a : what === "sign" ? "/sign" : "/stage");
         if (what === "job" && !confirm("Start the " + a + " job for " + e.name + "?")) return;
-        // Releasing is signing. The words are signoff.STATEMENT; the server records them with the report's hash.
-        if (what === "stage" && a === "release" && !confirm("Release the report for " + e.name + " to the client?\n\nReleasing signs it in your name:\n\n\"I have read this report, the ratings marked borderline, the citations the check flagged and the findings the independent check questioned. I release it to the client and answer for it on behalf of the practice.\"")) return;
-        const j = await api(path, what === "job" ? {} : {stage: a, value: val});
+        if (what === "stage" && a === "release" && !confirm("Release the report for " + e.name + " to the client? Who released it, and the report's hash, are recorded. Releasing does not sign it.")) return;
+        let body = what === "job" ? {} : {stage: a, value: val};
+        if (what === "sign") {
+          // The attestation is signoff.ATTESTATION, the text of the About page; the server records it with the report's hash.
+          const name = prompt("Sign the report for " + e.name + " in your own name. The signature carries the attestation of the About page (\"I have read every finding and the record behind it...\") and is shown to the client at the end of the report.\n\nSign as:", "");
+          if (!name || !name.trim()) return;
+          body = {name: name.trim()};
+        }
+        const j = await api(path, body);
         if (j) { data = j.engagements || j; render(); }
       });
     }

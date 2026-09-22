@@ -1,21 +1,23 @@
-"""The record that a person read a report and released it.
+"""Two records a person makes about a report, kept beside it.
 
-The site says a person confirms and signs every report. Until 2026-09-20 the
-only trace of that was the `release` stage mark in state.json, which names no
-report: the practice's own claims review of its site found the statement
-contradicted, because nothing in the delivered report or beside it said who
-stood behind it.
+**Release** is the practice making the report visible to the client. It is
+the default step of every engagement. `release` writes `release.json`: who
+released the report, when, the SHA-256 of the `report.md` released, and how
+many worklist items of each severity stood open. Nothing is added to the
+report: a released report carries no statement.
 
-`sign` is called by the release step. It writes `signoff.json` beside the
-report: who released it, when, the statement they agreed to, the SHA-256 of
-the `report.md` they released, and how many worklist items of each severity
-stood open when they did. report.md is not changed: it is the text that was
-read, and the hash says which text. The printable report (report.html and
-report.pdf) is rendered again with the sign-off as its last section, and the
-client's report page shows the same block.
+**Signing** is separate, and is not part of the default engagement. It is the
+practice's expert reading the whole record and putting their name to the
+attestation the site's About page gives. `sign` writes `signature.json` with
+the signer's name, the attestation, the time and the report's hash, and
+renders the printable report (report.html and report.pdf) again with the
+signature as its last section; the client's report page shows the same
+block. report.md is not changed by either: it is the text that was read, and
+the hash says which text.
 
-The statement is what the site says the person does (how-it-works, "A person
-confirms and signs"). Releasing is signing: there is no separate step.
+Until 2026-09-21 releasing wrote a sign-off in the releaser's name. Bruce:
+signing is an extra step at extra cost, and means he personally reviewed the
+report; releasing means only that the practice let the client see it.
 """
 from __future__ import annotations
 
@@ -31,25 +33,37 @@ from workflowsv2 import issues
 
 logger = logging.getLogger("signoff")
 
-FILENAME = "signoff.json"
-STATEMENT = ("I have read this report, the ratings marked borderline, the citations the check "
-             "flagged and the findings the independent check questioned. I release it to the "
-             "client and answer for it on behalf of the practice.")
+RELEASE = "release.json"
+SIGNATURE = "signature.json"
+#: The attestation on the site's About page (site/about.html, "Attested due
+#: diligence"). The two are kept the same by hand.
+ATTESTATION = ("I have read every finding and the record behind it. Each finding cites evidence that "
+               "exists as quoted and supports its verdict. Every claim in the documents named at intake "
+               "was listed, every claim rated as bearing on the decision received a finding, and what the "
+               "materials could not settle is reported as unsettled, not as false. I do not attest to the "
+               "truth of unsettled claims, to the seller's conduct, to the target's value, or to anything "
+               "outside the materials supplied, and nothing here is legal advice.")
 
 
-def load(merged_dir: Path) -> Optional[Dict[str, Any]]:
-    p = Path(merged_dir) / FILENAME
+def _load(merged_dir: Path, name: str) -> Optional[Dict[str, Any]]:
+    p = Path(merged_dir) / name
     return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else None
 
 
+def load_release(merged_dir: Path) -> Optional[Dict[str, Any]]:
+    return _load(merged_dir, RELEASE)
+
+
+def load_signature(merged_dir: Path) -> Optional[Dict[str, Any]]:
+    return _load(merged_dir, SIGNATURE)
+
+
 def block_md(rec: Dict[str, Any]) -> str:
-    """The sign-off as the last section of the report a reader sees."""
-    open_items = ", ".join(f"{n} {sev}" for sev, n in (rec.get("worklist") or {}).items() if n) or "none"
-    return ("\n\n## Sign-off\n\n"
-            f"Read and released by {rec['by']} on {rec['at'][:10]}.\n\n"
-            f"> {rec['statement']}\n\n"
-            f"Worklist items open at release: {open_items}. "
-            f"The report released is the text whose SHA-256 is `{rec['report_sha256']}`.\n")
+    """The signature as the last section of the report a reader sees."""
+    return ("\n\n## Signature\n\n"
+            f"Signed by {rec['by']} on {rec['at'][:10]}.\n\n"
+            f"> {rec['attestation']}\n\n"
+            f"The report signed is the text whose SHA-256 is `{rec['report_sha256']}`.\n")
 
 
 def worklist_counts(merged_dir: Path) -> Dict[str, int]:
@@ -69,21 +83,36 @@ def worklist_counts(merged_dir: Path) -> Dict[str, int]:
     return counts
 
 
-def sign(merged_dir: Path, by: str) -> Dict[str, Any]:
-    """Write the sign-off for the report in `merged_dir` and render the
-    printable report with it. Raises SystemExit when there is no report or no
-    named person: an unsigned release is what this exists to prevent."""
-    merged_dir = Path(merged_dir)
-    report = merged_dir / "report.md"
+def _report_text(merged_dir: Path, what: str, by: str) -> str:
+    report = Path(merged_dir) / "report.md"
     if not report.is_file():
-        raise SystemExit(f"{merged_dir.name} has no report.md to sign")
+        raise SystemExit(f"{Path(merged_dir).name} has no report.md to {what}")
     if not (by or "").strip():
-        raise SystemExit("a sign-off needs the person's name or address")
-    text = report.read_text(encoding="utf-8")
-    counts = worklist_counts(merged_dir)
-    rec = {"by": by.strip(), "at": state.stamp(), "run": merged_dir.name, "statement": STATEMENT,
-           "report_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(), "worklist": counts}
-    atomic_write_text(merged_dir / FILENAME, json.dumps(rec, indent=1, ensure_ascii=False) + "\n")
+        raise SystemExit(f"a {what} needs the person's name or address")
+    return report.read_text(encoding="utf-8")
+
+
+def release(merged_dir: Path, by: str) -> Dict[str, Any]:
+    """Record that `by` released the report in `merged_dir` to the client.
+    Raises SystemExit when there is no report or no named person."""
+    merged_dir = Path(merged_dir)
+    text = _report_text(merged_dir, "release", by)
+    rec = {"by": by.strip(), "at": state.stamp(), "run": merged_dir.name,
+           "report_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+           "worklist": worklist_counts(merged_dir)}
+    atomic_write_text(merged_dir / RELEASE, json.dumps(rec, indent=1, ensure_ascii=False) + "\n")
+    return rec
+
+
+def sign(merged_dir: Path, by: str) -> Dict[str, Any]:
+    """Record that `by` signed the attestation for the report in `merged_dir`,
+    and render the printable report with the signature. Raises SystemExit
+    when there is no report or no named person."""
+    merged_dir = Path(merged_dir)
+    text = _report_text(merged_dir, "signature", by)
+    rec = {"by": by.strip(), "at": state.stamp(), "run": merged_dir.name, "attestation": ATTESTATION,
+           "report_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
+    atomic_write_text(merged_dir / SIGNATURE, json.dumps(rec, indent=1, ensure_ascii=False) + "\n")
     try:
         from workflowsv2.audit_report import printable
         html = merged_dir / "report.html"
@@ -91,7 +120,7 @@ def sign(merged_dir: Path, by: str) -> Dict[str, Any]:
         printable.to_pdf(html)
     except Exception as e:                                     # noqa: BLE001
         # The record is written; the printable copy is a rendering of it.
-        logger.warning("sign-off recorded, but the printable report was not rendered again: %s", e)
+        logger.warning("signature recorded, but the printable report was not rendered again: %s", e)
         issues.note(merged_dir, "signoff", "printable_not_rendered",
-                    f"the printable report does not carry the sign-off: {e}")
+                    f"the printable report does not carry the signature: {e}")
     return rec

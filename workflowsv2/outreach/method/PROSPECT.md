@@ -12,7 +12,7 @@ A candidate who is not worth contacting is a correct and useful answer. Do not r
 
 ## 2. What Tuuyi is
 
-Tuuyi reviews the claims a software company makes about its product. Every assertion in the seller's documents is written down, section by section, and the list is fixed before testing. The claims that bear on the buyer's decision are each tested against the code, configuration and other materials supplied, never against the seller's own description. Each tested claim gets one of five verdicts: holds; true, with something to know; partly true; contradicted; unsettled. Every finding names the file and the lines it rests on, so the reader can check it. A second pass that did not do the review re-reads the evidence cited for every finding, and a person signs the report.
+Tuuyi reviews the claims a software company makes about its product. Every assertion in the seller's documents is written down, section by section, and the list is fixed before testing. The claims that bear on the buyer's decision are each tested against the code, configuration and other materials supplied, never against the seller's own description. Each tested claim gets one of five verdicts: holds; true, with something to know; partly true; contradicted; unsettled. Every finding names the file and the lines it rests on, so the reader can check it. A second pass that did not do the review re-reads the evidence cited for every finding, and a person at the practice reads the report before it is released.
 
 Two uses are likely:
 

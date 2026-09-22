@@ -259,26 +259,41 @@ def test_report_is_gated_on_release(env):
     eng = root / "e1"
     assert c.get("/e/e1/report/" + _as(CLIENT)).status_code == 404
     assert c.get("/e/e1/report/" + _as(PRACTICE)).status_code == 200      # the practice reads before release
-    # a run with a report, then release
+    # a run with a report, pinned to the intake the fake session makes, then release
+    (eng / "intakes" / "I1").mkdir(parents=True)
     merged = eng / "merged" / "2026-09-05T01-00-00Z_chain_T"
     merged.mkdir(parents=True)
-    (merged / "meta.json").write_text(json.dumps({"intake": None}))
+    (merged / "meta.json").write_text(json.dumps({"intake": "I1"}))
     (merged / "report.md").write_text("# r\n")
     mail.sent.clear()
     r = c.post("/p/api/engagements/e1/stage" + _as(PRACTICE), json={"stage": "release", "value": "released"})
     assert r.status_code == 200
     assert mail.sent[-1]["to"] == [CLIENT] and "/e/e1/report/" in mail.sent[-1]["body"]
     assert c.get("/e/e1/report/" + _as(CLIENT)).status_code == 200
-    # releasing is signing: who, the statement, and the hash of the report released
+    # releasing records who released which text; it is not a signature, and the report shows nothing of it
     import hashlib
-    signed = json.loads((merged / "signoff.json").read_text())
-    assert signed["by"] == PRACTICE and signed["run"] == merged.name and "I have read this report" in signed["statement"]
-    assert signed["report_sha256"] == hashlib.sha256(b"# r\n").hexdigest()
-    assert (merged / "report.md").read_text() == "# r\n"                  # the text that was read is not changed
-    assert "Sign-off" in (merged / "report.html").read_text() and PRACTICE in (merged / "report.html").read_text()
+    rel = json.loads((merged / "release.json").read_text())
+    assert rel["by"] == PRACTICE and rel["run"] == merged.name and "statement" not in rel
+    assert rel["report_sha256"] == hashlib.sha256(b"# r\n").hexdigest()
+    assert (merged / "report.md").read_text() == "# r\n" and not (merged / "signature.json").exists()
+    assert not (merged / "report.html").exists()
     FakeSession.merged_dir = merged                    # the real post session knows the run it shows
     doc = c.get("/e/e1/report/api/document" + _as(CLIENT)).json()
-    assert "Sign-off" in doc["html"] and doc["signoff"]["by"] == PRACTICE
+    assert "Signature" not in doc["html"] and "signature" not in doc
+    # signing is a separate step, in the signer's own name, after release
+    e1 = next(x for x in c.get("/p/api/engagements" + _as(PRACTICE)).json() if x["name"] == "e1")
+    assert e1["signed"] is False
+    r = c.post("/p/api/engagements/e1/sign" + _as(PRACTICE), json={"name": " "})
+    assert r.status_code == 400
+    r = c.post("/p/api/engagements/e1/sign" + _as(PRACTICE), json={"name": "Bruce D'Ambrosio"})
+    assert r.status_code == 200, r.json()
+    assert next(x for x in r.json() if x["name"] == "e1")["signed"] is True
+    sig = json.loads((merged / "signature.json").read_text())
+    assert sig["by"] == "Bruce D'Ambrosio" and "I have read every finding" in sig["attestation"]
+    assert (merged / "report.md").read_text() == "# r\n"                  # the text that was read is not changed
+    assert "Signature" in (merged / "report.html").read_text() and "Bruce D'Ambrosio" in (merged / "report.html").read_text()
+    doc = c.get("/e/e1/report/api/document" + _as(CLIENT)).json()
+    assert "Signature" in doc["html"] and doc["signature"]["by"] == "Bruce D'Ambrosio"
     with c.websocket_connect("/e/e1/report/ws" + _as(CLIENT)) as ws:
         assert [ws.receive_json()["type"] for _ in range(3)] == ["history", "document", "status"]
     s = c.get("/e/e1/api/status" + _as(CLIENT)).json()

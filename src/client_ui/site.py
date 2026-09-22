@@ -308,6 +308,10 @@ class StageChange(BaseModel):
     value: str
 
 
+class Signature(BaseModel):
+    name: str
+
+
 class Comment(BaseModel):
     source: str
     claim_id: Any
@@ -620,13 +624,13 @@ def make_site_app(access: Access, model: Optional[Path] = None,
                            "done": state.stage_value(eng_dir, "intake") == "done",
                            "empty": check.get("empty") or {}}
         else:
-            # The report the client reads ends with who read and released it.
+            # A signed report ends with the signature; a released one carries
+            # nothing about its release.
             from workflowsv2.audit_report import printable, signoff
-            # The run this session shows, which is the run that was released.
-            rec = signoff.load(e["session"].merged_dir)
+            rec = signoff.load_signature(e["session"].merged_dir)     # the run this session shows
             if rec and d.get("html"):
                 d["html"] += printable.to_body(signoff.block_md(rec))
-                d["signoff"] = rec
+                d["signature"] = rec
         return d
 
     async def _turn(kind: str, name: str, text: str) -> None:
@@ -777,6 +781,8 @@ def make_site_app(access: Access, model: Optional[Path] = None,
                              for src in s["claim_sources"]]
             cur = state.current_run(d, s["current_intake"])
             s["report_exists"] = bool(cur and (cur / "report.md").is_file())
+            from workflowsv2.audit_report import signoff
+            s["signed"] = bool(cur and signoff.load_signature(cur))
             s["settings"] = _settings(d)
             out.append(s)
         return out
@@ -889,6 +895,23 @@ def make_site_app(access: Access, model: Optional[Path] = None,
     #: The stage changes a practice button makes directly, and the value each sets.
     BUTTON_STAGES = {"materials": "ready", "release": "released", "closed": "closed"}
 
+    @app.post("/p/api/engagements/{name}/sign")
+    async def sign_report(name: str, body: Signature, request: Request):
+        """The practice's expert signs the released report in their own name
+        (signoff.ATTESTATION). Not part of the default engagement."""
+        _practice(request)
+        eng_dir = _eng(name)
+        if state.stage_value(eng_dir, "release") != "released":
+            raise HTTPException(status_code=400, detail="the report is not released; a report is signed after release")
+        cur = state.current_run(eng_dir, state.current_intake(eng_dir))
+        if not (cur and (cur / "report.md").is_file()):
+            raise HTTPException(status_code=400, detail="no report to sign")
+        if not body.name.strip():
+            raise HTTPException(status_code=400, detail="the signer's name is needed")
+        from workflowsv2.audit_report import signoff
+        _act(signoff.sign, cur, body.name.strip())
+        return JSONResponse(_all())
+
     @app.post("/p/api/engagements/{name}/stage")
     async def change_stage(name: str, body: StageChange, request: Request):
         email = _practice(request)
@@ -899,10 +922,10 @@ def make_site_app(access: Access, model: Optional[Path] = None,
             cur = state.current_run(eng_dir, state.current_intake(eng_dir))
             if not (cur and (cur / "report.md").is_file()):
                 raise HTTPException(status_code=400, detail="no report to release")
-            # Releasing is signing: the person's name, the statement and the
-            # report's hash are written beside the report before the stage moves.
+            # Who released which text is recorded beside the report before the
+            # stage moves. Releasing is not signing (signoff.py).
             from workflowsv2.audit_report import signoff
-            _act(signoff.sign, cur, email)
+            _act(signoff.release, cur, email)
         state.set_stage(eng_dir, body.stage, body.value, email)
         if body.stage == "release":
             mail.send(state.client_emails(eng_dir), f"Tuuyi: the report for {name} is ready",
