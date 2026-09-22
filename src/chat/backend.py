@@ -404,9 +404,17 @@ class _ChatBackend:
             if resp.ok or resp.status_code not in self._TRANSIENT_STATUS:
                 return resp
             wait = delay
+            # OpenRouter sends the hint as {"error": {"metadata":
+            # {"retry_after_seconds": N}}}. Other providers shape the body
+            # differently (xAI sends "error" as a string), so each link is
+            # read only when it is a dict; any other shape falls through to
+            # the backoff. `or {}` guards were not enough: a non-empty string
+            # is truthy, and .get on it raised AttributeError (2026-09-22).
             try:
-                meta = ((resp.json() or {}).get('error') or {}).get('metadata') or {}
-                hinted = meta.get('retry_after_seconds')
+                body = resp.json()
+                err = body.get('error') if isinstance(body, dict) else None
+                meta = err.get('metadata') if isinstance(err, dict) else None
+                hinted = meta.get('retry_after_seconds') if isinstance(meta, dict) else None
                 if isinstance(hinted, (int, float)) and hinted > 0:
                     wait = float(hinted)
             except ValueError:
