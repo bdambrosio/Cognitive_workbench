@@ -51,6 +51,11 @@ MODEL_TEMPERATURE: Dict[str, float] = {
     # Cloud, closed.
     "gpt-5.6-luna": 0.2,
     "gpt-5.6-terra": 0.1,      # the pinned grader; NOT exempt from TOP_P
+    # gpt-6-luna (OpenAI, direct). OpenAI publishes no recommendation, and with
+    # reasoning on the API accepts only the default temperature 1 and rejects
+    # top_p outright (checked 2026-09-22), so 1.0 is what runs at any effort
+    # above none. Bruce chose 1.0 on 2026-09-22.
+    "gpt-6-luna": 1.0,
     "grok-4.6": 0.5,           # xAI publishes no agentic recommendation
     # grok-4.7 (released 2026-09-21). xAI's model page publishes no
     # temperature, as for 4.6; Bruce chose 0.5 on 2026-09-22, the 4.6 value.

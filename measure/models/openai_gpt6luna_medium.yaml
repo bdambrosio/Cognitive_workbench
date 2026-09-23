@@ -1,0 +1,22 @@
+# OpenAI gpt-6-luna, direct, added 2026-09-22.
+#
+# Prescreened 2026-09-22 with the real payload: schema-valid 9/9 at none, low
+# and medium; medium 324-562 completion tokens in 4.3-6.8 s; a required field
+# the prompt never mentioned appeared 3/3, so the schema is enforced.
+#
+# The API takes max_completion_tokens, not max_tokens, and rejects top_p; the
+# backend renames the first and drops the second for the session. With
+# reasoning on, only temperature 1 is accepted.
+#
+# EFFORT `medium`, Bruce's choice 2026-09-22 for gate 3.
+#
+# TEMPERATURE resolves through src/chat/model_params.py ("gpt-6-luna" -> 1.0;
+# Bruce, 2026-09-22; OpenAI publishes none).
+llm_config:
+  server: local
+  model: "gpt-6-luna"
+  vllm_url: https://api.openai.com/v1
+  # NAME of the env var holding the bearer token, not the token.
+  api_key: OPENAI_API_KEY
+  is_reasoning_model: true
+  reasoning_effort: medium

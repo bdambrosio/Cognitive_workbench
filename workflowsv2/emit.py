@@ -64,7 +64,12 @@ def emit(loop, system: str, user: str, schema: Dict[str, Any],
                                        "last_reasoning_chars", None)})
         if (raw or "").strip():
             break
-    dropped = sorted(set(getattr(loop.backend, "_param_drops", set())) - before)
+    # Only response_format decides whether the answer was schema-constrained.
+    # A route that rejects another parameter (gpt-6-luna rejects top_p,
+    # 2026-09-22) still constrains the answer, and that drop is logged by the
+    # backend.
+    dropped = sorted(d for d in set(getattr(loop.backend, "_param_drops", set())) - before
+                     if d == "response_format")
     obj, how, err = None, None, None
     try:
         obj, how = json.loads(raw), "parsed"

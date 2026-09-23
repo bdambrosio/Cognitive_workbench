@@ -34,6 +34,7 @@ numbers are trusted.**
 |---|---|---|
 | `gpt-5.6-luna` | 0.2 | Bruce, 2026-08-24 |
 | `gpt-5.6-terra` (grader) | 0.1 | Bruce, 2026-08-24 — kept from the prior hardcoded value |
+| `gpt-6-luna` | 1.0 | Bruce, 2026-09-22. **OpenAI publishes no recommendation.** With reasoning on, the API accepts only the default temperature 1 and rejects `top_p` outright, so 1.0 is what runs above effort `none`; the backend drops the rejected `top_p` for the session. Route `measure/models/openai_gpt6luna_medium.yaml` |
 | `grok-4.6` | 0.5 | Bruce, 2026-08-24. **xAI publishes no recommendation** — checked the model page and the 4.6 docs page; the "0.7/0.95" seen in search results is third-party example code, not xAI guidance |
 | `grok-4.7` | 0.5 | Bruce, 2026-09-22, the grok-4.6 value. **xAI publishes no recommendation**: checked the grok-4.7 model page on docs.x.ai the day after release |
 | `Qwen3.8-27B` (local) | 0.25 | Bruce, 2026-08-24. Key **narrowed** from the bare `Qwen3.8` on 2026-08-26: that spelling also matched `qwen3.8-flash` and `qwen3.8-max`, handing each a temperature nobody chose |
