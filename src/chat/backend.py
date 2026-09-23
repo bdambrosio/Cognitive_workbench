@@ -28,6 +28,33 @@ logger = logging.getLogger('chat_loop')
 #: run log at INFO without also taking the <llm-raw> message dumps.
 usage_logger = logging.getLogger('chat.backend.usage')
 
+
+def request_shape(body: Dict[str, Any]) -> Dict[str, Any]:
+    """What a rejected request looked like, without its content: the body's
+    other keys, and each message's role, form and length. Added 2026-09-22
+    after xAI answered one request of two long messages with "Messages
+    cannot be empty", which it otherwise sends only for an empty list; the
+    body had not been kept, so nothing could say what was sent."""
+    shape: Dict[str, Any] = {
+        'keys': sorted(k for k in body if k not in ('messages', 'system')),
+        'bytes': len(json.dumps(body, ensure_ascii=False).encode('utf-8'))}
+    msgs = []
+    for m in body.get('messages') or []:
+        c = m.get('content') if isinstance(m, dict) else None
+        if isinstance(c, str):
+            msgs.append({'role': m.get('role'), 'form': 'text', 'chars': len(c)})
+        elif isinstance(c, list):
+            msgs.append({'role': m.get('role'), 'form': 'parts', 'parts': len(c),
+                         'chars': sum(len(p.get('text') or '') for p in c
+                                      if isinstance(p, dict))})
+        else:
+            msgs.append({'role': (m.get('role') if isinstance(m, dict) else None),
+                         'form': type(c).__name__})
+    shape['messages'] = msgs
+    if 'system' in body:
+        shape['system_form'] = type(body['system']).__name__
+    return shape
+
 # Client read timeout for a completion call. It bounds QUEUE WAIT plus
 # generation, not generation alone: a turn fans out into reflection, claim
 # grading and concern triage against the same server, and a call sitting
@@ -598,6 +625,10 @@ class _ChatBackend:
             # rate limits are not a property of the wire format.
             resp = self._post_transient_retrying(
                 f'{self.base_url}/v1/messages', headers, body)
+            if not resp.ok:
+                logger.warning('_ChatBackend: %s rejected a request (%s): %s',
+                               self.model or self.base_url, resp.status_code,
+                               json.dumps(request_shape(body)))
             resp.raise_for_status()
             data = resp.json()
             self.last_finish_reason = data.get('stop_reason')
@@ -757,6 +788,9 @@ class _ChatBackend:
         _t0 = time.monotonic()
         resp = self._post_adapting(url, headers, body, timeout_s=timeout_s)
         if not resp.ok:
+            logger.warning('_ChatBackend: %s rejected a request (%s): %s',
+                           self.model or self.base_url, resp.status_code,
+                           json.dumps(request_shape(body)))
             # Surface the provider's actual error reason (xAI/OpenAI return
             # JSON like {"error":{"message":"...","type":"..."}}); requests'
             # default HTTPError only carries the status line.
