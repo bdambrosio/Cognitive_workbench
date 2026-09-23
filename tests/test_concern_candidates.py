@@ -283,6 +283,7 @@ def test_expect_line_reads_the_last_line_while_fresh():
 
 
 def test_expectation_checks_log_in_shadow_and_bump_live(loop, tmp_path, monkeypatch):
+    monkeypatch.setattr(C, "_EXPECTATIONS_LIVE", False)          # shadow is what this test checks
     now = datetime.now(timezone.utc).isoformat()
     a = _note(loop, "Collection_ac", {"kind": "agent_concern", "status": "active", "activation": 0.4,
                                       "instruction": "x", "rhythm_hours": 24,
@@ -374,6 +375,7 @@ def _fire(loop, monkeypatch, prev_wip, rewrite, activation=0.4, seen=None):
 
 
 def test_fire_check_is_asked_for_logged_and_stripped(loop, tmp_path, monkeypatch):
+    monkeypatch.setattr(C, "_EXPECTATIONS_LIVE", False)          # shadow is what this test checks
     seen = []
     nid = _fire(loop, monkeypatch, "seen once\nEXPECT: volts stay above 51.5",
                 "seen twice\nCHECK: violated; aversive; 50.1 V this fire\nEXPECT: back above 51.5 next hour", seen=seen)
@@ -441,9 +443,9 @@ def test_repeat_violation_does_not_bump(loop, tmp_path, monkeypatch):
     props = get(nid)["properties"]
     loop.backend = StubBackend(["w3\nCHECK: violated; aversive; on surrender this time\nEXPECT: a saying on enquiry"])
     loop._update_concern_wip(nid, "deliver", [("ACTION", "fetch")], "Talk 244", "respond")
-    assert props["activation"] == pytest.approx(0.4 + C._AGENT_CONCERN_BUMP_AMOUNT)   # logged, not bumped
+    assert props["activation"] == pytest.approx(0.4 + C._AGENT_CONCERN_BUMP_AMOUNT)   # not bumped
     rows = _rows(tmp_path / "memory" / C._EXPECTATIONS_FILE)
-    assert [r["verdict"] for r in rows] == ["violated", "violated"]
+    assert [r["verdict"] for r in rows] == ["violated"]      # the identical repeat is not written
     # a held check in between clears the repeat
     loop.backend = StubBackend(["w4\nCHECK: held; neutral; on enquiry\nEXPECT: a saying on enquiry"])
     loop._update_concern_wip(nid, "deliver", [("ACTION", "fetch")], "Talk 9", "respond")
@@ -482,6 +484,7 @@ def test_companion_sections_carry_the_two_new_headings(loop):
 # ── the whole reflection path, stubbed model ───────────────────────────
 
 def test_reflection_shows_the_sections_and_logs_the_shadow_rows(loop, tmp_path, monkeypatch):
+    monkeypatch.setattr(C, "_EXPECTATIONS_LIVE", False)          # shadow is what this test checks
     """Drives _reflect_and_remember with a fake dialog, a reasoning record
     carrying two thoughts, one agent concern with a fresh EXPECT line, and a
     backend that answers with candidates and a check. Asserts what the model
@@ -544,10 +547,13 @@ def _user_turn(loop):
     loop._last_turn_seq = 41
 
 
-def test_mint_is_refused_outside_a_user_turn_and_twice_in_one(loop, tmp_path, monkeypatch):
+def test_mint_works_in_a_fire_and_is_refused_twice_in_one_turn(loop, tmp_path, monkeypatch):
+    monkeypatch.setattr(C, "_MINT_LIVE", False)
     loop._current_turn = {"kind": "autonomous", "source": "Tester"}
     loop._minted_this_turn = False
-    assert loop._run_mint("the retry path swallows one error", "check whether it still does", 24).startswith("ERROR")
+    assert loop._run_mint("the retry path swallows one error", "check whether it still does", 24).startswith("OK: recorded")
+    assert _rows(tmp_path / "memory" / C._MINTS_FILE)[-1]["turn_kind"] == "autonomous"
+    (tmp_path / "memory" / C._MINTS_FILE).unlink()
     _user_turn(loop)
     assert loop._run_mint("", "check", 24).startswith("ERROR")           # both fields needed
     assert loop._run_mint("x", "", 24).startswith("ERROR")
@@ -598,7 +604,7 @@ def test_mint_live_creates_a_durable_capped_concern(loop, tmp_path, monkeypatch)
     assert len(loop.resource_manager.resource_registry["Collection_ac"]["properties"]["content"]) == 1
 
 
-def test_mint_is_offered_on_user_turns_only(loop):
+def test_mint_is_offered_in_user_turns_and_fires(loop):
     loop._discovered_tools = {}
     loop._omitted_tools = []
     loop._peers = []
@@ -607,4 +613,4 @@ def test_mint_is_offered_on_user_turns_only(loop):
     cat = loop._build_react_tool_catalog()
     assert '"tool": "mint"' in cat and cat.index('"mint"') < cat.index('"display"')
     loop._current_turn = {"kind": "autonomous", "source": "Tester"}
-    assert '"tool": "mint"' not in loop._build_react_tool_catalog()
+    assert '"tool": "mint"' in loop._build_react_tool_catalog()

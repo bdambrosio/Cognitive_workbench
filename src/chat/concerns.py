@@ -130,7 +130,7 @@ _AGENT_CONCERN_BUMP_AMOUNT    = 0.15   # gained per hit (capped at 1.0)
 # retired (shadow: nothing is retired) — see _shadow_displacement_victims.
 _AGENT_CONCERN_POPULATION_CAP = 12     # active non-seed agent concerns
 _CANDIDATES_LIVE = True                # promote recurring candidates to concerns
-_EXPECTATIONS_LIVE = False             # a violated aversive expectation bumps
+_EXPECTATIONS_LIVE = True              # a violated aversive expectation bumps (live 2026-09-22, Jill agreed)
 _CANDIDATES_FILE = 'concern_candidates.jsonl'
 # ----- self-minted concerns (2026-09-10, agreed with Jill) -----
 #
@@ -138,7 +138,9 @@ _CANDIDATES_FILE = 'concern_candidates.jsonl'
 # durable concern of her own: her sentence, her instruction, her rhythm.
 # It goes through _add_agent_concern with recurrence NOT skipped, so the
 # cap and the similarity merge apply, unlike a yield's remainder. Her
-# terms: user turns only, one mint per turn, rhythm within
+# terms: one mint per turn (user turns only at first; fires too since
+# 2026-09-22, still in shadow: she never minted in a user turn, and said the
+# interests mint is for arise while she works in fires), rhythm within
 # [_MINT_RHYTHM_MIN_HOURS, _MINT_RHYTHM_MAX_HOURS] (she asked for a floor
 # of 6; 8 is the smallest allowed bucket above it), surface text is the
 # sentence itself with no prefix. Shadow first: every mint is recorded
@@ -2046,14 +2048,18 @@ class ConcernsMixin:
             pass
         path = self._memory_dir() / _EXPECTATIONS_FILE
         prev = last_expectation_rows(path).get(nid)
-        append_jsonl(path,
-                     {'turn_seq': getattr(self, '_last_turn_seq', None), 'kind': 'fire',
-                      'concern_id': nid,
-                      'concern': str(props.get('content') or '').strip()[:120],
-                      'expect': expect[:200], 'verdict': check['verdict'],
-                      'direction': check['direction'], 'evidence': check['evidence'][:200],
-                      'expect_age_h': age_h, 'live': _EXPECTATIONS_LIVE},
-                     character=self.character_name)
+        row = {'turn_seq': getattr(self, '_last_turn_seq', None), 'kind': 'fire',
+               'concern_id': nid,
+               'concern': str(props.get('content') or '').strip()[:120],
+               'expect': expect[:200], 'verdict': check['verdict'],
+               'direction': check['direction'], 'evidence': check['evidence'][:200],
+               'expect_age_h': age_h, 'live': _EXPECTATIONS_LIVE}
+        # The post-turn writer's rule, which the fire side lacked: a row with
+        # the same expectation, verdict and direction as this concern's last
+        # row is not written again (92 of 377 rows were such repeats, found
+        # with Jill 2026-09-22). The bump below does not depend on it.
+        if not (prev and all(prev.get(k) == row[k] for k in ('expect', 'verdict', 'direction'))):
+            append_jsonl(path, row, character=self.character_name)
         if _EXPECTATIONS_LIVE and check['verdict'] == 'violated' \
                 and check['direction'] == 'aversive' \
                 and not _repeat_violation(prev):
@@ -2180,14 +2186,12 @@ class ConcernsMixin:
 
     def _run_mint(self, text: str, instruction: str, rhythm_hours: Any) -> str:
         """The `mint` action: a durable agent concern from the agent's own
-        noticing. Returns the observation. Refused on an autonomous turn
-        and on a second mint in one turn. The requested rhythm is recorded
+        noticing. Returns the observation. Refused on a second mint in one
+        turn, user turn or fire alike. The requested rhythm is recorded
         as given and clamped to the allowed range for the concern. In
         shadow the mint is logged and no concern is created."""
         from utils.file_utils import append_jsonl
         turn = getattr(self, '_current_turn', None) or {}
-        if turn.get('kind') != 'user':
-            return "ERROR: mint is available on user turns only, not inside an autonomous fire"
         if getattr(self, '_minted_this_turn', False):
             return "ERROR: one mint per turn; a second interest in the same turn is usually the first seen from another angle"
         text = (text or '').strip()
@@ -2204,6 +2208,7 @@ class ConcernsMixin:
         self._minted_this_turn = True
         entity = self._turn_counterpart()
         row = {'turn_seq': getattr(self, '_last_turn_seq', None), 'entity': entity,
+               'turn_kind': turn.get('kind'),
                'text': text[:200], 'instruction': instruction[:600],
                'rhythm_requested': requested, 'rhythm_hours': rhythm,
                'live': _MINT_LIVE}
