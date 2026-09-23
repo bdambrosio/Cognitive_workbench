@@ -103,15 +103,20 @@ page, to the client and the practice; the practice corrects it there. The
 record is `surface/reliance.json`.
 
 **Tiers** (`claims_audit/tiers.py`, `method/TIERS.md`). Each claim is rated
-by what its being false would change for this buyer, against the
+by whether any way it could be untrue would matter to this buyer, against the
 transaction, the thresholds and the reliance statement, fifteen claims to a
-call, with no tools and no evidence. **Tier 1**: the buyer would go back to
-the seller to reopen the price or the terms over this claim alone, or would
-not close. **Tier 2**: a documented detail that a person operating the
-software acts on, which on its own changes nothing. **Tier 3**: nothing
-rests on it. Each rating carries a **basis**, whose last sentence says
-whether it rests on a threshold the buyer stated, on the practice's reading
-of the buyer's plan, or on the scale alone. The tier and the basis are marks
+call, with no tools and no evidence. **Tier 1**: some way the claim could be
+untrue would make the buyer go back to the seller to reopen the price or the
+terms over this claim alone, or not close. A claim can reach tier 1 only
+through a **route**: a stated threshold that names the kind of failure, or a
+reliance item the buyer `depends` on; a failure the buyer's plan survives,
+by another way the documents describe, does not count. **Tier 2**: a detail
+that a person setting up or operating the software would act on and would
+meet in use, whose failure on its own changes nothing for the buyer. **Tier
+3**: neither. Each rating carries a **basis**, whose last sentence says
+whether it rests on a threshold the buyer stated, on the buyer's plan as the
+buyer stated it, on the practice's reading of the buyer's plan, or on the
+scale alone. The tier and the basis are marks
 on the claim; the practice changes either on the surface page, and a tier a
 person set is left alone by a later rating. Tier 1 is tested. Tiers 2 and 3
 are **listed, not tested**: they stay on the surface and in the report. A

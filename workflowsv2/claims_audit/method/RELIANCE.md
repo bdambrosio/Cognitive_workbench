@@ -29,8 +29,8 @@ For each item:
 | `item` | The name of the function, component, property or commitment |
 | `reliance` | `depends`: the buyer's plan does not work, or the price is not justified, without it. `uses`: the buyer will use it, and would work around its failure at a cost small beside the price. `does_not_use`: the buyer's plan does not touch it |
 | `if_it_failed` | One sentence: what the buyer would have to do if this item did not work as the seller's documents describe. Where the buyer could repair or replace it themselves, say so, and say whether that is cheap or costly for this buyer, given who they said will operate the offering. Use what is generally known about this kind of software: which parts are its core, and which are commodity that a competent engineer replaces in a day. Do not estimate amounts of money |
-| `source` | `buyer` where the reliance follows from the buyer's own words. `inference` where you reasoned from the buyer's plan and from what is generally known about this kind of software |
-| `buyer_words` | For `buyer`: the buyer's words the reliance rests on, quoted. For `inference`: the words of the buyer's plan you reasoned from, quoted. Quote only words that bear on this item; where none do, leave the field empty |
+| `source` | `buyer` only where the buyer's quoted words themselves say what the item says. Where the item goes further than the words — the buyer named tracking, and the item also covers donation messages — the part the words say is one item with `source` `buyer`, and each part beyond them is a separate item with `source` `inference`. `inference` where you reasoned from the buyer's plan and from what is generally known about this kind of software |
+| `buyer_words` | For `buyer`: the buyer's words that say what the item says, quoted exactly. For `inference`: the words of the buyer's plan you reasoned from, quoted exactly. Quote only words that bear on this item; where none do, leave the field empty |
 
 ## 4. Rules
 

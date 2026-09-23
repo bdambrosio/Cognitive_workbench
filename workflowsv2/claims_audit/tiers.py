@@ -1,5 +1,5 @@
-"""Rate each claim by what its being false would change for this buyer,
-before the surface is frozen.
+"""Rate each claim by whether any way it could be untrue would matter to this
+buyer, before the surface is frozen.
 
     python3 workflowsv2/claims_audit/tiers.py --engagement <name> --model <yaml> [--source <claim source>]
 

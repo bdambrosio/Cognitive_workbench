@@ -562,9 +562,9 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
         out.append(f"| {s} | 0 | {listed[s]} | 0 | | | | |")
     out += ["", ("*Tested* counts the seller's assertions, as enumerated from the "
                  "claim source, that the review tested, one finding each. *Not "
-                 "tested* counts those rated before testing as ones whose being "
-                 "false would not lead the buyer to reopen the price or the "
-                 "terms; they are listed with their reasons in the second "
+                 "tested* counts those rated before testing as claims whose being "
+                 "untrue in any way would not lead the buyer to reopen the price "
+                 "or the terms; they are listed with their reasons in the second "
                  "appendix, and a claim source with nothing to test has no other "
                  "figures. " if untested else
                  "*Claims* are the seller's assertions as enumerated from the "
@@ -630,8 +630,8 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
 
     out += ["## Coverage", "", ("Every claim received one finding. " if not untested else
             f"Every claim that was tested received one finding. {len(untested)} further "
-            f"claim(s) were rated before testing as ones whose being false would not "
-            f"lead the buyer to reopen the price or the terms; they are listed in the "
+            f"claim(s) were rated before testing as claims whose being untrue in any way "
+            f"would not lead the buyer to reopen the price or the terms; they are listed in the "
             f"second appendix, each with the reason, and were not tested. ")
             + "By verdict and class:", "", "| verdict | class | claims |", "|---|---|---|"]
     counts = {"contradicted": 0, "partial": 0, "real_with_caveat": 0,
@@ -683,9 +683,10 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
     if untested:
         out += ["", "## Appendix — claims listed, not tested", "",
                 "Rated before testing, against the transaction and the buyer's "
-                "thresholds, and not tested. Tier 2: a documented detail that a "
-                "person operating the software would act on, which on its own "
-                "changes nothing. Tier 3: nothing rests on it. The buyer may ask "
+                "thresholds, and not tested. Tier 2: a detail that a person "
+                "setting up or operating the software would act on and would "
+                "meet in use, whose failure on its own changes nothing for the "
+                "buyer. Tier 3: neither. The buyer may ask "
                 "for any of them to be tested.", "",
                 "| source | id | lines | claim | tier | reason |",
                 "|---|---|---|---|---|---|"]

@@ -160,9 +160,10 @@ it. Do not adjudicate it now and present that as the engagement's.
 
 ## 8. A claim that was listed and not tested
 
-Before testing, each claim was rated by what its being false would change for
-this buyer. Claims in tier 1 were tested. Claims in tier 2 or 3 were listed and
-not tested: each is in the report's second appendix with its tier and the
+Before testing, each claim was rated by whether any way it could be untrue
+would matter to this buyer. Claims in tier 1 were tested. Claims in tier 2
+or 3 were listed and not tested: each is in the report's second appendix with
+its tier and the
 reason for it, and the `claim` action returns the same. Such a claim has no
 finding, no check and no rating. That was decided before any testing. It is
 not a failure of the engagement (§7), and the claim is not `unverifiable`.
