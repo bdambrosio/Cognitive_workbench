@@ -1,0 +1,16 @@
+# OpenAI gpt-6-sol, direct, added 2026-09-23 as a reviewer for the chhoto-full
+# review comparison.
+#
+# EFFORT `medium`, Bruce's choice 2026-09-23.
+#
+# TEMPERATURE resolves through src/chat/model_params.py ("gpt-6-sol" -> 1.0;
+# Bruce, 2026-09-23). With reasoning on, the API accepts only the default 1;
+# OpenAI's recommended 0.3 applies with reasoning off.
+llm_config:
+  server: local
+  model: "gpt-6-sol"
+  vllm_url: https://api.openai.com/v1
+  # NAME of the env var holding the bearer token, not the token.
+  api_key: OPENAI_API_KEY
+  is_reasoning_model: true
+  reasoning_effort: medium
