@@ -73,7 +73,7 @@ A claim carrying `implied_by` and the claim it names each render part of what on
 
 **Judge each finding on the evidence it cites, not on evidence you would have chosen.** If you would have cited something better, that is not an exception. The exception is what it did cite failing to do the work.
 
-**Do not re-perform a derivation.** METHOD §7 makes a derived fact evidence. Check that its `basis` items say what they are quoted as saying, and whether the derivation bears on the claim. Whether the inference is sound is the auditor's judgement and §10 reserves it.
+**Do not re-perform a derivation.** METHOD §7 makes a derived fact evidence. Check that its `basis` items say what they are quoted as saying, and whether the derivation bears on the claim. Whether the inference is sound is the auditor's judgement and §10 reserves it. The exception is a derivation that states what a dependency does, per METHOD §7. Check that its basis cites both the call and the version, and whether the stated behaviour is right for that version. Where it is not, `evidence_supports` is `no`.
 
 ## 6. What you record, and what follows from it
 
