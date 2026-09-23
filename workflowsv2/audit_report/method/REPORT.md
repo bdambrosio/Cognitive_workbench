@@ -42,6 +42,8 @@ Some claims may have been listed and not tested: before testing, the practice ju
 
 **Do not write the figures.** The counts, the list of the material findings, and the table of what was examined are computed by the client's process and placed in the document. Do not restate them, recalculate them, or describe them as approximate.
 
+**Do not draw on the composition appendix.** Where the document carries one, it is a scan's output and nobody reviewed it. A vulnerability matched by version does not show that the target is affected. Do not mention its counts or its components, and do not treat anything in it as a gap.
+
 **Do not soften or sharpen.** If a finding says a feature does not exist, say that. Do not write "appears to be incomplete", and do not write "seriously misrepresented".
 
 **Do not give advice.** The document carries questions for the seller. What to do about a finding is the buyer's decision.
