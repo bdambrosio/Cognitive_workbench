@@ -61,6 +61,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s
 logger = logging.getLogger("full_run")
 
 ENGAGEMENTS = REPO / "workflowsv2" / "claims_audit" / "engagements"
+STEPS = ("create", "sort", "confirm sorting", "brief", "enumerate", "freeze", "chain")
 BY = "full_run.py: the model's proposal, unchanged; no person"
 
 
@@ -83,6 +84,10 @@ def main() -> int:
     ap.add_argument("--name", required=True, help="new engagement name; must not exist")
     ap.add_argument("--model", required=True, type=Path)
     ap.add_argument("--duplicates-model", type=Path, default=None)
+    ap.add_argument("--from", dest="start", choices=STEPS, default=STEPS[0],
+                    help="resume an existing run at this step, after an earlier "
+                         "step was finished by hand (the steps before it are "
+                         "skipped; full_run.json keeps its record and notes the resume)")
     args = ap.parse_args()
 
     base = ENGAGEMENTS / args.base
@@ -93,10 +98,21 @@ def main() -> int:
         if not (REPO / m).is_file():
             raise SystemExit(f"no model config {m}")
 
-    record = {"base": args.base, "engagement": args.name, "model": model,
-              "duplicates_model": dup_model, "harness": _harness(),
-              "started": _now(), "steps": []}
     rec_path = eng / "full_run.json"
+    if args.start == STEPS[0]:
+        record = {"base": args.base, "engagement": args.name, "model": model,
+                  "duplicates_model": dup_model, "harness": _harness(),
+                  "started": _now(), "steps": []}
+    else:
+        if not rec_path.is_file():
+            raise SystemExit(f"--from {args.start}: {rec_path} does not exist")
+        record = json.loads(rec_path.read_text(encoding="utf-8"))
+        if record.get("model") != model:
+            raise SystemExit(f"--model {model} differs from the run's {record.get('model')}")
+        record.setdefault("resumes", []).append(
+            {"from": args.start, "at": _now(), "harness": _harness()})
+        record.pop("outcome", None)
+        record.pop("ended", None)
 
     def save() -> None:
         if not eng.is_dir():        # new_engagement creates it, and refuses one that exists
@@ -179,13 +195,11 @@ def main() -> int:
         return counts
 
     jobs.DUPLICATES_MODEL = dup_model
-    step("create", create)
-    step("sort", job("sort"))
-    step("confirm sorting", confirm)
-    step("brief", brief)
-    step("enumerate", job("enumerate"))
-    step("freeze", freeze)
-    step("chain", job("chain"))
+    fns = {"create": create, "sort": job("sort"), "confirm sorting": confirm,
+           "brief": brief, "enumerate": job("enumerate"), "freeze": freeze,
+           "chain": job("chain")}
+    for name in STEPS[STEPS.index(args.start):]:
+        step(name, fns[name])
     record["merged"] = str(max((eng / state.MERGED).iterdir())) if (eng / state.MERGED).is_dir() else None
     record["ended"], record["outcome"] = _now(), "done"
     save()
