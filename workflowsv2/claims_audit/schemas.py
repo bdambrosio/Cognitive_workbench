@@ -371,6 +371,8 @@ def audit_schema() -> Dict[str, Any]:
         # derived
         "basis": {"type": "array", "items": basis},
         "derivation": {"type": "string"}, "consequence": {"type": "string"},
+        # true only on a statement of what a dependency does (METHOD §7)
+        "from_knowledge": {"type": "boolean"},
         # search
         "kind": {"enum": list(SEARCH_KINDS)},
         "performed": {"type": "string"}, "result": {"type": "string"},

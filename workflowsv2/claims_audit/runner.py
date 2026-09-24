@@ -1183,6 +1183,18 @@ def post_run_checks(obj: Optional[Dict[str, Any]], corpus: Path,
     for problem in res["problems"]:
         issues.note(out, stage="claims_audit", code="output_check",
                     text=problem, severity="blocking")
+    # A STATEMENT OF WHAT A DEPENDENCY DOES IS CHECKED BY A PERSON. The review
+    # takes it as written (REVIEW §5, 2026-09-23), so each one goes to the
+    # worklist to be checked against the dependency's source.
+    for f in (obj or {}).get("findings") or []:
+        for e in (f.get("evidence") or []) if isinstance(f, dict) else []:
+            if (isinstance(e, dict) and e.get("form") == "derived"
+                    and e.get("from_knowledge") is True):
+                issues.note(out, stage="claims_audit", code="dependency_knowledge",
+                            text=(f"claim {f.get('claim_id')}: check this statement "
+                                  f"against the dependency's source: "
+                                  f"{e.get('derivation')}"),
+                            severity="check")
     if res["ok"]:
         logger.info("output check: clean — %s", res["figures"])
     else:
