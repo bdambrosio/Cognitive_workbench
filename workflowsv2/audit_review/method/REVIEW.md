@@ -92,6 +92,11 @@ information.
 | `verdict_calibration` | `correct`, `overstated`, `understated` | §5 check 4 — is the verdict the right one from METHOD §6 |
 | `searches_adequate` | `yes`, `no`, `not_applicable` | §5 check 5 — `not_applicable` when the finding's evidence records no search |
 
+`evidence_relevant` and `evidence_supports` answer for the finding, not for
+each evidence item. Each is `no` when an item the verdict rests on fails its
+check. An item the verdict does not rest on, and that fails, is not an
+exception.
+
 An observation is **clean** when its value is `yes`, `correct` or
 `not_applicable`. Every other value is **not clean**.
 

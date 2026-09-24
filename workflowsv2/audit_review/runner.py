@@ -689,7 +689,10 @@ def standings(first: Dict[str, Any], second: Dict[str, Any],
             rows[cid] = {"standing": "not retested",
                          "why": "the retest produced nothing readable"}
             continue
-        same = all(obs.get(n) == mine.get(n) for n in schemas.OBSERVATIONS)
+        # Only the observations REVIEW §9 retests are compared. Comparing all
+        # four let a difference in `verdict_calibration` alone mark an
+        # exception as not standing (sol, chhoto-full README #51, 2026-09-23).
+        same = all(obs.get(n) == mine.get(n) for n in schemas.RETESTED)
         # BOTH SETS OF OBSERVATIONS ARE KEPT. The first version recorded only
         # `agreed`, so a control that disagreed on 2 of 3 (Qwen, 2026-09-02)
         # could not say what the second reviewer had seen differently.
