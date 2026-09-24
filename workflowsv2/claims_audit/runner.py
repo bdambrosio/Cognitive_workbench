@@ -1873,6 +1873,47 @@ def main() -> int:
                     logger.warning("%d file(s) named by searches were not "
                                    "opened: %s", len(chase["unopened_after"]),
                                    ", ".join(chase["unopened_after"]))
+
+            # ONE RETRY FOR A FINDING THAT LACKS A REQUIRED FIELD (Bruce,
+            # 2026-09-23). It runs after the chases because a re-adjudication
+            # can drop a field too: README #25 lost its `gap` in a chase pass
+            # (chhoto-full, 2026-09-23). What is still missing after the one
+            # retry is reported by the output check, as before.
+            if not error and emission and emission.get("obj"):
+                lacking = {f.get("claim_id"): [t for _, t in schemas.missing_fields(f)]
+                           for f in emission["obj"].get("findings") or []
+                           if isinstance(f, dict) and schemas.missing_fields(f)}
+                if lacking:
+                    todo_ids = sorted(lacking, key=lambda x: (x is None, x))
+                    logger.warning("%d finding(s) lack a required field — "
+                                   "retrying once: %s", len(todo_ids),
+                                   ", ".join(str(c) for c in todo_ids))
+                    listed = "\n".join(f"  claim {cid}: " + "; ".join(lacking[cid])
+                                       for cid in todo_ids)
+                    again = adjudicate(
+                        todo_ids,
+                        note=("The findings for these claims lack a field "
+                              "the method requires:\n\n" + listed
+                              + "\n\nThe adjudication each carries now:\n\n"
+                              + previous_adjudications(emission["obj"], todo_ids)
+                              + "\n\nAdjudicate these claims again and emit "
+                                "each finding whole, with every required "
+                                "field. Where the verdict or the disposition "
+                                "changes, say in `correction` what changed "
+                                "and why, in one line (METHOD §10)."))
+                    retry = {"claims": todo_ids, "parse": again["parse"],
+                             "finish": again["finish"],
+                             "replaced": replace_findings(emission["obj"], again,
+                                                          set(todo_ids))}
+                    retry["still_lacking"] = sorted(
+                        (f.get("claim_id") for f in emission["obj"].get("findings") or []
+                         if isinstance(f, dict) and f.get("claim_id") in lacking
+                         and schemas.missing_fields(f)),
+                        key=lambda x: (x is None, x))
+                    emission["fields_retry"] = retry
+                    logger.info("field retry: replaced %d of %d; still lacking: %s",
+                                retry["replaced"], len(todo_ids),
+                                retry["still_lacking"] or "none")
     except Exception as e:                                     # noqa: BLE001
         error = f"{type(e).__name__}: {e}"
         logger.exception("run failed")

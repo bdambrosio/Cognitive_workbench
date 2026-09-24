@@ -836,6 +836,26 @@ def missing_search_kinds(findings: Sequence[Dict[str, Any]],
     return out
 
 
+def missing_fields(finding: Dict[str, Any]) -> List[Tuple[Optional[int], str]]:
+    """The fields METHOD §7, §8 and §13 require of one finding that it does
+    not carry, as `(evidence item number, or None for the adjudication, what
+    is missing)`. One rule for the output check and for the runner's one
+    retry of a finding that lacks a field (Bruce, 2026-09-23)."""
+    out: List[Tuple[Optional[int], str]] = []
+    adj = finding.get("adjudication") or {}
+    v = adj.get("verdict")
+    if v in GAP_REQUIRED and not _norm(adj.get("gap")):
+        out.append((None, f"verdict {v!r} requires `gap` (METHOD §13)"))
+    if v == "unverifiable" and adj.get("unresolved_because") not in UNRESOLVED_BECAUSE:
+        out.append((None, "`unverifiable` requires `unresolved_because` (METHOD §8)"))
+    for j, e in enumerate(finding.get("evidence") or [], 1):
+        if isinstance(e, dict) and e.get("form") in FORM_FIELDS:
+            for field in FORM_FIELDS[e["form"]]:
+                if e.get(field) in (None, "", []):
+                    out.append((j, f"form {e['form']!r} requires {field!r} (METHOD §7)"))
+    return out
+
+
 def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
                  frozen: Sequence[Dict[str, Any]],
                  read: Optional[set] = None,
@@ -974,15 +994,12 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
         verdicts[v] = verdicts.get(v, 0) + 1
         if v not in VERDICTS:
             problems.append(f"{w}: verdict {v!r} is not one of METHOD §6's")
-        if v in GAP_REQUIRED and not _norm(adj.get("gap")):
-            problems.append(f"{w}: verdict {v!r} requires `gap` (METHOD §13)")
+        lacks = missing_fields(f)
+        problems.extend(f"{w}: {text}" for j, text in lacks if j is None)
         if v == "real" and _norm(adj.get("gap")):
             problems.append(f"{w}: verdict `real` carries a `gap`")
         if v == "unverifiable":
             because = adj.get("unresolved_because")
-            if because not in UNRESOLVED_BECAUSE:
-                problems.append(f"{w}: `unverifiable` requires "
-                                f"`unresolved_because` (METHOD §8)")
             # Both search kinds, except for a claim about the seller:
             # `missing_search_kinds` says which and why.
             missing = (short_of_a_kind.get(cid) or {}).get("missing") or []
@@ -1055,10 +1072,7 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
                 problems.append(f"{ew}: form {form!r} is not one of "
                                 f"{', '.join(EVIDENCE_FORMS)}")
                 continue
-            for field in FORM_FIELDS[form]:
-                if e.get(field) in (None, "", []):
-                    problems.append(f"{ew}: form {form!r} requires {field!r} "
-                                    f"(METHOD §7)")
+            problems.extend(f"{ew}: {text}" for k, text in lacks if k == j)
             if form == "citation":
                 _cite(ew, e.get("document"), e.get("lines"), e.get("quote"), e)
             elif form == "derived":

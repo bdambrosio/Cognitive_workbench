@@ -412,3 +412,21 @@ def test_missing_search_kinds_names_the_kind_each_finding_lacks():
     assert "claim 4. never writes to disk" in msg and "missing: a lexical search" in msg
     assert msg.index("claim 1.") < msg.index("claim 4.") < msg.index("claim 6.")
     assert "Do not write findings" in msg
+
+
+def test_missing_fields_names_what_each_finding_lacks():
+    # The shape of README #25 in chhoto-full on 2026-09-23: a caveat with no
+    # `gap`, which a chase re-adjudication had dropped.
+    rwc = {"claim_id": 25, "adjudication": {"verdict": "real_with_caveat"},
+           "evidence": [{"form": "citation", "document": "a.py", "lines": [1, 1],
+                         "quote": "x = 1"}]}
+    assert sch.missing_fields(rwc) == [
+        (None, "verdict 'real_with_caveat' requires `gap` (METHOD §13)"),
+        (1, "form 'citation' requires 'shows' (METHOD §7)")]
+    unv = {"claim_id": 3, "adjudication": {"verdict": "unverifiable"}, "evidence": []}
+    assert sch.missing_fields(unv) == [
+        (None, "`unverifiable` requires `unresolved_because` (METHOD §8)")]
+    whole = {"claim_id": 4, "adjudication": {"verdict": "real"},
+             "evidence": [{"form": "citation", "document": "a.py", "lines": [1, 1],
+                           "quote": "x = 1", "shows": "it"}]}
+    assert sch.missing_fields(whole) == []
