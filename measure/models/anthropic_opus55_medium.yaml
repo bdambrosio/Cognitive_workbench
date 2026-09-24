@@ -1,0 +1,22 @@
+# Claude Opus 5.5, Anthropic direct, added 2026-09-24 for the outreach
+# workflow's three writing calls (the first message, the follow-up and the
+# answer to a reply; workflowsv2/outreach/runner.py --writer).
+#
+# ROUTE 1 of src/chat/backend.py: POST {vllm_url}/v1/messages. That route
+# sends no temperature and no top_p (Opus 5.5 rejects both) and no effort.
+#
+# EFFORT `medium`, Bruce's choice 2026-09-24. It is Opus 5.5's default when no
+# effort is sent, so the route gives medium without sending it. Thinking cannot
+# be turned off on this model and counts against max_tokens.
+#
+# THE KEY is read from CLAUDE_API_KEY, not ANTHROPIC_API_KEY: Bruce keeps the
+# standard name unset so it does not take over his Claude subscription.
+#
+# TEMPERATURE: src/chat/model_params.py must still have an entry, because the
+# backend looks one up before choosing a route. The value is not sent.
+llm_config:
+  server: anthropic
+  model: "claude-opus-5-5"
+  vllm_url: https://api.anthropic.com
+  # NAME of the env var holding the key, not the key.
+  api_key: CLAUDE_API_KEY

@@ -31,9 +31,8 @@ from typing import Dict, List
 # GLOBAL. Every model, every call site: runs, scoring, the grader, chat,
 # subagents. Not a per-model setting and not overridable by convention — the
 # grader's old `top_p=1.0` pin was removed rather than kept as an exception.
-# Route 1 (Anthropic) omits top_p entirely because Opus 4.7 rejects it; that
-# is a protocol limit, not an exemption, and no Anthropic model is currently
-# configured.
+# Route 1 (Anthropic) omits top_p entirely because Opus 4.7 and Opus 5.5
+# reject it; that is a protocol limit, not an exemption.
 # ---------------------------------------------------------------------------
 TOP_P: float = 0.95
 
@@ -64,6 +63,11 @@ MODEL_TEMPERATURE: Dict[str, float] = {
     # grok-4.7 (released 2026-09-21). xAI's model page publishes no
     # temperature, as for 4.6; Bruce chose 0.5 on 2026-09-22, the 4.6 value.
     "grok-4.7": 0.5,
+    # claude-opus-5-5 (Anthropic, direct). Anthropic publishes no value: the
+    # API accepts temperature only at 1.0 and rejects any other value, and
+    # rejects top_p and top_k (checked 2026-09-24). The Anthropic route sends
+    # neither, so the model runs at 1.0. Bruce chose 1.0 on 2026-09-24.
+    "claude-opus-5-5": 1.0,
     # Local.
     #
     # NARROWED 2026-08-26 from the bare `Qwen3.8`. That key matched every

@@ -378,19 +378,19 @@ def test_daily_works_the_named_then_scouts_the_least_scouted_kind_when_the_pool_
     did = []
     named = [{"name": "Ann Named"}]
     monkeypatch.setattr(runner, "pickup", lambda data: named)
-    monkeypatch.setattr(runner, "work", lambda backend, cands, stages, data, use_attio, redo=False:
+    monkeypatch.setattr(runner, "work", lambda backend, writer, cands, stages, data, use_attio, redo=False:
                         did.append(("work", [c["name"] for c in cands], stages[-1], use_attio)))
     ready = [{"entry_values": {"stage": [{"status": {"title": "Ready to contact"}}]}}] * 2
     monkeypatch.setattr(runner.attio, "entries", lambda: ready)
     monkeypatch.setattr(runner, "scout", lambda b, kind, data, want: did.append(("scout", kind, want)) or [{"name": "Sue Scouted"}])
     monkeypatch.setattr(runner, "scout_firms", lambda b, kind, data, want: did.append(("firms", kind, want)) or [])
     monkeypatch.setattr(runner, "next_kind", lambda: "Repeat acquirer")
-    text = runner.daily(Backend(), tmp_path, pool=5, want=2)
+    text = runner.daily(Backend(), Backend(), tmp_path, pool=5, want=2)
     assert did == [("work", ["Ann Named"], "push", True), ("work", [], "push", True),
                    ("firms", "Repeat acquirer", 2), ("work", [], "push", True)]
     assert "Scouted for: Repeat acquirer, by firm." in text and "Ready to contact now: 2." in text
     did.clear()
-    runner.daily(Backend(), tmp_path, pool=2, want=2)                 # the pool is full: no scouting
+    runner.daily(Backend(), Backend(), tmp_path, pool=2, want=2)                 # the pool is full: no scouting
     assert [d[0] for d in did] == ["work", "work"]
 
 
@@ -510,7 +510,7 @@ def test_a_reply_is_read_once_and_its_quotes_are_checked(tmp_path, monkeypatch):
         "introduced_name": "Pat Head", "next_step": "Thank her; do not argue. Approach Pat Head as a referral."},
         {"takes_up": "The objection and the introduction.", "message": "Jane, thank you. May I use your name with Pat?",
          "assumes": ""}], seen))
-    assert runner.replies(Backend(), tmp_path) == ["Jane Smith"]
+    assert runner.replies(Backend(), Backend(), tmp_path) == ["Jane Smith"]
     user = seen[0]["user"]
     assert "PROSPECT.md §22" in user and "   2|Honestly our diligence" in user and "Jane, I read your post." in user
     rec = json.loads((tmp_path / "jane_smith" / "replies.json").read_text())[0]
@@ -522,7 +522,7 @@ def test_a_reply_is_read_once_and_its_quotes_are_checked(tmp_path, monkeypatch):
     assert "PROSPECT.md §23" in seen[1]["user"] and '"what": "objection"' in seen[1]["user"]
     assert "   2|Honestly our diligence" in seen[1]["user"]
     assert rec["answer"]["message"].startswith("Jane, thank you.") and not rec["answer"]["flags"]
-    assert runner.replies(Backend(), tmp_path) == [] and len(seen) == 2         # read once, answered once
+    assert runner.replies(Backend(), Backend(), tmp_path) == [] and len(seen) == 2         # read once, answered once
 
     # a reply read before answers existed gets its answer on the next run
     log = tmp_path / "jane_smith" / "replies.json"
@@ -530,7 +530,7 @@ def test_a_reply_is_read_once_and_its_quotes_are_checked(tmp_path, monkeypatch):
     del have[0]["answer"]
     log.write_text(json.dumps(have))
     monkeypatch.setattr(runner, "emit", _fake([{"takes_up": "t", "message": "word " * 95, "assumes": ""}], seen))
-    assert runner.replies(Backend(), tmp_path) == ["Jane Smith"] and len(wrote) == 2   # nothing more written to Attio
+    assert runner.replies(Backend(), Backend(), tmp_path) == ["Jane Smith"] and len(wrote) == 2   # nothing more written to Attio
     assert json.loads(log.read_text())[0]["answer"]["flags"] == ["the answer is 95 words"]
 
 

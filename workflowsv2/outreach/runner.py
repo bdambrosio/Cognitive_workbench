@@ -11,7 +11,9 @@ the practice has recorded and drafts the follow-ups that are due; then, when few
 `--pool` people are Ready to contact, scouts for the day's kind (the kinds take turns by date; people
 an earlier scout found of that kind are taken before any new search)
 (`--want` of the people found go on to research); and pushes everything it
-qualified. The model is the local Qwen unless `--model` names another.
+qualified. The model is the local Qwen unless `--model` names another; the three calls
+that write a message to send (the first message, the follow-up, the answer to a reply)
+use the `--writer` model, Claude Opus 5.5 unless it names another.
 
 THE CANDIDATES FILE is a YAML list. Each entry has `name`, and any of `firm`,
 `urls` (pages to fetch), `pasted` (a list of `{source, date, text}`: text
@@ -397,7 +399,7 @@ def draft(backend, c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]
     for _ in range(2):
         # Asked again once when nothing usable comes back: a strong candidate
         # with no message is not pushed, and would wait for a person to notice.
-        out = _ask(backend, user, schemas.draft_schema(), 8192)
+        out = _ask(backend, user, schemas.draft_schema(), 16000)
         d, dropped, flags = schemas.clean_draft(out.get("obj"), evidence)
         if out.get("parse") in ("parsed", "repaired") and d["message"]:
             break
@@ -563,7 +565,7 @@ def followup(backend, c: Dict[str, Any], cand_dir: Path, contact: str, sent: str
             + f"{evidence_block(cand_dir, files)}\n\n"
             f"This step drafts the follow-up. Emit the answer per PROSPECT.md §21.")
     for _ in range(2):                                     # asked again once, as `draft` is
-        out = _ask(backend, user, schemas.followup_schema(), 4096)
+        out = _ask(backend, user, schemas.followup_schema(), 16000)
         f, flags = schemas.clean_followup(out.get("obj"))
         if out.get("parse") in ("parsed", "repaired") and f["message"]:
             break
@@ -575,7 +577,7 @@ def followup(backend, c: Dict[str, Any], cand_dir: Path, contact: str, sent: str
     return rec
 
 
-def followups(backend, data: Path) -> List[str]:
+def followups(writer, data: Path) -> List[str]:
     """Draft the follow-up for everyone at Initial sent whose date has come
     and who has none drafted. Returns their names."""
     names = []
@@ -588,7 +590,7 @@ def followups(backend, data: Path) -> List[str]:
             continue
         rid = e["parent_record_id"]
         logger.info("%s: follow-up", c["name"])
-        followup(backend, c, cand_dir, attio.contact_record({"id": {"record_id": rid}}), sent_block(rid))
+        followup(writer, c, cand_dir, attio.contact_record({"id": {"record_id": rid}}), sent_block(rid))
         names.append(c["name"])
     return names
 
@@ -624,7 +626,7 @@ def answer(backend, c: Dict[str, Any], cand_dir: Path, sent: str, rec: Dict[str,
                                                        indent=1, ensure_ascii=False) + "\n\n" if q else "")
             + "This step drafts the practice's answer to the reply. Emit your output per PROSPECT.md §23.")
     for _ in range(2):                                     # asked again once, as `draft` is
-        out = _ask(backend, user, schemas.answer_schema(), 4096)
+        out = _ask(backend, user, schemas.answer_schema(), 16000)
         a, flags = schemas.clean_answer(out.get("obj"))
         if out.get("parse") in ("parsed", "repaired") and a["message"]:
             break
@@ -633,7 +635,7 @@ def answer(backend, c: Dict[str, Any], cand_dir: Path, sent: str, rec: Dict[str,
     return {**a, "at": today(), "model": backend.resolved_model(), "flags": flags}
 
 
-def replies(backend, data: Path) -> List[str]:
+def replies(backend, writer, data: Path) -> List[str]:
     """Read every recorded reply that has not been read, and draft the answer
     to every reply that has none. The record is replies.json, one entry per
     reply; Attio gets the next step as the entry's next action and a note of
@@ -667,7 +669,7 @@ def replies(backend, data: Path) -> List[str]:
             if "answer" in rec or not rec["gives"]:
                 continue
             logger.info("%s: answer to the reply of %s", c["name"], rec["received"])
-            rec["answer"] = answer(backend, c, cand_dir, sent_block(rid), rec)
+            rec["answer"] = answer(writer, c, cand_dir, sent_block(rid), rec)
             _write_json(log, have)
             if c["name"] not in names:
                 names.append(c["name"])
@@ -880,10 +882,12 @@ DAILY_KINDS = ("M&A adviser", "Repeat acquirer", "Searcher", "Small PE-family of
                "Technical feedback", "VC / Investor")
 FIRM_KINDS = ("Repeat acquirer", "Small PE-family office")
 MODEL = REPO / "measure/models/local_qwen38flashnext.yaml"
+WRITER = REPO / "measure/models/anthropic_opus55_medium.yaml"
 RECORDS = {"research": "research.json", "qualify": "qualification.json", "draft": "draft.json"}
 
 
-def work(backend, cands: List[Dict[str, Any]], stages, data: Path, use_attio: bool, redo: bool = False) -> None:
+def work(backend, writer, cands: List[Dict[str, Any]], stages, data: Path, use_attio: bool,
+         redo: bool = False) -> None:
     """Run the named stages for each candidate. A stage whose record exists
     is not run again unless `redo`."""
     for c in cands:
@@ -906,7 +910,10 @@ def work(backend, cands: List[Dict[str, Any]], stages, data: Path, use_attio: bo
                             attio.contact_for(c["name"], str(c.get("firm") or ""), firm_domain(c)) if use_attio else "")
                 better_contact(c, q, data, use_attio)
                 continue
-            {"research": research, "draft": draft}[st](backend, c, cand_dir)
+            if st == "draft":
+                draft(writer, c, cand_dir)
+                continue
+            research(backend, c, cand_dir)
 
 
 def unpushed(data: Path) -> List[Dict[str, Any]]:
@@ -922,7 +929,7 @@ def next_kind(day: Optional[datetime.date] = None) -> str:
     return DAILY_KINDS[(day or datetime.date.today()).toordinal() % len(DAILY_KINDS)]
 
 
-def daily(backend, data: Path, pool: int, want: int) -> str:
+def daily(backend, writer, data: Path, pool: int, want: int) -> str:
     """The whole day's work, in order: the names waiting at Research in Attio;
     the replies recorded and not yet read, and the follow-ups that are due;
     then, when fewer than `pool` people are Ready to contact, a scout for the
@@ -930,9 +937,9 @@ def daily(backend, data: Path, pool: int, want: int) -> str:
     person needs to read."""
     data.mkdir(parents=True, exist_ok=True)
     named = pickup(data)
-    work(backend, named, STAGES + ("push",), data, use_attio=True)
-    work(backend, unpushed(data), ("push",), data, use_attio=True)      # left by an earlier scout
-    read, drafted = replies(backend, data), followups(backend, data)
+    work(backend, writer, named, STAGES + ("push",), data, use_attio=True)
+    work(backend, writer, unpushed(data), ("push",), data, use_attio=True)      # left by an earlier scout
+    read, drafted = replies(backend, writer, data), followups(writer, data)
     ready = sum(1 for e in attio.entries() if attio.stage_of(e) == "Ready to contact")
     lines = [f"Names you added, researched today: {len(named)}.",
              f"Replies read: {len(read)}{' (' + ', '.join(read) + ')' if read else ''}.",
@@ -944,7 +951,7 @@ def daily(backend, data: Path, pool: int, want: int) -> str:
         by_firm = kind in FIRM_KINDS
         lines.append(f"Scouted for: {kind}{', by firm' if by_firm else ''}.")
         scouted = (scout_firms if by_firm else scout)(backend, kind, data, want)
-        work(backend, scouted, STAGES + ("push",), data, use_attio=True)
+        work(backend, writer, scouted, STAGES + ("push",), data, use_attio=True)
     ready = sum(1 for e in attio.entries() if attio.stage_of(e) == "Ready to contact")
     lines.append(f"Ready to contact now: {ready}.")
     return summary(named + scouted, data) + "\n" + "\n".join(lines) + "\n"
@@ -959,6 +966,8 @@ def main() -> int:
     ap.add_argument("--candidates", type=Path, default=None,
                     help="a YAML file of candidates; without it, the entries at stage Research in Attio")
     ap.add_argument("--model", type=Path, default=MODEL, help="default: the local Qwen model file")
+    ap.add_argument("--writer", type=Path, default=WRITER,
+                    help="the model for the calls that write a message to send; default: Claude Opus 5.5")
     ap.add_argument("--firms", action="store_true",
                     help="for `scout`: find firms of the kind, then the person to approach at each")
     ap.add_argument("--want", type=int, default=3,
@@ -977,12 +986,15 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     stages = STAGES if args.stage in ("run", "scout") else (args.stage,)
     backend = backend_from_model(args.model) if stages not in (("brief",), ("push",)) else None
+    writer = (backend_from_model(args.writer)
+              if args.stage in ("daily", "followups", "replies") or "draft" in stages else None)
     if args.stage == "daily":
-        print(daily(backend, args.data, args.pool, args.want))
+        print(daily(backend, writer, args.data, args.pool, args.want))
         return 0
     if args.stage in ("followups", "replies"):
         args.data.mkdir(parents=True, exist_ok=True)
-        names = {"followups": followups, "replies": replies}[args.stage](backend, args.data)
+        names = (followups(writer, args.data) if args.stage == "followups"
+                 else replies(backend, writer, args.data))
         print(f"{args.stage}: {len(names)}" + (f" ({', '.join(names)})" if names else ""))
         return 0
     if args.stage == "scout":
@@ -997,7 +1009,7 @@ def main() -> int:
     todo = [c for c in cands if args.only in (None, slug(c["name"]))]
     if not todo and args.only:
         raise SystemExit(f"no candidate with the slug {args.only}")
-    work(backend, todo, stages, args.data, args.attio, args.redo)
+    work(backend, writer, todo, stages, args.data, args.attio, args.redo)
     print(summary(cands, args.data))
     return 0
 
