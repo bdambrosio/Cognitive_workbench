@@ -1,0 +1,92 @@
+# Known answers for the chhoto-url target (6a1b51c, v7.5.1), for scoring a run
+# with measure/known_answers.py. Each answer was checked by hand against the
+# target on 2026-09-24; `basis` says how. They are a first set, from the claims
+# the runs of 2026-09-20..24 got wrong at least once, not a sample of the
+# surface, and Bruce has not yet reviewed them.
+#
+# Fields:
+#   source, lines   where the claim is made; a frozen claim whose own quote
+#                   overlaps these lines is a candidate
+#   statement       what the claim says; among several candidates the one whose
+#                   statement is closest (the duplicates pass's embedder) is taken
+#   verdict         when the claim was tested, the verdicts that are right
+#   cites_any       when the claim was tested, the finding must cite at least
+#                   one of these line ranges; this is how a right verdict for a
+#                   wrong reason is told apart
+target: chhoto-url 6a1b51c
+answers:
+  - id: hit-only
+    source: README.md
+    lines: [66, 67]
+    statement: Only the hit is recorded for each visit to a short link, and nothing else about the visitor.
+    verdict: [real, real_with_caveat]
+    basis: >
+      Hits are counted per link. As shipped nothing else about a visitor is
+      written: the default log filter (backend/src/main.rs:45-52,
+      "warn,chhoto_url=info,...") drops actix-web's info-level access log, so
+      raising RUST_LOG is an operator setting and at most a caveat (METHOD §2,
+      as shipped). The enumeration of 2026-09-24 (cmp-chhoto-glm-med) lost this
+      claim to a wrong `restates` pointer.
+
+  - id: no-personal-info-logged
+    source: docs/INSTALLATION.md
+    lines: [279, 279]
+    statement: No personal information of the end user is ever logged.
+    verdict: [contradicted]
+    cites_any:
+      - {document: backend/src/database/events.rs, lines: [258, 263]}
+    basis: >
+      When adding a link fails, backend/src/database/events.rs:258-263 logs the
+      submitted long URL and shortlink at ERROR, which the default filter
+      passes. Not the actix access log: that is dropped by the default filter,
+      so a finding resting on it alone is right for the wrong reason
+      (cmp-chhoto-glm-med INSTALLATION #101).
+
+  - id: no-cookies
+    source: README.md
+    lines: [98, 99]
+    statement: The software sets no cookies.
+    verdict: [contradicted]
+    cites_any:
+      - {document: backend/src/main.rs, lines: [104, 112]}
+    basis: >
+      backend/src/main.rs:104-112 wraps the app in actix-session's
+      SessionMiddleware with CookieSessionStore and a persistent session; the
+      admin login writes a token into it. Set by default, no setting needed.
+
+  - id: no-tracking
+    source: README.md
+    lines: [94, 94]
+    statement: The software performs no tracking or spying of any kind.
+    verdict: [real_with_caveat]
+    basis: >
+      The backend has no HTTP client and sends nothing out. The shipped
+      frontend (frontend/index.html:50-60) loads scripts and fonts from
+      cdn.jsdelivr.net and Google Fonts, which exposes each visitor's IP to
+      those hosts, and the session cookie is set on admin login. Caveats, not
+      tracking by the software.
+
+  - id: compose-basic-deployment
+    source: docs/INSTALLATION.md
+    lines: [8, 9]
+    statement: The sample compose file contains everything needed for a basic deployment.
+    verdict: [contradicted, partial]
+    cites_any:
+      - {document: deploy/compose.yaml, lines: [35, 35]}
+      - {document: deploy/compose.yaml, lines: [106, 117]}
+    basis: >
+      Docker Compose v5.0.2, `docker compose config -q` on the shipped file:
+      fails on line 35 ("CHHOTO_SQLITE_USE_WAL_MODE = True", trailing space);
+      with that fixed, fails on "refers to undefined volume data" (the service
+      mounts `data` at line 107, the file declares only `db` at 116-117). Both
+      fixed, it validates. The file cannot be used as shipped.
+
+  - id: compose-up
+    source: docs/INSTALLATION.md
+    lines: [22, 26]
+    statement: Running docker compose up -d with the provided compose file deploys the service.
+    verdict: [contradicted]
+    cites_any:
+      - {document: deploy/compose.yaml, lines: [35, 35]}
+      - {document: deploy/compose.yaml, lines: [106, 117]}
+    basis: Same check as compose-basic-deployment.

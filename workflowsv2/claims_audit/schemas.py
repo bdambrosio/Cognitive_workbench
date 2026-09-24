@@ -41,7 +41,7 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 logger = logging.getLogger("claims_audit.schemas")
 
@@ -196,7 +196,8 @@ def split_by_tier(claims: Sequence[Dict[str, Any]]
     return tested, [c for c in claims if c.get("tier") in (2, 3)]
 
 
-def assemble_surface(claim_source: str, sections: Sequence[Dict[str, Any]]
+def assemble_surface(claim_source: str, sections: Sequence[Dict[str, Any]],
+                     same_claim: Optional[Callable[[str, str], bool]] = None
                      ) -> Dict[str, Any]:
     """The frozen surface from per-section emissions, ids in document order.
 
@@ -218,6 +219,15 @@ def assemble_surface(claim_source: str, sections: Sequence[Dict[str, Any]]
     different statements are two claims sharing a quote, which is what the
     split rule in METHOD asks for; only a repeated statement folds, and
     its quote becomes a location on the first.
+
+    A `restates` IS CHECKED BEFORE IT FOLDS when `same_claim` is given: it
+    is called with the restating statement and the named claim's, and a
+    fold it refuses keeps the claim as a claim of its own, with the id it
+    named in `restates_rejected`. The model names the wrong id often enough
+    to matter: of the 143 folds on record (2026-09-24), at least 20 joined
+    unrelated claims, and each lost its statement. One was chhoto's "only the hit is recorded, and nothing
+    else", folded into a claim about security updates. A claim kept here
+    that does repeat another is left to the duplicates pass.
     """
     claims: List[Dict[str, Any]] = []
     by_id: Dict[int, Dict[str, Any]] = {}
@@ -229,6 +239,11 @@ def assemble_surface(claim_source: str, sections: Sequence[Dict[str, Any]]
         for c in sec.get("claims") or []:
             loc = {"quote": c.get("quote"), "lines": c.get("lines")}
             target = by_id.get(c.get("restates")) if c.get("restates") else None
+            if target is not None and same_claim is not None and not same_claim(
+                    c.get("statement") or "", target.get("statement") or ""):
+                rejected, target = c["restates"], None
+            else:
+                rejected = None
             if target is not None:
                 target.setdefault("locations", []).append(loc)
                 continue
@@ -240,7 +255,9 @@ def assemble_surface(claim_source: str, sections: Sequence[Dict[str, Any]]
             row = {"id": len(claims) + 1, "quote": c.get("quote"),
                    "lines": c.get("lines"), "statement": c.get("statement"),
                    "about": c.get("about")}
-            if c.get("restates"):
+            if rejected is not None:
+                row["restates_rejected"] = rejected
+            elif c.get("restates"):
                 row["restates"] = c["restates"]      # unresolved; reported
             claims.append(row)
             by_id[row["id"]] = row

@@ -106,3 +106,32 @@ def test_assemble_surface_folds_only_a_repeated_statement_within_a_section():
         {"quote": "self-host it", "lines": [40, 40], "statement": "s", "about": "target"}]}]
     out = sch.assemble_surface("d.md", later)
     assert [c["id"] for c in out["claims"]] == [1, 2, 3, 4]
+
+
+def test_a_restates_naming_an_unrelated_claim_keeps_its_own_claim():
+    # cmp-chhoto-glm-med, README, 2026-09-24: the model emitted the privacy
+    # claim with `restates` naming a claim about security updates, and the
+    # fold discarded it. A true restatement from the same run still folds.
+    # Uses the real embedder: the threshold is the contract.
+    from workflowsv2.claims_audit.duplicates import same_statement
+    parts = [
+        {"claims": [
+            {"quote": "keep it updated", "lines": [26, 27], "about": "seller",
+             "statement": "Seller intent: the seller commits to keeping the project updated "
+                          "against security vulnerabilities."},
+            {"quote": "hit counting", "lines": [39, 40], "about": "target",
+             "statement": "The target includes hit counting."}]},
+        {"claims": [
+            {"quote": "only the hit is recorded, and nothing else", "lines": [67, 67],
+             "about": "target", "restates": 1,
+             "statement": "Boundary claim: only the hit is recorded for each visit, and "
+                          "nothing else about the visitor (no other data is collected)."},
+            {"quote": "Counts number of hits", "lines": [66, 66], "about": "target",
+             "restates": 2, "statement": "The target counts the number of hits for each short link."}]}]
+    out = sch.assemble_surface("README.md", parts, same_claim=same_statement)
+    assert [c["id"] for c in out["claims"]] == [1, 2, 3]
+    kept = out["claims"][2]
+    assert kept["quote"] == "only the hit is recorded, and nothing else"
+    assert kept["restates_rejected"] == 1 and "restates" not in kept
+    assert "locations" not in out["claims"][0]
+    assert out["claims"][1]["locations"] == [{"quote": "Counts number of hits", "lines": [66, 66]}]

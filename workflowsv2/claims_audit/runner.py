@@ -83,7 +83,7 @@ logger.setLevel(logging.INFO)
 # `schemas.py` holds the contract and the reason; this file only drives it.
 from chat.workflow import load_workflow                          # noqa: E402
 from workflowsv2 import issues                                    # noqa: E402
-from workflowsv2.claims_audit import behaviour_split, schemas    # noqa: E402
+from workflowsv2.claims_audit import behaviour_split, duplicates, schemas  # noqa: E402
 from workflowsv2.emit import emit                                 # noqa: E402
 
 # The brief lives with its engagement, in engagements/<name>/brief.md — it is
@@ -1433,7 +1433,8 @@ def main() -> int:
                          f"(finish={part['finish']}): {part['parse_error']}")
                 break
             parts.append(part["obj"])
-            assembled = schemas.assemble_surface(claim_source, parts)
+            assembled = schemas.assemble_surface(claim_source, parts,
+                                                 same_claim=duplicates.same_statement)
         # ---- split claims about behaviour, before the freeze -------------
         # A claim that says what the software does when it runs becomes a
         # mechanism claim and a behaviour claim (BEHAVIOUR_SPLIT.md). Only an

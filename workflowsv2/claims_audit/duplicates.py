@@ -140,6 +140,30 @@ def embed(statements: Sequence[str]):
     return model.encode(list(statements), normalize_embeddings=True, show_progress_bar=False)
 
 
+# The cosine similarity a `restates` statement must reach with the claim it
+# names before assemble_surface folds it. Set from the 143 folds on record
+# (2026-09-24): the 20 below 0.60 all joined unrelated claims; the 39 from
+# 0.60 to 0.75 are mixed, wrong targets beside restatements and narrower
+# versions of the named claim; the 84 above are restatements. A claim wrongly
+# kept goes to the duplicates pass, and one wrongly folded is lost, so the
+# line sits at the top of the mixed band.
+RESTATES_FLOOR = 0.75
+_restates_seen: Dict[Tuple[str, str], bool] = {}
+
+
+def same_statement(new: str, named: str) -> bool:
+    """Whether a statement emitted with `restates` says the same as the
+    statement of the claim it names; for schemas.assemble_surface."""
+    key = (new, named)
+    if key not in _restates_seen:
+        a, b = embed([new, named])
+        sim = float(a @ b)
+        _restates_seen[key] = sim >= RESTATES_FLOOR
+        if not _restates_seen[key]:
+            logger.info("restates refused (similarity %.2f): %r does not restate %r", sim, new, named)
+    return _restates_seen[key]
+
+
 def nearest(row, allowed: Sequence[int]) -> List[int]:
     """Indices from `allowed`, the at most NEAREST most similar to the claim
     whose similarity row is `row`, none below FLOOR, most similar first."""
