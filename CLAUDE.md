@@ -125,6 +125,35 @@ pre-existing dead code alone and mention it instead. Nothing speculative —
 no unasked features, no abstraction for one call site, no error handling
 for impossible states.
 
+## Tests must protect behaviour
+
+Before adding or changing a test, answer three questions. If one has no
+answer, do not add the test.
+
+1. What behaviour or contract does it protect, stated as something a
+   caller or user can observe?
+2. What credible change to the code would make it fail?
+3. Why does no existing test already fail on that change?
+
+A regression test must be shown to fail on the code before the fix, for
+the reason the bug gives. A test that has only ever passed proves the
+mock, not the fix.
+
+Do not add a test that:
+- asserts which internal functions were called, or in what order, when
+  the order is not observable behaviour;
+- uses a mock that returns exactly what the assertion checks;
+- computes its expected value with the code under test;
+- needs an export, flag or hook that no production caller uses.
+
+The non-obvious half: a test you have to edit during a change that does
+not alter behaviour was testing the implementation. Rewrite it at the
+boundary a caller uses, or delete it, in the same change. And for the LLM
+stages, no unit test catches a wrong reading, verdict or omission. Report
+what a run showed, not that tests pass.
+
+Going forward, not backward: no sweep of existing tests.
+
 ## Changes that affect Jill are put to Jill
 
 Jill is the chat agent defined in `scenarios/jill-chat.yaml`. The scope

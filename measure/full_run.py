@@ -84,6 +84,10 @@ def main() -> int:
     ap.add_argument("--name", required=True, help="new engagement name; must not exist")
     ap.add_argument("--model", required=True, type=Path)
     ap.add_argument("--duplicates-model", type=Path, default=None)
+    ap.add_argument("--source", default=None,
+                    help="test this one claim source only: the sorting is confirmed with it "
+                         "alone, its evidence excludes as proposed, and a sentence saying so "
+                         "is added to the base's brief")
     ap.add_argument("--from", dest="start", choices=STEPS, default=STEPS[0],
                     help="resume an existing run at this step, after an earlier "
                          "step was finished by hand (the steps before it are "
@@ -101,7 +105,7 @@ def main() -> int:
     rec_path = eng / "full_run.json"
     if args.start == STEPS[0]:
         record = {"base": args.base, "engagement": args.name, "model": model,
-                  "duplicates_model": dup_model, "harness": _harness(),
+                  "duplicates_model": dup_model, "source": args.source, "harness": _harness(),
                   "started": _now(), "steps": []}
     else:
         if not rec_path.is_file():
@@ -169,12 +173,22 @@ def main() -> int:
     def confirm():
         sel = sorting.load(eng)
         proposed = list(sel["proposal"]["claim_sources"])
-        sorting.confirm(eng, by=BY)
-        return {"claim_sources": proposed,
+        if args.source and args.source not in proposed:
+            raise SystemExit(f"--source {args.source} is not among the proposed claim sources {proposed}")
+        sorting.confirm(eng, by=BY, claim_sources=[args.source] if args.source else None)
+        return {"claim_sources": proposed, "confirmed": state.claim_sources(eng),
                 "evidence_excludes": list(sel["proposal"]["evidence_excludes"])}
 
     def brief():
         mine, theirs = state.claim_sources(eng), state.claim_sources(base)
+        if args.source:
+            if mine != [args.source] or args.source not in theirs:
+                raise SystemExit(f"--source {args.source}: this engagement has {mine}, the base has {theirs}")
+            text = (base / "brief.md").read_text(encoding="utf-8").rstrip()
+            (eng / "brief.md").write_text(
+                text + f"\n\nThis run tests one claim source only: {args.source}. The other claim "
+                       f"sources named above are not tested, and remain not evidence.\n", encoding="utf-8")
+            return {"copied_from": args.base, "source": args.source}
         if sorted(mine) != sorted(theirs):
             raise SystemExit(f"this sorting proposed {mine}, the base has {theirs}: "
                              f"the base's brief does not describe these claim sources; "
