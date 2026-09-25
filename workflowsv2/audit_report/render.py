@@ -217,7 +217,12 @@ def _evidence(items: Sequence[Dict[str, Any]]) -> List[str]:
         elif form == "derived":
             basis = "; ".join(f"`{b.get('document')}` {_lines(b.get('lines'))}"
                               for b in (e.get("basis") or []) if isinstance(b, dict))
-            out.append(f"- derived from {basis}: {_md_safe(e.get('derivation'))} "
+            if e.get("from_knowledge") is True:
+                head = ("- derived **from knowledge of the dependency, not from the "
+                        f"supplied materials**, with {basis} as its basis: ")
+            else:
+                head = f"- derived from {basis}: "
+            out.append(f"{head}{_md_safe(e.get('derivation'))} "
                        f"— {_md_safe(e.get('consequence'))}")
         elif form == "search":
             cands = ", ".join(f"`{c}`" for c in (e.get("candidates") or []))
@@ -226,6 +231,17 @@ def _evidence(items: Sequence[Dict[str, Any]]) -> List[str]:
                        f"{_md_safe(e.get('result'))}"
                        + (f" Files named: {cands}." if cands else ""))
     return out
+
+
+def _from_knowledge(f: Dict[str, Any]) -> bool:
+    """Whether any evidence item states what a dependency does from knowledge
+    of it (METHOD §7, `from_knowledge`). Only a declared statement is seen: a
+    gap that relies on such knowledge without the item is not."""
+    return any(isinstance(e, dict) and e.get("form") == "derived"
+               and e.get("from_knowledge") is True for e in f.get("evidence") or [])
+
+
+KNOWLEDGE_MARK = "rests in part on knowledge of a dependency"
 
 
 def _review_line(f: Dict[str, Any]) -> str:
@@ -295,6 +311,11 @@ def _finding(f: Dict[str, Any], rating: Optional[Dict[str, Any]],
                 "hosted service, which the supplied materials are not "
                 "expected to reach.", ""]
     out += [f"**Verdict:** {VERDICT_WORDS.get(v, v)}.", ""]
+    if _from_knowledge(f):
+        out += [f"**{KNOWLEDGE_MARK.capitalize()}.** Part of the evidence for this verdict is "
+                "a statement of what a third-party library does, made from the practice's "
+                "knowledge of that library. The supplied materials show where the library "
+                "is called and which version is used; they do not show what it does.", ""]
     if covered:
         wk = f"{covered.get('source')}#{covered.get('id')}"
         wv = (verdicts or {}).get(wk)
@@ -399,7 +420,8 @@ def key_findings(classes: Dict[str, List[Dict[str, Any]]],
         adj = f.get("adjudication") or {}
         rows.append(f"- **{f.get('claim_source')}, claim {f.get('claim_id')}** "
                     f"({VERDICT_WORDS.get(adj.get('verdict'), adj.get('verdict')).split(' — ')[0]}; "
-                    f"{r.get('materiality')}): {_md_safe(_first_sentence(adj.get('gap') or ''))}")
+                    f"{r.get('materiality')}): {_md_safe(_first_sentence(adj.get('gap') or ''))}"
+                    + (f" — *{KNOWLEDGE_MARK}*" if _from_knowledge(f) else ""))
     return rows
 
 
@@ -476,6 +498,14 @@ def _how_to_read() -> List[str]:
         "hosted service — shows any link the claim source itself gives for "
         "it. The practice did not follow those links and says nothing about "
         "what is there; the buyer can look.", "",
+        "**Knowledge of a dependency.** Some verdicts depend on what a "
+        "third-party library does, when the supplied materials show only that "
+        "the library is called and which version. The practice may then state "
+        "that behaviour from its knowledge of the library. The evidence line "
+        "says so, and the finding is marked *" + KNOWLEDGE_MARK + "*. The check "
+        "takes such a statement as written: the materials do not show it, and "
+        "nothing in this report confirms it. A finding without the mark may "
+        "still rely on such knowledge without saying so.", "",
         "**Ratings.** Materiality and exposure use one scale, read for a gap "
         "the review showed or for a claim assumed false:", "",
         "| rating | meaning |", "|---|---|",

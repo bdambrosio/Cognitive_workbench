@@ -282,3 +282,25 @@ def test_the_scope_table_counts_what_was_not_tested_and_names_a_source_with_no_r
     assert "`docs/SECURITY.md`" in text.split("**What this document is.**")[0]
     row = next(l for l in text.splitlines() if l.startswith(f"| {src} | "))
     assert row.split(" | ")[2] == "1"
+
+
+def test_a_verdict_resting_on_dependency_knowledge_is_marked_and_no_other_is():
+    """B, 2026-09-24: a finding whose evidence states what a dependency does
+    from knowledge (`from_knowledge`) is marked under its verdict and on its
+    evidence line; a derivation from the materials is not."""
+    def f(from_knowledge):
+        item = {"form": "derived", "derivation": "d", "consequence": "c",
+                "basis": [{"document": "backend/src/main.rs", "lines": [99, 99], "quote": "q"}]}
+        if from_knowledge:
+            item["from_knowledge"] = True
+        return {"claim_source": "docs/INSTALLATION.md", "claim_id": 1, "quote": "q",
+                "lines": [1, 1], "statement": "s",
+                "adjudication": {"verdict": "contradicted", "gap": "g"},
+                "evidence": [item],
+                "review": {"outcome": "holds", "adverse_observations": []},
+                "citation_problems": []}
+    marked = "\n".join(render._finding(f(True), None, "materiality"))
+    plain = "\n".join(render._finding(f(False), None, "materiality"))
+    assert "Rests in part on knowledge of a dependency." in marked
+    assert "from knowledge of the dependency, not from the supplied materials" in marked
+    assert "knowledge of" not in plain and "- derived from `backend/src/main.rs`" in plain
