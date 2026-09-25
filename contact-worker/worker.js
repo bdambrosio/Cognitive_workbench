@@ -13,7 +13,7 @@ const FROM = "contact@tuuyi.com";
 const TO = "info@tuuyi.com";
 const PAGE = "https://tuuyi.com/contact";
 const LIMITS = { name: 200, email: 254, company: 300, link: 500, message: 5000 };
-const REASONS = { beta: "Beta claims review", contact: "Contact" };
+const REASONS = { beta: "Beta claims review", seller: "Seller claims check", contact: "Contact" };
 
 export default {
   async fetch(request, env) {
