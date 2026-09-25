@@ -17,14 +17,14 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="stylesheet" href="/site.css?v=20260910">
+<link rel="stylesheet" href="/site.css?v=20260925">
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 <body>
 <div class="wrap">
 <header class="top">
   <a class="brand" href="/">Tuuyi</a>
-  <nav><a href="/">Home</a><a href="/how-it-works">How it works</a><a href="/pricing">Pricing</a><a href="/demo">Demo</a><a href="/about">About</a><a class="pill" href="/pricing">Beta: free claims reviews, limited</a><button class="theme" id="theme" type="button">light</button></nav>
+  <nav><a href="/">Home</a><a href="/how-it-works">How it works</a><a href="/pricing">Pricing</a><a href="/demo">Demo</a><a href="/about">About</a><a class="pill" href="/pricing">Beta: free claims reviews, limited</a></nav>
 </header>
 <main>
 
@@ -48,7 +48,7 @@
   <label>Company or firm <small>optional</small> <input name="company" type="text" maxlength="300" autocomplete="organization"></label>
   <label>Link to the software or its repository <small>optional</small> <input name="link" type="url" maxlength="500" placeholder="https://"></label>
   <label>Message <textarea name="message" required maxlength="5000" rows="7" placeholder="What are you evaluating, and what would you like checked?"></textarea></label>
-  <div class="cf-turnstile" data-sitekey="0x4AAAAAAEvvsIwVZ5n9v3D0" data-theme="auto"></div>
+  <div class="cf-turnstile" data-sitekey="0x4AAAAAAEvvsIwVZ5n9v3D0" data-theme="light"></div>
   <p><button class="btn primary" type="submit">Send</button></p>
 </form>
 
@@ -60,7 +60,6 @@
   <div><a href="/privacy">Privacy</a><a href="/demo">Demo</a><a href="/about">About</a></div>
 </footer>
 </div>
-<script src="/site.js?v=20260905"></script>
 <script>
 // Preselect the reason from the link that brought the visitor here, and show
 // the outcome the receiver reported in the query string after a submission.

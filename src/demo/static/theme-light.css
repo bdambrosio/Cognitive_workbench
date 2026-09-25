@@ -1,12 +1,12 @@
 /* The site's visual system over the client page, for the demo only: the same
-   tokens as site/site.css (dark by default, 2026-09-04). The client page paid
-   clients use keeps its own look; this file is loaded by demo.html alone. */
+   tokens as site/site.css (light, tan / rust / brown, 2026-09-25). The client
+   page paid clients use keeps its own look; this file is loaded by demo.html alone. */
 :root {
-  --bg: #080f19; --panel: #101d2b; --panel2: #09121e; --rule: #2b3a4b;
-  --text: #f3f6fa; --muted: #acbbcd; --label: #8295ab; --accent: #63efd9; --accent2: #63efd9;
-  --accent-ink: #08141c; --empty: #f3c988; --ok: #63efd9;
+  --bg: #efeadb; --panel: #faf8f0; --panel2: #e8e1ce; --rule: #dbd1b9;
+  --text: #2a1c12; --muted: #624b3a; --label: #7d6350; --accent: #9c3f1c; --accent2: #83341a;
+  --accent-ink: #fdf7ef; --empty: #6a430f; --ok: #9c3f1c;
   --mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
-  color-scheme: dark;
+  color-scheme: light;
 }
 body { font-family: Inter, "Segoe UI", system-ui, -apple-system, Arial, sans-serif; }
 /* header: the brand, then what this page is */
@@ -34,9 +34,11 @@ header .mode { display: none; }
 /* messages and controls in the site's colours */
 .msg.client { background: var(--accent); color: var(--accent-ink); border-radius: 8px; }
 .msg.client .who { color: var(--accent-ink); opacity: .7; }
+.msg.error { background: #f6d9cc; border: 1px solid #b0432a; }
 button, .upload { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
-.report a { color: inherit; text-decoration: underline; text-decoration-color: var(--rule); }
-.report a:hover { text-decoration-color: var(--accent); }
+.report a, .report a.ref { color: inherit; text-decoration: underline; text-decoration-color: var(--rule); }
+.report a:hover, .report a.ref:hover { text-decoration-color: var(--accent); }
+.report h3:hover { color: var(--accent); }
 .report .finding.named { border-color: var(--ok); box-shadow: 0 0 0 1px var(--ok); }
 .report code { font-family: var(--mono); color: var(--accent); }
 #evidence { border-top: 2px solid var(--ok); }
