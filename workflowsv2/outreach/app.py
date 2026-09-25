@@ -2,10 +2,11 @@
 
     python3 workflowsv2/outreach/app.py [--port 8810] [--model <yaml>]
 
-The page keeps nothing of its own. What it shows comes from Attio (who is at
-which stage, tasks due) and from the runner's records under prospects/ (the
-brief, the evidence, the draft); what it writes goes to the same two places,
-and only when a person presses a button. It sends no message to anyone: the
+The page keeps nothing of its own. What it shows comes from the contacts
+(contacts.py: who is at which stage, the notes of each exchange) and from the
+runner's records under prospects/ (the brief, the evidence, the draft); what
+it writes goes to the same two places, and only when a person presses a
+button. It sends no message to anyone: the
 person copies the text into LinkedIn and then presses Sent.
 
 It binds to 127.0.0.1 and has no login. It is not part of the client site.
@@ -13,7 +14,6 @@ It binds to 127.0.0.1 and has no login. It is not part of the client site.
 from __future__ import annotations
 
 import argparse
-import concurrent.futures
 import datetime
 import json
 import logging
@@ -32,7 +32,7 @@ from fastapi import FastAPI, HTTPException                              # noqa: 
 from fastapi.responses import FileResponse                              # noqa: E402
 from pydantic import BaseModel                                          # noqa: E402
 
-from workflowsv2.outreach import attio, runner, schemas                 # noqa: E402
+from workflowsv2.outreach import contacts, runner, schemas                # noqa: E402
 from utils.file_utils import atomic_write_text                          # noqa: E402
 
 logger = logging.getLogger("outreach.app")
@@ -57,9 +57,9 @@ def today() -> str:
     return datetime.date.today().isoformat()
 
 
-def _local(name: str) -> Dict[str, Any]:
+def _local(cid: str) -> Dict[str, Any]:
     """The runner's record of this person, where there is one."""
-    d = runner.DATA / runner.slug(name)
+    d = runner.DATA / cid
     out: Dict[str, Any] = {}
     for key, f in (("qualification", "qualification.json"), ("draft", "draft.json"),
                    ("followup", "followup.json"), ("replies", "replies.json")):
@@ -70,8 +70,8 @@ def _local(name: str) -> Dict[str, Any]:
     return out
 
 
-def _text(entry: Dict[str, Any], slug: str) -> Optional[str]:
-    return attio._first(entry, slug, "value")
+def _text(c: Dict[str, Any], field: str) -> Optional[str]:
+    return (c.get("entry") or {}).get(field) or None
 
 
 @app.get("/")
@@ -81,14 +81,11 @@ def page() -> FileResponse:
 
 @app.get("/api/queue")
 def queue() -> Dict[str, Any]:
-    try:
-        entries = attio.entries()
-    except attio.AttioError as e:
-        raise HTTPException(502, str(e))
+    entries = contacts.entries()
     shown: List[tuple] = []
     counts: Dict[str, int] = {}
     for e in entries:
-        stage = attio.stage_of(e)
+        stage = contacts.stage_of(e)
         counts[stage] = counts.get(stage, 0) + 1
         if stage not in GROUP_OF:
             continue
@@ -97,47 +94,38 @@ def queue() -> Dict[str, Any]:
             counts["(put off)"] = counts.get("(put off)", 0) + 1
             continue
         group = GROUP_OF[stage]
-        if group in ("followup", "noresponse") and not attio.due(e, stage, today()):
+        if group in ("followup", "noresponse") and not contacts.due(e, stage, today()):
             group = "waiting"
         shown.append((e, stage, group))
-    # Each card costs one or two reads of Attio; one after another they took
-    # half a minute for 25 cards.
-    try:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
-            cards = list(pool.map(lambda t: _card(*t), shown))
-    except attio.AttioError as e:
-        raise HTTPException(502, str(e))
+    cards = [_card(*t) for t in shown]
     cards.sort(key=lambda c: GROUPS.index(c["group"]))
     return {"cards": cards, "counts": counts,
             "kinds": [k for k in schemas.TYPES if k != "none"]}
 
 
 def _card(e: Dict[str, Any], stage: str, group: str) -> Dict[str, Any]:
-    """One entry of the outreach list as the page shows it."""
+    """One contact in the outreach list as the page shows it."""
     later = _text(e, "next_action_date")
-    person = attio._call("GET", f"/objects/people/records/{e['parent_record_id']}")["data"]
-    name = attio._first(person, "name", "full_name") or "(no name)"
-    local = _local(name)
+    name = e["name"]
+    local = _local(e["id"])
     draft = local.get("draft") or {}
     follow = local.get("followup") or {}
-    rid = e["parent_record_id"]
-    got = [] if group in ("ready", "qualified", "research") else attio.notes(rid)
-    sent = [{"what": what, **n} for what, title in (("First message", attio.SENT_NOTE),
-                                                    ("Follow-up", attio.FOLLOWUP_NOTE),
-                                                    ("Reply", attio.REPLY_NOTE),
-                                                    ("Answer", attio.ANSWER_NOTE))
-            for n in attio.note_texts(rid, title, got)]
-    option = attio._first(e, "category", "option")
+    rid = e["id"]
+    sent = [{"what": what, **n} for what, title in (("First message", contacts.SENT_NOTE),
+                                                    ("Follow-up", contacts.FOLLOWUP_NOTE),
+                                                    ("Reply", contacts.REPLY_NOTE),
+                                                    ("Answer", contacts.ANSWER_NOTE))
+            for n in contacts.note_texts(rid, title, e["notes"])]
     return {"record_id": rid, "name": name, "stage": stage, "group": group,
             "last_contact": _text(e, "last_contact"), "due": later,
             "next_action": _text(e, "next_action"),
             "followup": follow.get("edited_message") or follow.get("message"),
             "followup_idea": follow.get("idea"), "sent": sent,
             "replies": local.get("replies") or [],
-            "title": attio._first(person, "job_title", "value"),
-            "linkedin": attio._first(person, "linkedin", "value"),
-            "web_url": person.get("web_url"),
-            "category": option.get("title") if isinstance(option, dict) else None,
+            "contact": {k: e.get(k) or "" for k in contacts.PERSON_FIELDS},
+            "how_known": _text(e, "notes") or "",
+            "title": e.get("title"), "linkedin": e.get("linkedin"),
+            "category": _text(e, "category"),
             "fit_rationale": _text(e, "fit_rationale"),
             "message": draft.get("edited_message") or draft.get("message"),
             "flags": ((local.get("qualification") or {}).get("flags", []) + draft.get("flags", [])
@@ -157,13 +145,13 @@ def sent(body: Sent) -> Dict[str, Any]:
     """The person has sent the message by hand. Record the exact text and move
     the entry to Initial sent."""
     try:
-        attio.create_note(body.record_id, f"{attio.SENT_NOTE} {today()}", body.message)
-        attio.upsert_entry(body.record_id, {"stage": "Initial sent", "last_contact": today(),
+        contacts.create_note(body.record_id, f"{contacts.SENT_NOTE} {today()}", body.message)
+        contacts.upsert_entry(body.record_id, {"stage": "Initial sent", "last_contact": today(),
                                             "next_action": "Follow up if no response",
                                             "next_action_date": (datetime.date.today() + datetime.timedelta(
                                                 days=FOLLOWUP_AFTER_DAYS)).isoformat()})
-    except attio.AttioError as e:
-        raise HTTPException(502, str(e))
+    except contacts.ContactError as e:
+        raise HTTPException(422, str(e))
     return {"ok": True}
 
 
@@ -172,13 +160,13 @@ def followup_sent(body: Sent) -> Dict[str, Any]:
     """The person has sent the follow-up by hand. It is the only one: the next
     action is to close the approach if nothing comes back."""
     try:
-        attio.create_note(body.record_id, f"{attio.FOLLOWUP_NOTE} {today()}", body.message)
-        attio.upsert_entry(body.record_id, {"stage": "Follow-up sent", "last_contact": today(),
+        contacts.create_note(body.record_id, f"{contacts.FOLLOWUP_NOTE} {today()}", body.message)
+        contacts.upsert_entry(body.record_id, {"stage": "Follow-up sent", "last_contact": today(),
                                             "next_action": "Close if no response",
                                             "next_action_date": (datetime.date.today() + datetime.timedelta(
                                                 days=CLOSE_AFTER_DAYS)).isoformat()})
-    except attio.AttioError as e:
-        raise HTTPException(502, str(e))
+    except contacts.ContactError as e:
+        raise HTTPException(422, str(e))
     return {"ok": True}
 
 
@@ -195,18 +183,18 @@ def replied(body: Replied) -> Dict[str, Any]:
     if not body.reply.strip():
         raise HTTPException(422, "paste the reply")
     try:
-        # compared without regard to spacing: Attio returns a note's text re-spaced
-        if any(n["text"].split() == body.reply.split() for n in attio.note_texts(body.record_id, attio.REPLY_NOTE)):
+        # compared without regard to spacing: notes carried over from Attio were re-spaced
+        if any(n["text"].split() == body.reply.split() for n in contacts.note_texts(body.record_id, contacts.REPLY_NOTE)):
             raise HTTPException(409, "this reply is already recorded for this person")
-        entry = attio.entry_of(body.record_id)
-        attio.create_note(body.record_id, f"{attio.REPLY_NOTE} {today()}", body.reply.strip())
+        entry = contacts.entry_of(body.record_id)
+        contacts.create_note(body.record_id, f"{contacts.REPLY_NOTE} {today()}", body.reply.strip())
         values: Dict[str, Any] = {"last_contact": today(), "next_action": "Read the reply",
                                   "next_action_date": today()}
-        if entry is None or attio.stage_of(entry) != "Conversation":
+        if entry is None or contacts.stage_of(entry) != "Conversation":
             values["stage"] = "Replied"
-        attio.upsert_entry(body.record_id, values)
-    except attio.AttioError as e:
-        raise HTTPException(502, str(e))
+        contacts.upsert_entry(body.record_id, values)
+    except contacts.ContactError as e:
+        raise HTTPException(422, str(e))
     reading = not _running()
     if reading:
         _start([[sys.executable, str(HERE / "runner.py"), "replies", "--model", str(MODEL)]], "reading the reply")
@@ -225,13 +213,13 @@ def answer_sent(body: Answered) -> Dict[str, Any]:
     """The person has sent the answer by hand. Record the exact text; the
     exchange is now a conversation."""
     try:
-        attio.create_note(body.record_id, f"{attio.ANSWER_NOTE} {today()}", body.message)
-        attio.upsert_entry(body.record_id, {"stage": "Conversation", "last_contact": today(),
+        contacts.create_note(body.record_id, f"{contacts.ANSWER_NOTE} {today()}", body.message)
+        contacts.upsert_entry(body.record_id, {"stage": "Conversation", "last_contact": today(),
                                             "next_action": "Wait for their reply",
                                             "next_action_date": (datetime.date.today() + datetime.timedelta(
                                                 days=CLOSE_AFTER_DAYS)).isoformat()})
-    except attio.AttioError as e:
-        raise HTTPException(502, str(e))
+    except contacts.ContactError as e:
+        raise HTTPException(422, str(e))
     _in_reply(body.name, body.note_id, {"answer_sent": today()})
     return {"ok": True}
 
@@ -254,9 +242,9 @@ class Record(BaseModel):
 @app.post("/api/conversation")
 def conversation(body: Record) -> Dict[str, Any]:
     try:
-        attio.upsert_entry(body.record_id, {"stage": "Conversation"})
-    except attio.AttioError as e:
-        raise HTTPException(502, str(e))
+        contacts.upsert_entry(body.record_id, {"stage": "Conversation"})
+    except contacts.ContactError as e:
+        raise HTTPException(422, str(e))
     return {"ok": True}
 
 
@@ -268,9 +256,9 @@ class Skip(BaseModel):
 @app.post("/api/skip")
 def skip(body: Skip) -> Dict[str, Any]:
     try:
-        attio.not_pursuing(body.record_id, f"Skipped by the practice. {body.reason.strip()}", today())
-    except attio.AttioError as e:
-        raise HTTPException(502, str(e))
+        contacts.not_pursuing(body.record_id, f"Skipped by the practice. {body.reason.strip()}", today())
+    except contacts.ContactError as e:
+        raise HTTPException(422, str(e))
     return {"ok": True}
 
 
@@ -282,9 +270,9 @@ class Later(BaseModel):
 @app.post("/api/later")
 def later(body: Later) -> Dict[str, Any]:
     try:
-        attio.upsert_entry(body.record_id, {"next_action_date": body.until})
-    except attio.AttioError as e:
-        raise HTTPException(502, str(e))
+        contacts.upsert_entry(body.record_id, {"next_action_date": body.until})
+    except contacts.ContactError as e:
+        raise HTTPException(422, str(e))
     return {"ok": True}
 
 
@@ -316,6 +304,9 @@ def edit(body: Edit) -> Dict[str, Any]:
 class Add(BaseModel):
     name: str
     title: str = ""
+    firm: str = ""
+    domain: str = ""
+    email: str = ""
     linkedin: str = ""
     how_known: str = ""
     pasted: str = ""
@@ -330,21 +321,40 @@ def add(body: Add) -> Dict[str, Any]:
     if not name:
         raise HTTPException(422, "a name is needed")
     try:
-        person = attio.find_person(name) or attio.create_person(name, body.title.strip(), body.linkedin.strip())
-        rid = person["id"]["record_id"]
-        entry = attio.entry_of(rid)
-        if entry is not None and attio.stage_of(entry) != "Research":
-            raise HTTPException(409, f"{name} is already in the list at '{attio.stage_of(entry)}'")
+        person = contacts.find_person(name) or contacts.create_person(
+            name, body.title, body.linkedin, firm=body.firm, domain=body.domain, email=body.email)
+        rid = person["id"]
+        entry = contacts.entry_of(rid)
+        if entry is not None and contacts.stage_of(entry) != "Research":
+            raise HTTPException(409, f"{name} is already in the list at '{contacts.stage_of(entry)}'")
         values: Dict[str, Any] = {"stage": "Research"}
         if body.how_known.strip():
             values["notes"] = body.how_known.strip()
-        attio.upsert_entry(rid, values)
+        contacts.upsert_entry(rid, values)
         if body.pasted.strip():
-            attio.create_note(rid, f"{attio.EVIDENCE_NOTE}: {body.pasted_source.strip() or 'pasted text'}",
+            contacts.create_note(rid, f"{contacts.EVIDENCE_NOTE}: {body.pasted_source.strip() or 'pasted text'}",
                               body.pasted.strip())
-    except attio.AttioError as e:
-        raise HTTPException(502, str(e))
+    except contacts.ContactError as e:
+        raise HTTPException(422, str(e))
     return {"ok": True, "record_id": rid}
+
+
+class ContactEdit(BaseModel):
+    record_id: str
+    values: Dict[str, str]
+    how_known: Optional[str] = None
+
+
+@app.post("/api/contact")
+def contact(body: ContactEdit) -> Dict[str, Any]:
+    """A person corrected the contact's own fields, and how they know them."""
+    try:
+        contacts.update_person(body.record_id, body.values)
+        if body.how_known is not None and contacts.entry_of(body.record_id) is not None:
+            contacts.upsert_entry(body.record_id, {"notes": body.how_known.strip()})
+    except contacts.ContactError as e:
+        raise HTTPException(422, str(e))
+    return {"ok": True}
 
 
 def _running() -> bool:
@@ -376,7 +386,7 @@ def run(body: Run) -> Dict[str, Any]:
     if body.what == "scout":
         if body.kind not in schemas.TYPES or body.kind == "none":
             raise HTTPException(422, "choose a kind to scout for")
-        first = [py, script, "scout", "--kind", body.kind, "--want", str(body.want), "--attio", "--model", str(MODEL)]
+        first = [py, script, "scout", "--kind", body.kind, "--want", str(body.want), "--contacts", "--model", str(MODEL)]
         first += ["--firms"] if body.firms else []
         what = f"scout for {body.kind}" + (", by firm" if body.firms else "")
     elif body.what == "replies":

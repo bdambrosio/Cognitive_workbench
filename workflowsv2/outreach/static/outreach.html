@@ -89,7 +89,9 @@
     <div class="card">
       <div class="grid">
         <input id="a_name" placeholder="Name">
-        <input id="a_title" placeholder="Title and firm (optional)">
+        <input id="a_title" placeholder="Title (optional)">
+        <input id="a_firm" placeholder="Firm (optional)">
+        <input id="a_email" placeholder="Email (optional)">
         <input id="a_linkedin" placeholder="LinkedIn URL (optional)">
         <input id="a_how" placeholder="How you know them, or who introduced them (optional)">
       </div>
@@ -140,7 +142,7 @@ const GIVES = {opinion:"Opinion on the need", objection:"Objection", new_use:"Ne
                test_case:"Test case offered", meeting:"Meeting", question:"Question", declined:"Declined", other:"Other"};
 
 function exchange(c) {
-  // what was sent and what came back, as recorded in Attio, oldest first
+  // what was sent and what came back, as recorded, oldest first
   const rows = (c.sent || []).slice().sort((a, b) => a.date < b.date ? -1 : 1)
     .map(n => `<div class="meta" style="margin:8px 0 0">${esc(n.what)}, ${esc(n.date)}</div><div class="said">${esc(n.text)}</div>`).join("");
   return rows ? `<details><summary>What was sent and received</summary>${rows}</details>` : "";
@@ -168,17 +170,36 @@ function answerBox(c, i, r, isLast) {
       <button class="go" onclick="answerSent(${i}, '${esc(r.note_id)}')">Answer sent</button>
     </div>`;
 }
+const FIELDS = [["title", "Title"], ["firm", "Firm"], ["domain", "Firm web domain, e.g. acme.com"],
+                ["linkedin", "LinkedIn URL"], ["email", "Email"], ["phone", "Phone"], ["location", "Location"]];
+function contactBox(c, i) {
+  // the contact's own fields, editable; the name is not, because the runner's records are filed under it
+  const inputs = FIELDS.map(([k, label]) =>
+    `<input id="cf_${k}${i}" placeholder="${label}" title="${label}" value="${esc(c.contact[k])}">`).join("");
+  return `<details><summary>Contact details</summary>
+    <div class="grid" style="margin-top:6px">${inputs}</div>
+    <div class="row"><input class="grow" id="cf_how${i}" placeholder="How you know them, or who introduced them" value="${esc(c.how_known)}"></div>
+    <div class="row"><textarea class="grow" id="cf_description${i}" placeholder="Description" style="min-height:60px">${esc(c.contact.description)}</textarea></div>
+    <div class="row"><button onclick="saveContact(${i})">Save contact</button></div></details>`;
+}
+async function saveContact(i) {
+  const values = {};
+  for (const [k] of FIELDS.concat([["description"]])) values[k] = $("cf_" + k + i).value;
+  await call("/api/contact", {record_id: cards[i].record_id, values, how_known: $("cf_how" + i).value});
+  note("Contact saved."); load();
+}
 function closeRow(i, placeholder) {
   return `<input class="grow" id="why${i}" placeholder="${placeholder}"><button class="stop" onclick="skip(${i})">Close</button>`;
 }
 
 function card(c, i) {
   const links = [c.linkedin ? `<a href="${esc(c.linkedin)}" target="_blank" rel="noopener">LinkedIn</a>` : "",
-                 c.web_url ? `<a href="${esc(c.web_url)}" target="_blank" rel="noopener">Attio</a>` : ""].filter(Boolean).join(" · ");
-  const head = `<h3>${esc(c.name)}</h3><div class="meta">${esc([c.title, c.category].filter(Boolean).join(" · "))}${links ? " · " + links : ""}</div>`;
+                 c.contact.email ? `<a href="mailto:${esc(c.contact.email)}">${esc(c.contact.email)}</a>` : ""].filter(Boolean).join(" · ");
+  const head = `<h3>${esc(c.name)}</h3><div class="meta">${esc([c.title, c.contact.firm, c.category].filter(Boolean).join(" · "))}${links ? " · " + links : ""}</div>`;
   const why = c.fit_rationale ? `<div class="why">${esc(c.fit_rationale)}</div>` : "";
   const flags = (c.flags || []).map(f => `<div class="flag">Check: ${esc(f)}</div>`).join("");
-  const brief = c.brief ? `<details><summary>Brief and evidence</summary><pre class="brief">${esc(c.brief)}</pre></details>` : "";
+  const brief = (c.brief ? `<details><summary>Brief and evidence</summary><pre class="brief">${esc(c.brief)}</pre></details>` : "")
+    + contactBox(c, i);
   const dates = `<div class="meta">Last contact ${esc(c.last_contact || "not recorded")}${c.due ? " · next look " + esc(c.due) : ""}</div>`;
 
   if (c.group === "ready") return `<div class="card" id="card${i}">${head}${why}${flags}
@@ -220,7 +241,7 @@ function card(c, i) {
       <button onclick="later(${i})">Later</button>
     </div>${replyBox(i, "They replied")}${exchange(c)}${brief}</div>`;
 
-  if (c.group === "waiting") return `<div class="card" id="card${i}">${head}${dates}${replyBox(i, "They replied")}${exchange(c)}</div>`;
+  if (c.group === "waiting") return `<div class="card" id="card${i}">${head}${dates}${replyBox(i, "They replied")}${exchange(c)}${contactBox(c, i)}</div>`;
 
   if (c.group === "replies") {
     const last = (c.replies || []).length - 1;
@@ -301,9 +322,10 @@ async function later(i) {
   await call("/api/later", {record_id: cards[i].record_id, until}); note("Put off until " + until + "."); load();
 }
 async function addName() {
-  await call("/api/add", {name: $("a_name").value, title: $("a_title").value, linkedin: $("a_linkedin").value,
+  await call("/api/add", {name: $("a_name").value, title: $("a_title").value, firm: $("a_firm").value,
+                          email: $("a_email").value, linkedin: $("a_linkedin").value,
                           how_known: $("a_how").value, pasted: $("a_pasted").value, pasted_source: $("a_source").value});
-  ["a_name", "a_title", "a_linkedin", "a_how", "a_pasted", "a_source"].forEach(id => $(id).value = "");
+  ["a_name", "a_title", "a_firm", "a_email", "a_linkedin", "a_how", "a_pasted", "a_source"].forEach(id => $(id).value = "");
   note("Added. The next research run will work on them."); load();
 }
 async function startRun(what) {

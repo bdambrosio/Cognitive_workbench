@@ -8,8 +8,8 @@ from typing import Any, Dict, List, Sequence, Tuple
 
 from workflowsv2.claims_audit.schemas import quote_at
 
-#: The options of the `category`, `relationship` and problem-recognition selects
-#: of the practice's Attio list, by title, so a value is written there as it is.
+#: The values of the `category`, `relationship` and `problem_recognition` fields
+#: of an entry in the outreach list (contacts.py), carried over from Attio.
 #: PROSPECT.md §4 and §14 define them; a new option needs a definition there.
 TYPES = ("M&A adviser", "Repeat acquirer", "Searcher", "Small PE-family office", "VC / Investor",
          "Lawyer", "Contracted-software buyer", "licensee", "Connector", "Technical feedback", "none")

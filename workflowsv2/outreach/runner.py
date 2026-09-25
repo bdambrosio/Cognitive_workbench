@@ -6,7 +6,7 @@
     python3 workflowsv2/outreach/runner.py research|qualify|draft|brief ...   (one stage)
     python3 workflowsv2/outreach/runner.py followups|replies               (after a message is sent)
 
-`daily` works on the names waiting at Research in Attio; reads the replies
+`daily` works on the names waiting at Research in the contacts; reads the replies
 the practice has recorded and drafts the follow-ups that are due; then, when fewer than
 `--pool` people are Ready to contact, scouts for the day's kind (the kinds take turns by date; people
 an earlier scout found of that kind are taken before any new search)
@@ -36,7 +36,7 @@ no tools; everything that touches the network is code.
     brief      brief.md per candidate and summary.md for the file, written
                from the records. No model.
     push       not part of `run`. For a `strong` candidate with a draft: the
-               person's record in Attio is found by name or created, the person
+               person's contact (contacts.py) is found by name or created, the person
                is put in the outreach list at "Ready to contact" with the
                rationale and the three selects, and the brief is attached as a
                note. A plausible candidate goes to "Qualified" with the brief;
@@ -44,27 +44,27 @@ no tools; everything that touches the network is code.
                note that gives the reason. An
                existing person record is never changed, and an entry at any
                stage but Research is left alone: a person set it. Recorded in
-               attio.json; a candidate with that file is not pushed again.
+               pushed.json; a candidate with that file is not pushed again.
 
     scout      `scout --kind "<a kind from PROSPECT.md §4>" --model <yaml>`. The
                model proposes up to three descriptions of such people (§16),
                differing from the searches already logged; Exa's people search
-               runs them; a name already in Attio or already in the record is
+               runs them; a name already in the contacts or already in the record is
                skipped; each new person gets a first look at their profile
                (§17), which costs no search. Those who fit become candidates,
                with the profile as their first evidence file, and go through
                the four stages at once. Nothing found by scouting is written to
-               Attio unless `push` later finds it strong. With `--firms` the
+               the contacts unless `push` later finds it strong. With `--firms` the
                search is for firms (§18, §19); for each firm that fits, one
                people search at that firm and one emission (§20) choose whom
                to approach, with a checked citation that they work there now.
-               One candidate per firm; a firm Attio already has is skipped.
+               One candidate per firm; a firm a contact works at is skipped.
 
     followups  for each person at "Initial sent" whose next action date has
                come: one emission (§21) drafts the one follow-up, from the first
-               message as the page recorded it in Attio, the contact record, and
+               message as the page recorded it, the contact record, and
                the qualification and evidence when there are any. No search.
-    replies    for each reply the page recorded in Attio (a note "Reply
+    replies    for each reply the page recorded (a note "Reply
                received <date>") that has not been read: one emission (§22)
                says what the reply gives and what to do next. The quotes are
                checked against the reply. The next step goes into the entry's
@@ -74,7 +74,7 @@ no tools; everything that touches the network is code.
                stage when a reply is recorded; `daily` runs it for whatever is
                still unread or unanswered.
 
-WITHOUT --candidates the candidates are the entries of the Attio outreach list
+WITHOUT --candidates the candidates are the contacts in the outreach list
 at stage Research: a person adds a name there, with how they know them in the
 entry's Notes and any pasted text in a note titled "Evidence: <source>".
 
@@ -93,7 +93,6 @@ import argparse
 import datetime
 import json
 import logging
-import re
 import sys
 import types
 import urllib.request
@@ -112,7 +111,7 @@ for p in (str(REPO), str(REPO / "src")):
 from workflowsv2 import issues                                          # noqa: E402
 from workflowsv2.emit import emit                                       # noqa: E402
 from workflowsv2.claims_audit.decompose import backend_from_model       # noqa: E402
-from workflowsv2.outreach import attio, exa, schemas                    # noqa: E402
+from workflowsv2.outreach import contacts, exa, schemas                   # noqa: E402
 from chat.workflow import load_workflow                                 # noqa: E402
 from utils import tavily_client                                         # noqa: E402
 from utils.doc_extract import html_to_markdown, pdf_to_markdown         # noqa: E402
@@ -138,8 +137,8 @@ def today() -> str:
     return datetime.date.today().isoformat()
 
 
-def slug(name: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+#: A person's directory name here is their contact id.
+slug = contacts.slug
 
 
 def _write_json(path: Path, obj: Any) -> None:
@@ -303,7 +302,7 @@ def firm_domain(c: Dict[str, Any]) -> str:
     return ""
 
 
-def better_contact(c: Dict[str, Any], q: Dict[str, Any], data: Path, use_attio: bool) -> Optional[Path]:
+def better_contact(c: Dict[str, Any], q: Dict[str, Any], data: Path, use_contacts: bool) -> Optional[Path]:
     """When the qualification names a better person to approach at the firm,
     that person becomes a candidate waiting for research, unless the practice
     already has them. Returns their directory when one was made."""
@@ -311,7 +310,7 @@ def better_contact(c: Dict[str, Any], q: Dict[str, Any], data: Path, use_attio: 
     if not name or not slug(name) or slug(name) == slug(c["name"]):
         return None
     cand_dir = data / slug(name)
-    if cand_dir.exists() or (use_attio and attio.known(name)):
+    if cand_dir.exists() or (use_contacts and contacts.known(name)):
         return None
     new = {"name": name, "firm": c.get("firm") or "", "title": q.get("better_contact_role") or "",
            "urls": [u for u in c.get("urls") or [] if firm_domain({"urls": [u]})],
@@ -464,7 +463,7 @@ def brief(c: Dict[str, Any], cand_dir: Path) -> str:
 
 
 #: The list stage a category is written as. A weak or rejected person gets no
-#: stage: they leave the list with a "Not pursuing" note (attio.not_pursuing).
+#: stage: they leave the list with a "Not pursuing" note (contacts.not_pursuing).
 STAGE_OF = {"strong": "Ready to contact", "plausible": "Qualified"}
 CATEGORIES_PUSHED = ("strong", "plausible", "weak", "reject")
 #: The stages this program may move an entry out of. Any other stage was set
@@ -473,7 +472,7 @@ OURS = (None, "Research")
 
 
 def push(c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]]:
-    """Write one qualified candidate into Attio: the list stage for its
+    """Write one qualified candidate into the contacts: the list stage for its
     category, the rationale and the three selects, and for a strong or
     plausible candidate the brief as a note. A strong candidate with no
     usable draft is not written. Returns the record of what was written."""
@@ -483,51 +482,51 @@ def push(c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]]:
     if category not in CATEGORIES_PUSHED or (category == "strong" and not (d and d.get("message"))):
         logger.info("%s: no category, or strong with no draft; nothing is pushed", c["name"])
         return None
-    if (cand_dir / "attio.json").is_file():
+    if (cand_dir / "pushed.json").is_file():
         logger.info("%s: already pushed", c["name"])
         return None
-    person = attio.find_person(c["name"])
+    person = contacts.find_person(c["name"])
     created = person is None
     if created and category != "strong":
-        return None                     # a name nobody put in Attio, and not worth putting there
+        return None                     # a name nobody put in the contacts, and not worth putting there
     if created:
         linkedin = next((u for u in c.get("urls") or [] if "linkedin.com" in urlparse(u).netloc.lower()), "")
-        person = attio.create_person(c["name"], str(c.get("title") or ""), linkedin)
-    rid = person["id"]["record_id"]
-    entry = None if created else attio.entry_of(rid)
-    if entry is not None and attio.stage_of(entry) not in OURS:
-        logger.info("%s: the entry is at '%s', set by a person; left alone", c["name"], attio.stage_of(entry))
+        person = contacts.create_person(c["name"], str(c.get("title") or ""), linkedin,
+                                        firm=str(c.get("firm") or ""), domain=firm_domain(c))
+    rid = person["id"]
+    entry = None if created else contacts.entry_of(rid)
+    if entry is not None and contacts.stage_of(entry) not in OURS:
+        logger.info("%s: the entry is at '%s', set by a person; left alone", c["name"], contacts.stage_of(entry))
         return None
     why = q.get("reject_reason") or f"{q.get('why_person', '')} {q.get('why_now', '')}".strip()
     if category not in STAGE_OF:
-        attio.not_pursuing(rid, f"Qualified as {category}. {why}", today())
-        rec = {"at": today(), "record_id": rid, "person_created": False, "not_pursuing": True, "reason": why}
-        _write_json(cand_dir / "attio.json", rec)
+        contacts.not_pursuing(rid, f"Qualified as {category}. {why}", today())
+        rec = {"at": today(), "contact_id": rid, "person_created": False, "not_pursuing": True, "reason": why}
+        _write_json(cand_dir / "pushed.json", rec)
         return rec
     stage = STAGE_OF[category]
     values: Dict[str, Any] = {"stage": stage, "fit_rationale": why}
     if category == "strong":
         values.update(next_action="Review the draft and send on LinkedIn", next_action_date=today())
-    for slug_, key in (("category", "prospect_type"), ("relationship", "relationship"),
-                       ("probelm_recognition", "problem_recognition")):   # the list's own spelling
+    for field, key in (("category", "prospect_type"), ("relationship", "relationship"),
+                       ("problem_recognition", "problem_recognition")):
         if q.get(key) and q[key] != "none":
-            values[slug_] = q[key]
-    written = attio.upsert_entry(rid, values)
+            values[field] = q[key]
+    contacts.upsert_entry(rid, values)
     note_id = None
     if category in ("strong", "plausible"):
-        note = attio.create_note(rid, f"Outreach brief {today()}", brief(c, cand_dir))
-        note_id = (note.get("id") or {}).get("note_id")
-    rec = {"at": today(), "record_id": rid, "person_created": created,
-           "entry_id": written["id"]["entry_id"], "note_id": note_id, "entry_values": values}
-    _write_json(cand_dir / "attio.json", rec)
+        note_id = contacts.create_note(rid, f"Outreach brief {today()}", brief(c, cand_dir))["note_id"]
+    rec = {"at": today(), "contact_id": rid, "person_created": created, "note_id": note_id,
+           "entry_values": values}
+    _write_json(cand_dir / "pushed.json", rec)
     return rec
 
 
 def pickup(data: Path) -> List[Dict[str, Any]]:
-    """The candidates waiting in Attio: every entry of the outreach list at
+    """The candidates waiting in the contacts: every entry of the outreach list at
     stage Research, as candidate records. This is how the practice hands a
     name to the workflow."""
-    return [attio.candidate_from(e) for e in attio.entries() if attio.stage_of(e) == "Research"]
+    return [contacts.candidate_from(e) for e in contacts.entries() if contacts.stage_of(e) == "Research"]
 
 
 # ---- after a message is sent --------------------------------------------------
@@ -542,14 +541,14 @@ def _known_dir(c: Dict[str, Any], data: Path) -> Path:
     return cand_dir
 
 
-def sent_block(record_id: str) -> str:
+def sent_block(cid: str) -> str:
     """The messages the practice recorded as sent to this person, with their
     dates, as a prompt states them. Empty when none was recorded."""
-    got = attio.notes(record_id)
+    got = contacts.notes(cid)
     rows = [f"{label}, sent {n['date']}:\n\n{n['text']}"
-            for label, title in (("The first message", attio.SENT_NOTE), ("The follow-up", attio.FOLLOWUP_NOTE),
-                                 ("An answer to an earlier reply", attio.ANSWER_NOTE))
-            for n in attio.note_texts(record_id, title, got)]
+            for label, title in (("The first message", contacts.SENT_NOTE), ("The follow-up", contacts.FOLLOWUP_NOTE),
+                                 ("An answer to an earlier reply", contacts.ANSWER_NOTE))
+            for n in contacts.note_texts(cid, title, got)]
     return "\n\n".join(rows)
 
 
@@ -581,16 +580,15 @@ def followups(writer, data: Path) -> List[str]:
     """Draft the follow-up for everyone at Initial sent whose date has come
     and who has none drafted. Returns their names."""
     names = []
-    for e in attio.entries():
-        if not attio.due(e, "Initial sent", today()):
+    for e in contacts.entries():
+        if not contacts.due(e, "Initial sent", today()):
             continue
-        c = attio.candidate_from(e)
+        c = contacts.candidate_from(e)
         cand_dir = _known_dir(c, data)
         if (cand_dir / "followup.json").is_file():
             continue
-        rid = e["parent_record_id"]
         logger.info("%s: follow-up", c["name"])
-        followup(writer, c, cand_dir, attio.contact_record({"id": {"record_id": rid}}), sent_block(rid))
+        followup(writer, c, cand_dir, contacts.contact_record(e), sent_block(e["id"]))
         names.append(c["name"])
     return names
 
@@ -638,15 +636,15 @@ def answer(backend, c: Dict[str, Any], cand_dir: Path, sent: str, rec: Dict[str,
 def replies(backend, writer, data: Path) -> List[str]:
     """Read every recorded reply that has not been read, and draft the answer
     to every reply that has none. The record is replies.json, one entry per
-    reply; Attio gets the next step as the entry's next action and a note of
+    reply; the contact gets the next step as the entry's next action and a note of
     what it gave. Returns the names of the people something was done for."""
     names = []
-    for e in attio.entries():
-        if attio.stage_of(e) not in REPLY_STAGES:
+    for e in contacts.entries():
+        if contacts.stage_of(e) not in REPLY_STAGES:
             continue
-        rid = e["parent_record_id"]
-        got = attio.note_texts(rid, attio.REPLY_NOTE)
-        c = attio.candidate_from(e)
+        rid = e["id"]
+        got = contacts.note_texts(rid, contacts.REPLY_NOTE, e["notes"])
+        c = contacts.candidate_from(e)
         cand_dir = _known_dir(c, data)
         log = cand_dir / "replies.json"
         have = json.loads(log.read_text(encoding="utf-8")) if log.is_file() else []
@@ -661,9 +659,9 @@ def replies(backend, writer, data: Path) -> List[str]:
             body = "\n".join([f"- **{g['what']}**: {g['note']} (\"{g['quote']}\")" for g in rec["gives"]]
                              + ([f"\nIntroduces: {rec['introduced_name']}"] if rec["introduced_name"] else [])
                              + [f"\nNext step: {rec['next_step']}"] + [f"- CHECK: {f}" for f in rec["flags"]])
-            attio.create_note(rid, f"Reply read {today()}: {gave}", body)
+            contacts.create_note(rid, f"Reply read {today()}: {gave}", body)
             if rec["next_step"]:
-                attio.upsert_entry(rid, {"next_action": rec["next_step"], "next_action_date": today()})
+                contacts.upsert_entry(rid, {"next_action": rec["next_step"], "next_action_date": today()})
             names.append(c["name"])
         for rec in have:
             if "answer" in rec or not rec["gives"]:
@@ -715,7 +713,7 @@ def scout(backend, kind: str, data: Path, want: int) -> List[Dict[str, Any]]:
             cand_dir = data / slug(name)
             if not name or not slug(name) or cand_dir.exists() or len(text.split()) < MIN_WORDS:
                 continue
-            if attio.known(name):
+            if contacts.known(name):
                 continue
             new += 1
             c = {"name": name, "urls": [url] if url else [],
@@ -749,7 +747,7 @@ PROFILE_WORDS = 500
 
 def scout_firms(backend, kind: str, data: Path, want: int) -> List[Dict[str, Any]]:
     """Find firms of one kind, then the person to approach at each. One
-    candidate per firm. A firm Attio already has is skipped: the practice
+    candidate per firm. A firm a contact works at is skipped: the practice
     knows it. Every firm looked at leaves a record under _firms/."""
     found = waiting(data, kind)
     if len(found) >= want:
@@ -771,7 +769,7 @@ def scout_firms(backend, kind: str, data: Path, want: int) -> List[Dict[str, Any
             domain = urlparse(url).netloc.lower().removeprefix("www.")
             firm_dir = data / FIRMS / slug(firm)
             if not slug(firm) or firm_dir.exists() or len(text.split()) < MIN_WORDS \
-                    or attio.firm_record(firm, domain) is not None:
+                    or contacts.firm_known(firm, domain):
                 continue
             new += 1
             firm_dir.mkdir(parents=True)
@@ -836,7 +834,7 @@ def person_at(backend, firm: str, url: str, domain: str, rec: Dict[str, Any], fi
     r = files[first]
     name = str(r["title"]).strip()
     cand_dir = data / slug(name)
-    if cand_dir.exists() or attio.known(name):
+    if cand_dir.exists() or contacts.known(name):
         rec["chosen_reason"] += f" ({name} is already known)"
         return None
     rec["chosen"] = name
@@ -886,7 +884,7 @@ WRITER = REPO / "measure/models/anthropic_opus55_medium.yaml"
 RECORDS = {"research": "research.json", "qualify": "qualification.json", "draft": "draft.json"}
 
 
-def work(backend, writer, cands: List[Dict[str, Any]], stages, data: Path, use_attio: bool,
+def work(backend, writer, cands: List[Dict[str, Any]], stages, data: Path, use_contacts: bool,
          redo: bool = False) -> None:
     """Run the named stages for each candidate. A stage whose record exists
     is not run again unless `redo`."""
@@ -907,8 +905,8 @@ def work(backend, writer, cands: List[Dict[str, Any]], stages, data: Path, use_a
             logger.info("%s: %s", c["name"], st)
             if st == "qualify":
                 q = qualify(backend, c, cand_dir,
-                            attio.contact_for(c["name"], str(c.get("firm") or ""), firm_domain(c)) if use_attio else "")
-                better_contact(c, q, data, use_attio)
+                            contacts.contact_for(c["name"], str(c.get("firm") or ""), firm_domain(c)) if use_contacts else "")
+                better_contact(c, q, data, use_contacts)
                 continue
             if st == "draft":
                 draft(writer, c, cand_dir)
@@ -917,10 +915,10 @@ def work(backend, writer, cands: List[Dict[str, Any]], stages, data: Path, use_a
 
 
 def unpushed(data: Path) -> List[Dict[str, Any]]:
-    """People scouting found who are qualified and not yet written to Attio."""
+    """People scouting found who are qualified and not yet written to the contacts."""
     return [yaml.safe_load((f.parent / "candidate.yaml").read_text(encoding="utf-8"))
             for f in sorted(data.glob("*/first_look.json"))
-            if (f.parent / "qualification.json").is_file() and not (f.parent / "attio.json").is_file()]
+            if (f.parent / "qualification.json").is_file() and not (f.parent / "pushed.json").is_file()]
 
 
 def next_kind(day: Optional[datetime.date] = None) -> str:
@@ -929,18 +927,43 @@ def next_kind(day: Optional[datetime.date] = None) -> str:
     return DAILY_KINDS[(day or datetime.date.today()).toordinal() % len(DAILY_KINDS)]
 
 
+#: How many backups of the records `backup` keeps.
+BACKUPS_KEPT = 14
+
+
+def backup(data: Path) -> Path:
+    """Copy the records (the contacts and every person's files; not the logs)
+    to _backups/<date and time>.tar.gz under `data`, and keep the newest
+    BACKUPS_KEPT. Raises when the copy cannot be made: the day's work does not
+    start without one."""
+    import tarfile
+    out = data / "_backups"
+    out.mkdir(parents=True, exist_ok=True)
+    dest = out / f"{datetime.datetime.now().strftime('%Y-%m-%dT%H-%M-%S')}.tar.gz"
+    tmp = dest.with_name(dest.name + ".tmp")
+    with tarfile.open(tmp, "w:gz") as tar:
+        for p in sorted(data.iterdir()):
+            if p.name != "_backups" and p.suffix != ".log":
+                tar.add(p, arcname=p.name)
+    tmp.replace(dest)
+    for old in sorted(out.glob("*.tar.gz"))[:-BACKUPS_KEPT]:
+        old.unlink()
+    return dest
+
+
 def daily(backend, writer, data: Path, pool: int, want: int) -> str:
-    """The whole day's work, in order: the names waiting at Research in Attio;
+    """The whole day's work, in order: a backup of the records; the names waiting at Research in the contacts;
     the replies recorded and not yet read, and the follow-ups that are due;
     then, when fewer than `pool` people are Ready to contact, a scout for the
     day's kind. Everything qualified is pushed. Returns what a
     person needs to read."""
     data.mkdir(parents=True, exist_ok=True)
+    logger.info("backup: %s", backup(data))
     named = pickup(data)
-    work(backend, writer, named, STAGES + ("push",), data, use_attio=True)
-    work(backend, writer, unpushed(data), ("push",), data, use_attio=True)      # left by an earlier scout
+    work(backend, writer, named, STAGES + ("push",), data, use_contacts=True)
+    work(backend, writer, unpushed(data), ("push",), data, use_contacts=True)      # left by an earlier scout
     read, drafted = replies(backend, writer, data), followups(writer, data)
-    ready = sum(1 for e in attio.entries() if attio.stage_of(e) == "Ready to contact")
+    ready = sum(1 for e in contacts.entries() if contacts.stage_of(e) == "Ready to contact")
     lines = [f"Names you added, researched today: {len(named)}.",
              f"Replies read: {len(read)}{' (' + ', '.join(read) + ')' if read else ''}.",
              f"Follow-ups drafted: {len(drafted)}{' (' + ', '.join(drafted) + ')' if drafted else ''}.",
@@ -951,8 +974,8 @@ def daily(backend, writer, data: Path, pool: int, want: int) -> str:
         by_firm = kind in FIRM_KINDS
         lines.append(f"Scouted for: {kind}{', by firm' if by_firm else ''}.")
         scouted = (scout_firms if by_firm else scout)(backend, kind, data, want)
-        work(backend, writer, scouted, STAGES + ("push",), data, use_attio=True)
-    ready = sum(1 for e in attio.entries() if attio.stage_of(e) == "Ready to contact")
+        work(backend, writer, scouted, STAGES + ("push",), data, use_contacts=True)
+    ready = sum(1 for e in contacts.entries() if contacts.stage_of(e) == "Ready to contact")
     lines.append(f"Ready to contact now: {ready}.")
     return summary(named + scouted, data) + "\n" + "\n".join(lines) + "\n"
 
@@ -964,7 +987,7 @@ def main() -> int:
     ap.add_argument("--kind", choices=[k for k in schemas.TYPES if k != "none"], default=None,
                     help="for `scout`: the kind of prospect to look for")
     ap.add_argument("--candidates", type=Path, default=None,
-                    help="a YAML file of candidates; without it, the entries at stage Research in Attio")
+                    help="a YAML file of candidates; without it, the contacts at stage Research")
     ap.add_argument("--model", type=Path, default=MODEL, help="default: the local Qwen model file")
     ap.add_argument("--writer", type=Path, default=WRITER,
                     help="the model for the calls that write a message to send; default: Claude Opus 5.5")
@@ -979,8 +1002,8 @@ def main() -> int:
                     help="the candidates are the people scouting found to fit who are qualified and not yet pushed")
     ap.add_argument("--only", default=None, help="one candidate, by slug (the name in lower case, _ for spaces)")
     ap.add_argument("--redo", action="store_true", help="run a stage again although its record exists")
-    ap.add_argument("--attio", action="store_true",
-                    help="read the person's history from Attio for the qualification (reads only)")
+    ap.add_argument("--contacts", action="store_true",
+                    help="read the person's history from the contacts for the qualification (reads only)")
     ap.add_argument("--data", type=Path, default=DATA)
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
@@ -1009,7 +1032,7 @@ def main() -> int:
     todo = [c for c in cands if args.only in (None, slug(c["name"]))]
     if not todo and args.only:
         raise SystemExit(f"no candidate with the slug {args.only}")
-    work(backend, writer, todo, stages, args.data, args.attio, args.redo)
+    work(backend, writer, todo, stages, args.data, args.contacts, args.redo)
     print(summary(cands, args.data))
     return 0
 

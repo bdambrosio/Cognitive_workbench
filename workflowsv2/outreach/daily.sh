@@ -4,8 +4,9 @@
 #
 #     workflowsv2/outreach/daily.sh [--pool 5] [--want 3]
 #
-# The four API keys are read from the environment, and from ~/.bashrc for any
+# The three API keys are read from the environment, and from ~/.bashrc for any
 # that are not set there (a shell that is not interactive does not load it).
+
 set -u
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 PY="$REPO/zenoh_venv/bin/python3"
@@ -13,7 +14,7 @@ PORT=8810
 LOG="$REPO/workflowsv2/outreach/prospects"
 mkdir -p "$LOG"
 
-for k in ATTIO_API_KEY EXA_API_KEY TAVILY_API_KEY CLAUDE_API_KEY; do
+for k in EXA_API_KEY TAVILY_API_KEY CLAUDE_API_KEY; do
   if [ -z "${!k:-}" ]; then
     v="$(grep -m1 "^export $k=" "$HOME/.bashrc" | sed -e "s/^export $k=//" -e 's/^["'"'"']//' -e 's/["'"'"']$//')"
     [ -n "$v" ] && export "$k=$v"

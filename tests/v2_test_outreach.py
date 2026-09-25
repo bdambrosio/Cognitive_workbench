@@ -9,7 +9,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from workflowsv2.outreach import runner, schemas                     # noqa: E402
+import pytest                                                         # noqa: E402
+
+from workflowsv2.outreach import contacts, runner, schemas           # noqa: E402
 
 BODY = ["Source: https://example.com/post", "Retrieved: 2026-09-20", "---",
         "Several of our sellers are entering diligence at the same time.",
@@ -142,78 +144,68 @@ def test_research_saves_pages_and_leaves_out_another_person(tmp_path, monkeypatc
     assert "unreadable_page" in (tmp_path / "issues.jsonl").read_text()
 
 
-# ---- attio.py, against a fake HTTP session: no live calls ----------------------
+# ---- contacts.py, on files in a temporary folder --------------------------------
 
-class _Resp:
-    def __init__(self, body, status=200):
-        self._body, self.status_code, self.text = body, status, str(body)
-
-    def json(self):
-        return self._body
+@pytest.fixture
+def store(tmp_path, monkeypatch):
+    monkeypatch.setattr(contacts, "DIR", tmp_path / "contacts")
+    return contacts
 
 
-def _attio(monkeypatch, answers, calls):
-    from workflowsv2.outreach import attio
-
-    def request(method, url, json=None, params=None, timeout=None, headers=None):
-        calls.append({"method": method, "path": url.replace(attio.API, ""), "json": json, "params": params})
-        return answers.pop(0)
-    monkeypatch.setenv("ATTIO_API_KEY", "k")
-    monkeypatch.setattr(attio.requests, "request", request)
-    return attio
+def _person(name, stage=None, next_date="", firm="", domain="", **entry):
+    """A contact, in the outreach list at `stage` when one is given. Returns the id."""
+    c = contacts.create_person(name, firm=firm, domain=domain)
+    if stage:
+        contacts.upsert_entry(c["id"], {"stage": stage, "next_action_date": next_date, **entry})
+    return c["id"]
 
 
-def test_attio_contact_record_reads_stage_tasks_and_notes(monkeypatch):
-    calls = []
-    attio = _attio(monkeypatch, [
-        _Resp({"data": [{"list_api_slug": "tuuyi_outreach", "entry_id": "e1"},
-                        {"list_api_slug": "another", "entry_id": "e2"}]}),
-        _Resp({"data": {"entry_values": {"stage": [{"status": {"title": "Initial sent"}}],
-                                         "last_contact": [{"value": "2026-09-16"}]}}}),
-        _Resp({"data": [{"is_completed": False, "deadline_at": "2026-09-23T00:00:00Z",
-                         "content_plaintext": "Follow up  if no\nresponse"}]}),
-        _Resp({"data": [{"created_at": "2026-09-14T01:00:00Z", "title": "Proposed Tuuyi outreach"}]})], calls)
-    text = attio.contact_record({"id": {"record_id": "r1"}})
+def test_contact_record_reads_stage_tasks_and_notes(store):
+    cid = _person("Jane Smith", "Initial sent", last_contact="2026-09-16")
+    c = store.get(cid)
+    c["tasks"] = [{"text": "Follow up  if no\nresponse", "due": "2026-09-23", "done": False}]
+    store._write(c)
+    store.create_note(cid, "Proposed Tuuyi outreach", "text")
+    text = store.contact_record(store.get(cid))
     assert "stage 'Initial sent', last contact 2026-09-16" in text
     assert "Task (open, due 2026-09-23): Follow up if no response" in text
-    assert "Note of 2026-09-14: Proposed Tuuyi outreach" in text
-    assert [c["method"] for c in calls] == ["GET"] * 4          # reading writes nothing
+    assert f"Note of {runner.today()}: Proposed Tuuyi outreach" in text
 
 
-def test_attio_two_people_of_one_name_is_an_error_and_writes_have_the_documented_shape(monkeypatch):
-    import pytest
-    calls = []
-    attio = _attio(monkeypatch, [_Resp({"data": [{}, {}]}), _Resp({"data": {"id": {}}}),
-                                 _Resp({"data": {}}), _Resp({"detail": "no"}, 403)], calls)
-    with pytest.raises(attio.AttioError):
-        attio.find_person("Jane Smith")
-    attio.upsert_entry("r1", {"stage": "Ready to contact"})
-    assert calls[1]["method"] == "PUT" and calls[1]["path"] == "/lists/tuuyi_outreach/entries"
-    assert calls[1]["json"]["data"] == {"parent_object": "people", "parent_record_id": "r1",
-                                        "entry_values": {"stage": "Ready to contact"}}
-    attio.create_note("r1", "Outreach brief", "# x")
-    assert calls[2]["json"]["data"]["format"] == "markdown"
-    with pytest.raises(attio.AttioError):
-        attio.create_person("Jane Smith")
+def test_one_contact_per_name_and_only_known_fields_are_written(store):
+    _person("Jane Smith")
+    assert store.find_person("jane  SMITH")["name"] == "Jane Smith" and store.known("Jane Smith")
+    with pytest.raises(store.ContactError):
+        store.create_person("Jane Smith")
+    with pytest.raises(store.ContactError):
+        store.upsert_entry("jane_smith", {"stagee": "Ready to contact"})
+    with pytest.raises(store.ContactError):
+        store.update_person("jane_smith", {"name": "Janet Smith"})       # the runner files records under the name
+    store.update_person("jane_smith", {"email": " jane@acme.example "})
+    assert store.get("jane_smith")["email"] == "jane@acme.example"
 
 
-def _fake_attio(monkeypatch, wrote, person=None, entry_stage=None):
-    a = runner.attio
-    monkeypatch.setattr(a, "find_person", lambda name: person)
-    monkeypatch.setattr(a, "create_person",
-                        lambda name, title, li: wrote.append(("person", name, li)) or {"id": {"record_id": "r1"}})
-    monkeypatch.setattr(a, "entry_of", lambda rid: None if entry_stage is None else
-                        {"entry_values": {"stage": [{"status": {"title": entry_stage}}]}})
-    monkeypatch.setattr(a, "not_pursuing", lambda rid, reason, on: wrote.append(("not pursuing", rid, reason)))
-    monkeypatch.setattr(a, "upsert_entry",
-                        lambda rid, v: wrote.append(("entry", rid, v)) or {"id": {"entry_id": "e1"}})
-    monkeypatch.setattr(a, "create_note",
-                        lambda rid, title, md: wrote.append(("note", title, md)) or {"id": {"note_id": "n1"}})
+def _add_notes(n):
+    for i in range(n):
+        contacts.create_note("jane_smith", "Note", str(i))
+
+
+def test_two_writers_at_once_lose_no_note(store):
+    # the page and the runner are separate processes writing the same file
+    import multiprocessing
+    _person("Jane Smith")
+    ctx = multiprocessing.get_context("fork")
+    procs = [ctx.Process(target=_add_notes, args=(40,)) for _ in range(2)]
+    for p in procs:
+        p.start()
+    for p in procs:
+        p.join()
+    assert len(store.get("jane_smith")["notes"]) == 80
 
 
 def _qualified(tmp_path, monkeypatch, category, with_draft=True):
     _prepare(tmp_path)
-    for f in ("attio.json", "draft.json"):
+    for f in ("pushed.json", "draft.json"):
         (tmp_path / f).unlink(missing_ok=True)
     drafted = {"angle": "a", "message": "Jane, a short message." if with_draft else "", "assumes": "",
                "rests_on": [_cite("Several of our sellers are entering diligence")]}
@@ -222,75 +214,68 @@ def _qualified(tmp_path, monkeypatch, category, with_draft=True):
     runner.draft(Backend(), CAND, tmp_path)
 
 
-def test_push_writes_a_strong_candidate_once(tmp_path, monkeypatch):
-    wrote = []
-    _fake_attio(monkeypatch, wrote)
+def test_push_writes_a_strong_candidate_once(tmp_path, monkeypatch, store):
     _qualified(tmp_path, monkeypatch, "strong")
     rec = runner.push(CAND, tmp_path)
-    assert [w[0] for w in wrote] == ["person", "entry", "note"]
-    v = wrote[1][2]
-    assert v["stage"] == "Ready to contact" and v["category"] == "M&A adviser"
-    assert v["relationship"] == "Referral" and v["probelm_recognition"] == "Strong"
-    assert "Jane, a short message." in wrote[2][2] and rec["person_created"]
-    assert runner.push(CAND, tmp_path) is None and len(wrote) == 3    # not pushed twice
+    c = store.get("jane_smith")
+    e = c["entry"]
+    assert e["stage"] == "Ready to contact" and e["category"] == "M&A adviser"
+    assert e["relationship"] == "Referral" and e["problem_recognition"] == "Strong"
+    assert c["firm"] == "Acme Advisers" and rec["person_created"]
+    assert [n["title"][:14] for n in c["notes"]] == ["Outreach brief"] and "Jane, a short message." in c["notes"][0]["text"]
+    assert runner.push(CAND, tmp_path) is None and len(store.get("jane_smith")["notes"]) == 1   # not pushed twice
 
 
-def test_push_leaves_alone_what_is_not_its_to_write(tmp_path, monkeypatch):
-    known = {"id": {"record_id": "r9"}}
-    wrote = []
-    _fake_attio(monkeypatch, wrote)                                   # nobody in Attio by that name
+def test_push_leaves_alone_what_is_not_its_to_write(tmp_path, monkeypatch, store):
     _qualified(tmp_path, monkeypatch, "plausible")
-    assert runner.push(CAND, tmp_path) is None and not wrote          # not strong: no new person
-    _fake_attio(monkeypatch, wrote, person=known, entry_stage="Initial sent")
+    assert runner.push(CAND, tmp_path) is None and not store.known("Jane Smith")   # not strong: no new person
+    _person("Jane Smith", "Initial sent")
     _qualified(tmp_path, monkeypatch, "strong")
-    assert runner.push(CAND, tmp_path) is None and not wrote          # a person set that stage
+    assert runner.push(CAND, tmp_path) is None                        # a person set that stage
+    assert store.stage_of(store.get("jane_smith")) == "Initial sent" and not store.get("jane_smith")["notes"]
+    store.upsert_entry("jane_smith", {"stage": "Research"})
     _qualified(tmp_path, monkeypatch, "strong", with_draft=False)
-    _fake_attio(monkeypatch, wrote, person=known, entry_stage="Research")
-    assert runner.push(CAND, tmp_path) is None and not wrote          # strong with no draft
+    assert runner.push(CAND, tmp_path) is None                        # strong with no draft
+    assert store.stage_of(store.get("jane_smith")) == "Research"
 
 
-def test_push_moves_a_research_entry_by_category(tmp_path, monkeypatch):
-    known = {"id": {"record_id": "r9"}}
-    wrote = []
-    _fake_attio(monkeypatch, wrote, person=known, entry_stage="Research")
+def test_push_moves_a_research_entry_by_category(tmp_path, monkeypatch, store):
+    _person("Jane Smith", "Research")
     _qualified(tmp_path, monkeypatch, "plausible")
     runner.push(CAND, tmp_path)
-    assert [w[0] for w in wrote] == ["entry", "note"] and wrote[0][2]["stage"] == "Qualified"
-    assert "next_action" not in wrote[0][2]
-    wrote.clear()
+    c = store.get("jane_smith")
+    assert c["entry"]["stage"] == "Qualified" and not c["entry"]["next_action"]
+    assert [n["title"][:14] for n in c["notes"]] == ["Outreach brief"]
+    store.upsert_entry("jane_smith", {"stage": "Research"})
     _qualified(tmp_path, monkeypatch, "reject")
     rec = runner.push(CAND, tmp_path)
-    assert [w[0] for w in wrote] == ["not pursuing"] and wrote[0][2].startswith("Qualified as reject.")
+    c = store.get("jane_smith")
+    assert c["entry"] is None and c["notes"][-1]["title"].startswith("Not pursuing")
+    assert c["notes"][-1]["text"].startswith("Qualified as reject.")
     assert rec["not_pursuing"] and runner.push(CAND, tmp_path) is None   # once
 
 
-def test_candidate_from_an_attio_entry(monkeypatch):
-    calls = []
-    attio = _attio(monkeypatch, [
-        _Resp({"data": {"values": {"name": [{"full_name": "Jane Smith"}], "job_title": [{"value": "Partner"}],
-                                   "company": [{"target_record_id": "c1"}],
-                                   "linkedin": [{"value": "https://www.linkedin.com/in/jane"}]}}}),
-        _Resp({"data": {"values": {"name": [{"value": "Acme Advisers"}], "domains": [{"domain": "acme.example"}]}}}),
-        _Resp({"data": [{"title": "Evidence: LinkedIn post", "created_at": "2026-09-15T10:00:00Z",
-                         "content_plaintext": "Four deals in diligence."},
-                        {"title": "Outreach brief 2026-09-01", "content_plaintext": "old"}]})], calls)
-    c = attio.candidate_from({"parent_record_id": "r1", "entry_values": {
-        "notes": [{"value": "Met at a conference in May."}],
-        "relationship": [{"option": {"title": "Warm"}}]}})
-    assert c["name"] == "Jane Smith" and c["firm"] == "Acme Advisers" and c["title"] == "Partner"
-    assert c["urls"] == ["https://acme.example", "https://www.linkedin.com/in/jane"]
-    assert "Warm" in c["relationship"] and "conference in May" in c["relationship"]
-    assert c["pasted"] == [{"source": "LinkedIn post", "date": "2026-09-15", "text": "Four deals in diligence."}]
+def test_candidate_from_a_contact(store):
+    c = store.create_person("Jane Smith", "Partner", "https://www.linkedin.com/in/jane",
+                            firm="Acme Advisers", domain="acme.example")
+    store.upsert_entry(c["id"], {"stage": "Research", "notes": "Met at a conference in May.", "relationship": "Warm"})
+    store.create_note(c["id"], "Evidence: LinkedIn post", "Four deals in diligence.")
+    store.create_note(c["id"], "Outreach brief 2026-09-01", "old")
+    got = store.candidate_from(store.get(c["id"]))
+    assert got["name"] == "Jane Smith" and got["firm"] == "Acme Advisers" and got["title"] == "Partner"
+    assert got["urls"] == ["https://acme.example", "https://www.linkedin.com/in/jane"]
+    assert "Warm" in got["relationship"] and "conference in May" in got["relationship"]
+    assert got["pasted"] == [{"source": "LinkedIn post", "date": runner.today(), "text": "Four deals in diligence."}]
 
 
-def test_scout_skips_known_names_looks_once_and_limits_research(tmp_path, monkeypatch):
+def test_scout_skips_known_names_looks_once_and_limits_research(tmp_path, monkeypatch, store):
     profile = "M&A adviser to founder-led SaaS companies. " * 6
     monkeypatch.setattr(runner.exa, "search", lambda q, cat: [
         {"title": "Ann Known", "url": "https://www.linkedin.com/in/ann", "text": profile},
         {"title": "Bob New", "url": "https://www.linkedin.com/in/bob", "text": profile, "publishedDate": "2026-08-01T00:00:00Z"},
         {"title": "Cy Student", "url": "https://www.linkedin.com/in/cy", "text": "Finance student. " * 12},
         {"title": "Di New", "url": "https://www.linkedin.com/in/di", "text": profile}])
-    monkeypatch.setattr(runner.attio, "known", lambda name: name == "Ann Known")
+    _person("Ann Known")
     seen = []
     monkeypatch.setattr(runner, "emit", _fake([
         {"queries": ["sell-side advisers to bootstrapped vertical SaaS founders"], "reason": "first search"},
@@ -308,7 +293,7 @@ def test_scout_skips_known_names_looks_once_and_limits_research(tmp_path, monkey
     assert "vertical SaaS" in (tmp_path / "scout_log.jsonl").read_text()
 
 
-def test_firm_scout_picks_one_checked_person_per_firm(tmp_path, monkeypatch):
+def test_firm_scout_picks_one_checked_person_per_firm(tmp_path, monkeypatch, store):
     firm_text = "Acme Software Group buys small vertical software companies and holds them. " * 4
     head = "Head of M&A at Acme Software Group. Runs acquisitions of vertical software companies. " * 3
     def search(q, category="people", *a):
@@ -318,8 +303,7 @@ def test_firm_scout_picks_one_checked_person_per_firm(tmp_path, monkeypatch):
         return [{"title": "Pat Head", "url": "https://www.linkedin.com/in/pat", "text": head},
                 {"title": "Sam Former", "url": "https://www.linkedin.com/in/sam", "text": "Formerly at Acme. " * 10}]
     monkeypatch.setattr(runner.exa, "search", search)
-    monkeypatch.setattr(runner.attio, "firm_record", lambda firm, domain: {} if firm == "Known Holdings" else None)
-    monkeypatch.setattr(runner.attio, "known", lambda name: False)
+    _person("Kim Known", firm="Known Holdings")
     seen = []
     whom = {"first": "01_pat_head.md", "first_role": "Head of M&A", "alternate": "02_sam_former.md",
             "first_citation": {"file": "01_pat_head.md", "lines": [4, 4], "quote": "Head of M&A at Acme Software Group."},
@@ -331,7 +315,7 @@ def test_firm_scout_picks_one_checked_person_per_firm(tmp_path, monkeypatch):
     assert [c["name"] for c in got] == ["Pat Head"] and got[0]["firm"] == "Acme Software Group"
     assert "Alternate at the firm" in got[0]["notes"] and "Sam Former" in got[0]["notes"]
     assert "PROSPECT.md §18" in seen[0]["user"] and "§19" in seen[1]["user"] and "§20" in seen[2]["user"]
-    assert not (tmp_path / "_firms" / "known_holdings").exists()          # Attio has that firm
+    assert not (tmp_path / "_firms" / "known_holdings").exists()          # a contact works there
     firm = json.loads((tmp_path / "_firms" / "acme_software_group" / "firm.json").read_text())
     assert firm["chosen"] == "Pat Head" and firm["alternate"] == "Sam Former"
     assert runner.firm_domain(got[0]) == "acme.example"
@@ -353,35 +337,29 @@ def test_firm_scout_picks_one_checked_person_per_firm(tmp_path, monkeypatch):
 def test_a_better_contact_named_in_qualification_waits_for_research(tmp_path, monkeypatch):
     cand = {**CAND, "urls": ["https://acme.example/team", "https://www.linkedin.com/in/jane"]}
     q = {"better_contact_name": "Ravi Diligence", "better_contact_role": "VP R&D, M&A", "prospect_type": "Repeat acquirer"}
-    d = runner.better_contact(cand, q, tmp_path, use_attio=False)
+    d = runner.better_contact(cand, q, tmp_path, use_contacts=False)
     made = runner.waiting(tmp_path, "Repeat acquirer")
     assert d is not None and [m["name"] for m in made] == ["Ravi Diligence"]
     assert made[0]["firm"] == "Acme Advisers" and made[0]["urls"] == ["https://acme.example/team"]
-    assert runner.better_contact(cand, q, tmp_path, use_attio=False) is None     # once
-    assert runner.better_contact(cand, {"better_contact_name": ""}, tmp_path, use_attio=False) is None
+    assert runner.better_contact(cand, q, tmp_path, use_contacts=False) is None     # once
+    assert runner.better_contact(cand, {"better_contact_name": ""}, tmp_path, use_contacts=False) is None
 
 
-def test_attio_contact_for_someone_unknown_reports_colleagues_at_the_firm(monkeypatch):
-    calls = []
-    attio = _attio(monkeypatch, [
-        _Resp({"data": []}),                                                       # no such person
-        _Resp({"data": [{"values": {"team": [{"target_record_id": "r2"}]}}]}),      # the firm, by domain
-        _Resp({"data": {"values": {"name": [{"full_name": "Pat Head"}]}}}),
-        _Resp({"data": [{"list_api_slug": "tuuyi_outreach", "entry_id": "e2"}]}),
-        _Resp({"data": {"entry_values": {"stage": [{"status": {"title": "Initial sent"}}]}}})], calls)
-    text = attio.contact_for("Ravi Diligence", "Acme Software Group", "acme.example")
+def test_contact_for_someone_unknown_reports_colleagues_at_the_firm(store):
+    _person("Pat Head", "Initial sent", domain="acme.example")
+    _person("Lee Elsewhere", "Initial sent", firm="Other Group")
+    text = store.contact_for("Ravi Diligence", "Acme Software Group", "acme.example")
     assert text == "A colleague at the same firm, Pat Head, is in the outreach list at stage 'Initial sent'."
-    assert calls[1]["json"]["filter"] == {"domains": "acme.example"}
 
 
-def test_daily_works_the_named_then_scouts_the_least_scouted_kind_when_the_pool_is_low(tmp_path, monkeypatch):
+def test_daily_works_the_named_then_scouts_the_least_scouted_kind_when_the_pool_is_low(tmp_path, monkeypatch, store):
     did = []
     named = [{"name": "Ann Named"}]
     monkeypatch.setattr(runner, "pickup", lambda data: named)
-    monkeypatch.setattr(runner, "work", lambda backend, writer, cands, stages, data, use_attio, redo=False:
-                        did.append(("work", [c["name"] for c in cands], stages[-1], use_attio)))
-    ready = [{"entry_values": {"stage": [{"status": {"title": "Ready to contact"}}]}}] * 2
-    monkeypatch.setattr(runner.attio, "entries", lambda: ready)
+    monkeypatch.setattr(runner, "work", lambda backend, writer, cands, stages, data, use_contacts, redo=False:
+                        did.append(("work", [c["name"] for c in cands], stages[-1], use_contacts)))
+    _person("Ann Ready", "Ready to contact")
+    _person("Bob Ready", "Ready to contact")
     monkeypatch.setattr(runner, "scout", lambda b, kind, data, want: did.append(("scout", kind, want)) or [{"name": "Sue Scouted"}])
     monkeypatch.setattr(runner, "scout_firms", lambda b, kind, data, want: did.append(("firms", kind, want)) or [])
     monkeypatch.setattr(runner, "next_kind", lambda: "Repeat acquirer")
@@ -394,18 +372,14 @@ def test_daily_works_the_named_then_scouts_the_least_scouted_kind_when_the_pool_
     assert [d[0] for d in did] == ["work", "work"]
 
 
-def test_attio_not_pursuing_writes_the_note_then_removes_the_entry(monkeypatch):
-    calls = []
-    attio = _attio(monkeypatch, [
-        _Resp({"data": [{"list_api_slug": "tuuyi_outreach", "entry_id": "e1"}]}),
-        _Resp({"data": {"id": {"entry_id": "e1"}, "entry_values": {
-            "stage": [{"status": {"title": "Ready to contact"}}], "fit_rationale": [{"value": "Advises sellers."}]}}}),
-        _Resp({"data": {"id": {"note_id": "n1"}}}), _Resp({})], calls)
-    attio.not_pursuing("r1", "Skipped by the practice. Too large.", "2026-09-21")
-    note = calls[2]["json"]["data"]
-    assert note["title"] == "Not pursuing 2026-09-21" and "Too large." in note["content"]
-    assert "Ready to contact" in note["content"] and "Advises sellers." in note["content"]
-    assert (calls[3]["method"], calls[3]["path"]) == ("DELETE", "/lists/tuuyi_outreach/entries/e1")
+def test_not_pursuing_writes_the_note_then_removes_the_entry(store):
+    _person("Jane Smith", "Ready to contact", fit_rationale="Advises sellers.")
+    store.not_pursuing("jane_smith", "Skipped by the practice. Too large.", "2026-09-21")
+    c = store.get("jane_smith")
+    assert c["entry"] is None and store.known("Jane Smith")          # kept, so scouting does not bring her back
+    note = c["notes"][-1]
+    assert note["title"] == "Not pursuing 2026-09-21" and "Too large." in note["text"]
+    assert "Ready to contact" in note["text"] and "Advises sellers." in note["text"]
 
 
 def test_the_daily_kind_takes_turns_by_date():
@@ -430,26 +404,17 @@ def test_an_empty_draft_is_asked_for_once_more(tmp_path, monkeypatch):
 
 # ---- after a message is sent ---------------------------------------------------
 
-def _entry(stage, rid="r1", next_date=None):
-    values = {"stage": [{"status": {"title": stage}}]}
-    if next_date:
-        values["next_action_date"] = [{"value": next_date}]
-    return {"parent_record_id": rid, "entry_values": values}
-
-
-def test_attio_due_and_note_texts(monkeypatch):
-    from workflowsv2.outreach import attio
-    assert attio.due(_entry("Initial sent", next_date="2026-09-21"), "Initial sent", "2026-09-21")
-    assert not attio.due(_entry("Initial sent", next_date="2026-09-27"), "Initial sent", "2026-09-21")
-    assert attio.due(_entry("Initial sent"), "Initial sent", "2026-09-21")          # no date: nobody said when
-    assert not attio.due(_entry("Follow-up sent"), "Initial sent", "2026-09-21")
-    monkeypatch.setattr(attio, "notes", lambda rid: [
-        {"id": {"note_id": "n2"}, "title": "Message sent 2026-09-21", "created_at": "2026-09-21T09:00:00Z",
-         "content_plaintext": " second "},
-        {"id": {"note_id": "n0"}, "title": "Outreach brief 2026-09-20", "content_plaintext": "brief"},
-        {"id": {"note_id": "n1"}, "title": "Message sent 2026-09-02", "created_at": "2026-09-02T09:00:00Z",
-         "content_plaintext": "first"}])
-    assert attio.note_texts("r1", attio.SENT_NOTE) == [
+def test_due_and_note_texts(store):
+    def c(stage, next_date=""):
+        return {"entry": {"stage": stage, "next_action_date": next_date}}
+    assert store.due(c("Initial sent", "2026-09-21"), "Initial sent", "2026-09-21")
+    assert not store.due(c("Initial sent", "2026-09-27"), "Initial sent", "2026-09-21")
+    assert store.due(c("Initial sent"), "Initial sent", "2026-09-21")          # no date: nobody said when
+    assert not store.due(c("Follow-up sent"), "Initial sent", "2026-09-21")
+    among = [{"note_id": "n2", "title": "Message sent 2026-09-21", "date": "2026-09-21", "text": " second "},
+             {"note_id": "n0", "title": "Outreach brief 2026-09-20", "date": "2026-09-20", "text": "brief"},
+             {"note_id": "n1", "title": "Message sent 2026-09-02", "date": "2026-09-02", "text": "first"}]
+    assert store.note_texts("r1", store.SENT_NOTE, among) == [
         {"note_id": "n1", "date": "2026-09-02", "text": "first"},
         {"note_id": "n2", "date": "2026-09-21", "text": "second"}]
 
@@ -471,37 +436,26 @@ def test_followup_prompt_record_and_flags(tmp_path, monkeypatch):
     assert rec["flags"] == ["the follow-up is 70 words"]
 
 
-def test_followups_are_drafted_once_for_those_whose_date_has_come(tmp_path, monkeypatch):
-    a = runner.attio
+def test_followups_are_drafted_once_for_those_whose_date_has_come(tmp_path, monkeypatch, store):
     monkeypatch.setattr(runner, "today", lambda: "2026-09-21")
-    monkeypatch.setattr(a, "entries", lambda: [_entry("Initial sent", "r1", "2026-09-21"),
-                                               _entry("Initial sent", "r2", "2026-09-27"),
-                                               _entry("Ready to contact", "r3")])
-    monkeypatch.setattr(a, "candidate_from", lambda e: {"name": {"r1": "Ann Due"}[e["parent_record_id"]]})
-    monkeypatch.setattr(a, "contact_record", lambda person: "the record of " + person["id"]["record_id"])
-    monkeypatch.setattr(a, "notes", lambda rid: [])                            # no live call
-    monkeypatch.setattr(a, "note_texts", lambda rid, title, among=None: (
-        [{"note_id": "n1", "date": "2026-09-15", "text": "Ann, I read your post."}] if title == a.SENT_NOTE else []))
+    _person("Ann Due", "Initial sent", "2026-09-21")
+    _person("Bo Later", "Initial sent", "2026-09-27")
+    _person("Cy Ready", "Ready to contact")
+    store.create_note("ann_due", "Message sent 2026-09-15", "Ann, I read your post.")
     seen = []
     monkeypatch.setattr(runner, "emit", _fake([{"idea": "i", "message": "Ann, one more thought.", "assumes": ""}], seen))
     assert runner.followups(Backend(), tmp_path) == ["Ann Due"]
-    assert "the record of r1" in seen[0]["user"] and "The first message, sent 2026-09-15" in seen[0]["user"]
+    assert "stage 'Initial sent'" in seen[0]["user"] and "Ann, I read your post." in seen[0]["user"]
     assert (tmp_path / "ann_due" / "candidate.yaml").is_file()                 # someone the workflow had no record of
     assert runner.followups(Backend(), tmp_path) == [] and len(seen) == 1      # once
 
 
-def test_a_reply_is_read_once_and_its_quotes_are_checked(tmp_path, monkeypatch):
-    a = runner.attio
-    wrote = []
+def test_a_reply_is_read_once_and_its_quotes_are_checked(tmp_path, monkeypatch, store):
     reply = "Thanks Bruce.\nHonestly our diligence provider already covers this.\nTalk to Pat Head at Acme, she buys small SaaS."
-    monkeypatch.setattr(a, "entries", lambda: [_entry("Replied", "r1"), _entry("Initial sent", "r2")])
-    monkeypatch.setattr(a, "candidate_from", lambda e: dict(CAND))
-    monkeypatch.setattr(a, "notes", lambda rid: [])                            # no live call
-    monkeypatch.setattr(a, "note_texts", lambda rid, title, among=None: (
-        [{"note_id": "n7", "date": "2026-09-24", "text": reply}] if title == a.REPLY_NOTE else
-        [{"note_id": "n1", "date": "2026-09-21", "text": "Jane, I read your post."}] if title == a.SENT_NOTE else []))
-    monkeypatch.setattr(a, "create_note", lambda rid, title, md: wrote.append(("note", title, md)))
-    monkeypatch.setattr(a, "upsert_entry", lambda rid, v: wrote.append(("entry", rid, v)))
+    _person("Jane Smith", "Replied", firm="Acme Advisers")
+    _person("Bo Waiting", "Initial sent")
+    store.create_note("jane_smith", "Message sent 2026-09-21", "Jane, I read your post.")
+    got = store.create_note("jane_smith", "Reply received 2026-09-24", reply)
     seen = []
     monkeypatch.setattr(runner, "emit", _fake([{"gives": [
         {"what": "objection", "quote": "our diligence provider already covers this", "note": "Says diligence covers it."},
@@ -515,10 +469,13 @@ def test_a_reply_is_read_once_and_its_quotes_are_checked(tmp_path, monkeypatch):
     assert "PROSPECT.md §22" in user and "   2|Honestly our diligence" in user and "Jane, I read your post." in user
     rec = json.loads((tmp_path / "jane_smith" / "replies.json").read_text())[0]
     assert [(g["what"], g["quote_found"]) for g in rec["gives"]] == [("objection", True), ("introduction", False)]
-    assert rec["flags"] == ["the words quoted for `introduction` are not in the reply"] and rec["note_id"] == "n7"
-    assert wrote[0][1].startswith("Reply read") and "objection, introduction" in wrote[0][1]
-    assert "Introduces: Pat Head" in wrote[0][2] and "CHECK:" in wrote[0][2]
-    assert wrote[1] == ("entry", "r1", {"next_action": rec["next_step"], "next_action_date": runner.today()})
+    assert rec["flags"] == ["the words quoted for `introduction` are not in the reply"]
+    assert rec["note_id"] == got["note_id"]
+    c = store.get("jane_smith")
+    read = c["notes"][-1]
+    assert read["title"].startswith("Reply read") and "objection, introduction" in read["title"]
+    assert "Introduces: Pat Head" in read["text"] and "CHECK:" in read["text"]
+    assert c["entry"]["next_action"] == rec["next_step"] and c["entry"]["next_action_date"] == runner.today()
     assert "PROSPECT.md §23" in seen[1]["user"] and '"what": "objection"' in seen[1]["user"]
     assert "   2|Honestly our diligence" in seen[1]["user"]
     assert rec["answer"]["message"].startswith("Jane, thank you.") and not rec["answer"]["flags"]
@@ -530,37 +487,35 @@ def test_a_reply_is_read_once_and_its_quotes_are_checked(tmp_path, monkeypatch):
     del have[0]["answer"]
     log.write_text(json.dumps(have))
     monkeypatch.setattr(runner, "emit", _fake([{"takes_up": "t", "message": "word " * 95, "assumes": ""}], seen))
-    assert runner.replies(Backend(), Backend(), tmp_path) == ["Jane Smith"] and len(wrote) == 2   # nothing more written to Attio
+    assert runner.replies(Backend(), Backend(), tmp_path) == ["Jane Smith"]
+    assert len(store.get("jane_smith")["notes"]) == 3                                     # nothing more written to the contact
     assert json.loads(log.read_text())[0]["answer"]["flags"] == ["the answer is 95 words"]
 
 
-def test_the_page_records_a_follow_up_and_a_reply(tmp_path, monkeypatch):
+def test_the_page_records_a_follow_up_and_a_reply(tmp_path, monkeypatch, store):
     from workflowsv2.outreach import app
-    wrote, started = [], []
-    monkeypatch.setattr(app.attio, "create_note", lambda rid, title, md: wrote.append(("note", title, md)))
-    monkeypatch.setattr(app.attio, "upsert_entry", lambda rid, v: wrote.append(("entry", rid, v)))
+    started = []
+    _person("Jane Smith", "Initial sent")
     monkeypatch.setattr(app, "today", lambda: "2026-09-27")
-    app.followup_sent(app.Sent(record_id="r1", name="Jane Smith", message="Jane, one more thought."))
-    assert wrote[0] == ("note", "Follow-up sent 2026-09-27", "Jane, one more thought.")
-    assert wrote[1][2]["stage"] == "Follow-up sent" and wrote[1][2]["next_action"] == "Close if no response"
+    app.followup_sent(app.Sent(record_id="jane_smith", name="Jane Smith", message="Jane, one more thought."))
+    c = store.get("jane_smith")
+    assert (c["notes"][0]["title"], c["notes"][0]["text"]) == ("Follow-up sent 2026-09-27", "Jane, one more thought.")
+    assert c["entry"]["stage"] == "Follow-up sent" and c["entry"]["next_action"] == "Close if no response"
 
-    wrote.clear()
     monkeypatch.setattr(app, "_running", lambda: False)
     monkeypatch.setattr(app, "_start", lambda steps, what: started.append(steps[0][2]))
-    monkeypatch.setattr(app.attio, "entry_of", lambda rid: _entry("Follow-up sent"))
-    monkeypatch.setattr(app.attio, "note_texts", lambda rid, title, among=None: [{"text": "Already  here."}])
-    import pytest
+    store.create_note("jane_smith", "Reply received 2026-09-26", "Already  here.")
     with pytest.raises(app.HTTPException) as refused:                            # the same words a second time
-        app.replied(app.Replied(record_id="r1", reply="Already here.\n"))
-    assert refused.value.status_code == 409 and not wrote
-    assert app.replied(app.Replied(record_id="r1", reply=" Not for us. "))["reading"]
-    assert wrote[0] == ("note", "Reply received 2026-09-27", "Not for us.")
-    assert wrote[1][2]["stage"] == "Replied" and started == ["replies"]
-    wrote.clear()
+        app.replied(app.Replied(record_id="jane_smith", reply="Already here.\n"))
+    assert refused.value.status_code == 409 and len(store.get("jane_smith")["notes"]) == 2
+    assert app.replied(app.Replied(record_id="jane_smith", reply=" Not for us. "))["reading"]
+    c = store.get("jane_smith")
+    assert (c["notes"][-1]["title"], c["notes"][-1]["text"]) == ("Reply received 2026-09-27", "Not for us.")
+    assert c["entry"]["stage"] == "Replied" and started == ["replies"]
     monkeypatch.setattr(app, "_running", lambda: True)                           # a run is going: read later
-    monkeypatch.setattr(app.attio, "entry_of", lambda rid: _entry("Conversation"))
-    assert not app.replied(app.Replied(record_id="r1", reply="And another thing."))["reading"]
-    assert "stage" not in wrote[1][2] and started == ["replies"]                 # a conversation stays one
+    store.upsert_entry("jane_smith", {"stage": "Conversation"})
+    assert not app.replied(app.Replied(record_id="jane_smith", reply="And another thing."))["reading"]
+    assert store.stage_of(store.get("jane_smith")) == "Conversation" and started == ["replies"]   # a conversation stays one
 
     monkeypatch.setattr(app.runner, "DATA", tmp_path)
     (tmp_path / "jane_smith").mkdir()
@@ -570,11 +525,9 @@ def test_the_page_records_a_follow_up_and_a_reply(tmp_path, monkeypatch):
     assert saved["message"] == "model's text" and saved["edited_message"] == "my text"
 
 
-def test_the_page_records_an_answer_and_keeps_an_edit(tmp_path, monkeypatch):
+def test_the_page_records_an_answer_and_keeps_an_edit(tmp_path, monkeypatch, store):
     from workflowsv2.outreach import app
-    wrote = []
-    monkeypatch.setattr(app.attio, "create_note", lambda rid, title, md: wrote.append(("note", title, md)))
-    monkeypatch.setattr(app.attio, "upsert_entry", lambda rid, v: wrote.append(("entry", rid, v)))
+    _person("Jane Smith", "Replied")
     monkeypatch.setattr(app, "today", lambda: "2026-09-21")
     monkeypatch.setattr(app.runner, "DATA", tmp_path)
     (tmp_path / "jane_smith").mkdir()
@@ -582,7 +535,9 @@ def test_the_page_records_an_answer_and_keeps_an_edit(tmp_path, monkeypatch):
     log.write_text(json.dumps([{"note_id": "n7", "answer": {"message": "model's answer"}}]))
     app.edit(app.Edit(name="Jane Smith", message="my answer", which="answer", note_id="n7"))
     assert json.loads(log.read_text())[0]["edited_answer"] == "my answer"
-    app.answer_sent(app.Answered(record_id="r1", name="Jane Smith", note_id="n7", message="my answer"))
-    assert wrote[0] == ("note", "Answer sent 2026-09-21", "my answer") and wrote[1][2]["stage"] == "Conversation"
+    app.answer_sent(app.Answered(record_id="jane_smith", name="Jane Smith", note_id="n7", message="my answer"))
+    c = store.get("jane_smith")
+    assert (c["notes"][0]["title"], c["notes"][0]["text"]) == ("Answer sent 2026-09-21", "my answer")
+    assert c["entry"]["stage"] == "Conversation"
     rec = json.loads(log.read_text())[0]
     assert rec["answer_sent"] == "2026-09-21" and rec["answer"]["message"] == "model's answer"
