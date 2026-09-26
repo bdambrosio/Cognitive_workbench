@@ -47,7 +47,6 @@ numbers are trusted.**
 | `qwen3.8-flash-next` (local) | 1.0 | Qwen, via the Qwen3.8-Flash-Next open-weights card. **The one row whose publisher recommendation applies to the model it names** — these are those weights, at a third party's quantization. 1.0 is the THINKING-mode value and thinking is the mode we run; Qwen publishes 0.7 for non-thinking, so a config that turns thinking off is at the wrong operating point and needs its own conversation |
 | `qwen/qwen3.8-flash` | 1.0 | Bruce, 2026-08-28. Publisher value, but for a model that is **probably, not provably, this one**: Qwen publishes 1.0 (thinking) and 0.7 (non-thinking) on the Qwen3.8-Flash-Next open-weights card, and it is not established that the hosted route serves those weights — OpenRouter's entry declares image+video input where the card describes a text stack. No recommendation for the hosted model was found. **One value across both the reasoning-on and reasoning-off arms**, rather than the published pair, so those runs vary reasoning and not two things at once; the off arm therefore runs above its recommended 0.7 |
 | `claude-opus-5-5` | 1.0 | Bruce, 2026-09-24. **Anthropic publishes no value.** The API accepts `temperature` only at 1.0 (0.5 returned "`temperature` is deprecated for this model") and rejects `top_p` and `top_k`, checked 2026-09-24. The Anthropic route sends neither, so 1.0 is what runs. Route `measure/models/anthropic_opus55_medium.yaml` (effort medium, the model's default) |
-| `gemini-3.8-flash` | 1.0 | Bruce, 2026-09-24. **Nominal.** Google's page (ai.google.dev/gemini-api/docs/latest-model, read 2026-09-24): "Strip `temperature`, `top_p`, and `top_k` from generation configs"; the parameters are deprecated and reported ignored by the backend. The OpenAI-compatible route sends them anyway. Route `measure/models/or_gemini38flash_low.yaml` (OpenRouter, pinned to google-ai-studio, effort low: the only level that passed gate 2) |
 | `mimo-v2.6-flash` | 1.0 | Xiaomi, via mimo.mi.com's model-hyperparameters page, read 2026-09-22 (release day): 1.0 / top_p 0.95, and thinking mode forces both to those values whatever is sent. Bruce confirmed 2026-09-22. Served from DeepInfra as `XiaomiMiMo/MiMo-V2.6-Flash` (fp8); prescreen in `measure/models/di_mimo_v26flash_medium.yaml` |
 
 **The keys above are the literal keys in `MODEL_TEMPERATURE`**, not the model
@@ -75,6 +74,7 @@ Named explicitly so a stale config fails with a reason instead of a bare
 | `claude-opus-4-7` | dropped 2026-08-24; revisit at Sonnet 5 |
 | `claude-sonnet-4-6` | dropped 2026-08-24; revisit at Sonnet 5 |
 | `mimo-v2.5` | dropped 2026-08-24 |
+| `gemini-3.8-flash` | failed pre-screen gate 3, 2026-09-24; unqualified. The model emits only the properties the action schema declares (`thought`, `tool`), so its actions carry no tool arguments. Gates 1-2 passed only at effort low. Route kept as a record: `measure/models/or_gemini38flash_low.yaml` |
 
 ## Adding a model
 

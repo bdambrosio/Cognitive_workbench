@@ -1,8 +1,10 @@
 # Google Gemini 3.8 Flash via OpenRouter, pinned to Google AI Studio's
 # standard endpoint, added 2026-09-24 for gate 3.
 #
-# KEPT AS A RECORD: gate 3 FAILED 2026-09-24. The model emits only the
-# properties the action schema declares (thought, tool), so no tool arguments.
+# FAILED PRE-SCREEN, UNQUALIFIED (Bruce, 2026-09-26). Gate 3 failed
+# 2026-09-24: the model emits only the properties the action schema declares
+# (thought, tool), so its actions carry no tool arguments. The model is in
+# model_params.RETIRED, so this config no longer runs.
 #
 # NO DIRECT ROUTE: GOOGLE_API_KEY in ~/.bashrc is not a Gemini API key (the
 # API answers "API key not valid"). OpenRouter serves the model only from
@@ -14,9 +16,6 @@
 # tokens, 1.2-1.5 s; medium 3,082-15,834 tokens and 21-66 s per one-line
 # action; nothing sent 1,678-15,857 and 13-70 s. Google recommends medium for
 # agentic work, so this runs below the publisher's recommendation.
-#
-# TEMPERATURE resolves through src/chat/model_params.py ("gemini-3.8-flash"
-# -> 1.0), nominal: Google says to strip it.
 llm_config:
   server: local
   model: "google/gemini-3.8-flash"

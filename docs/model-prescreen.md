@@ -129,7 +129,7 @@ artifact under a pinned id.
 one-line answer, against grok-4.6's 33. Recorded in `model_params.RETIRED`, so a
 config naming it fails with that reason rather than "unknown model".
 
-**Gate 3's one categorical failure.** Nemotron 3 Super passed gates 1 and 2 —
+**Gate 3's first categorical failure.** Nemotron 3 Super passed gates 1 and 2 —
 schema accepted, well-formed actions, 235 tokens on a one-line action — then ran
 33 minutes across four legs and delivered a `report.md` whose entire content was
 the literal string `<the entire report>`, with `error: None`.
@@ -143,6 +143,12 @@ layer that owns the check performed it; a runner check would have recovered
 nothing, since the placeholder was the final turn's deliverable; and a runner
 that loops until a reply looks like a report measures the retry loop rather than
 the model.
+
+**Gate 3 failure — `gemini-3.8-flash`, 2026-09-24.** Passed gates 1 and 2 at
+effort low only (OpenRouter, pinned to Google AI Studio). In gate 3 its actions
+carried only the properties the action schema declares, `thought` and `tool`, and
+no tool arguments, so no tool call could run. Unqualified; recorded in
+`model_params.RETIRED`, Bruce's decision 2026-09-26.
 
 **Watch item, open.** `Qwen3.8-27B` is on record as unusable for this METHOD —
 two of three runs inadmissible, from citing claim ordinals rather than line

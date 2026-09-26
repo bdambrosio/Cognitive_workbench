@@ -68,12 +68,6 @@ MODEL_TEMPERATURE: Dict[str, float] = {
     # rejects top_p and top_k (checked 2026-09-24). The Anthropic route sends
     # neither, so the model runs at 1.0. Bruce chose 1.0 on 2026-09-24.
     "claude-opus-5-5": 1.0,
-    # gemini-3.8-flash (Google, via OpenRouter). Google's model page says
-    # "Strip temperature, top_p, and top_k from generation configs": the
-    # parameters are deprecated and third-party pages say the backend ignores
-    # them. The OpenAI-compatible route sends both, so this entry is nominal.
-    # Bruce chose 1.0 on 2026-09-24, for the gate-3 run.
-    "gemini-3.8-flash": 1.0,
     # Local.
     #
     # NARROWED 2026-08-26 from the bare `Qwen3.8`. That key matched every
@@ -184,6 +178,9 @@ RETIRED: Dict[str, str] = {
     "claude-opus-4-7":   "dropped 2026-08-24; revisit at Sonnet 5",
     "claude-sonnet-4-6": "dropped 2026-08-24; revisit at Sonnet 5",
     "mimo-v2.5":         "dropped 2026-08-24",
+    "gemini-3.8-flash":
+        "failed pre-screen gate 3 2026-09-24, unqualified: emits only the "
+        "action schema's declared properties, so no tool arguments",
 }
 
 
