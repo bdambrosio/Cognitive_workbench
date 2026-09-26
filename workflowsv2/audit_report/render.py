@@ -398,20 +398,13 @@ def _slot(name: str, prose: Optional[Dict[str, Any]]) -> List[str]:
     return [f"[[{name}]]", ""]
 
 
-def _first_sentence(text: str) -> str:
-    t = " ".join((text or "").split())
-    for stop in (". ", "; "):
-        i = t.find(stop)
-        if 0 < i < 220:
-            return t[:i + 1]
-    return t[:220]
-
-
 def key_findings(classes: Dict[str, List[Dict[str, Any]]],
                  by_m: Dict[str, Dict[str, Any]]) -> List[str]:
-    """The shown findings rated material or decisive, one line each, in
-    rating order. Computed, so the executive summary lists what the ratings
-    say and not what a writer chose to mention."""
+    """The shown findings rated material or decisive, one item each, in
+    rating order, each with its whole gap: a gap's first sentence often says
+    what holds and the caveat comes after it. Computed, so the executive
+    summary lists what the ratings say and not what a writer chose to
+    mention."""
     rows = []
     for f in _ordered(classes["shown"], by_m, "materiality"):
         r = by_m.get(_key(f))
@@ -420,32 +413,39 @@ def key_findings(classes: Dict[str, List[Dict[str, Any]]],
         adj = f.get("adjudication") or {}
         rows.append(f"- **{f.get('claim_source')}, claim {f.get('claim_id')}** "
                     f"({VERDICT_WORDS.get(adj.get('verdict'), adj.get('verdict')).split(' — ')[0]}; "
-                    f"{r.get('materiality')}): {_md_safe(_first_sentence(adj.get('gap') or ''))}"
+                    f"{r.get('materiality')}): {_md_safe(' '.join((adj.get('gap') or '').split()))}"
                     + (f" — *{KNOWLEDGE_MARK}*" if _from_knowledge(f) else ""))
     return rows
 
 
 def _front_matter(engagement: str, dates: List[str], revs: List[str],
-                  sources: List[str]) -> List[str]:
+                  sources: List[str], tiered: bool = False) -> List[str]:
     """Title, the materials' date and version, the assurance given, and who
     is responsible for what. Fixed text from the record; defines the terms it
-    uses at first use."""
+    uses at first use. `tiered`: some claims were listed and not tested."""
     when = ", ".join(dates) if dates else "an undated run"
     rev = (" at commit " + ", ".join(r[:12] for r in revs)) if revs else ""
     src = ", ".join(f"`{s}`" for s in sources) or "the claim sources named by the engagement"
     return [
         f"# Claims review — {engagement}", "",
         f"Materials as of {when}{rev}. Claim sources: {src}.", "",
-        "**What this document is.** A claims review: the assertions the seller "
-        "makes in the claim sources are tested, one by one, against the "
-        "materials the seller supplied, and each is reported with the "
-        "evidence that settles it. A *claim source* is a document in which "
+        "**What this document is.** A claims review: "
+        + ("every assertion the seller makes in the claim sources is listed, "
+           "and each is rated by what it would change for the buyer if it were "
+           "untrue. The claims the buyer's decision rests on are tested, one by "
+           "one, against the materials the seller supplied, and each is "
+           "reported with the evidence that settles it; the others are listed "
+           "as not tested, with the reason. " if tiered else
+           "the assertions the seller makes in the claim sources are tested, "
+           "one by one, against the materials the seller supplied, and each is "
+           "reported with the evidence that settles it. ")
+        + "A *claim source* is a document in which "
         "the seller asserts things about the target; the *materials* are "
         "everything supplied, including the claim sources, source code and "
         "configuration. The review examined what was supplied and nothing "
         "else.", "",
         "**The assurance given is limited.** The review reports what the "
-        "materials show about each claim. It did not perform procedures "
+        f"materials show about each{' tested' if tiered else ''} claim. It did not perform procedures "
         "beyond examining the materials, so a claim the materials cannot "
         "settle is reported as unsettled, not as false, and the document "
         "states no overall conclusion on the target or the transaction. An "
@@ -549,7 +549,7 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
     unrun = sorted({c.get("claim_source") for c in untested} - set(sources) - {None})
     sources = sources + unrun
     out = _front_matter(engagement or merged.get("engagement") or "engagement",
-                        dates, revs, sources)
+                        dates, revs, sources, tiered=bool(untested))
 
     out += ["## The transaction", ""]
     out += ["  \n".join(transaction.strip().splitlines()), ""] if transaction else [

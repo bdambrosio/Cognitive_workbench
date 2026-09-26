@@ -252,6 +252,20 @@ def test_a_covered_claim_names_the_wider_claim_and_keeps_its_own_verdict(tmp_pat
     assert render.covered_by(tmp_path / "nowhere" / "merged" / "m") == {}
 
 
+def test_the_executive_summary_carries_a_material_gap_whole(tmp_path):
+    # A gap whose first sentence says what holds, longer than a line, and whose
+    # caveat comes after it: the reader of the summary needs the caveat.
+    rec = _record()
+    holds = ("The released data files are pipeline outputs and not records of real patients: the exporter "
+             "describes them as synthetic, the schema carries generation columns, and the encounter notes "
+             "are written by the pipeline itself rather than taken from any clinical system.")
+    caveat = "No licence document covers the data files; LICENSE covers the code only."
+    next(f for f in rec["merged"]["findings"] if f["claim_id"] == 5)["adjudication"]["gap"] = holds + " " + caveat
+    doc = render.assemble(rec)
+    ex = doc[doc.index("## Executive summary"):doc.index("## Scope and approach")]
+    assert holds in ex and caveat in ex
+
+
 def test_claims_listed_and_not_tested_are_counted_and_given_their_own_appendix(tmp_path):
     rec = _record()
     assert "Every claim received one finding." in render.assemble(rec)
@@ -265,6 +279,8 @@ def test_claims_listed_and_not_tested_are_counted_and_given_their_own_appendix(t
     assert [c["id"] for c in rec["not_tested"]] == [9]
     text = render.assemble(rec)
     assert "Every claim that was tested received one finding. 1 further claim(s)" in text
+    opening = text.split("## The transaction")[0]              # the first thing a reader is told
+    assert "the others are listed as not tested" in opening and "about each tested claim" in opening
     assert "## Appendix — claims listed, not tested" in text
     assert "| docs/CLI.md | 9 | 40 | page_size defaults to 10 | 2 | A default a developer codes against." in text
 
