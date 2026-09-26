@@ -1,10 +1,13 @@
 # Known answers for the chhoto-url target (6a1b51c, v7.5.1), for scoring a run
 # with measure/known_answers.py. Each answer was checked by hand against the
-# target on 2026-09-24; `basis` says how. They are a first set, from the claims
-# the runs of 2026-09-20..24 got wrong at least once, not a sample of the
-# surface. Bruce reviewed them on 2026-09-26: no-personal-info-logged accepts
-# two verdicts because the claim does not say what counts as personal
-# information; compose-up dropped (its text says to modify the file first).
+# target; `basis` says how. Two groups, marked by `selected`: `failure` answers
+# (2026-09-24) are claims the runs of 2026-09-20..24 got wrong at least once, so
+# they show whether a known failure came back and are not a rate; `sample`
+# answers (2026-09-26) are a random draw from the reviewed surface, and only
+# they read as a rate. The `failure` answers were reviewed by Bruce on
+# 2026-09-26: no-personal-info-logged accepts two verdicts because the claim
+# does not say what counts as personal information; compose-up was dropped (its
+# text says to modify the file first).
 #
 # Fields:
 #   source, lines   where the claim is made; a frozen claim whose own quote
@@ -15,9 +18,11 @@
 #   cites_any       when the claim was tested, the finding must cite at least
 #                   one of these line ranges; this is how a right verdict for a
 #                   wrong reason is told apart
+#   selected        `failure` or `sample`, as above
 target: chhoto-url 6a1b51c
 answers:
   - id: hit-only
+    selected: failure
     source: README.md
     lines: [66, 67]
     statement: Only the hit is recorded for each visit to a short link, and nothing else about the visitor.
@@ -31,6 +36,7 @@ answers:
       claim to a wrong `restates` pointer.
 
   - id: no-personal-info-logged
+    selected: failure
     source: docs/INSTALLATION.md
     lines: [279, 279]
     statement: No personal information of the end user is ever logged.
@@ -47,6 +53,7 @@ answers:
       URL is personal information only when it happens to contain some.
 
   - id: no-cookies
+    selected: failure
     source: README.md
     lines: [98, 99]
     statement: The software sets no cookies.
@@ -65,6 +72,7 @@ answers:
       words; the context bears on materiality, not on the verdict.
 
   - id: no-tracking
+    selected: failure
     source: README.md
     lines: [94, 94]
     statement: The software performs no tracking or spying of any kind.
@@ -77,6 +85,7 @@ answers:
       tracking by the software.
 
   - id: compose-basic-deployment
+    selected: failure
     source: docs/INSTALLATION.md
     lines: [8, 9]
     statement: The sample compose file contains everything needed for a basic deployment.
@@ -92,3 +101,574 @@ answers:
       2026-09-24 by running `docker compose config -q` (Docker Compose v5.0.2)
       on the shipped file, which is no longer done: seller files are not
       executed, not even compose config.
+
+  # --- selected: sample. A random draw (Python random.seed(20260926), 20 of
+  # the 32 tier-1 claims on chhoto-full's reviewed surface that no answer
+  # above covers). Each was answered from the target without opening any
+  # run's finding, then reviewed; "Review:" at the end of a basis says what
+  # the review changed. The review by Bruce is still to come.
+  - id: readme-mit-licence
+    selected: sample
+    source: README.md
+    lines:
+    - 12
+    - 12
+    statement: The target is licensed under the MIT licence.
+    verdict:
+    - real
+    basis: 'The claim is about a document (the licence), so METHOD §7 (a claim about
+      a document is settled by the document) decides it. Verified: LICENSE:1 reads "MIT
+      License", and LICENSE:3-21 is the standard MIT permission and warranty text ("Permission
+      is hereby granted, free of charge, to any person obtaining a copy ..."), with
+      "Copyright (c) 2023-2026 Sayantan Santra". The package manifest agrees: backend/Cargo.toml:9
+      `license = "mit"`, and source files carry "SPDX-License-Identifier: MIT" (for
+      example backend/src/services/get.rs:2). No other licence file was found in the
+      target root. Per §7, this settles that the file is the MIT licence, not any legal
+      question about distribution.'
+  - id: selfhosted-url-shortener
+    selected: sample
+    source: README.md
+    lines:
+    - 20
+    - 20
+    statement: The product is a self-hosted URL shortener — the core function of the
+      category exists.
+    verdict:
+    - real
+    basis: 'METHOD §2 reads a category claim as one claim: that the core function of
+      the category exists. Verified in source: a create path, `#[post("/api/new")]`
+      at backend/src/services/post.rs:29-30, which calls `utils::add_links_helper` (post.rs:34)
+      to store a long link under a short link (backend/src/database/queries.rs:25-28,
+      `INSERT INTO urls (long_url, short_url, hits, expiry_time, notes)`); and a resolve
+      path, `#[get("/{shortlink}")]` at backend/src/services/get.rs:124, which looks
+      up the long URL (get.rs:130-131) and redirects to it (get.rs:133-137). Self-hosted:
+      the target ships its own server (`HttpServer::new` at backend/src/main.rs:97)
+      and deployment files (deploy/compose.yaml, deploy/Containerfile*, deploy/helm-chart/).
+      I inferred, and did not check, that nothing depends on a hosted service of the
+      seller to run.'
+  - id: readme-hit-counting
+    selected: sample
+    source: README.md
+    lines:
+    - 39
+    - 39
+    statement: The software includes hit counting as one of its features.
+    verdict:
+    - real
+    basis: 'An existence claim, settled by citation per METHOD §6. Verified: the redirect
+      handler calls `database::find_and_add_hit` (backend/src/services/get.rs:131),
+      which after resolving the link sends the short link to a hit queue: `hits_tx.send((shortlink.to_owned(),
+      false))` (backend/src/database/events.rs:161). A background worker, started at
+      backend/src/main.rs:91-92, counts pending hits per link (backend/src/background.rs:27)
+      and writes them with the ADD_HIT statement `SET hits = hits + :count` (backend/src/database/queries.rs:20-23),
+      into the `hits INTEGER NOT NULL` column of the urls table (queries.rs:42). Hits
+      are returned with each link by the list queries (queries.rs:105-106).'
+  - id: shortening-mechanism
+    selected: sample
+    source: README.md
+    lines:
+    - 58
+    - 58
+    statement: The target contains a shortening path that accepts a submitted long URL
+      and stores or returns a short link generated at random.
+    verdict:
+    - real
+    basis: 'Verified in source: `#[post("/api/new")]` (backend/src/services/post.rs:29-30)
+      takes the request body as `req: String` and passes it to `add_links_helper`. When
+      no shortlink is supplied (backend/src/services/utils.rs:203-204), `gen_link` generates
+      one (utils.rs:214-221). The default style is Pair (backend/src/config.rs:292-294;
+      the shipped compose.yaml:71 also sets CHHOTO_SLUG_STYLE=Pair), which picks a random
+      adjective and a random name: `ADJECTIVES.choose(&mut rand::rng())` and `NAMES.choose(&mut
+      rand::rng())` (utils.rs:382-388). The UID style uses `nanoid!(slug_len, ...)`
+      (utils.rs:375-378). The link is stored by ADD_LINK (backend/src/database/queries.rs:25-28)
+      and returned in the response (post.rs:37-39). This settles the frozen statement:
+      real (METHOD §6). The two verdicts come from an ambiguity in the claim. The frozen
+      statement omits "of any length", but the quote carries it. If "of any length"
+      is read as part of the claim, it is a limit, and there is one: the handler reads
+      the body with actix-web''s `String` extractor (post.rs:30), and actix-web (backend/Cargo.toml:40
+      `actix-web = "4.15.0"`, backend/Cargo.lock:174-175) applies PayloadConfig to that
+      extractor with a default limit of 256 kB. The target sets no PayloadConfig (no
+      match for PayloadConfig or JsonConfig under backend/src). That limit comes from
+      the dependency''s documentation (docs.rs, actix-web latest 4.x PayloadConfig page:
+      "By default, the payload size limit is 256kB ... Applies to the built-in Bytes
+      and String extractors"), not from the materials, and is admissible only as a §7
+      from_knowledge derived item citing post.rs:30 and Cargo.toml:40. A long URL near
+      256 kB is therefore refused, so the limit differs from "any length": partial per
+      §6 (a limit that differs is partial). No other length check on the long link was
+      found (utils.rs:44-49 checks only that it parses and its scheme is allowed). Review:
+      real only. The frozen statement is what is tested, and it does not carry "of any
+      length"; the length limit is not part of this claim.'
+  - id: redirect-mechanism
+    selected: sample
+    source: README.md
+    lines:
+    - 62
+    - 63
+    statement: The target contains a redirect handler that resolves a short URL to its
+      stored long URL and issues an HTTP redirect to it.
+    verdict:
+    - real
+    basis: 'An existence claim, settled by citation per METHOD §6. Verified: `#[get("/{shortlink}")]
+      pub(crate) async fn link_handler` (backend/src/services/get.rs:124-125), registered
+      first at backend/src/main.rs:125, looks up the stored long URL with `database::find_and_add_hit`
+      (get.rs:130-131), which runs FIND_LINK, `SELECT long_url FROM urls WHERE short_url
+      = :short` for links that have not expired (backend/src/database/queries.rs:12-18).
+      It then returns an HTTP redirect: `Either::Left(Redirect::to(longlink))` when
+      a temporary redirect is configured, otherwise `Redirect::to(longlink).permanent()`
+      (get.rs:133-137). The response is a redirect, not an intermediate page; an unknown
+      or expired link gets a 404 page (get.rs:140-143). The code default is permanent
+      (config.rs:198-199, TEMPORARY only when CHHOTO_REDIRECT_METHOD=TEMPORARY); the
+      shipped deploy/compose.yaml:65 sets TEMPORARY. Either way the claim holds.'
+  - id: delete-list-need-admin-password
+    selected: sample
+    source: README.md
+    lines:
+    - 77
+    - 77
+    statement: Deleting or listing links requires admin access with the password.
+    verdict:
+    - real_with_caveat
+    cites_any:
+    - document: backend/src/auth.rs
+      lines:
+      - 115
+      - 119
+    - document: backend/src/config.rs
+      lines:
+      - 221
+      - 226
+    - document: backend/src/auth.rs
+      lines:
+      - 19
+      - 27
+    - document: backend/src/services/delete.rs
+      lines:
+      - 42
+      - 42
+    basis: 'Verified by reading. Deletion is the route at backend/src/services/delete.rs:35
+      (`#[delete("/api/del/{shortlink}")]`); it deletes only for `Auth::ValidAPIKey`
+      (line 42) or `Auth::ValidSession` (line 76), and answers `Auth::None { result:
+      _ } => HttpResponse::Unauthorized().body("Not logged in!")` (line 93). Listing
+      is `#[get("/api/all")]` at backend/src/services/get.rs:24; it returns Unauthorized
+      for `Auth::None` (line 31) and `Auth::InvalidAPIKey` (line 34), and lists only
+      in the remaining (admin) cases (line 37). Neither handler checks public mode,
+      so public mode does not open them. A session becomes valid only through POST /api/login,
+      which compares the password (backend/src/services/post.rs:188-207). The shipped
+      deployment files all set a password: deploy/compose.yaml:56 `- password=TopSecretPass`
+      (legacy name, read through the fallback at backend/src/config.rs:41-51 and 221),
+      deploy/chhoto-url.container:28 `Environment=CHHOTO_PASSWORD=TopSecretPass`, deploy/helm-chart/values.yaml:12
+      `password: cGFzc3dvcmQ=`. So as shipped the claim holds (METHOD §2, boundary read
+      against default plus shipped deployment files). Two things a reader must know,
+      each an operator setting, which §2 makes a caveat and not a contradiction: (1)
+      with no password configured, backend/src/auth.rs:116-118 `if config.password.is_none()
+      { return true; }` makes every request an admin session, and backend/src/config.rs:224-225
+      logs "No password was provided. The API will be accessible to the public." — so
+      anyone can delete and list; (2) when CHHOTO_API_KEY is set (commented out in all
+      shipped deploy files, compose.yaml:61), a valid `X-API-Key` header also authorizes
+      deletion and listing without the password (auth.rs:19-27, 168-170; delete.rs:42).
+      Verdict real_with_caveat per §6. That these routes behave this way in a running
+      instance is inferred from the code; nothing was run. Review: cites_any accepts
+      either caveat, the no-password path or the API-key path.'
+  - id: shortening-behaviour
+    selected: sample
+    source: README.md
+    lines:
+    - 58
+    - 58
+    statement: When a URL is submitted to the running service, it returns a randomly
+      generated short link for that URL.
+    verdict:
+    - unverifiable
+    basis: 'Verified by reading. POST /api/new (backend/src/services/post.rs:29-30)
+      calls `add_links_helper`; requests with an empty shortlink go to `without_shortlinks`
+      (backend/src/services/utils.rs:203-204) and receive `gen_link(...)` (utils.rs:214-220).
+      `gen_link` picks a random adjective and name (`ADJECTIVES.choose(&mut rand::rng())`,
+      utils.rs:383-389; default style Pair, config.rs:292-294, and compose.yaml:71 `CHHOTO_SLUG_STYLE=Pair`)
+      or a nanoid of random characters (utils.rs:375-379). The created short URL is
+      returned (post.rs:37-39 and 51-73). The only check on the long URL is scheme validity
+      (utils.rs:46-49 `Url::parse(link)` and allowed protocols); no length check in
+      the code or the schema. However the handler takes the body as `req: String` (post.rs:30),
+      and actix-web 4.15.0 (backend/Cargo.lock:174-175, backend/Cargo.toml:40 `actix-web
+      = "4.15.0"`) limits the String extractor to its default PayloadConfig of 262,144
+      bytes (`DEFAULT_CONFIG_LIMIT: usize = 262_144`), and main.rs sets no PayloadConfig
+      (backend/src/main.rs:97-150). This limit comes from knowledge of the dependency,
+      confirmed by reading actix-web 4.15.0 source src/types/payload.rs on docs.rs,
+      not from the materials (METHOD §7 dependency rule). So a request body, and therefore
+      a URL, over about 256 KiB is rejected. The claim''s core holds; the ambiguity
+      is in "of any length". Read in its ordinary sense (long URLs are accepted; no
+      length restriction imposed by the product), every part holds and the 256 KiB ceiling
+      is a caveat: real_with_caveat. Read literally as an unlimited quantity, a citable
+      limit exists and the quantity differs: partial (METHOD §6, a quantity that differs).
+      The statement''s "running service" does not make it unverifiable: this is a functional
+      capability, which the code path shows (§7); nothing was run. Review (changes the
+      verdict from real_with_caveat/partial): this is the behaviour half of a behaviour
+      split (BEHAVIOUR_SPLIT.md §1: reading code settles the mechanism, nothing in the
+      code settles the behaviour), and METHOD §7 says a code path does not show behaviour
+      in operation. No record of the software running was supplied: unverifiable, outside_the_materials.
+      The code facts above belong to the mechanism claim (shortening-mechanism).'
+  - id: redirect-behaviour
+    selected: sample
+    source: README.md
+    lines:
+    - 62
+    - 63
+    statement: When a short URL is visited in a browser, the running service redirects
+      the browser to the correct destination long URL.
+    verdict:
+    - unverifiable
+    basis: 'Verified by reading. The route `#[get("/{shortlink}")]` (backend/src/services/get.rs:124)
+      looks up the long URL with `database::find_and_add_hit` and answers `Either::Left(Redirect::to(longlink))`
+      when temporary redirects are configured (get.rs:133-134) and `Redirect::to(longlink).permanent()`
+      otherwise (get.rs:137): an HTTP redirect response straight to the stored long
+      URL, with no intermediate page. The lookup is `SELECT long_url FROM urls WHERE
+      short_url = :short AND (expiry_time IS NULL OR expiry_time > :now)` (backend/src/database/queries.rs:12-18,
+      used at backend/src/database/events.rs:148-164), so it returns the long URL stored
+      for that short link; an unknown or expired link gets the 404 page (get.rs:141).
+      The route is registered in backend/src/main.rs:125. compose.yaml:65 sets `CHHOTO_REDIRECT_METHOD=TEMPORARY`.
+      "Instantly" is read, from the same bullet''s "(So no stupid redirection pages.)"
+      at README.md:63, as "by a direct redirect", which the code shows. METHOD §6 real;
+      §7 a code path shows the capability. Behaviour in a live instance is inferred,
+      not run. Review (changes the verdict from real): the behaviour half of a behaviour
+      split; as for shortening-behaviour, unverifiable, outside_the_materials. The code
+      facts above belong to redirect-mechanism.'
+  - id: container-image-size
+    selected: sample
+    source: claim_sources/site_index_html.md
+    lines:
+    - 11
+    - 11
+    statement: The compressed container image is below 4.5 MB for the scratch variant
+      and below 8.5 MB for the alpine variant.
+    verdict:
+    - unverifiable
+    basis: 'Checked. deploy/Containerfile.scratch and deploy/Containerfile.alpine define
+      images that copy a prebuilt binary from `./backend/target/<triple>/release/chhoto-url`
+      plus `./frontend` onto `scratch` or `alpine` (Containerfile.alpine also runs `apk
+      add --no-cache tzdata`). No built binary, no image, no registry manifest and no
+      image-size record is in the materials: there is no backend/target directory, and
+      .github/workflows/test-and-release.yml builds and pushes the images but records
+      no size. backend/Cargo.toml:32-37 sets a size-oriented release profile (`lto =
+      "fat"`, `strip = "symbols"`), which does not give a size. The README''s "~6MB"
+      is excluded documentation and a different figure; it is not evidence (METHOD §7).
+      Lexical search for size and MB terms over deploy/, .github/, Makefile and backend/Cargo.toml,
+      and structural inspection of the deploy/ directory; all candidates opened. A compressed
+      image size is a measure of a built artefact that the materials do not contain
+      (§7, evidence must reach the scope the claim states). unresolved_because: outside_the_materials
+      (§8) — the kind of material that would settle it, a built image or registry manifest,
+      was not supplied.'
+  - id: site-mit-licence
+    selected: sample
+    source: claim_sources/site_index_html.md
+    lines:
+    - 13
+    - 13
+    statement: The software is free and open source, released under the MIT licence.
+    verdict:
+    - real
+    basis: 'Verified by reading. LICENSE:1 `MIT License`, and the rest of the file is
+      the standard MIT permission text ("Permission is hereby granted, free of charge,
+      to any person obtaining a copy ..."); backend/Cargo.toml:9 `license = "mit"`;
+      every source file carries `SPDX-License-Identifier: MIT` (a search for SPDX identifiers
+      other than MIT over the target, excluding .git, returned nothing). The source
+      is supplied, so it is open source; the MIT licence grants use free of charge.
+      A licence is a provenance fact settled by the LICENSE file (METHOD §6 provenance,
+      §7 "MIT licensed" is settled by the text of the LICENSE file; whether distribution
+      is lawful is a legal question left alone).'
+  - id: create-generated-or-custom-slug
+    selected: sample
+    source: claim_sources/site_index_html.md
+    lines:
+    - 29
+    - 29
+    statement: The target contains code that accepts a URL for shortening and creates
+      a short link for it, using either an automatically generated slug or a user-chosen
+      custom alias.
+    verdict:
+    - real
+    basis: 'Verified by reading the code. backend/src/services/post.rs:29-30 registers
+      the creation route ("#[post(\"/api/new\")]", "pub(crate) async fn add_links"),
+      and main.rs:131 registers the service (".service(services::add_links)"). In backend/src/services/utils.rs
+      the request struct carries an optional alias (26-31: "#[serde(default)]" / "pub(crate)
+      shortlink: String"); add_links_helper splits requests by whether an alias was
+      given (203-207: "} else if req.shortlink.is_empty() {" / "without_shortlinks.push((i,
+      req));" / "with_shortlinks.push((i, req));"); a supplied alias is inserted as
+      given (210: "for (i, res) in add_links(with_shortlinks, db, false).0 {"); an empty
+      one is replaced by gen_link (214-220: "req.shortlink = gen_link("), which builds
+      an adjective-name pair or a random UID (369-396). The insert is database/queries.rs:25-28
+      ("INSERT INTO urls" ... "VALUES (:long, :short, 0, :expiry, :notes)"). The web
+      UI form sends both fields (frontend/static/script.js:792-794: "longlink: longUrl.value,"
+      / "shortlink: shortUrl.value,"). Both parts of the claim exist in code; METHOD
+      §6 real. Per §7 this shows the capability exists, which is what the statement
+      asserts ("contains code that").'
+  - id: site-hit-counting
+    selected: sample
+    source: claim_sources/site_index_html.md
+    lines:
+    - 37
+    - 37
+    statement: The target contains code that records a hit each time a short link is
+      used and keeps a per-link count.
+    verdict:
+    - real
+    - real_with_caveat
+    basis: 'Verified by reading the code. The redirect handler backend/src/services/get.rs:124-131
+      ("#[get(\"/{shortlink}\")]", "database::find_and_add_hit(shortlink_str, &data.reader,
+      &data.hits_tx)") calls database/events.rs:142-165, which on a found, unexpired
+      link enqueues a hit (161: "if let Err(err) = hits_tx.send((shortlink.to_owned(),
+      false)).await {"). The worker in backend/src/background.rs:15-47 ("Run hit updates
+      every 500ms or once 500 distinct links are pending.") sums pending hits per link
+      and calls database::add_hits (45), which runs database/queries.rs:20-23 ("UPDATE
+      urls" / "SET hits = hits + :count"). The per-link column is queries.rs:42 ("hits
+      INTEGER NOT NULL"), and it is returned by /api/expand (post.rs:140 "hits: chunks.hits,")
+      and /api/all. The capability exists; METHOD §6. Two careful readings of the claim
+      differ: (a) the claim asserts that a per-link usage counter exists: real. (b)
+      "records a hit each time" asserts every use is counted: then a reader must know
+      that hits are held in memory and written in batches, and that a batch whose commit
+      fails is discarded (events.rs:185-191: "warn!(\"Add hit commit failed: {e}\");"
+      ... "\"Dropped a total of {} hit increments, with {} distinct links.\""), and
+      that an enqueue failure only logs (events.rs:161-163). That is real_with_caveat,
+      not partial, because §7 says a code path does not show behaviour in operation
+      and no citable evidence shows counts actually being lost. Inferred, not verified:
+      hits pending in memory at shutdown are also lost (background.rs:22 holds them
+      in a local HashMap). Review: two verdicts because "each time" may or may not promise
+      an exact count; hits lost only on an error path, as for no-personal-info-logged.'
+  - id: container-deployment
+    selected: sample
+    source: claim_sources/site_index_html.md
+    lines:
+    - 61
+    - 61
+    statement: The product is deployable as an OCI-compatible container, including via
+      Docker and Podman.
+    verdict:
+    - real
+    - real_with_caveat
+    basis: 'Verified by reading the deployment files; nothing was run. deploy/Containerfile:4-30
+      is a multi-stage OCI build from the backend source ("FROM docker.io/lukemathwalker/cargo-chef:latest-rust-slim
+      AS chef", "RUN cargo build --release --target=$target --locked --bin chhoto-url",
+      "FROM scratch", "ENTRYPOINT [\"/chhoto-url\"]"); Containerfile.alpine and Containerfile.scratch
+      package prebuilt musl binaries for four architectures. Podman: deploy/chhoto-url.container
+      is a Podman quadlet ("To be used with rootless quadlets", "Image=docker.io/sintan1729/chhoto-url:latest",
+      "Volume=data:/data"), and Makefile:34-50 builds and runs with podman ("podman
+      build --tag chhoto-url:debug -f deploy/Containerfile.debug ."). Docker: .github/workflows/test-and-release.yml:117-125
+      builds the image with docker buildx from deploy/Containerfile.alpine, and deploy/compose.yaml
+      is a Docker Compose file. So the capability exists for Docker, Podman and plain
+      OCI builds (METHOD §6, §7: deployment files show what a deployment is configured
+      to be). Caveat a reader must know: the supplied compose.yaml mounts a named volume
+      that it does not declare (107: "- data:/data"; 116-117: "volumes:" / "  db:"),
+      which Docker Compose rejects as an undefined volume, so that file does not start
+      as shipped without a one-word edit. That Compose rejects it is from knowledge
+      of the Compose file format, not from the materials; the mismatch itself is verified.
+      Minor, also verified: compose.yaml:35 ("- CHHOTO_SQLITE_USE_WAL_MODE = True")
+      has spaces around "=", so the variable name the program reads (config.rs:307 "CHHOTO_SQLITE_USE_WAL_MODE")
+      is not the one set; the same line appears in chhoto-url.container:24. The compose
+      and quadlet files pull a prebuilt image from docker.io that is not in the materials;
+      the Containerfile shows it can be built from source instead. Review: two verdicts
+      because the claim does not say whether it covers the supplied compose sample;
+      if it does, the sample''s undeclared volume is a caveat. cites_any dropped: it
+      listed whole files.'
+  - id: edit-links-and-metadata
+    selected: sample
+    source: claim_sources/site_index_html.md
+    lines:
+    - 41
+    - 41
+    statement: When an existing link is edited, the changes take effect and the link's
+      stored details and metadata reflect them.
+    verdict:
+    - partial
+    cites_any:
+    - document: backend/src/database/queries.rs
+      lines:
+      - 91
+      - 100
+    - document: backend/src/services/utils.rs
+      lines:
+      - 284
+      - 293
+    basis: 'Verified by reading the code. The edit route is backend/src/services/put.rs:17-22
+      ("#[put(\"/api/edit\")]", "utils::edit_link_helper"), registered at main.rs:126.
+      edit_link_helper (services/utils.rs:257-302) validates and calls database::edit_link
+      with the new long URL, reset_hits, expiry and notes, and turns empty values into
+      "no value" (288-289: "chunks.expiry_time.filter(|&t| t > 0)," / "chunks.notes.filter(|s|
+      !s.is_empty()).as_deref(),"). The SQL is database/queries.rs:91-100: "long_url
+      = :long," / "hits = COALESCE(:hits, hits)," / "notes = COALESCE(:notes, notes),"
+      / "expiry_time = COALESCE(:expiry, expiry_time)". So the destination, a new non-empty
+      note, a new expiry and a hit reset are stored. But a note cannot be cleared and
+      an expiry cannot be removed: an empty note or an expiry of 0 becomes NULL and
+      COALESCE keeps the old value. The web UI sends exactly those values when a user
+      empties the fields (frontend/static/script.js:891-903: "const notes = document.getElementById(\"edited-notes\").value;",
+      "let expiry = 0;", "notes: notes,", "expiry_time: expiry,") and then shows the
+      cleared values locally (929-930: "LOCAL_DATA[editedIndex][\"notes\"] = notes;"),
+      so the screen disagrees with the stored row until the list is reloaded. Expired
+      links cannot be edited (queries.rs:99 "AND (expiry_time IS NULL OR expiry_time
+      > :now)"), which I read as consistent with "existing". Two careful readings of
+      the claim differ: (a) "update existing links and manage their metadata" asserts
+      that editing exists and changes the link and its notes, expiry and hits; every
+      part holds and the inability to clear is something a reader must know: real_with_caveat
+      (§6). (b) the statement "the changes take effect" includes removing a note or
+      an expiry, which the cited SQL shows does not take effect: a citable part not
+      as claimed, so partial (§6, "Choosing between partial and real_with_caveat").
+      Not contradicted: editing exists. Review (one verdict, partial): in its ordinary
+      sense managing metadata includes removing a note or an expiry, and the SQL cited
+      shows a removal does not take effect: a citable part not as claimed (METHOD §6,
+      choosing between partial and real_with_caveat). Checked queries.rs:91-100 and
+      utils.rs:284-292 by hand.'
+  - id: installation-doc-mit-licence
+    selected: sample
+    source: docs/INSTALLATION.md
+    lines:
+    - 2
+    - 2
+    statement: The document is licensed under the MIT licence.
+    verdict:
+    - real
+    basis: 'Verified: LICENSE:1 "MIT License", and LICENSE:5-6 grants rights to "this
+      software and associated documentation files (the \"Software\")". LICENSE is not
+      an excluded file, so under METHOD §7 ("MIT licensed" is settled by the text of
+      the LICENSE file) it can be cited. docs/INSTALLATION.md is a documentation file
+      in the same repository; treating it as an "associated documentation file" is an
+      inference, supported by the same SPDX header ("SPDX-License-Identifier: MIT")
+      appearing on every source file (for example backend/src/main.rs:2), and no other
+      licence file or REUSE configuration exists in the target (find for REUSE, .reuse,
+      dep5 returned nothing). On that reading the verdict is real. Two careful readings
+      of the claim differ: (a) the claim is about the licence that governs the document,
+      settled by LICENSE: real. (b) the claim is the document''s own declaration of
+      its licence, that is, about what the excluded document says; §7 lets an excluded
+      document show only its existence, length and headings, and line 2 is an HTML comment,
+      not a heading, so it cannot be read as given: unverifiable, unresolved_because
+      present_but_not_readable (§7, §8). Review (one verdict, real): the statement is
+      that the document is MIT-licensed, a provenance claim that LICENSE settles (METHOD
+      §7), not a claim about what the excluded document says.'
+  - id: oci-image-runs-on-oci-engines
+    selected: sample
+    source: docs/INSTALLATION.md
+    lines:
+    - 32
+    - 32
+    statement: The software is packaged as an OCI image whose configuration files, such
+      as the compose.yaml and chhoto-url.container samples, support running it with
+      OCI-compatible engines.
+    verdict:
+    - partial
+    - real_with_caveat
+    cites_any:
+    - document: deploy/compose.yaml
+      lines:
+      - 106
+      - 117
+    - document: deploy/compose.yaml
+      lines:
+      - 35
+      - 35
+    basis: 'Verified by reading. The image definitions are standard container build
+      files: deploy/Containerfile.scratch:4-5 "FROM scratch AS builder-amd64" / "COPY
+      ./backend/target/x86_64-unknown-linux-musl/release/chhoto-url /chhoto-url" and
+      :20 "ENTRYPOINT [\"/chhoto-url\"]" (a static musl binary in an empty base image);
+      deploy/Containerfile.alpine is the other variant. The release workflow is configured
+      to build and push them for four platforms: .github/workflows/test-and-release.yml:240
+      "file: deploy/Containerfile.scratch", :243 "platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/riscv64"
+      (configured, not shown to have run, METHOD §7). A podman quadlet sample exists:
+      deploy/chhoto-url.container:14-15 "ContainerName=chhoto-url" / "Image=docker.io/sintan1729/chhoto-url:latest".
+      The Makefile builds and runs the image with podman (Makefile:35 "podman build
+      --tag chhoto-url:debug -f deploy/Containerfile.debug ."). The claim is hedged
+      ("It should be possible"), and the materials bear out that the image is an ordinary
+      OCI image with a fixed entrypoint and a quadlet sample. Caveat (verified by reading):
+      the compose sample mounts a named volume that it does not declare: deploy/compose.yaml:107
+      "- data:/data" against :116-117 "volumes:" / "  db:". That Compose rejects an
+      undeclared named volume is knowledge of the Compose specification, not something
+      the materials state (inferred; no Compose version is cited, so METHOD §7''s dependency
+      rule does not strictly apply). Also compose.yaml:35 "- CHHOTO_SQLITE_USE_WAL_MODE
+      = True" has spaces around "=", so the variable name the container receives is
+      not the one the code reads (inferred from the list-form environment syntax). METHOD
+      §6 decides: every part of the hedged claim holds, and the compose defects are
+      what a reader must know, so real_with_caveat. Second reading: the statement names
+      compose.yaml as one of the configuration files that support running the image.
+      A reader who treats compose.yaml and chhoto-url.container as the members of the
+      claim finds one member (the compose sample as shipped) shown not to run, which
+      is partial under METHOD §6. The ambiguity is in the claim: the quote (line 32)
+      speaks only of running the image on OCI engines, while the enumerated statement
+      adds the sample files. Review: two verdicts because the quote names no sample
+      file and the statement does. Either verdict rests on the compose sample''s defects,
+      so cites_any names them.'
+  - id: official-support-docker-podman
+    selected: sample
+    source: docs/INSTALLATION.md
+    lines:
+    - 33
+    - 34
+    statement: Official support is provided only for docker and podman.
+    verdict:
+    - unverifiable
+    basis: 'The claim concerns the seller''s support policy (about: seller, METHOD §5
+      table). Searched the non-excluded materials for a support policy or agreement:
+      .github/ISSUE_TEMPLATE/ (bug_report.md, feature_request.md, config.yml), .github/pull_request_template.md,
+      docs/CONTRIBUTING.md, deploy/. The bug report template asks only for version,
+      OS and browser; nothing states which engines are supported. The deploy files and
+      Makefile show docker and podman usage (Makefile:35 podman build; deploy/chhoto-url.container
+      for podman; a Helm chart under deploy/helm-chart also exists), which shows what
+      the seller ships samples for, not what the seller officially supports. No support
+      agreement or policy record was supplied. METHOD §8: unresolved_because outside_the_materials.'
+  - id: password-env-chhoto-password
+    selected: sample
+    source: docs/INSTALLATION.md
+    lines:
+    - 62
+    - 62
+    statement: The access password is configured through the CHHOTO_PASSWORD environment
+      variable.
+    verdict:
+    - real
+    basis: 'Verified. backend/src/config.rs:221 "let password = read_config_wrapper(\"CHHOTO_PASSWORD\",
+      \"password\")" reads the variable (falling back to the legacy name "password",
+      config.rs:41-51), and :224-225 warn "No password was provided. The API will be
+      accessible to the public." when it is absent. The value is the access password:
+      backend/src/services/post.rs:188 "let authorized = if let Some(password) = &config.password
+      {" and :202 "Some(password == &req)" compare the login request against it (or
+      verify an Argon2 hash, post.rs:193-196); backend/src/auth.rs:117 "if config.password.is_none()
+      {" lets every session through when it is unset. METHOD §6: the whole claim holds.
+      Review: cites_any dropped; any route to real is fine.'
+  - id: data-mount-persistence
+    selected: sample
+    source: docs/INSTALLATION.md
+    lines:
+    - 73
+    - 73
+    statement: Database persistence is achieved by mounting a host directory into the
+      container at /data.
+    verdict:
+    - real
+    basis: 'Verified. The instruction block mounts ./data at /data and sets CHHOTO_DB_URL=/data/urls.sqlite
+      (INSTALLATION.md:73-74, read for context only). The software opens the database
+      at the configured path: backend/src/config.rs:55 "if let Some(db_url) = read_config_wrapper(\"CHHOTO_DB_URL\",
+      \"db_url\")" returns that path, and backend/src/main.rs:83 "database::open_db(&conf.db_location,
+      false)" opens it. Without the variable the default is also under /data: config.rs:64
+      "let (legacy_location, new_location) = (\"/urls.sqlite\", \"/data/urls.sqlite\");",
+      and :65-66 create the directory. So the database file lives in /data either way,
+      and a host directory mounted there holds it. That a bind mount keeps files on
+      the host is the container engine''s behaviour (general knowledge, not from the
+      materials). METHOD §6: the claim holds.'
+  - id: tools-md-copyright-line
+    selected: sample
+    source: docs/TOOLS.md
+    lines:
+    - 1
+    - 1
+    statement: This document states a copyright of 2023-2026 held by Sayantan Santra.
+    verdict:
+    - unverifiable
+    - real
+    basis: 'docs/TOOLS.md is excluded by the engagement. Under METHOD §7 an excluded
+      document shows only its existence, length (35 lines) and headings ("Software related
+      to Chhoto URL", "Official CLI application", "3rd Party Tools", and subheadings).
+      The SPDX line is an HTML comment, not a heading, so what the document states on
+      line 1 cannot be read as evidence: unverifiable, unresolved_because present_but_not_readable
+      (METHOD §7, §8). Second reading: the SPDX line is a provenance claim (who holds
+      copyright in the document) rather than a claim about the document''s wording.
+      Read that way, the non-excluded LICENSE settles it for the project the document
+      belongs to: LICENSE:3 "Copyright (c) 2023-2026 Sayantan Santra", and git history
+      shows docs/TOOLS.md committed by SinTan1729 (38dd606). That reading gives real.
+      The ambiguity is whether the claim is what the document says (statement wording)
+      or who holds the copyright (the SPDX tag''s purpose). Review: two verdicts because
+      an enumeration may state this claim as what the document says (unverifiable, METHOD
+      §7 last paragraph) or as who holds the copyright (real, LICENSE:3).'

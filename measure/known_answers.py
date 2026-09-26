@@ -15,13 +15,22 @@ For each answer, in this order:
                can be seen.
   tested       the claim has a finding in the merged run (tier 1, or no tier).
   verdict      the finding's verdict is one the answer lists.
+  distance     for a wrong settled verdict, how many steps it lies from the
+               nearest accepted one on the order real, real_with_caveat,
+               partial, contradicted; `lenient` when it lies toward real,
+               `harsh` when toward contradicted. `unverifiable` is not on the
+               order: where the answer settles the claim it is counted as
+               unsettled, not given a distance.
   reason       the finding cites at least one of the answer's `cites_any` line
                ranges, as a citation or in a derivation's basis. A right verdict
                that cites none of them is right for a reason the answer does not
                accept (cmp-chhoto-glm-med INSTALLATION #101).
 
 An answer whose claim source is not one of the engagement's is out of scope and
-not scored. Nothing here reads a finding's prose.
+not scored. Answers are summed separately by `selected`: `failure` answers were
+chosen because runs got them wrong, so their count says whether a known failure
+came back and is not a rate; `sample` answers are a random draw from the
+reviewed claim surface, and only their counts read as a rate. Nothing here reads a finding's prose.
 """
 from __future__ import annotations
 
@@ -41,6 +50,19 @@ for p in (str(REPO), str(REPO / "src")):
 from workflowsv2.claims_audit.duplicates import embed      # noqa: E402
 
 ENGAGEMENTS = REPO / "workflowsv2" / "claims_audit" / "engagements"
+
+
+ORDER = ("real", "real_with_caveat", "partial", "contradicted")
+
+
+def _distance(verdict: str, accepted: List[str]) -> Optional[int]:
+    """Signed steps from the nearest accepted verdict: negative is lenient, positive harsh.
+
+    None when either side is off the order (`unverifiable`)."""
+    on = [ORDER.index(v) for v in accepted if v in ORDER]
+    if verdict not in ORDER or not on:
+        return None
+    return min((ORDER.index(verdict) - i for i in on), key=abs)
 
 
 def _overlaps(a: List[int], b: List[int]) -> bool:
@@ -67,7 +89,8 @@ def score(answers: List[Dict[str, Any]], eng: Path, merged: Path) -> List[Dict[s
                 for f in json.loads((merged / "merged.json").read_text(encoding="utf-8"))["findings"]}
     rows = []
     for a in answers:
-        row: Dict[str, Any] = {"id": a["id"], "source": a["source"], "lines": a["lines"]}
+        row: Dict[str, Any] = {"id": a["id"], "source": a["source"], "lines": a["lines"],
+                               "selected": a.get("selected", "failure")}
         rows.append(row)
         claims = surfaces.get(a["source"])
         if claims is None:
@@ -96,9 +119,15 @@ def score(answers: List[Dict[str, Any]], eng: Path, merged: Path) -> List[Dict[s
         cited = _cited(f)
         ok_reason = (not need) or any(n["document"] == x["document"] and _overlaps(x.get("lines") or [], n["lines"])
                                       for n in need for x in cited)
-        row["result"] = ("right" if ok_verdict and ok_reason
-                         else "right verdict, reason not cited" if ok_verdict
-                         else f"WRONG VERDICT (expected {' or '.join(a['verdict'])})")
+        if ok_verdict:
+            row["result"] = "right" if ok_reason else "right verdict, reason not cited"
+        elif verdict == "unverifiable":
+            row["result"] = f"UNSETTLED (expected {' or '.join(a['verdict'])})"
+        else:
+            d = _distance(verdict, a.get("verdict") or [])
+            row["distance"] = d
+            how = "" if d is None else f", {abs(d)} step{'s' if abs(d) > 1 else ''} {'harsh' if d > 0 else 'lenient'}"
+            row["result"] = f"WRONG VERDICT (expected {' or '.join(a['verdict'])}{how})"
     return rows
 
 
@@ -123,13 +152,19 @@ def main() -> int:
             if "verdict" in r:
                 detail += f"  {r['verdict']} / review {r['review']}"
         print(f"  {r['id']:26s} {where:28s} {r['result']}{detail}")
-    scored = [r for r in rows if r["result"] != "out of scope"]
-    enum = [r for r in scored if "claim" in r]
-    tested = [r for r in enum if "verdict" in r]
-    right_v = [r for r in tested if not r["result"].startswith("WRONG")]
-    right = [r for r in tested if r["result"] == "right"]
-    print(f"  enumerated {len(enum)}/{len(scored)}; tested {len(tested)}; "
-          f"right verdict {len(right_v)}/{len(tested)}; right verdict and reason {len(right)}/{len(tested)}")
+    for group in ("failure", "sample"):
+        scored = [r for r in rows if r["selected"] == group and r["result"] != "out of scope"]
+        if not scored:
+            continue
+        enum = [r for r in scored if "claim" in r]
+        tested = [r for r in enum if "verdict" in r]
+        right_v = [r for r in tested if r["result"].startswith("right")]
+        right = [r for r in tested if r["result"] == "right"]
+        unsettled = [r for r in tested if r["result"].startswith("UNSETTLED")]
+        dist = [r["distance"] for r in tested if r.get("distance") is not None]
+        print(f"  {group}: enumerated {len(enum)}/{len(scored)}; tested {len(tested)}; "
+              f"right verdict {len(right_v)}/{len(tested)}; right verdict and reason {len(right)}/{len(tested)}; "
+              f"unsettled {len(unsettled)}; wrong lenient {sum(d < 0 for d in dist)}, harsh {sum(d > 0 for d in dist)}")
     return 0
 
 
