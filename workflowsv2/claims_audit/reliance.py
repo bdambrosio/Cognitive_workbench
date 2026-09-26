@@ -17,7 +17,11 @@ account (TIERS.md §2).
 
 WHAT IS WRITTEN. `surface/reliance.json` in the engagement: `use`, `items[]`,
 and when and by which model it was written. A person corrects it by editing
-that file. Running this again overwrites it, corrections included.
+that file. Running this again overwrites it, corrections included, with one
+exception: a record carrying `frozen_from` is another engagement's statement,
+copied in by `freeze_from` (measure/full_run.py does this for a comparison
+run, so every model is rated against the same statement), and running this
+leaves it as it is.
 """
 from __future__ import annotations
 
@@ -130,10 +134,28 @@ def load(eng_dir: Path) -> Dict[str, Any]:
     return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {}
 
 
+def freeze_from(src_dir: Path, dst_dir: Path, src_name: str) -> Dict[str, Any]:
+    """Copy `src_dir`'s reliance statement into `dst_dir`, marked `frozen_from`
+    so that `run` leaves it alone. The source must have one."""
+    record = load(src_dir)
+    if not record.get("items"):
+        raise SystemExit(f"{src_name} has no reliance statement to freeze from")
+    record = dict(record, frozen_from=src_name)
+    (dst_dir / state.SURFACE).mkdir(exist_ok=True)
+    atomic_write_text(dst_dir / state.SURFACE / RECORD,
+                      json.dumps(record, indent=1, ensure_ascii=False) + "\n")
+    return record
+
+
 def run(eng_name: str, model_yaml: Path) -> Dict[str, Any]:
     from workflowsv2.claims_audit.runner import load_engagement
     eng = load_engagement(eng_name)
     eng_dir = eng["dir"]
+    frozen = load(eng_dir)
+    if frozen.get("frozen_from"):
+        logger.info("%s: the reliance statement is frozen from %s; left as it is",
+                    eng_name, frozen["frozen_from"])
+        return frozen
     backend = backend_from_model(model_yaml)
     got = propose(backend, buyer_said(eng), inventory(eng_dir))
     if got["parse"] not in ("parsed", "repaired") or not got["items"]:
@@ -156,6 +178,8 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     rec = run(args.engagement, args.model)
     n = {r: sum(1 for x in rec["items"] if x["reliance"] == r) for r in RELIANCE}
+    if rec.get("frozen_from"):
+        print(f"frozen from {rec['frozen_from']}: ", end="")
     print(f"{len(rec['items'])} items: depends {n['depends']}, uses {n['uses']}, "
           f"does_not_use {n['does_not_use']}; "
           f"{sum(1 for x in rec['items'] if x['source'] == 'inference')} inferred")

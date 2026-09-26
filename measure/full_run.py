@@ -24,7 +24,10 @@ the model proposed them, and each is recorded as such:
      the base's claim sources, so the run stops here when this sorting
      proposed different ones: that brief would then be wrong, and a person
      writes this one.
-  4. The enumerate job (enumeration, repeats, reliance, tiers).
+  4. The enumerate job (enumeration, repeats, reliance, tiers). With
+     --reliance-from, the reliance step leaves in place the statement copied
+     from that engagement at create, so the tiers of every comparison run
+     rest on one statement and a tier difference is the rater's alone.
   5. The freeze, as the surface page saves it: claims marked `same_as` an
      earlier claim are left out, everything else as enumerated and rated.
   6. The chain job (audit and review per claim source, materiality, report).
@@ -88,6 +91,11 @@ def main() -> int:
                     help="test this one claim source only: the sorting is confirmed with it "
                          "alone, its evidence excludes as proposed, and a sentence saying so "
                          "is added to the base's brief")
+    ap.add_argument("--reliance-from", default=None, metavar="ENGAGEMENT",
+                    help="rate the claims against this engagement's reliance statement "
+                         "instead of writing a new one: its surface/reliance.json is copied "
+                         "in at create, marked frozen_from, and the enumerate job's reliance "
+                         "step leaves it alone")
     ap.add_argument("--from", dest="start", choices=STEPS, default=STEPS[0],
                     help="resume an existing run at this step, after an earlier "
                          "step was finished by hand (the steps before it are "
@@ -105,7 +113,8 @@ def main() -> int:
     rec_path = eng / "full_run.json"
     if args.start == STEPS[0]:
         record = {"base": args.base, "engagement": args.name, "model": model,
-                  "duplicates_model": dup_model, "source": args.source, "harness": _harness(),
+                  "duplicates_model": dup_model, "source": args.source,
+                  "reliance_from": args.reliance_from, "harness": _harness(),
                   "started": _now(), "steps": []}
     else:
         if not rec_path.is_file():
@@ -158,7 +167,13 @@ def main() -> int:
                 raise SystemExit(f"{key} did not copy from {args.base}")
         rev = subprocess.run(["git", "-C", str(state.target_dir(eng)), "rev-parse", "HEAD"],
                              capture_output=True, text=True).stdout.strip()
-        return {"target_rev": rev}
+        out = {"target_rev": rev}
+        if args.reliance_from:
+            from workflowsv2.claims_audit import reliance
+            frozen = reliance.freeze_from(ENGAGEMENTS / args.reliance_from, eng, args.reliance_from)
+            out["reliance_from"] = {"engagement": args.reliance_from, "at": frozen.get("at"),
+                                    "items": len(frozen["items"])}
+        return out
 
     def job(kind: str):
         def run():
