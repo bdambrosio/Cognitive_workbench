@@ -112,7 +112,6 @@ answers:
       on the shipped file, which is no longer done: seller files are not
       executed, not even compose config.
 
-
   # --- selected: sample. A random draw (Python random.seed(20260926)) of 20 of
   # the 32 tier-1 claims on chhoto-full's reviewed surface that no answer above
   # covers. Each was answered from the target by an agent that opened no run's
@@ -630,7 +629,7 @@ answers:
     cites_any:
       - {document: backend/src/database/queries.rs, lines: [91, 100]}
       - {document: backend/src/services/utils.rs, lines: [284, 293]}
-    tier: [2, 3]
+    tier: [2]
     basis: >
       Verified by reading. The edit route is backend/src/services/put.rs:17-22,
       calling edit_link_helper (backend/src/services/utils.rs:257-302). Before
@@ -664,6 +663,7 @@ answers:
       resting on the price assuming the README is accurate, which §4 step 1 says
       is not a route. The editing item is `uses`, so no route and not tier 1; 2
       held, 3 if tier 2 is read as details only.
+      Settled 2026-09-26 by Claude at Bruce's request: tier 2, the editing item is `uses`, so no route; staff act on editing and meet its failure in use, §3.
 
   - id: installation-doc-mit-licence
     selected: sample
@@ -703,7 +703,7 @@ answers:
     cites_any:
       - {document: deploy/compose.yaml, lines: [106, 117]}
       - {document: deploy/compose.yaml, lines: [35, 35]}
-    tier: [1, 2]
+    tier: [1]
     basis: >
       Verified by reading. The image definitions are standard container build
       files: deploy/Containerfile.scratch:4-5 "FROM scratch AS builder-amd64" /
@@ -750,6 +750,7 @@ answers:
       is documented, so neither is material; no OCI image at all defeats the
       item, since rebuilding one is engineering by the buyer. Rated on the
       buyer's plan as the buyer stated it.
+      Settled 2026-09-26 by Claude at Bruce's request: tier 1, if the software were not packaged as an OCI image the self-hosting item the buyer depends on is defeated, and doubt about the effect resolves to tier 1.
 
   - id: official-support-docker-podman
     selected: sample
@@ -794,7 +795,7 @@ answers:
     lines: [62, 62]
     statement: The access password is configured through the CHHOTO_PASSWORD environment variable.
     verdict: [real, real_with_caveat]
-    tier: [1, 2]
+    tier: [1]
     basis: >
       Verified. backend/src/config.rs:221 "let password =
       read_config_wrapper(\"CHHOTO_PASSWORD\", \"password\")" reads the variable
@@ -827,6 +828,7 @@ answers:
       what the buyer said it is paying for, and fronting the service with the
       buyer's own gate is engineering by the buyer, so that way is material.
       Rated on the buyer's plan as the buyer stated it.
+      Settled 2026-09-26 by Claude at Bruce's request: tier 1, if there were no password gate the service is not private, which defeats the access-control item the buyer depends on; doubt resolves to tier 1.
 
   - id: data-mount-persistence
     selected: sample
@@ -834,7 +836,7 @@ answers:
     lines: [73, 73]
     statement: Database persistence is achieved by mounting a host directory into the container at /data.
     verdict: [real]
-    tier: [1, 2]
+    tier: [1]
     basis: >
       Verified. The instruction block mounts ./data at /data and sets
       CHHOTO_DB_URL=/data/urls.sqlite (INSTALLATION.md:73-74, read for context
@@ -861,6 +863,7 @@ answers:
       held. The mount is what keeps links across restarts; if it did not, the
       self-hosting item the buyer depends on is defeated, and doubt about the
       effect resolves to tier 1.
+      Settled 2026-09-26 by Claude at Bruce's request: tier 1, if the mount did not keep the database every link is lost on restart, defeating the self-hosting item the buyer depends on.
 
   - id: tools-md-copyright-line
     selected: sample
@@ -868,7 +871,7 @@ answers:
     lines: [1, 1]
     statement: This document states a copyright of 2023-2026 held by Sayantan Santra.
     verdict: [unverifiable, real]
-    tier: [3, 1]
+    tier: [3]
     basis: >
       docs/TOOLS.md is excluded, so under METHOD §7 it shows only its existence,
       length and headings, and its line 1 is an HTML comment. The frozen
@@ -895,7 +898,7 @@ answers:
       gives no route; read as a notice of who owns the project's files, the
       ownership threshold reaches it. The same ambiguity as the verdict answer
       for this claim.
-
+      Settled 2026-09-26 by Claude at Bruce's request: tier 3, a header line of a documentation file about that file alone, §4's SPDX example: no route, and not a detail a person acts on.
 
   # --- selected: tier-sample. A random draw (random.seed(20260927)) of 18 claims
   # from the 274 on chhoto-full's surface not covered above and not marked as
@@ -955,7 +958,7 @@ answers:
     source: README.md
     lines: [75, 75]
     statement: The service can serve a custom landing page when configured to do so.
-    tier: [2, 3]
+    tier: [2]
     basis: >
       Step 1: no stated threshold reaches this claim (it is not about logging,
       footprint, a hardening default, licence or a dependency). It falls under
@@ -970,13 +973,14 @@ answers:
       so there is no route; the ambiguity is whether a capability claim under a
       `uses` item meets §3's tier-2 test (a person setting the software up acts
       on it) or whether tier 2 is confined to documented details.
+      Settled 2026-09-26 by Claude at Bruce's request: tier 2, a capability a person setting the software up acts on and meets the failure of, §3.
 
   - id: qr-code-and-api
     selected: tier-sample
     source: claim_sources/site_index_html.md
     lines: [49, 49]
     statement: The target contains code that generates a QR code for a short link and exposes an API through which the service can be used programmatically.
-    tier: [2, 3]
+    tier: [2]
     basis: >
       Step 1: no stated threshold reaches this claim. It asserts two things, and
       each falls under a reliance item the buyer uses: QR codes under "the web
@@ -990,6 +994,7 @@ answers:
       keep the buyer's plan as stated. Rated on the practice's reading of the
       buyer's plan. Review: two tiers, 2 held, for the same reason as
       custom-landing-page: a capability under a `uses` item.
+      Settled 2026-09-26 by Claude at Bruce's request: tier 2, a capability a person operating the service or writing against its API acts on, §3.
 
   - id: getconfig-reply-fields
     selected: tier-sample
@@ -1112,7 +1117,7 @@ answers:
     source: docs/INSTALLATION.md
     lines: [161, 161]
     statement: The CHHOTO_REDIRECT_METHOD variable controls which redirection is used when a shortlink is resolved.
-    tier: [2, 1]
+    tier: [2]
     basis: >
       Step 1: the claim falls under the resolving item, which the buyer depends
       on and which names the choice of temporary or permanent redirect; no
@@ -1129,6 +1134,7 @@ answers:
       tiers, 2 held. The resolving item names the choice of redirect, so a route
       exists; its `if_it_failed` text is about resolution failing, and losing
       the choice leaves the default redirect working, which is why 2 is held.
+      Settled 2026-09-26 by Claude at Bruce's request: tier 2, a documented configuration key; if it were ignored the default redirect still resolves, so the resolving item is not defeated, and §4 step 5's third bullet applies.
 
   - id: slug-length-variable
     selected: tier-sample
