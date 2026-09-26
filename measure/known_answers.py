@@ -31,7 +31,7 @@ For each answer, in this order:
                the run rated lower or higher on the scale not_material,
                material, decisive. A run that settled a claim the answer leaves
                unsettled, or the reverse, has no rating of that kind and is
-               reported as "not rated as such".
+               not compared: the verdict miss is already counted.
   in report    the finding reaches report.md whole: its section (a shown or
                unsettled claim) carries the record's gap text and every
                citation, or its row in the "Claims that hold" table carries
@@ -185,8 +185,9 @@ def score(answers: List[Dict[str, Any]], eng: Path, merged: Path) -> List[Dict[s
         row.update(verdict=verdict, review=(f.get("review") or {}).get("outcome"))
         if report is not None:
             row["report"] = in_report(report, f)
-        for kind, array in (("materiality", "ratings"), ("exposure", "exposures")):
-            if a.get(kind):
+        for kind, array, when in (("materiality", "ratings", ("real_with_caveat", "partial", "contradicted")),
+                                  ("exposure", "exposures", ("unverifiable",))):
+            if a.get(kind) and verdict in when:
                 got = _rating(ratings, array, kind, a["source"], c["id"])
                 row[kind] = {"expected": a[kind], "got": got,
                              "off": None if got is None else _scale_off(got, a[kind])}
@@ -231,7 +232,7 @@ def main() -> int:
                 if r.get(kind):
                     k = r[kind]
                     if k["got"] is None:
-                        detail += f"  {kind}: not rated as such"
+                        detail += f"  {kind}: NOT RATED"
                     elif k["off"] == 0:
                         detail += f"  {kind} ok"
                     else:
@@ -271,7 +272,7 @@ def main() -> int:
                 offs = [r[kind]["off"] for r in have if r[kind]["off"]]
                 print(f"  {group} {kind}: right {sum(r[kind]['off'] == 0 for r in have)}/{len(have)}; "
                       f"rated lower {sum(o < 0 for o in offs)}, higher {sum(o > 0 for o in offs)}; "
-                      f"not rated as such {len(rated) - len(have)}")
+                      f"not rated {len(rated) - len(have)}")
         delivered = [r for r in tested if r.get("report")]
         whole = [r for r in delivered if r["report"]["where"] != "MISSING" and r["report"]["gap"]
                  and r["report"]["cites"][0] == r["report"]["cites"][1]]

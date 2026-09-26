@@ -27,6 +27,11 @@
 #                   statement (TIERS.md §4); two tiers only where the claim or
 #                   the reliance statement can be read two ways
 #   tier_basis      how the tier was decided, where the answer also has a verdict
+#   materiality     for a gap (real_with_caveat, partial, contradicted): the
+#                   ratings that are right (MATERIALITY.md §2-§4), rated blind
+#                   on the gap as `basis` states it, then adjudicated
+#   exposure        for an unsettled claim: the exposure ratings that are right
+#   rating_basis    how the rating was decided
 #   selected        `failure`, `sample` or `tier-sample`, as above
 target: chhoto-url 6a1b51c
 answers:
@@ -36,6 +41,7 @@ answers:
     lines: [66, 67]
     statement: Only the hit is recorded for each visit to a short link, and nothing else about the visitor.
     verdict: [real, real_with_caveat]
+    materiality: [not_material]
     basis: >
       Hits are counted per link. As shipped nothing else about a visitor is
       written: the default log filter (backend/src/main.rs:45-52,
@@ -43,6 +49,17 @@ answers:
       raising RUST_LOG is an operator setting and at most a caveat (METHOD §2,
       as shipped). The enumeration of 2026-09-24 (cmp-chhoto-glm-med) lost this
       claim to a wrong `restates` pointer.
+    rating_basis: >
+      The caveat is that "raising RUST_LOG is an operator setting" which would
+      let the web framework's access log through; as shipped "the default log
+      filter ... drops actix-web's info-level access log" and "nothing else
+      about a visitor is written". The threshold on visitor logging reaches this
+      kind of gap, but the gap is too small to reopen the price: the access log
+      is off by default and turning it on is a choice of the buyer's own staff,
+      who operate the instance, so the reliance item "nothing about visitors is
+      logged or tracked beyond the hit count" (depends) is not defeated. Rated
+      against the buyer's stated threshold: "any way visitors are logged or
+      tracked beyond the hit count".
 
   - id: no-personal-info-logged
     selected: failure
@@ -52,6 +69,7 @@ answers:
     verdict: [contradicted, real_with_caveat]
     cites_any:
       - {document: backend/src/database/events.rs, lines: [258, 263]}
+    materiality: [not_material, material]
     basis: >
       When adding a link fails, backend/src/database/events.rs:258-263 logs the
       submitted long URL and shortlink at ERROR, which the default filter
@@ -60,6 +78,21 @@ answers:
       (cmp-chhoto-glm-med INSTALLATION #101). real_with_caveat is also right:
       the line is written only when saving a new link fails, and a submitted URL
       is personal information only when it happens to contain some.
+    rating_basis: >
+      The gap is one log line: "when adding a link fails" the service "logs the
+      submitted long URL and shortlink at ERROR", which the default filter
+      passes. The threshold on logging reaches this kind of gap, but it is too
+      small to reopen the price: the line is written only on a failed save, it
+      holds the URL the link creator submitted rather than anything about a
+      visitor following a link, and it is "personal information only when it
+      happens to contain some", so the reliance item "nothing about visitors is
+      logged or tracked beyond the hit count" (depends) stands. Rated against
+      the buyer's stated threshold: "any way visitors are logged or tracked
+      beyond the hit count". Adjudicated: both values. The gap is one ERROR line
+      on a database failure, which is small; but the transaction says the price
+      assumes the README is accurate, and a contradicted logging claim under
+      that basis is one a buyer could reopen the price over. MATERIALITY.md does
+      not exclude that route.
 
   - id: no-cookies
     selected: failure
@@ -69,6 +102,7 @@ answers:
     verdict: [contradicted]
     cites_any:
       - {document: backend/src/main.rs, lines: [104, 112]}
+    materiality: [not_material, material]
     basis: >
       backend/src/main.rs:104-112 wraps the app in actix-session's
       SessionMiddleware with CookieSessionStore and a persistent session; the
@@ -79,6 +113,19 @@ answers:
       shipped `contradicted`. Reading "cookies" as tracking cookies only,
       because the list calls them anti-user, narrows the claim beyond its words;
       the context bears on materiality, not on the verdict.
+    rating_basis: >
+      The software does set a cookie, but "the cookie is set only for the admin
+      after login; visitors to short links get none". The threshold on visitor
+      tracking reaches cookies in kind, and the reliance item "nothing about
+      visitors is logged or tracked beyond the hit count, with no cookies"
+      (depends) names them, but the gap is too small to reopen the price because
+      the only cookie is the login session of the buyer's own staff, which
+      records nothing about visitors or customers. Rated against the buyer's
+      stated threshold: "any way visitors are logged or tracked beyond the hit
+      count". Adjudicated: both values. The cookie reaches only the admin, so
+      the visitor-tracking condition is not touched; but the transaction's price
+      basis assumes the README is accurate and the claim is contradicted as
+      written, which a buyer could reopen the price over.
 
   - id: no-tracking
     selected: failure
@@ -86,6 +133,7 @@ answers:
     lines: [94, 94]
     statement: The software performs no tracking or spying of any kind.
     verdict: [real_with_caveat]
+    materiality: [material]
     basis: >
       The backend has no HTTP client and sends nothing out. The shipped frontend
       (frontend/index.html:50-60) loads scripts and fonts from cdn.jsdelivr.net
@@ -93,6 +141,22 @@ answers:
       session cookie is set on admin login. Caveats, not tracking by the
       software. backend/Cargo.toml lists no HTTP client crate (checked
       2026-09-26).
+    rating_basis: >
+      The caveat is that "the shipped frontend loads scripts and fonts from
+      cdn.jsdelivr.net and Google Fonts, which exposes each visitor's IP to
+      those hosts"; the backend itself "sends nothing out". The reliance
+      statement has the buyer's customers create links through the service, so
+      as shipped the address of everyone who opens its page reaches two third
+      parties, which is recording beyond the hit count even though the software
+      itself does none, and the reliance item "nothing about visitors is logged
+      or tracked beyond the hit count" (depends) rests on the buyer's own words,
+      so the buyer would go back to the seller to have this stated or removed
+      before close. Rated against the buyer's stated threshold: "any way
+      visitors are logged or tracked beyond the hit count". Adjudicated:
+      material, as both raters held. The third-party fetches on the
+      visitor-facing 404 page are active as shipped, and the buyer's condition
+      is 'any way visitors are logged or tracked beyond the hit count', which
+      admits no size test.
 
   - id: compose-basic-deployment
     selected: failure
@@ -103,6 +167,7 @@ answers:
     cites_any:
       - {document: deploy/compose.yaml, lines: [35, 35]}
       - {document: deploy/compose.yaml, lines: [106, 117]}
+    materiality: [not_material]
     basis: >
       By reading: the service mounts a volume `data` (line 107) and the file
       declares only `db` (116-117), so the file cannot be used as shipped. Line
@@ -111,6 +176,16 @@ answers:
       2026-09-24 by running `docker compose config -q` (Docker Compose v5.0.2)
       on the shipped file, which is no longer done: seller files are not
       executed, not even compose config.
+    rating_basis: >
+      The compose file "cannot be used as shipped" because "the service mounts a
+      volume data ... and the file declares only db", and line 35 sets a
+      variable name with a trailing space. The buyer can still run the service
+      on its own hardware, since the reliance item "Self-hosting on the buyer's
+      own hardware" (depends) also lists the images and the Containerfile, and
+      the compose defect is a one-word edit for staff who run containers, so the
+      gap does not reach the end-the-deal condition and no price condition names
+      it. Rated against the buyer's stated threshold: "a dependency the buyer
+      cannot run on its own hardware".
 
   # --- selected: sample. A random draw (Python random.seed(20260926)) of 20 of
   # the 32 tier-1 claims on chhoto-full's reviewed surface that no answer above
@@ -297,6 +372,7 @@ answers:
       - {document: backend/src/auth.rs, lines: [19, 27]}
       - {document: backend/src/services/delete.rs, lines: [42, 42]}
     tier: [1]
+    materiality: [not_material]
     basis: >
       Verified by reading. Deletion is the route at
       backend/src/services/delete.rs:35 (`#[delete("/api/del/{shortlink}")]`);
@@ -343,6 +419,19 @@ answers:
       its own gate, which is buyer engineering and not a way the plan holds, so
       the failure is material. Rated against the buyer's stated threshold: "a
       hardening step the README implies is on by default but is not".
+    rating_basis: >
+      The caveats are operator settings: with no password configured "every
+      request [is] an admin session" and the program logs "No password was
+      provided. The API will be accessible to the public.", and a configured API
+      key also authorizes deletion and listing; as shipped "the shipped
+      deployment files all set a placeholder password" and the API key is
+      commented out, so the password check is on. The threshold on hardening
+      reaches this kind of gap, but the gap is too small to reopen the price:
+      the step is on by default, the open state needs the buyer's own staff to
+      remove the password and is announced in the log, so the reliance item
+      "Authentication and access control" (depends) is not defeated. Rated
+      against the buyer's stated threshold: "a hardening step the README implies
+      is on by default but is not".
 
   - id: shortening-behaviour
     selected: sample
@@ -351,6 +440,7 @@ answers:
     statement: When a URL is submitted to the running service, it returns a randomly generated short link for that URL.
     verdict: [unverifiable]
     tier: [1]
+    exposure: [decisive]
     basis: >
       Claim 59 is the behaviour half of the split of claim 15, made by the
       automatic behaviour-split pass (implied_by 15, property "behaviour in
@@ -382,6 +472,19 @@ answers:
       acceptable cost; predictable links would let outsiders guess links on a
       service the buyer said is private, and doubt about the effect of that
       resolves to tier 1. Rated on the buyer's plan as the buyer stated it.
+    rating_basis: >
+      If the claim were false, the running service would not return a short link
+      for a submitted URL; the review found the handler and generator code and
+      tests but "no record of the software running". The reliance item
+      "Shortening a submitted long URL into a short link" (depends) rests on the
+      buyer's own words and states that failure means "the service cannot do the
+      one thing the buyer is buying it for" and is not something staff can patch
+      at acceptable cost, so the buyer would not close. Rated against the
+      buyer's stated threshold: "a small, private link shortener the buyer can
+      run for its customers". Adjudicated: decisive. Read as false, the service
+      does not shorten URLs; §3's definition applies directly, since the buyer
+      would not close on a shortener that does not shorten. No run has rated
+      this exposure, since every run settled the claim.
 
   - id: redirect-behaviour
     selected: sample
@@ -390,6 +493,7 @@ answers:
     statement: When a short URL is visited in a browser, the running service redirects the browser to the correct destination long URL.
     verdict: [unverifiable]
     tier: [1]
+    exposure: [decisive]
     basis: >
       Claim 61 is the behaviour half of the split of claim 20, made by the
       automatic behaviour-split pass (implied_by 20, property "behaviour in
@@ -416,6 +520,16 @@ answers:
       statement says the buyer cannot repair, and no other documented path
       substitutes for the redirect, so the failure is material. Rated on the
       buyer's plan as the buyer stated it.
+    rating_basis: >
+      If the claim were false, a visited short link would not reach its
+      destination; the review found the redirect handler and tests but "no
+      record of the software running". The reliance item "Resolving a short link
+      by redirecting the visitor straight to the destination" (depends) rests on
+      the buyer's own words and states that failure means "every link the
+      buyer's customers share would fail or mislead", which the buyer cannot
+      repair, so the buyer would not close. Rated against the buyer's stated
+      threshold: "a small, private link shortener the buyer can run for its
+      customers". Adjudicated: decisive, as for shortening-behaviour.
 
   - id: container-image-size
     selected: sample
@@ -424,6 +538,7 @@ answers:
     statement: The compressed container image is below 4.5 MB for the scratch variant and below 8.5 MB for the alpine variant.
     verdict: [unverifiable]
     tier: [1]
+    exposure: [material]
     basis: >
       Checked. deploy/Containerfile.scratch and deploy/Containerfile.alpine
       define images that copy a prebuilt binary from
@@ -455,6 +570,16 @@ answers:
       regard as cheap, and doubt about the size of the failure resolves to tier
       1. Rated against the buyer's stated threshold: "footprint or resource
       figures materially worse than stated".
+    rating_basis: >
+      If the claim were false, the compressed images would be larger than "4.5
+      MB for the scratch variant and ... 8.5 MB for the alpine variant"; the
+      materials hold "no built binary, no image, no registry manifest and no
+      image-size record". The reliance item "The small resource footprint:
+      compressed image sizes and RAM use" (depends) rests on the buyer's words
+      that worse figures change the price, so the buyer would go back to the
+      seller over it; it would not end the deal, since the buyer "could move to
+      bigger hardware". Rated against the buyer's stated threshold: "footprint
+      or resource figures materially worse than stated".
 
   - id: site-mit-licence
     selected: sample
@@ -533,6 +658,7 @@ answers:
     statement: The target contains code that records a hit each time a short link is used and keeps a per-link count.
     verdict: [real, real_with_caveat]
     tier: [1]
+    materiality: [not_material]
     basis: >
       Verified by reading the code. The redirect handler
       backend/src/services/get.rs:124-131 ("#[get(\"/{shortlink}\")]",
@@ -564,6 +690,14 @@ answers:
       price assumes; no other documented way supplies it, and restoring it would
       need a code fix by the buyer, which is not a way the plan holds. Rated on
       the buyer's plan as the buyer stated it.
+    rating_basis: >
+      The caveat is that hits "are held in memory and written in batches" in "a
+      500 ms window" and "a batch whose commit fails is dropped"; "no evidence
+      shows a count actually lost". The per-link count the reliance item
+      "Counting hits per short link" (depends) needs still exists and is served,
+      and no stated threshold names an undercount: the buyer's logging threshold
+      is about recording beyond the count, and the footprint threshold does not
+      apply. Rated on the scale alone.
 
   - id: container-deployment
     selected: sample
@@ -572,6 +706,7 @@ answers:
     statement: The product is deployable as an OCI-compatible container, including via Docker and Podman.
     verdict: [real, real_with_caveat]
     tier: [1]
+    materiality: [not_material]
     basis: >
       Verified by reading the deployment files; nothing was run.
       deploy/Containerfile:4-30 is a multi-stage OCI build from the backend
@@ -619,6 +754,17 @@ answers:
       item, since rebuilding an image from the repository is engineering by the
       buyer and not a way the plan holds. Rated on the buyer's plan as the buyer
       stated it.
+    rating_basis: >
+      The caveat is that "the supplied compose.yaml mounts a named volume that
+      it does not declare", so "that file does not start as shipped without a
+      one-word edit", and its WAL line sets a misnamed variable; the
+      Containerfiles, the Podman quadlet and the Makefile show the image can be
+      built and run. The reliance item "Self-hosting on the buyer's own
+      hardware" (depends) is not defeated: the buyer can run the service on its
+      own hardware, and a one-word edit to a sample file is routine for staff
+      who run containers, so the gap does not reach the end-the-deal condition.
+      Rated against the buyer's stated threshold: "a dependency the buyer cannot
+      run on its own hardware".
 
   - id: edit-links-and-metadata
     selected: sample
@@ -630,6 +776,7 @@ answers:
       - {document: backend/src/database/queries.rs, lines: [91, 100]}
       - {document: backend/src/services/utils.rs, lines: [284, 293]}
     tier: [2]
+    materiality: [not_material]
     basis: >
       Verified by reading. The edit route is backend/src/services/put.rs:17-22,
       calling edit_link_helper (backend/src/services/utils.rs:257-302). Before
@@ -664,6 +811,15 @@ answers:
       is not a route. The editing item is `uses`, so no route and not tier 1; 2
       held, 3 if tier 2 is read as details only.
       Settled 2026-09-26 by Claude at Bruce's request: tier 2, the editing item is `uses`, so no route; staff act on editing and meet its failure in use, §3.
+    rating_basis: >
+      The gap is that "a note therefore cannot be cleared and an expiry cannot
+      be removed" through the edit route, and the web page "shows the cleared
+      values locally" until reload; "editing exists and other changes are
+      stored". The reliance item "Editing, deleting and listing existing links,
+      with notes, filtering and pagination" (uses, the practice's inference) is
+      narrowed rather than defeated, staff can delete and recreate a link to
+      clear its metadata, and no stated threshold names editing. Rated on the
+      practice's reading of the buyer's plan.
 
   - id: installation-doc-mit-licence
     selected: sample
@@ -704,6 +860,7 @@ answers:
       - {document: deploy/compose.yaml, lines: [106, 117]}
       - {document: deploy/compose.yaml, lines: [35, 35]}
     tier: [1]
+    materiality: [not_material]
     basis: >
       Verified by reading. The image definitions are standard container build
       files: deploy/Containerfile.scratch:4-5 "FROM scratch AS builder-amd64" /
@@ -751,6 +908,16 @@ answers:
       item, since rebuilding one is engineering by the buyer. Rated on the
       buyer's plan as the buyer stated it.
       Settled 2026-09-26 by Claude at Bruce's request: tier 1, if the software were not packaged as an OCI image the self-hosting item the buyer depends on is defeated, and doubt about the effect resolves to tier 1.
+    rating_basis: >
+      The gap is in the shipped compose sample, not the image: compose.yaml:107
+      mounts "- data:/data" while the volumes block declares "db:", and line 35
+      writes "CHHOTO_SQLITE_USE_WAL_MODE = True" with spaces so the variable is
+      not the one the code reads. The image itself is shown to be an ordinary
+      OCI image with a fixed entrypoint and a podman quadlet sample, so the
+      buyer can run it on its own hardware; the sample defects are two lines the
+      buyer's own staff correct before the first start, and they do not defeat
+      the self-hosting item the buyer depends on. Rated against the buyer's
+      stated threshold: "a dependency the buyer cannot run on its own hardware".
 
   - id: official-support-docker-podman
     selected: sample
@@ -759,6 +926,7 @@ answers:
     statement: Official support is provided only for docker and podman.
     verdict: [unverifiable]
     tier: [2]
+    exposure: [not_material]
     basis: >
       The claim concerns the seller's support policy (about: seller, METHOD §5
       table). Searched the non-excluded materials for a support policy or
@@ -788,6 +956,14 @@ answers:
       the price assuming the documentation is accurate, which is not a route.
       Support falls under the maintainer's upkeep item (`uses`); a supported
       platform is §3's own example of tier 2.
+    rating_basis: >
+      If the support policy were false the buyer would lose the seller's
+      official backing for docker and podman deployment, not the ability to
+      deploy: the finding shows the deploy files and Makefile ship docker and
+      podman usage regardless of policy. That loss falls under the maintainer's
+      upkeep commitments, which the buyer uses and whose failure means the
+      buyer's staff carry fixes themselves. Rated on the practice's reading of
+      the buyer's plan.
 
   - id: password-env-chhoto-password
     selected: sample
@@ -796,6 +972,7 @@ answers:
     statement: The access password is configured through the CHHOTO_PASSWORD environment variable.
     verdict: [real, real_with_caveat]
     tier: [1]
+    materiality: [not_material]
     basis: >
       Verified. backend/src/config.rs:221 "let password =
       read_config_wrapper(\"CHHOTO_PASSWORD\", \"password\")" reads the variable
@@ -829,6 +1006,15 @@ answers:
       buyer's own gate is engineering by the buyer, so that way is material.
       Rated on the buyer's plan as the buyer stated it.
       Settled 2026-09-26 by Claude at Bruce's request: tier 1, if there were no password gate the service is not private, which defeats the access-control item the buyer depends on; doubt resolves to tier 1.
+    rating_basis: >
+      The caveat is that deploy/compose.yaml:56 sets the legacy name "password="
+      rather than CHHOTO_PASSWORD, and the finding shows the code accepts it
+      through the fallback at config.rs:41-51, so the access password is in
+      force as shipped and the service is private. The threshold on hardening
+      reaches an authentication finding, but this gap shows no hardening step
+      that is off; it is a naming difference with no effect on behaviour. Rated
+      against the buyer's stated threshold: "a hardening step the README implies
+      is on by default but is not".
 
   - id: data-mount-persistence
     selected: sample
@@ -872,6 +1058,7 @@ answers:
     statement: This document states a copyright of 2023-2026 held by Sayantan Santra.
     verdict: [unverifiable, real]
     tier: [3]
+    exposure: [not_material, material]
     basis: >
       docs/TOOLS.md is excluded, so under METHOD §7 it shows only its existence,
       length and headings, and its line 1 is an HTML comment. The frozen
@@ -899,6 +1086,18 @@ answers:
       ownership threshold reaches it. The same ambiguity as the verdict answer
       for this claim.
       Settled 2026-09-26 by Claude at Bruce's request: tier 3, a header line of a documentation file about that file alone, §4's SPDX example: no route, and not a detail a person acts on.
+    rating_basis: >
+      If the document did not state that copyright the buyer would lose nothing
+      about who owns the code: the finding shows LICENSE:3 "Copyright (c)
+      2023-2026 Sayantan Santra" carries the ownership the buyer relies on, and
+      TOOLS.md:1 is an HTML comment in a documentation page about third-party
+      tools. The ownership threshold reaches the finding, but a header line in
+      one documentation file is not an ownership problem with the code. Rated
+      against the buyer's stated threshold: "a licence or ownership problem with
+      the code". Adjudicated: both values. Read as false, the document's header
+      names another copyright holder: a header line of one documentation file
+      (not_material) or a sign of an ownership problem the buyer would raise
+      before closing (material).
 
   # --- the ten remaining tier-1 claims on chhoto-full's surface (every tier-1
   # claim now has a verdict answer). Answered blind by two agents on
@@ -942,6 +1141,7 @@ answers:
     statement: The Docker image is approximately 6MB in size.
     verdict: [unverifiable]
     tier: [1]
+    exposure: [material]
     basis: >
       A quantity claim about a built artifact. What the materials hold: the
       build recipe only. deploy/Containerfile:27-30 "FROM scratch / COPY
@@ -972,6 +1172,15 @@ answers:
       Tier 1, rated by Claude on 2026-09-26 against TIERS.md §4 (not blind:
       these ten were drawn as the surface's remaining tier-1 claims): a figure
       the footprint threshold reaches.
+    rating_basis: >
+      If the "approximately 6MB" figure were false the buyer would lose the
+      image size its price assumes, and the finding shows nothing in the
+      materials measures it: only a scratch-base build recipe with a stripped,
+      LTO release profile. Image size is one of the footprint figures the buyer
+      named as changing the price, and the reliance statement lists compressed
+      image sizes under the footprint item the buyer depends on. Rated against
+      the buyer's stated threshold: "footprint or resource figures materially
+      worse than stated".
 
   - id: ram-under-five-mb
     selected: sample
@@ -980,6 +1189,7 @@ answers:
     statement: RAM usage stays under 5MB under normal use.
     verdict: [unverifiable]
     tier: [1]
+    exposure: [material]
     basis: >
       A quantity claim about behaviour in operation. What the materials hold:
       source that can be read for what it allocates, and deployment files with
@@ -1003,6 +1213,14 @@ answers:
       Tier 1, rated by Claude on 2026-09-26 against TIERS.md §4 (not blind:
       these ten were drawn as the surface's remaining tier-1 claims): a figure
       the footprint threshold reaches.
+    rating_basis: >
+      If "under 5MB" were false the buyer would lose the RAM figure its price
+      assumes, and the finding shows no measurement, benchmark or memory limit
+      anywhere in the materials, only the "temp_store" pragma and a 100Mi
+      storage request. RAM use is the resource figure the buyer named as
+      changing the price, and it sits under the footprint item the buyer depends
+      on. Rated against the buyer's stated threshold: "footprint or resource
+      figures materially worse than stated".
 
   - id: available-as-docker-container
     selected: sample
@@ -1048,6 +1266,7 @@ answers:
       - {document: backend/src/config.rs, lines: [221, 226]}
       - {document: backend/src/auth.rs, lines: [115, 126]}
     tier: [1]
+    materiality: [not_material]
     basis: >
       Verified in the code. The password is one operator-provided value read
       from the environment: backend/src/config.rs:221-223 'let password =
@@ -1081,6 +1300,17 @@ answers:
       Tier 1, rated by Claude on 2026-09-26 against TIERS.md §4 (not blind:
       these ten were drawn as the surface's remaining tier-1 claims): the
       access-control item the buyer depends on.
+    rating_basis: >
+      The caveat is that with no password configured the code opens every route
+      rather than refusing to start (auth.rs:116-119 "if
+      config.password.is_none() { return true; }", config.rs:224-226 warns "The
+      API will be accessible to the public"), while as shipped compose.yaml:56
+      sets a password and the service is private. The hardening threshold
+      reaches the finding, but the finding shows the hardening on as shipped and
+      its absence to be an operator setting the buyer's staff control and are
+      warned about, so the gap is too small to reopen the price. Rated against
+      the buyer's stated threshold: "a hardening step the README implies is on
+      by default but is not".
 
   - id: site-no-tracking
     selected: sample
@@ -1094,6 +1324,7 @@ answers:
       - {document: frontend/static/404.html, lines: [17, 20]}
       - {document: backend/src/database/queries.rs, lines: [20, 23]}
     tier: [1]
+    materiality: [material]
     basis: >
       Claim of absence, so METHOD section 6 and section 8 decide it: two
       searches over every place tracking could occur, every candidate opened,
@@ -1149,6 +1380,17 @@ answers:
       these ten were drawn as the surface's remaining tier-1 claims): reached by
       the threshold 'any way visitors are logged or tracked beyond the hit
       count'.
+    rating_basis: >
+      The caveat is that the admin page and the public 404 page load scripts and
+      fonts from cdn.jsdelivr.net and Google Fonts, which "puts the visitor's
+      address in front of those third parties on each uncached load", and the
+      404 page is served to any visitor of a missing shortlink. The buyer's
+      threshold names "any way" visitors are logged beyond the hit count, and
+      the no-tracking promise is an item the buyer depends on; removing the
+      third-party loads is a code change to the shipped frontend, so this alone
+      is something the buyer would put back to the seller. Rated against the
+      buyer's stated threshold: "any way visitors are logged or tracked beyond
+      the hit count". Adjudicated: material, as for no-tracking.
 
   - id: site-web-interface-create-edit-manage
     selected: sample
@@ -1157,6 +1399,7 @@ answers:
     statement: Through that web interface on a running instance, a user can create, edit and manage short URLs.
     verdict: [unverifiable]
     tier: [2]
+    exposure: [not_material]
     basis: >
       A claim that a capability exists, settled by the code path (METHOD section
       7: a code path shows a capability exists, which is the scope this claim
@@ -1192,6 +1435,14 @@ answers:
       these ten were drawn as the surface's remaining tier-1 claims): the web
       administration interface is an item the buyer uses, not one it depends on;
       the surface has 1.
+    rating_basis: >
+      If the web interface did not let a user create, edit and manage links on a
+      running instance, the buyer's staff would work through the API routes the
+      finding shows registered ("/api/new", "/api/edit", "/api/del/{shortlink}")
+      or patch the plain HTML and JavaScript frontend, which the reliance
+      statement calls a day's repair. The web administration interface is an
+      item the buyer uses, not one it depends on. Rated on the practice's
+      reading of the buyer's plan.
 
   - id: cli-api-key-validation-env
     selected: sample
@@ -1235,6 +1486,7 @@ answers:
       - {document: backend/src/main.rs, lines: [45, 52]}
       - {document: backend/src/main.rs, lines: [97, 100]}
     tier: [1]
+    materiality: [not_material]
     basis: >
       A boundary claim of absence, so METHOD section 2 (read against the
       software as shipped: default behaviour plus the shipped deployment files;
@@ -1304,6 +1556,18 @@ answers:
       these ten were drawn as the surface's remaining tier-1 claims): reached by
       the threshold 'any way visitors are logged or tracked beyond the hit
       count'.
+    rating_basis: >
+      The caveat is that RUST_LOG=info admits the actix access log, which writes
+      one line per request with the client address, and chhoto_url=debug adds
+      the "Added link" line; as shipped the default filter
+      "warn,chhoto_url=info,actix_session::middleware=error" drops those records
+      and no deploy file sets RUST_LOG. The logging threshold reaches the
+      finding, but the gap is a setting only the buyer's own staff could turn
+      on, so nothing as shipped logs visitors beyond the hit count and the gap
+      is too small to reopen the price. Rated against the buyer's stated
+      threshold: "any way visitors are logged or tracked beyond the hit count".
+      Adjudicated: not_material, as for hit-only: the access log is silent as
+      shipped and only an operator setting the buyer controls turns it on.
 
   - id: install-images-four-architectures
     selected: sample
@@ -1312,6 +1576,7 @@ answers:
     statement: The images are built for linux/amd64, linux/arm64, linux/arm/v7 and linux/riscv64.
     verdict: [real, unverifiable]
     tier: [1]
+    exposure: [material]
     basis: >
       One property naming several things (METHOD section 5), settled by build
       files (section 7 admits build and deployment files). Verified:
@@ -1337,6 +1602,16 @@ answers:
       Tier 1, rated by Claude on 2026-09-26 against TIERS.md §4 (not blind:
       these ten were drawn as the surface's remaining tier-1 claims): the
       self-hosting item the buyer depends on names the published architectures.
+    rating_basis: >
+      If the published images did not cover the four platforms the buyer would
+      lose a prebuilt image for whatever hardware it runs, and would have to
+      build one from the Containerfiles the finding cites, which the reliance
+      statement calls plausible for staff who run containers but not free. The
+      published architectures are a named part of the self-hosting item the
+      buyer depends on, so losing one is something the buyer would go back to
+      the seller over, though not an end to the deal since the source still
+      builds. Rated against the buyer's stated threshold: "a dependency the
+      buyer cannot run on its own hardware".
 
   # --- selected: tier-sample. A random draw (random.seed(20260927)) of 18 claims
   # from the 274 on chhoto-full's surface not covered above and not marked as
