@@ -13,6 +13,10 @@ For each answer, in this order:
                statement is closest to the answer's is taken (the duplicates
                pass's embedder), and the similarity is printed so a wrong pick
                can be seen.
+  tier         where the answer carries `tier`, the surface's tier for the
+               claim is one the answer lists; a miss says whether the run
+               rated the claim lower (a higher number) or higher. An answer
+               with `tier` and no `verdict` is scored on the tier alone.
   tested       the claim has a finding in the merged run (tier 1, or no tier).
   verdict      the finding's verdict is one the answer lists.
   distance     for a wrong settled verdict, how many steps it lies from the
@@ -30,7 +34,8 @@ An answer whose claim source is not one of the engagement's is out of scope and
 not scored. Answers are summed separately by `selected`: `failure` answers were
 chosen because runs got them wrong, so their count says whether a known failure
 came back and is not a rate; `sample` answers are a random draw from the
-reviewed claim surface, and only their counts read as a rate. Nothing here reads a finding's prose.
+reviewed claim surface, and only their counts read as a rate; `tier-sample`
+answers are a random draw across tiers, scored on the tier alone. Nothing here reads a finding's prose.
 """
 from __future__ import annotations
 
@@ -108,6 +113,14 @@ def score(answers: List[Dict[str, Any]], eng: Path, merged: Path) -> List[Dict[s
         c = own[best]
         row.update(claim=c["id"], similarity=round(sims[best], 2), tier=c.get("tier"),
                    statement=c.get("statement"))
+        if a.get("tier"):
+            exp = [int(t) for t in a["tier"]]
+            got = c.get("tier")
+            row.update(tier_expected=exp, tier_ok=got in exp,
+                       tier_off=None if got is None else min((got - t for t in exp), key=abs))
+        if not a.get("verdict"):
+            row["result"] = "tier only"
+            continue
         f = findings.get((a["source"], c["id"]))
         if f is None:
             row["result"] = "enumerated, not tested"
@@ -151,8 +164,11 @@ def main() -> int:
             detail = f"  #{r['claim']} tier {r.get('tier')} sim {r['similarity']}"
             if "verdict" in r:
                 detail += f"  {r['verdict']} / review {r['review']}"
+            if "tier_ok" in r:
+                detail += ("  tier ok" if r["tier_ok"]
+                           else f"  TIER {r.get('tier')} (expected {' or '.join(map(str, r['tier_expected']))})")
         print(f"  {r['id']:26s} {where:28s} {r['result']}{detail}")
-    for group in ("failure", "sample"):
+    for group in ("failure", "sample", "tier-sample"):
         scored = [r for r in rows if r["selected"] == group and r["result"] != "out of scope"]
         if not scored:
             continue
@@ -162,6 +178,13 @@ def main() -> int:
         right = [r for r in tested if r["result"] == "right"]
         unsettled = [r for r in tested if r["result"].startswith("UNSETTLED")]
         dist = [r["distance"] for r in tested if r.get("distance") is not None]
+        tiered = [r for r in enum if "tier_ok" in r]
+        if tiered:
+            off = [r["tier_off"] for r in tiered if not r["tier_ok"] and r["tier_off"] is not None]
+            print(f"  {group} tiers: right {sum(r['tier_ok'] for r in tiered)}/{len(tiered)}; "
+                  f"rated lower than expected {sum(d > 0 for d in off)}, higher {sum(d < 0 for d in off)}")
+        if not tested and all("tier_ok" in r for r in enum):
+            continue
         print(f"  {group}: enumerated {len(enum)}/{len(scored)}; tested {len(tested)}; "
               f"right verdict {len(right_v)}/{len(tested)}; right verdict and reason {len(right)}/{len(tested)}; "
               f"unsettled {len(unsettled)}; wrong lenient {sum(d < 0 for d in dist)}, harsh {sum(d > 0 for d in dist)}")

@@ -4,7 +4,10 @@
 # (2026-09-24) are claims the runs of 2026-09-20..24 got wrong at least once, so
 # they show whether a known failure came back and are not a rate; `sample`
 # answers (2026-09-26) are a random draw from the reviewed surface, and only
-# they read as a rate. The `failure` answers were reviewed by Bruce on
+# they read as a rate; `tier-sample` answers (2026-09-26) are a random draw
+# across tiers, scored on the tier alone. Tiers on `sample` and `tier-sample`
+# answers were rated blind (TIERS.md, thresholds and reliance statement only, no
+# surface tier in view) and then adjudicated. The `failure` answers were reviewed by Bruce on
 # 2026-09-26: no-personal-info-logged accepts two verdicts because the claim
 # does not say what counts as personal information; compose-up was dropped (its
 # text says to modify the file first).
@@ -19,7 +22,12 @@
 #   cites_any       when the claim was tested, the finding must cite at least
 #                   one of these line ranges; this is how a right verdict for a
 #                   wrong reason is told apart
-#   selected        `failure` or `sample`, as above
+#   tier            the tiers that are right for the claim under this
+#                   engagement's thresholds and chhoto-full's reliance
+#                   statement (TIERS.md §4); two tiers only where the claim or
+#                   the reliance statement can be read two ways
+#   tier_basis      how the tier was decided, where the answer also has a verdict
+#   selected        `failure`, `sample` or `tier-sample`, as above
 target: chhoto-url 6a1b51c
 answers:
   - id: hit-only
@@ -117,6 +125,7 @@ answers:
     lines: [12, 12]
     statement: The target is licensed under the MIT licence.
     verdict: [real]
+    tier: [1]
     basis: >
       The claim is about a document (the licence), so METHOD §7 (a claim about a
       document is settled by the document) decides it. Verified: LICENSE:1 reads
@@ -128,6 +137,19 @@ answers:
       backend/src/services/get.rs:2). No other licence file was found in the
       target root. Per §7, this settles that the file is the MIT licence, not
       any legal question about distribution.
+    tier_basis: >
+      Step 1: the claim is about a document, but the badge line is a notice that
+      states the licence of the code, so under §4's document rule it has a
+      route; the stated threshold "a licence or ownership problem with the code"
+      names the kind of failure it could have, and the depends item "The MIT
+      licence and clean ownership of the code" also reaches it. Step 4: it could
+      be untrue by the code being under a different licence, under a more
+      restrictive or copyleft licence, under no licence at all, or under mixed
+      licences with parts not MIT. Step 5: any of these is a licence problem
+      with the code, which the buyer says ends the deal; there is no other way
+      the seller's documents describe that meets the plan, and the reliance item
+      says there is no repair the buyer could make itself. Rated against the
+      buyer's stated threshold: "a licence or ownership problem with the code".
 
   - id: selfhosted-url-shortener
     selected: sample
@@ -135,6 +157,7 @@ answers:
     lines: [20, 20]
     statement: The product is a self-hosted URL shortener — the core function of the category exists.
     verdict: [real]
+    tier: [1]
     basis: >
       METHOD §2 reads a category claim as one claim: that the core function of
       the category exists. Verified in source: a create path,
@@ -148,6 +171,20 @@ answers:
       backend/src/main.rs:97) and deployment files (deploy/compose.yaml,
       deploy/Containerfile*, deploy/helm-chart/). I inferred, and did not check,
       that nothing depends on a hosted service of the seller to run.
+    tier_basis: >
+      Step 1: the claim asserts two things; "URL shortener" falls under the
+      depends items for shortening and for resolving short links (the buyer said
+      "a small, private link shortener"), and "selfhosted" is reached by the
+      stated threshold "a dependency the buyer cannot run on its own hardware"
+      and by the depends item for self-hosting. Step 4: it could be untrue
+      because the shortening function is absent, because the product exists but
+      is not a URL shortener in use, or because it cannot be run on the buyer's
+      own hardware without a hosted dependency. Step 5: absence of shortening
+      leaves nothing the buyer is buying, and the reliance statement says staff
+      cannot patch that at acceptable cost; a hosted dependency triggers the
+      buyer's end-the-deal condition; neither leaves the plan holding, so the
+      claim is tier 1. Rated against the buyer's stated threshold: "a dependency
+      the buyer cannot run on its own hardware".
 
   - id: readme-hit-counting
     selected: sample
@@ -155,6 +192,7 @@ answers:
     lines: [39, 39]
     statement: The software includes hit counting as one of its features.
     verdict: [real]
+    tier: [1]
     basis: >
       An existence claim, settled by citation per METHOD §6. Verified: the
       redirect handler calls `database::find_and_add_hit`
@@ -166,6 +204,18 @@ answers:
       `SET hits = hits + :count` (backend/src/database/queries.rs:20-23), into
       the `hits INTEGER NOT NULL` column of the urls table (queries.rs:42). Hits
       are returned with each link by the list queries (queries.rs:105-106).
+    tier_basis: >
+      Step 1: the claim falls under the depends item "Counting hits per short
+      link", which the buyer's words support; no stated threshold reaches the
+      absence of hit counting as the buyer wrote them, since the logging
+      threshold names recording beyond the hit count, not the lack of a count.
+      Step 4: it could be untrue because hit counting is absent, or because it
+      is present and does not count hits as described. Step 5: the reliance
+      statement says the buyer would lose the one piece of visitor data its
+      price assumes and could not restore counting without fixing the code, and
+      repair by the buyer is not a way the plan still holds; no other documented
+      feature substitutes for it, so the failure is material. Rated on the
+      buyer's plan as the buyer stated it.
 
   - id: shortening-mechanism
     selected: sample
@@ -173,6 +223,7 @@ answers:
     lines: [58, 58]
     statement: The target contains a shortening path that accepts a submitted long URL and stores or returns a short link generated at random.
     verdict: [real]
+    tier: [1]
     basis: >
       The frozen statement is the mechanism reading of README.md:58 ("Shortens
       URLs of any length to a randomly generated link"); the behaviour reading
@@ -187,6 +238,18 @@ answers:
       METHOD §6: real. "Of any length" is not in the frozen statement, so the
       request-body limit of actix-web's String extractor (256 kB by default,
       from dependency knowledge) is not part of this claim.
+    tier_basis: >
+      Step 1: the claim describes the running behaviour of shortening and falls
+      under the depends item "Shortening a submitted long URL into a short link"
+      (the buyer said "a small, private link shortener the buyer can run for its
+      customers"); no stated threshold names this kind of failure. Step 4: it
+      could be untrue because the running service returns no short link, returns
+      a link that does not lead to the submitted URL, or returns links that are
+      not randomly generated. Step 5: the first two defeat the core function the
+      buyer is buying, which the reliance statement says staff cannot patch at
+      acceptable cost; predictable links would let outsiders guess links on a
+      service the buyer said is private, and doubt about the effect of that
+      resolves to tier 1. Rated on the buyer's plan as the buyer stated it.
 
   - id: redirect-mechanism
     selected: sample
@@ -194,6 +257,7 @@ answers:
     lines: [62, 63]
     statement: The target contains a redirect handler that resolves a short URL to its stored long URL and issues an HTTP redirect to it.
     verdict: [real]
+    tier: [1]
     basis: >
       An existence claim, settled by citation per METHOD §6. Verified:
       `#[get("/{shortlink}")] pub(crate) async fn link_handler`
@@ -209,6 +273,18 @@ answers:
       is permanent (config.rs:198-199, TEMPORARY only when
       CHHOTO_REDIRECT_METHOD=TEMPORARY); the shipped deploy/compose.yaml:65 sets
       TEMPORARY. Either way the claim holds.
+    tier_basis: >
+      Step 1: the claim describes the running behaviour of resolving and falls
+      under the depends item "Resolving a short link by redirecting the visitor
+      straight to the destination" (the buyer said "a small, private link
+      shortener the buyer can run for its customers"); no stated threshold names
+      this kind of failure. Step 4: it could be untrue because the service does
+      not redirect, redirects to the wrong destination, or redirects only for
+      some links or some browsers. Step 5: each way means links the buyer's
+      customers share fail or mislead their visitors, which the reliance
+      statement says the buyer cannot repair, and no other documented path
+      substitutes for the redirect, so the failure is material. Rated on the
+      buyer's plan as the buyer stated it.
 
   - id: delete-list-need-admin-password
     selected: sample
@@ -221,6 +297,7 @@ answers:
       - {document: backend/src/config.rs, lines: [221, 226]}
       - {document: backend/src/auth.rs, lines: [19, 27]}
       - {document: backend/src/services/delete.rs, lines: [42, 42]}
+    tier: [1]
     basis: >
       Verified by reading. Deletion is the route at
       backend/src/services/delete.rs:35 (`#[delete("/api/del/{shortlink}")]`);
@@ -238,20 +315,35 @@ answers:
       221), deploy/chhoto-url.container:28 (`Environment=CHHOTO_PASSWORD=`) and
       deploy/helm-chart/values.yaml:12 (`password:`, base64 of the word
       "password"). The values are the seller's public sample placeholders and
-      are not quoted here. So as shipped
-      the claim holds (METHOD §2, boundary read against default plus shipped
-      deployment files). Two things a reader must know, each an operator
-      setting, which §2 makes a caveat and not a contradiction: (1) with no
-      password configured, backend/src/auth.rs:116-118 `if
-      config.password.is_none() { return true; }` makes every request an admin
-      session, and backend/src/config.rs:224-225 logs "No password was provided.
-      The API will be accessible to the public." — so anyone can delete and
-      list; (2) when CHHOTO_API_KEY is set (commented out in all shipped deploy
-      files, compose.yaml:61), a valid `X-API-Key` header also authorizes
-      deletion and listing without the password (auth.rs:19-27, 168-170;
-      delete.rs:42). Verdict real_with_caveat per §6. That these routes behave
-      this way in a running instance is inferred from the code; nothing was run.
-      cites_any accepts either caveat: the no-password path or the API-key path.
+      are not quoted here. So as shipped the claim holds (METHOD §2, boundary
+      read against default plus shipped deployment files). Two things a reader
+      must know, each an operator setting, which §2 makes a caveat and not a
+      contradiction: (1) with no password configured,
+      backend/src/auth.rs:116-118 `if config.password.is_none() { return true;
+      }` makes every request an admin session, and backend/src/config.rs:224-225
+      logs "No password was provided. The API will be accessible to the public."
+      — so anyone can delete and list; (2) when CHHOTO_API_KEY is set (commented
+      out in all shipped deploy files, compose.yaml:61), a valid `X-API-Key`
+      header also authorizes deletion and listing without the password
+      (auth.rs:19-27, 168-170; delete.rs:42). Verdict real_with_caveat per §6.
+      That these routes behave this way in a running instance is inferred from
+      the code; nothing was run. cites_any accepts either caveat: the
+      no-password path or the API-key path.
+    tier_basis: >
+      Step 1: the claim states an access control that is in place, so the stated
+      threshold "a hardening step the README implies is on by default but is
+      not" names the kind of failure it could have; it also falls under the
+      depends item "Authentication and access control: ... admin-only listing
+      and deletion" (the buyer said "a small, private link shortener"). Step 4:
+      it could be untrue because listing needs no password, because deletion
+      needs no password, or because a password is asked for but does not
+      restrict access. Step 5: unauthenticated listing exposes every link the
+      buyer's customers create on a service the buyer is paying to be private,
+      and unauthenticated deletion lets anyone destroy them; the reliance
+      statement says the only way round is the buyer fronting the service with
+      its own gate, which is buyer engineering and not a way the plan holds, so
+      the failure is material. Rated against the buyer's stated threshold: "a
+      hardening step the README implies is on by default but is not".
 
   - id: shortening-behaviour
     selected: sample
@@ -259,6 +351,7 @@ answers:
     lines: [58, 58]
     statement: When a URL is submitted to the running service, it returns a randomly generated short link for that URL.
     verdict: [unverifiable]
+    tier: [1]
     basis: >
       Claim 59 is the behaviour half of the split of claim 15, made by the
       automatic behaviour-split pass (implied_by 15, property "behaviour in
@@ -278,6 +371,18 @@ answers:
       same case). The answer scores the frozen surface as it is. If the split is
       dropped from chhoto-full's surface, drop this answer too: the scorer would
       otherwise match it to claim 15.
+    tier_basis: >
+      Step 1: the claim describes the running behaviour of shortening and falls
+      under the depends item "Shortening a submitted long URL into a short link"
+      (the buyer said "a small, private link shortener the buyer can run for its
+      customers"); no stated threshold names this kind of failure. Step 4: it
+      could be untrue because the running service returns no short link, returns
+      a link that does not lead to the submitted URL, or returns links that are
+      not randomly generated. Step 5: the first two defeat the core function the
+      buyer is buying, which the reliance statement says staff cannot patch at
+      acceptable cost; predictable links would let outsiders guess links on a
+      service the buyer said is private, and doubt about the effect of that
+      resolves to tier 1. Rated on the buyer's plan as the buyer stated it.
 
   - id: redirect-behaviour
     selected: sample
@@ -285,6 +390,7 @@ answers:
     lines: [62, 63]
     statement: When a short URL is visited in a browser, the running service redirects the browser to the correct destination long URL.
     verdict: [unverifiable]
+    tier: [1]
     basis: >
       Claim 61 is the behaviour half of the split of claim 20, made by the
       automatic behaviour-split pass (implied_by 20, property "behaviour in
@@ -299,6 +405,18 @@ answers:
       second test in BEHAVIOUR_SPLIT.md §3; the answer scores the frozen surface
       as it is, and if the split is dropped from the surface this answer goes
       with it.
+    tier_basis: >
+      Step 1: the claim describes the running behaviour of resolving and falls
+      under the depends item "Resolving a short link by redirecting the visitor
+      straight to the destination" (the buyer said "a small, private link
+      shortener the buyer can run for its customers"); no stated threshold names
+      this kind of failure. Step 4: it could be untrue because the service does
+      not redirect, redirects to the wrong destination, or redirects only for
+      some links or some browsers. Step 5: each way means links the buyer's
+      customers share fail or mislead their visitors, which the reliance
+      statement says the buyer cannot repair, and no other documented path
+      substitutes for the redirect, so the failure is material. Rated on the
+      buyer's plan as the buyer stated it.
 
   - id: container-image-size
     selected: sample
@@ -306,6 +424,7 @@ answers:
     lines: [11, 11]
     statement: The compressed container image is below 4.5 MB for the scratch variant and below 8.5 MB for the alpine variant.
     verdict: [unverifiable]
+    tier: [1]
     basis: >
       Checked. deploy/Containerfile.scratch and deploy/Containerfile.alpine
       define images that copy a prebuilt binary from
@@ -324,6 +443,19 @@ answers:
       do not contain (§7, evidence must reach the scope the claim states).
       unresolved_because: outside_the_materials (§8) — the kind of material that
       would settle it, a built image or registry manifest, was not supplied.
+    tier_basis: >
+      Step 1: the stated threshold "footprint or resource figures materially
+      worse than stated" names the kind of failure a figure for compressed image
+      size could have, and the depends item "The small resource footprint:
+      compressed image sizes and RAM use" also reaches it. Step 4: the claim
+      carries two figures and either could be untrue by a small margin or a
+      large one; per §4 the margin taken is one large enough to reach the
+      threshold, and either variant's figure can fail on its own. Step 5: at
+      that margin the buyer's own price condition is breached; the reliance
+      statement's only way round is bigger hardware, which the buyer may not
+      regard as cheap, and doubt about the size of the failure resolves to tier
+      1. Rated against the buyer's stated threshold: "footprint or resource
+      figures materially worse than stated".
 
   - id: site-mit-licence
     selected: sample
@@ -331,6 +463,7 @@ answers:
     lines: [13, 13]
     statement: The software is free and open source, released under the MIT licence.
     verdict: [real]
+    tier: [1]
     basis: >
       Verified by reading. LICENSE:1 `MIT License`, and the rest of the file is
       the standard MIT permission text ("Permission is hereby granted, free of
@@ -342,6 +475,18 @@ answers:
       provenance fact settled by the LICENSE file (METHOD §6 provenance, §7 "MIT
       licensed" is settled by the text of the LICENSE file; whether distribution
       is lawful is a legal question left alone).
+    tier_basis: >
+      Step 1: the stated threshold "a licence or ownership problem with the
+      code" names the kind of failure this claim could have, and the depends
+      item "The MIT licence and clean ownership of the code" also reaches it.
+      Step 4: the claim asserts several things and could be untrue because the
+      licence is not MIT, because the code is not open source (source available
+      only, or parts withheld), or because it is not free of charge or of
+      restriction. Step 5: each of these is a licence problem with the code,
+      which the buyer says ends the deal; the reliance statement says there is
+      no repair the buyer could make itself, so the failure is material. Rated
+      against the buyer's stated threshold: "a licence or ownership problem with
+      the code".
 
   - id: create-generated-or-custom-slug
     selected: sample
@@ -349,6 +494,7 @@ answers:
     lines: [29, 29]
     statement: The target contains code that accepts a URL for shortening and creates a short link for it, using either an automatically generated slug or a user-chosen custom alias.
     verdict: [real]
+    tier: [1]
     basis: >
       Verified by reading the code. backend/src/services/post.rs:29-30 registers
       the creation route ("#[post(\"/api/new\")]", "pub(crate) async fn
@@ -368,6 +514,18 @@ answers:
       "shortlink: shortUrl.value,"). Both parts of the claim exist in code;
       METHOD §6 real. Per §7 this shows the capability exists, which is what the
       statement asserts ("contains code that").
+    tier_basis: >
+      Step 1: no stated threshold names a failure of shortening (the thresholds
+      cover logging, footprint, an implied hardening step, licence or ownership,
+      and a dependency the buyer cannot run); the claim falls under the reliance
+      item for shortening with a generated slug or a custom alias, which the
+      buyer depends on, source the buyer's words. Step 4: the claim asserts
+      several things and can be untrue by there being no shortening, by
+      generated slugs being absent, or by custom aliases being absent. Step 5:
+      shortening failing is the one function the buyer is buying the service
+      for; no other documented way meets the plan, and a repair by the buyer's
+      staff is not a way the plan holds; the buyer would go back to the seller
+      over it alone. Rated on the buyer's plan as the buyer stated it.
 
   - id: site-hit-counting
     selected: sample
@@ -375,6 +533,7 @@ answers:
     lines: [37, 37]
     statement: The target contains code that records a hit each time a short link is used and keeps a per-link count.
     verdict: [real, real_with_caveat]
+    tier: [1]
     basis: >
       Verified by reading the code. The redirect handler
       backend/src/services/get.rs:124-131 ("#[get(\"/{shortlink}\")]",
@@ -394,6 +553,18 @@ answers:
       window) and that a batch whose commit fails is dropped
       (events.rs:185-191), which is real_with_caveat. Not partial: no evidence
       shows a count actually lost (METHOD §6, a gap must be citable).
+    tier_basis: >
+      Step 1: the threshold "any way visitors are logged or tracked beyond the
+      hit count" names logging in excess of the count, and this claim fails by
+      counting not happening or not being per link, which is not that kind of
+      failure; the claim falls under the reliance item for counting hits per
+      short link, which the buyer depends on, source the buyer's words. Step 4:
+      the claim can be untrue by no hit being recorded, by hits not being kept
+      as a per-link count, or by the count not reflecting each use. Step 5: the
+      hit count is the one piece of visitor data the reliance statement says the
+      price assumes; no other documented way supplies it, and restoring it would
+      need a code fix by the buyer, which is not a way the plan holds. Rated on
+      the buyer's plan as the buyer stated it.
 
   - id: container-deployment
     selected: sample
@@ -401,6 +572,7 @@ answers:
     lines: [61, 61]
     statement: The product is deployable as an OCI-compatible container, including via Docker and Podman.
     verdict: [real, real_with_caveat]
+    tier: [1]
     basis: >
       Verified by reading the deployment files; nothing was run.
       deploy/Containerfile:4-30 is a multi-stage OCI build from the backend
@@ -433,6 +605,21 @@ answers:
       which the Containerfiles, the quadlet and the Makefile show, real. Read as
       covering the shipped Docker workflow file, the compose sample's undeclared
       volume is something a reader must know, real_with_caveat.
+    tier_basis: >
+      Step 1: the threshold "a dependency the buyer cannot run on its own
+      hardware" is about a dependency, and read no wider it does not name a
+      failure of the product's own container packaging; the claim falls under
+      the reliance item for self-hosting on the buyer's own hardware (the Docker
+      and Podman images), which the buyer depends on, source the buyer's words.
+      Step 4: the claim asserts several things and can be untrue by there being
+      no runnable container at all, by Docker not running it, by Podman not
+      running it, or by other OCI workflows not running it. Step 5: Docker alone
+      or Podman alone failing is not material because the other documented
+      engine still meets the plan, and other OCI workflows failing is not
+      material for the same reason; no runnable container at all defeats the
+      item, since rebuilding an image from the repository is engineering by the
+      buyer and not a way the plan holds. Rated on the buyer's plan as the buyer
+      stated it.
 
   - id: edit-links-and-metadata
     selected: sample
@@ -443,6 +630,7 @@ answers:
     cites_any:
       - {document: backend/src/database/queries.rs, lines: [91, 100]}
       - {document: backend/src/services/utils.rs, lines: [284, 293]}
+    tier: [2, 3]
     basis: >
       Verified by reading. The edit route is backend/src/services/put.rs:17-22,
       calling edit_link_helper (backend/src/services/utils.rs:257-302). Before
@@ -464,6 +652,18 @@ answers:
       choosing between partial and real_with_caveat). Not contradicted: editing
       exists and other changes are stored. A finding of real misses a gap that
       the cited lines show.
+    tier_basis: >
+      Step 1: no stated threshold names a failure of link editing; the claim
+      falls under the reliance item for editing, deleting and listing existing
+      links, which the buyer uses, the practice's inference, and a uses item is
+      not a route. Step 3: no route, so not tier 1. Step 6: a person operating
+      the service would act on this claim when changing a link and would meet
+      its failure in use, which meets the §3 test for tier 2; the reliance
+      statement says staff would manage links by hand if it failed. Rated on the
+      practice's reading of the buyer's plan. Review: the surface has tier 1,
+      resting on the price assuming the README is accurate, which §4 step 1 says
+      is not a route. The editing item is `uses`, so no route and not tier 1; 2
+      held, 3 if tier 2 is read as details only.
 
   - id: installation-doc-mit-licence
     selected: sample
@@ -471,6 +671,7 @@ answers:
     lines: [2, 2]
     statement: The document is licensed under the MIT licence.
     verdict: [real]
+    tier: [3]
     basis: >
       The statement is a provenance claim about the document: that it is
       MIT-licensed. LICENSE is not excluded: LICENSE:1 "MIT License", and
@@ -481,6 +682,17 @@ answers:
       be read because the document is excluded, but the claim does not depend on
       it. Contrast tools-md-copyright-line, whose statement is about what the
       excluded document says.
+    tier_basis: >
+      Step 1: the claim is about the document, and §4 says a line that states
+      the licence of the document alone, such as an SPDX line in a documentation
+      file, has no route; the threshold "a licence or ownership problem with the
+      code" is about the code, and the reliance item for the MIT licence and
+      ownership is about the code. Step 3: no route, so not tier 1. Step 6: no
+      person setting up, operating or writing against the software acts on the
+      licence of an installation document, so the §3 test for tier 2 is not met.
+      Rated on the scale alone. Review: the surface has tier 1. §4 says a line
+      that states the licence of the document alone, such as an SPDX line in a
+      documentation file, has no route: tier 3.
 
   - id: oci-image-runs-on-oci-engines
     selected: sample
@@ -491,6 +703,7 @@ answers:
     cites_any:
       - {document: deploy/compose.yaml, lines: [106, 117]}
       - {document: deploy/compose.yaml, lines: [35, 35]}
+    tier: [1, 2]
     basis: >
       Verified by reading. The image definitions are standard container build
       files: deploy/Containerfile.scratch:4-5 "FROM scratch AS builder-amd64" /
@@ -524,6 +737,19 @@ answers:
       possible"), the compose defects are what a reader must know:
       real_with_caveat. Either way the finding must cite the compose defect, so
       cites_any names it; real is one step lenient.
+    tier_basis: >
+      Step 1: no stated threshold read as the buyer wrote it names this failure;
+      the claim falls under the reliance item for self-hosting on the buyer's
+      own hardware (the images and the provided compose file), which the buyer
+      depends on, source the buyer's words. Step 4: the claim asserts several
+      things and can be untrue by there being no OCI image, by the compose.yaml
+      sample not working, by the chhoto-url.container sample not working, or by
+      engines other than docker and podman not running it. Step 5: a sample file
+      that does not work is a failure a person would notice at setup and correct
+      without changing the code, and other engines failing leaves docker, which
+      is documented, so neither is material; no OCI image at all defeats the
+      item, since rebuilding one is engineering by the buyer. Rated on the
+      buyer's plan as the buyer stated it.
 
   - id: official-support-docker-podman
     selected: sample
@@ -531,6 +757,7 @@ answers:
     lines: [33, 34]
     statement: Official support is provided only for docker and podman.
     verdict: [unverifiable]
+    tier: [2]
     basis: >
       The claim concerns the seller's support policy (about: seller, METHOD §5
       table). Searched the non-excluded materials for a support policy or
@@ -544,6 +771,22 @@ answers:
       for, not what the seller officially supports. No support agreement or
       policy record was supplied. METHOD §8: unresolved_because
       outside_the_materials.
+    tier_basis: >
+      Step 1: this is a claim about the seller, and its failure is the promise
+      not kept; no stated threshold names a failure of the seller's support
+      scope, and the claim falls under the reliance item for the maintainer's
+      upkeep commitments, which the buyer uses, the practice's inference, so
+      there is no route. Step 3: not tier 1; even placed under the self-hosting
+      item the buyer depends on, neither way it could be untrue (no official
+      support, or support wider than docker and podman) changes whether the
+      images run, and the reliance statement already weighs support as uses.
+      Step 6: a person setting the software up chooses an engine on this
+      statement of supported platforms and would meet its failure when seeking
+      support, which meets the §3 test for tier 2. Rated on the practice's
+      reading of the buyer's plan. Review: the surface has tier 1, resting on
+      the price assuming the documentation is accurate, which is not a route.
+      Support falls under the maintainer's upkeep item (`uses`); a supported
+      platform is §3's own example of tier 2.
 
   - id: password-env-chhoto-password
     selected: sample
@@ -551,6 +794,7 @@ answers:
     lines: [62, 62]
     statement: The access password is configured through the CHHOTO_PASSWORD environment variable.
     verdict: [real, real_with_caveat]
+    tier: [1, 2]
     basis: >
       Verified. backend/src/config.rs:221 "let password =
       read_config_wrapper(\"CHHOTO_PASSWORD\", \"password\")" reads the variable
@@ -568,6 +812,21 @@ answers:
       code accepts through the fallback at config.rs:41-51: real_with_caveat.
       The second verdict was added on 2026-09-26 after reading the demo run's
       caveat, which is this one; it was judged on its merits.
+    tier_basis: >
+      Step 1: the threshold "a hardening step the README implies is on by
+      default but is not" is about a default, and this claim is about an
+      explicitly set value, so read no wider the threshold does not reach it;
+      the claim falls under the reliance item for authentication and access
+      control (the admin password), which the buyer depends on, source the
+      buyer's words. Step 4: the claim can be untrue by the variable having
+      another name, by the variable being ignored while a password is still set
+      another way, or by there being no access password to configure. Step 5:
+      another name or another mechanism is a failure a person would notice at
+      setup and correct without changing the code, and is not material; no
+      access password at all would mean the service is not private, which is
+      what the buyer said it is paying for, and fronting the service with the
+      buyer's own gate is engineering by the buyer, so that way is material.
+      Rated on the buyer's plan as the buyer stated it.
 
   - id: data-mount-persistence
     selected: sample
@@ -575,6 +834,7 @@ answers:
     lines: [73, 73]
     statement: Database persistence is achieved by mounting a host directory into the container at /data.
     verdict: [real]
+    tier: [1, 2]
     basis: >
       Verified. The instruction block mounts ./data at /data and sets
       CHHOTO_DB_URL=/data/urls.sqlite (INSTALLATION.md:73-74, read for context
@@ -589,6 +849,18 @@ answers:
       it. That a bind mount keeps files on the host is the container engine's
       behaviour (general knowledge, not from the materials). METHOD §6: the
       claim holds.
+    tier_basis: >
+      Step 1: no stated threshold names a failure of data persistence; the claim
+      is about how stored data survives the container, which falls under the
+      reliance item for SQLite storage and its durability settings, which the
+      buyer uses, the practice's inference, so there is no route. Step 3: not
+      tier 1. Step 6: a person setting the software up mounts a directory at
+      this path on the strength of this claim and would meet its failure in use
+      (a file's location and a command's option), which meets the §3 test for
+      tier 2. Rated on the practice's reading of the buyer's plan. Review: 1
+      held. The mount is what keeps links across restarts; if it did not, the
+      self-hosting item the buyer depends on is defeated, and doubt about the
+      effect resolves to tier 1.
 
   - id: tools-md-copyright-line
     selected: sample
@@ -596,6 +868,7 @@ answers:
     lines: [1, 1]
     statement: This document states a copyright of 2023-2026 held by Sayantan Santra.
     verdict: [unverifiable, real]
+    tier: [3, 1]
     basis: >
       docs/TOOLS.md is excluded, so under METHOD §7 it shows only its existence,
       length and headings, and its line 1 is an HTML comment. The frozen
@@ -607,3 +880,367 @@ answers:
       Santra" settles it: real. The enumeration's wording ("states") created the
       ambiguity; either reading follows METHOD. Contradicted or partial would be
       wrong on any reading.
+    tier_basis: >
+      Step 1: the claim is about the document, and its subject is the copyright
+      line of a documentation file; §4 gives a route to a document claim only
+      where the document is itself the fact the buyer relies on, a licence text
+      or a notice of ownership of the code, and a header line stating the
+      copyright of the document alone is the same kind as the SPDX licence line
+      §4 says has no route, so the threshold "a licence or ownership problem
+      with the code" and the licence-and-ownership reliance item do not reach
+      it. Step 3: not tier 1. Step 6: no person setting up, operating or writing
+      against the software acts on the copyright line of a tools document, so
+      the §3 test for tier 2 is not met. Rated on the scale alone. Review: two
+      tiers, 3 held. Read as the document's own header, the SPDX example in §4
+      gives no route; read as a notice of who owns the project's files, the
+      ownership threshold reaches it. The same ambiguity as the verdict answer
+      for this claim.
+
+
+  # --- selected: tier-sample. A random draw (random.seed(20260927)) of 18 claims
+  # from the 274 on chhoto-full's surface not covered above and not marked as
+  # repeats; 12 came out tier 2 and 6 tier 3 on the surface, none tier 1 (only
+  # 10 tier-1 claims remained). One (INSTALLATION.md #87) was dropped: its
+  # statement does not restate its quote, so a tier for it scores the
+  # enumeration, not the rating. Bruce's review is pending.
+  - id: demo-cleared-every-15-min
+    selected: tier-sample
+    source: README.md
+    lines: [53, 53]
+    statement: The seller's hosted demo instance has its database cleared every 15 minutes.
+    tier: [3]
+    basis: >
+      Step 1: no stated threshold reaches this claim; the logging threshold is
+      about visitors to the buyer's own service, and the demo instance is the
+      seller's, not the buyer's. The claim falls under the reliance item "the
+      seller's hosted demonstration instance, whose database is cleared every 15
+      minutes", which the buyer does_not_use. Step 2 settles it: an item the
+      buyer does_not_use that no threshold reaches is tier 3. The ways it could
+      be untrue (the demo is cleared less often, more often, or never) touch
+      nothing the buyer will run or rely on. Rated on the practice's reading of
+      the buyer's plan.
+
+  - id: hashed-credentials-input
+    selected: tier-sample
+    source: README.md
+    lines: [72, 72]
+    statement: The user can supply the password and API key in hashed form.
+    tier: [2]
+    basis: >
+      Step 1: the threshold "a hardening step the README implies is on by
+      default but is not" does not reach this claim, because the claim describes
+      an option the user can take, not a step implied to be on by default. The
+      claim falls under the reliance item "authentication and access control:
+      the admin password, the API key, hashed credentials, admin-only listing
+      and deletion", which the buyer depends on, so it has a route. Step 4: the
+      capability can be absent (only plain-text credentials are accepted), or
+      present and not working as described (a hashed credential is accepted but
+      the check against it does not behave as a hashed check should). Step 5:
+      absence is a failure staff would notice at set-up and could correct
+      without changing the code by supplying plain-text credentials, which
+      changes how the software is set up, not whether the plan holds; but the
+      second way, a hashed credential accepted and then checked wrongly, could
+      leave the admin functions open, and the item's stated consequence is that
+      the service would not be private, which is what the buyer said it is
+      paying for. Whether that second way is a set-up defect or a failure of
+      access control stays unclear, and doubt about the effect of a failure
+      resolves to tier 1. Rated on the buyer's plan as the buyer stated it.
+      Review: tier 2 only. The claim asserts an input form; its failure is met
+      at setup and corrected without changing the code (§4 step 5, third
+      bullet). A hashed check that admits a wrong credential would be a
+      different claim.
+
+  - id: custom-landing-page
+    selected: tier-sample
+    source: README.md
+    lines: [75, 75]
+    statement: The service can serve a custom landing page when configured to do so.
+    tier: [2, 3]
+    basis: >
+      Step 1: no stated threshold reaches this claim (it is not about logging,
+      footprint, a hardening default, licence or a dependency). It falls under
+      the reliance item "serving a custom landing page, disabling the frontend,
+      and configuring Cache-Control headers", which the buyer uses; a uses item
+      is not a route. Step 3: with no route the claim is not tier 1. Step 6: a
+      person setting the software up who configures a landing page would act on
+      this claim and would meet its failure in use, so §3's tier-2 test is met;
+      on its own the failure changes nothing for the buyer, whose fallback under
+      the item is the built-in interface. Rated on the practice's reading of the
+      buyer's plan. Review: two tiers, 2 held. The landing-page item is `uses`,
+      so there is no route; the ambiguity is whether a capability claim under a
+      `uses` item meets §3's tier-2 test (a person setting the software up acts
+      on it) or whether tier 2 is confined to documented details.
+
+  - id: qr-code-and-api
+    selected: tier-sample
+    source: claim_sources/site_index_html.md
+    lines: [49, 49]
+    statement: The target contains code that generates a QR code for a short link and exposes an API through which the service can be used programmatically.
+    tier: [2, 3]
+    basis: >
+      Step 1: no stated threshold reaches this claim. It asserts two things, and
+      each falls under a reliance item the buyer uses: QR codes under "the web
+      administration interface, including mobile and dark mode, QR codes,
+      copyable links", and the API under "the HTTP API for programmatic use". A
+      uses item is not a route. Step 3: with no route the claim is not tier 1 in
+      either part. Step 6: a person writing against the API, or operating the
+      interface and offering QR codes, would act on this claim and meet its
+      failure in use, so the tier-2 test is met; the items' stated fallbacks
+      (the web interface for the API, and using the service without the feature)
+      keep the buyer's plan as stated. Rated on the practice's reading of the
+      buyer's plan. Review: two tiers, 2 held, for the same reason as
+      custom-landing-page: a capability under a `uses` item.
+
+  - id: getconfig-reply-fields
+    selected: tier-sample
+    source: docs/CLI.md
+    lines: [118, 131]
+    statement: A successful /api/getconfig reply is JSON containing the fields version, site_url, allow_capital_letters, public_mode, public_mode_expiry_delay, slug_style, slug_length and try_longer_slug.
+    tier: [2]
+    basis: >
+      Step 1: no stated threshold reaches this claim; a field list of a
+      configuration-reporting endpoint is not about logging, footprint, a
+      hardening default, licence or a dependency. It falls under the reliance
+      item "the HTTP API for programmatic use: the endpoints, their JSON
+      shapes", which the buyer uses; a uses item is not a route. Step 3: with no
+      route the claim is not tier 1. Step 6: a person writing against the API
+      would act on this field list and would meet a missing, renamed or
+      differently typed field in use, which is §3's tier-2 case of a field name
+      or format; on its own the failure changes nothing for the buyer's plan.
+      Rated on the practice's reading of the buyer's plan.
+
+  - id: whoami-reply-values
+    selected: tier-sample
+    source: docs/CLI.md
+    lines: [149, 150]
+    statement: The /api/whoami reply is `admin` when admin access is granted, `public` when admin access is not granted but public mode is enabled, and `nobody` when no access is granted.
+    tier: [2]
+    basis: >
+      Step 1: no stated threshold reaches this claim; it describes what an
+      endpoint reports, not a logging, footprint, hardening-default, licence or
+      dependency fact. The claim is about the reply of an API endpoint, so it
+      falls under the reliance item "the HTTP API for programmatic use: the
+      endpoints, their JSON shapes, batch creation, cookie and API key
+      authentication, and the documented status-code behaviour", which the buyer
+      uses; a uses item is not a route. Step 3: with no route the claim is not
+      tier 1. Step 6: a person writing a script or using the CLI against this
+      endpoint would act on the three reply values and would meet a different
+      value or a wrong value in use, so the tier-2 test is met; the reply
+      reports the access decision and does not make it, so a wrong reply on its
+      own does not change whether the service is private. Rated on the
+      practice's reading of the buyer's plan. Review: tier 2 only; the reply
+      reports the access decision, it does not make it.
+
+  - id: filter-parameter-fields
+    selected: tier-sample
+    source: docs/CLI.md
+    lines: [229, 229]
+    statement: The filter query parameter is applied on the shorturl, longurl and notes fields.
+    tier: [2]
+    basis: >
+      Step 1: no stated threshold names a failure of link filtering; the claim
+      falls under the listing-and-filtering item, which the buyer uses, and also
+      under the HTTP API item, also uses, so it has no route. Step 3: not tier
+      1. Step 6, §3 test: the claim states which fields a query parameter is
+      matched against, and a person writing against the API would build their
+      queries on it and would meet its failure in use (a filter on notes or on
+      the long URL returning nothing, or matching a field it should not); on its
+      own that changes nothing for the buyer, so tier 2. Rated on the practice's
+      reading of the buyer's plan.
+
+  - id: api-all-reply-fields
+    selected: tier-sample
+    source: docs/CLI.md
+    lines: [235, 249]
+    statement: A successful /api/all reply is an array whose entries contain the fields shortlink, longlink, hits, expiry_time and notes.
+    tier: [2]
+    basis: >
+      Step 1: the claim falls under the HTTP API item, which names the JSON
+      shapes and which the buyer uses; no stated threshold reaches it. The
+      logging threshold does not reach it: the claim says which fields an entry
+      contains and does not say "only", so it cannot be untrue by the reply
+      carrying extra visitor data, and a wrong field list is a fact about the
+      API's shape, not about what is recorded. Step 3: no route, not tier 1.
+      Step 6, §3 test: a field name and a response format that a person writing
+      against the API acts on and meets the failure of in use, so tier 2. Rated
+      on the practice's reading of the buyer's plan.
+
+  - id: no-auth-anyone-creates-deletes
+    selected: tier-sample
+    source: docs/CLI.md
+    lines: [280, 281]
+    statement: When authentication is disabled, anyone can create new links and delete old ones.
+    tier: [3]
+    basis: >
+      Step 1: the claim describes what happens when authentication is switched
+      off, so it falls under the authentication and access control item, which
+      the buyer depends on; no stated threshold reaches it (the hardening
+      threshold names a step implied to be on by default but not, and this claim
+      states no default). Step 4: the claim can be untrue because disabling
+      authentication does not in fact open link creation and deletion to anyone,
+      or because it opens more than the claim says. Step 5: the buyer's plan as
+      stated is a private service with authentication kept on, so neither way
+      changes anything for the buyer; the state the claim describes is one the
+      plan never enters, and there is no doubt about the effect to resolve
+      upward. Step 6, §3 test: a person setting the software up would heed the
+      warning but, keeping authentication on, would never meet its failure in
+      use, so tier 3. Rated on the buyer's plan as the buyer stated it.
+
+  - id: port-4567-published
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [60, 60]
+    statement: The target's container is configured to publish port 4567 to the host's port 4567.
+    tier: [2]
+    basis: >
+      Step 1: the claim falls under the self-hosting item, which the buyer
+      depends on and which names the service being reachable on its port, so it
+      has a route; the threshold "a dependency the buyer cannot run on its own
+      hardware" names a different kind of failure and does not reach a port
+      mapping. Step 4: the claim can be untrue because the command maps a
+      different port, or because the service listens inside the container on a
+      port other than 4567 so the mapping reaches nothing. Step 5: either
+      failure is one a person would notice while setting the software up and
+      could correct by changing the port mapping, without changing the code, so
+      it changes how the service is set up and not whether the plan holds; not
+      material. Step 6, §3 test: a command's option that the person setting up
+      acts on and meets the failure of in use, so tier 2. Rated on the buyer's
+      plan as the buyer stated it.
+
+  - id: redirect-method-variable
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [161, 161]
+    statement: The CHHOTO_REDIRECT_METHOD variable controls which redirection is used when a shortlink is resolved.
+    tier: [2, 1]
+    basis: >
+      Step 1: the claim falls under the resolving item, which the buyer depends
+      on and which names the choice of temporary or permanent redirect; no
+      stated threshold reaches it. Step 4: the claim can be untrue because the
+      variable has another name (a setup failure a person would notice and
+      correct without changing the code, not material), or because the variable
+      is ignored and the redirect method is fixed, which removes the choice the
+      reliance item names and cannot be corrected without changing the code.
+      Step 5: whether losing that choice defeats a plan that depends on
+      resolution is not settled by the reliance statement, which folds the
+      choice into the depends item but describes the failure of the item as
+      links failing or misleading; doubt about the effect of a failure resolves
+      to tier 1. Rated on the buyer's plan as the buyer stated it. Review: two
+      tiers, 2 held. The resolving item names the choice of redirect, so a route
+      exists; its `if_it_failed` text is about resolution failing, and losing
+      the choice leaves the default redirect working, which is why 2 is held.
+
+  - id: slug-length-variable
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [176, 176]
+    statement: When UID slugs are enabled, CHHOTO_SLUG_LENGTH sets the length of the generated slug.
+    tier: [2]
+    basis: >
+      Step 1: the claim falls under the slug generation item, which names slug
+      length and which the buyer uses, and under the environment-variable
+      configuration item, also uses; no stated threshold reaches it, so there is
+      no route. Step 3: not tier 1. Step 6, §3 test: a parameter and its effect
+      that a person setting the software up acts on and meets the failure of in
+      use (a slug of a different length, or the variable having no effect), so
+      tier 2. Rated on the practice's reading of the buyer's plan.
+
+  - id: public-mode-links-expire
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [238, 240]
+    statement: Links submitted in public mode stop working after the configured number of seconds.
+    tier: [3]
+    basis: >
+      Step 1: no stated threshold reaches the claim. It is not about logging,
+      footprint, the licence or a dependency; the hardening threshold names a
+      step the README implies is on by default, and this claim states an expiry
+      that applies only when public mode is enabled and a positive delay is set.
+      The claim falls under the reliance item "Public mode, in which anyone can
+      add links without authenticating, with the forced public expiry delay",
+      marked does_not_use. Step 2: a claim under an item the buyer does not use,
+      which no stated threshold reaches, is tier 3; the buyer runs a private
+      service and leaves the mode off, so nobody in the buyer's plan sets up or
+      operates this behaviour and no way it could be untrue is met in use. Rated
+      on the practice's reading of the buyer's plan.
+
+  - id: landing-dir-must-be-mounted
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [251, 252]
+    statement: When running under Docker, the custom landing directory must be mounted inside the container for the feature to work.
+    tier: [2]
+    basis: >
+      Step 1: no stated threshold reaches the claim; it is not about logging,
+      footprint figures, a default hardening step, the licence, or a dependency
+      the buyer cannot run on its own hardware. The claim states a requirement
+      of the custom landing page feature, which falls under the reliance item
+      "Serving a custom landing page, disabling the frontend, and configuring
+      Cache-Control headers", marked uses; a uses item is not a route. Step 3:
+      no route, so not tier 1. Step 6: a person setting the software up under
+      Docker would act on the claim by mounting the directory and would meet its
+      failure in use, either because the mount is not needed or because the
+      landing page is still not served, so the tier 2 test is met; no way the
+      claim could be untrue is material, since the item's own failure entry says
+      the buyer would fall back to the built-in interface. Rated on the
+      practice's reading of the buyer's plan.
+
+  - id: admin-path-with-landing-dir
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [252, 252]
+    statement: When a custom landing directory is configured, the admin page is served at the path `/admin/manage`.
+    tier: [2]
+    basis: >
+      Step 1: no stated threshold reaches the claim, which names the location of
+      a page. It falls under the reliance item "Serving a custom landing page,
+      disabling the frontend, and configuring Cache-Control headers", marked
+      uses, and also touches "The web administration interface", also marked
+      uses; neither is a route. Step 3: no route, so not tier 1. Step 6: the
+      claim is a path a person setting the software up would act on and would
+      meet the failure of in use, when the admin page is found at another path,
+      which is the kind of detail §3 lists for tier 2 (a file's location); no
+      way the claim could be untrue changes whether the buyer's plan holds.
+      Rated on the practice's reading of the buyer's plan.
+
+  - id: backups-are-sqlite-files
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [302, 302]
+    statement: The backup files are SQLite database files.
+    tier: [2]
+    basis: >
+      Step 1: no stated threshold reaches the claim; the logging threshold is
+      about what is recorded of visitors, not the format of a backup of the
+      database. The claim falls under the reliance item "Automatic database
+      backups at start-up and daily, with old backups pruned", marked uses,
+      which is not a route. Step 3: no route, so not tier 1. Step 6: a person
+      operating the instance would act on the claim when restoring, by treating
+      a backup file as a database to copy back or open, and would meet its
+      failure in use if the file were another format; this is a format detail of
+      the kind §3 lists for tier 2, and on its own its failure changes nothing
+      for the buyer, whose staff, per the item's failure entry, could back up
+      the data directory themselves. Rated on the practice's reading of the
+      buyer's plan.
+
+  - id: helm-hostpath-volume
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [313, 313]
+    statement: The Helm chart's persistent volume uses a host path volume.
+    tier: [2]
+    basis: >
+      Step 1: no stated threshold reaches the claim as the buyer wrote it. The
+      threshold "a dependency the buyer cannot run on its own hardware" names a
+      kind of dependency; this claim names which volume type one deployment
+      chart uses, and it can be untrue by using any other volume type, not only
+      one the buyer cannot run itself, in the way §4's example of the logs'
+      database file is not reached by the logging threshold. The claim falls
+      under the reliance item "The Helm chart for deploying on Kubernetes, with
+      its persistent volume and cert-manager dependency", marked uses, which is
+      not a route. Step 3: no route, so not tier 1. Step 6: a person deploying
+      with the chart would act on the claim, by preparing a host path on the
+      node, and would meet its failure in use if the chart asked for another
+      volume kind, so the tier 2 test is met; the compose file is the documented
+      basic path, so the plan holds without the chart. Rated on the practice's
+      reading of the buyer's plan.
