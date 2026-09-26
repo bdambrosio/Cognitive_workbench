@@ -1613,6 +1613,1046 @@ answers:
       builds. Rated against the buyer's stated threshold: "a dependency the
       buyer cannot run on its own hardware".
 
+  # --- claims tested by the other end-to-end runs (chhoto-sorted and the
+  # cmp-* runs) with no answer above: the 19 that two or more runs tested or
+  # that some run reported a gap on, of 44 such claims on 2026-09-26. Answered
+  # by claim-source line, since each run enumerates differently; the statement
+  # is the reading of the run that found a gap, or the first run's. Blind
+  # verdicts and tiers by agents, then adjudicated by Claude; "Checked" or
+  # "Adjudicated" says where and why. The rule from here on: after each
+  # end-to-end run, answer what it tested and this file lacks, asking Bruce
+  # first.
+  - id: readme-spdx-mit
+    selected: sample
+    source: README.md
+    lines: [2, 2]
+    statement: The document is licensed under the MIT licence.
+    verdict: [real]
+    tier: [3]
+    basis: >
+      The claim is about the README.md document itself (about: document).
+      README.md is an excluded file, so under METHOD §7 its own text (the SPDX
+      line at README.md:2) cannot be cited; only its existence, length and
+      headings count. The claim is therefore settled by the licence file, which
+      §7 names as the evidence for "MIT licensed". I read LICENSE whole:
+      LICENSE:1 "MIT License"; LICENSE:3 "Copyright (c) 2023-2026 Sayantan
+      Santra"; LICENSE:5-6 "of this software and associated documentation files
+      (the "Software")". The text is the MIT licence and its grant expressly
+      covers "associated documentation files", of which README.md is one.
+      backend/Cargo.toml:9 'license = "mit"' agrees. Verified: the LICENSE text
+      is the standard MIT licence (compared line by line against the SPDX MIT
+      text from memory; verbatim match). Inferred: that README.md falls under
+      "associated documentation files" of the same repository; nothing in the
+      materials places README.md under a different licence. Verdict real per §6
+      and §7 (document claim settled by the document).
+    tier_basis: >
+      Step 1: the claim is about a document, and the line states the licence of
+      the README alone, not the licence of the code, so under §4 "by what the
+      claim is about" it has no route; the threshold "a licence or ownership
+      problem with the code" names the code and does not reach a documentation
+      file's own header line, and the reliance item on the MIT licence is about
+      the code. Step 3: no route, so not tier 1. Step 6, §3 test: a person
+      setting up, operating or writing against the API does not act on the
+      licence of the README file and would meet no failure of it in use, so it
+      is not tier 2. Rated on the scale alone.
+
+  - id: maintainer-badge
+    selected: sample
+    source: README.md
+    lines: [9, 9]
+    statement: The project's maintainer is SinTan1729.
+    verdict: [real, unverifiable, real_with_caveat]
+    tier: [3]
+    materiality: [not_material]
+    exposure: [not_material]
+    basis: >
+      A badge that states a fact is the fact it states (§2), so this is a
+      provenance claim. The claim is ambiguous in a way that changes the
+      verdict. Reading 1: "maintainer" means the account that owns and
+      administers the project's repository and receives its issues. That is a
+      provenance fact (§5: "author, origin") settled by the manifest and the
+      shipped repository configuration: backend/Cargo.toml:11-13 'homepage =
+      "https://github.com/SinTan1729/chhoto-url"', 'repository =
+      "https://github.com/SinTan1729/chhoto-url"';
+      .github/ISSUE_TEMPLATE/bug_report.md:6 'assignees: "SinTan1729"' and
+      .github/ISSUE_TEMPLATE/feature_request.md:6 'assignees: "SinTan1729"'
+      (every new bug report and feature request is assigned to that account);
+      backend/src/main.rs:77 'info!("Source:
+      https://github.com/SinTan1729/chhoto-url");'. On this reading the verdict
+      is real. Reading 2: "maintainer" means the person who is actively doing
+      the maintenance work (fixing bugs, releasing). That is the seller's
+      ongoing activity, and under §7 a manifest or template shows who is
+      configured to receive issues, not who does the work; no commit record,
+      release record or issue history is supplied, so the verdict is
+      unverifiable, outside_the_materials. I searched the target (lexical:
+      SinTan1729, Sayantan, maintainer, author, over every non-excluded file;
+      structural: Cargo.toml [package], LICENSE, .github/) and found nothing
+      beyond the lines above. Verified: all quoted lines. Inferred: that the
+      account SinTan1729 and the copyright holder "Sayantan Santra" (LICENSE:3,
+      Cargo.toml:8) are the same person; nothing in the materials states it, and
+      the claim does not depend on it.
+      Widened 2026-09-26: the materials name a person as author (Cargo.toml:8) and an account as maintainer; a caveat saying so is accepted.
+    tier_basis: >
+      Step 1: the threshold "a licence or ownership problem with the code" names
+      ownership, and read as the buyer wrote it and no wider it does not name
+      who maintains the project; the reliance item on the maintainer's upkeep
+      commitments is `uses`, which is not a route, and the item on the MIT
+      licence and clean ownership concerns the licence and the owner of the
+      code, which a maintainer badge does not state. Step 3: no route, so not
+      tier 1. Step 6, §3 test: the maintainer's name is not something a person
+      setting up, operating or writing against the API acts on or meets the
+      failure of in use, so it is not tier 2. Rated on the scale alone.
+    rating_basis: >
+      The engagement names the counterparty as "the project's maintainer, as
+      seller", and the finding shows only that the account SinTan1729 is
+      configured to receive issues (ISSUE_TEMPLATE assignees) and is named in
+      the manifest homepage, not who does the maintenance work. If the claim
+      were false, the buyer would be contracting with a party who is not the
+      maintainer, and the upkeep commitments the reliance statement lists (uses,
+      the practice's inference) would rest on someone else; the buyer would go
+      back to the seller to establish who maintains the project and what the
+      seller can commit to, but the finding records nothing against ownership,
+      which the reliance statement keeps separate (LICENSE:3 "Sayantan Santra"
+      is not tied to the account by anything in the materials). Rated on the
+      practice's reading of the buyer's plan. Adjudicated: exposure
+      not_material, not the rater's material: the claim is tier 3 (no route),
+      and tier and exposure share one scale, so a way of being untrue that would
+      be material would have made it tier 1. The rater's reading (the
+      counterparty is 'the project's maintainer') is recorded as doubt. The
+      caveat reading (author's name against the account) is not_material.
+
+  - id: scratch-image-under-4-5-mb
+    selected: sample
+    source: README.md
+    lines: [21, 21]
+    statement: The docker image built from scratch is smaller than 4.5 MB compressed
+    verdict: [unverifiable]
+    tier: [1]
+    exposure: [material]
+    basis: >
+      A quantity claim about a built artefact. The materials hold the recipe,
+      not the artefact: deploy/Containerfile.scratch:4-20 builds 'FROM scratch'
+      and copies one binary ('COPY
+      ./backend/target/x86_64-unknown-linux-musl/release/chhoto-url
+      /chhoto-url', line 5) and the frontend directory ('COPY ./frontend
+      /frontend', line 18). No built image, image manifest, registry record or
+      measured size is supplied. Searches: lexical for "size", "MB", "megab"
+      over .github/workflows/*.yml, Makefile and deploy/Containerfile* found no
+      size figure or size check; structural over deploy/ and .github/workflows/
+      found only the build recipe and the push step
+      (.github/workflows/test-and-release.yml:234-244 builds 'file:
+      deploy/Containerfile.scratch' and pushes it), with no recorded size. Every
+      candidate was opened. Under §7 a build file shows what a build is
+      configured to be, not the size of what it produces, so the claim is
+      unverifiable; disposition outside_the_materials, because the kind of
+      material that would settle it (a built image or its manifest) was not
+      supplied at all. Verified: the Containerfile and workflow lines. Nothing
+      inferred about the actual size. The image-size badge at README.md:11 is
+      out of scope under §2 (a hosted measure); this claim is the prose at line
+      21 and is enumerated.
+    tier_basis: >
+      Step 1: the threshold "footprint or resource figures materially worse than
+      stated" names a figure the claim states, and the claim falls under the
+      `depends` item on the small resource footprint, which names compressed
+      image sizes. Step 4: the figure can be untrue by a small margin or a large
+      one; taking a margin large enough to reach the threshold, the compressed
+      image is materially larger than 4.5 MB. Step 5: the buyer said that figure
+      would change the price or the terms, and no other documented way keeps the
+      plan, since the image is what the buyer runs. Rated against the buyer's
+      stated threshold: "footprint or resource figures materially worse than
+      stated".
+    rating_basis: >
+      The finding shows the recipe (deploy/Containerfile.scratch:4-20, one
+      binary and the frontend directory) and no measured size, so the "4.5 MB
+      compressed" figure rests on the README alone. If it were false the buyer
+      would lose one of the footprint figures its price assumes, which is the
+      kind of figure the buyer said would change the price, under the reliance
+      item for the small resource footprint (depends). Rated against the buyer's
+      stated threshold: "footprint or resource figures materially worse than
+      stated".
+
+  - id: automatic-link-expiry
+    selected: sample
+    source: README.md
+    lines: [59, 59]
+    statement: The tool contains expiry logic that deactivates or removes links after a user-chosen time.
+    verdict: [real, real_with_caveat]
+    tier: [2]
+    materiality: [not_material]
+    basis: >
+      The user chooses the time: backend/src/services/utils.rs:26-31 'pub(crate)
+      struct NewURLRequest' with 'pub(crate) expiry_delay: Option<i64>' (line
+      30); the frontend form at frontend/index.html:111-122 offers a select
+      named "expiryDelay" with options from "Never" (value 0) through "10
+      Minutes", "1 Hour", "1 Day" and more. The delay is applied on insert:
+      backend/src/services/utils.rs:178-185 clamps it ('.map(|d| d.clamp(0,
+      157_784_760))', line 180, a 5-year maximum per the comment at line 177)
+      and backend/src/database/events.rs:228 'let expiry_time =
+      req.expiry_delay.map(|delay| now + delay);' passes it as ':expiry' to
+      ADD_LINK (backend/src/database/queries.rs:25-28). Deactivation: the
+      redirect lookup FIND_LINK, backend/src/database/queries.rs:12-18, has 'AND
+      ( expiry_time IS NULL OR expiry_time > :now )', executed with ':now' =
+      Utc::now().timestamp() in backend/src/database/events.rs:147-153
+      (find_and_add_hit), which the redirect handler
+      backend/src/services/get.rs:130-131 calls; an expired row is not returned
+      and the handler serves the 404 page (get.rs:139-144). Removal: CLEANUP at
+      queries.rs:47-48 '"DELETE FROM urls WHERE :now >= expiry_time AND
+      expiry_time IS NOT NULL"' is executed by cleanup() at
+      backend/src/database/utils.rs:31-39, which spawn_cleaner runs on an hourly
+      interval (backend/src/background.rs:61-64,
+      'interval(Duration::from_secs(3600))'), spawned unconditionally from
+      backend/src/main.rs:89. Both mechanisms exist in code that runs by default
+      with no setting required. Verdict real per §6; §7 is satisfied because the
+      claim is that the tool has the expiry logic, and a code path shows that
+      the capability exists. Verified: every quoted line. Inferred: none needed.
+      Widened 2026-09-26 after reading run caveats: the user-chosen delay is capped at five years (backend/src/services/utils.rs:177-181) and the interface's list stops at one year, which a reader may need to read 'user-chosen' correctly; real_with_caveat accepted.
+    tier_basis: >
+      Step 1: no stated threshold names link expiry (the thresholds are about
+      visitor logging, footprint, implied hardening, licence and dependencies),
+      and the claim falls under the reliance item on choosing and enforcing an
+      expiry time, which is `uses` and so is not a route. Step 3: no route, so
+      not tier 1. Step 6, §3 test: a capability that a person operating the
+      service sets on links and would meet the failure of in use, when links
+      outlive or die before the chosen time; on its own that changes nothing for
+      the buyer, whose staff could delete stale links by hand. Rated on the
+      practice's reading of the buyer's plan.
+    rating_basis: >
+      Rated by Claude 2026-09-26: the caveat (a five-year cap; the interface's
+      list stops at one year) falls under the expiry item the buyer uses; no
+      threshold reaches it. Rated on the practice's reading of the buyer's plan.
+
+  - id: links-stored-in-sqlite
+    selected: sample
+    source: README.md
+    lines: [82, 82]
+    statement: Links are stored in an SQLite database.
+    verdict: [real]
+    tier: [1]
+    basis: >
+      Dependency: backend/Cargo.toml:42 'rusqlite = { version = "0.40.2",
+      features = [ "backup", "bundled" ] }'; backend/Cargo.lock:1684-1685 'name
+      = "rusqlite"' / 'version = "0.40.2"' and Cargo.lock:1271-1272 'name =
+      "libsqlite3-sys"' / 'version = "0.38.2"'. Connection:
+      backend/src/database/utils.rs:337-346 open_db calls
+      'Connection::open(path)' (rusqlite); backend/src/main.rs:83 opens the
+      writer at conf.db_location and main.rs:116 opens a reader. Default
+      location: backend/src/config.rs:64 '("/urls.sqlite", "/data/urls.sqlite")'
+      and the shipped deploy/compose.yaml:28 '-
+      CHHOTO_DB_URL=/data/urls.sqlite'. Storage of links: the table schema at
+      backend/src/database/queries.rs:37-45 'CREATE TABLE urls (... short_url
+      TEXT NOT NULL, long_url TEXT NOT NULL, ...)' and ADD_LINK at
+      queries.rs:25-28 'INSERT INTO urls (long_url, short_url, hits,
+      expiry_time, notes)', executed at backend/src/database/events.rs:221-237.
+      A lexical search of backend/Cargo.toml and backend/src for postgres,
+      mysql, mariadb, sqlx, diesel found nothing, so no other database backend
+      is present. Verdict real per §6. Verified: every quoted line. Inferred:
+      that rusqlite is an SQLite binding, which is what its name and the
+      libsqlite3-sys dependency state; I did not consult crates.io.
+    tier_basis: >
+      Step 1: the threshold "a dependency the buyer cannot run on its own
+      hardware" names a kind of failure this claim could have, since a claim
+      about where links are stored fails by the storage being something other
+      than an in-process SQLite file; the claim also falls under the `uses` item
+      on SQLite storage, which on its own is not a route. Step 4: the claim
+      could be untrue by links being stored in another database or an external
+      service, or by links not being persisted at all. Step 5: storage in a
+      service the buyer cannot run on its own hardware would end the deal by the
+      buyer's words, and links not persisted would defeat the `depends` items on
+      shortening and resolving links; neither has another documented way that
+      keeps the plan, and any doubt about the effect resolves to tier 1. Rated
+      against the buyer's stated threshold: "a dependency the buyer cannot run
+      on its own hardware". Adjudicated: tier 1 held. A way the claim could be
+      untrue (links held by a service the buyer cannot run on its own hardware)
+      is the kind of failure the walk-away threshold names, so a route exists
+      and doubt resolves to 1.
+
+  - id: default-long-link-protocols
+    selected: sample
+    source: README.md
+    lines: [132, 132]
+    statement: By default, only https, http, ftp and magnet protocols are permitted for long links.
+    verdict: [real]
+    tier: [1]
+    basis: >
+      Boundary claim ("only ... by default"), read under METHOD §2 against the
+      default behaviour plus the shipped deployment files, and settled under
+      §6/§8 by the two searches. Verified: backend/src/config.rs:206-209 sets
+      the default list, `let mut allowed_protocols: Vec<String> = ["http",
+      "https", "ftp", "magnet"]`; lines 210-218 append entries from
+      CHHOTO_EXTRA_PROTOCOLS only when that variable is set.
+      backend/src/services/utils.rs:46-49 `fn is_longlink_valid(link: &str,
+      allowed_protocols: &[String]) -> bool` parses the link with `Url::parse`
+      and accepts it only if
+      `allowed_protocols.contains(&u.scheme().to_owned())`. It is called for
+      every new link at utils.rs:195 (`else if !is_longlink_valid(&req.longlink,
+      &config.allowed_protocols)`, which rejects with "Invalid longlink!") and
+      for every edit at utils.rs:275. Structural search: the only writes of a
+      long link to the urls table are database/events.rs add_links (line 231
+      `":long": req.longlink`) and edit_link (line 298 `":long": longlink`), and
+      the only callers of those are utils.rs add_links_helper (210, 223, 237)
+      and edit_link_helper (284), both after the validity check; no import or
+      migration path writes a long link. Lexical search over backend/, deploy/
+      and frontend/ for is_longlink_valid, allowed_protocols and EXTRA_PROTOCOLS
+      found no other site that admits a scheme. Shipped deployment files leave
+      the default in place: deploy/compose.yaml:103 has `# -
+      CHHOTO_EXTRA_PROTOCOLS=ftps,obsidian` commented out;
+      deploy/chhoto-url.container and deploy/helm-chart/templates/sts.yml set no
+      such variable. Dependency note, from knowledge of the url crate at 2.5.8
+      (backend/Cargo.toml:55, backend/Cargo.lock:2110-2111): `Url::parse`
+      lowercases the scheme, so "HTTPS://..." is accepted as https; this does
+      not widen the set. Inferred: nothing else; every fact above was read in
+      the files.
+    tier_basis: >
+      Step 1: the threshold "a hardening step the README implies is on by
+      default but is not" names a kind of failure this claim could have, since a
+      default restriction on the protocols a long link may use is a hardening
+      step the README states is on by default; the claim also falls under the
+      `uses` item on allowed protocols, which on its own is not a route. Step 4:
+      a claim with "only" fails by admitting what it excludes, so the way it
+      could be untrue is that other protocols are accepted by default; it could
+      also fail by one of the four named protocols being refused. Step 5: other
+      protocols accepted by default is the failure the buyer's threshold names
+      as changing the price or the terms, and it is not a failure a person would
+      notice while setting the service up, so the plan does not still hold; a
+      named protocol being refused would on its own be a configuration change,
+      but the first way settles the tier. Rated against the buyer's stated
+      threshold: "a hardening step the README implies is on by default but is
+      not".
+
+  - id: short-links-work-in-operation
+    selected: sample
+    source: claim_sources/site_index_html.md
+    lines: [1, 1]
+    statement: "When the target runs, short links created on it actually work in operation: a visitor who follows a created short link is sent to its destination."
+    verdict: [unverifiable]
+    tier: [1]
+    exposure: [decisive]
+    basis: >
+      The statement asks about behaviour in operation. METHOD §7: a code path
+      shows that a capability exists, not the behaviour in operation claimed for
+      it, and a test file shows a test is written, not that it passes. Verified:
+      the redirect code path exists at backend/src/services/get.rs:124-146
+      (`#[get("/{shortlink}")]` link_handler, which on a database hit returns
+      `Redirect::to(longlink).permanent()` or a temporary redirect when
+      `use_temp_redirect`), and a test is written at
+      backend/src/tests/access.rs:10-24 (`link_resolution`, asserting
+      `resp.status().is_redirection()` and a `location` header of
+      "https://example-test1.com"). Neither reaches operation. No run record,
+      log, deployment observation or test result is supplied, so the kind of
+      material needed was not supplied at all: unresolved_because
+      outside_the_materials. Searches: lexical for Redirect/redirection over
+      backend/src, structural over services/ and tests/; candidates get.rs and
+      access.rs opened.
+    tier_basis: >
+      Step 1: no stated threshold names the redirect (what the buyer is "paying
+      for" describes the purchase as a whole and is not a threshold), and the
+      claim falls under the `depends` item on resolving a short link by
+      redirecting the visitor straight to the destination, whose source is the
+      buyer's words. Step 4: the capability can be absent, or present and not
+      send the visitor to the destination. Step 5: either way every link the
+      buyer's customers share would fail or mislead, no other documented way
+      keeps the plan, and repair by the buyer does not count as the plan
+      holding. Rated on the buyer's plan as the buyer stated it.
+    rating_basis: >
+      The finding shows the redirect path exists
+      (backend/src/services/get.rs:124-146 returns `Redirect::to(longlink)`) and
+      a test is written (backend/src/tests/access.rs:10-24) but nothing that
+      reaches operation. If the claim were false, every link the buyer's
+      customers share would fail to reach its destination, which the reliance
+      statement records as one of the two core functions the buyer depends on
+      and cannot repair at acceptable cost; the buyer would not close on a link
+      shortener whose links do not resolve. Rated against the buyer's stated
+      threshold: "a small, private link shortener the buyer can run for its
+      customers at low cost, as the README describes it".
+
+  - id: configured-through-required-env-vars
+    selected: sample
+    source: claim_sources/site_index_html.md
+    lines: [65, 65]
+    statement: The application is configured through required environment variables for the site URL, credentials, and storage.
+    verdict: [real_with_caveat, real, partial]
+    tier: [2]
+    materiality: [not_material]
+    basis: >
+      An instruction; §2 says enumerate what it asserts about the target, here
+      that configuration of the site URL, credentials and storage is done
+      through environment variables. Verified in backend/src/config.rs: site URL
+      read at 239-243 (`read_config_wrapper("CHHOTO_SITE_URL", "site_url")`);
+      credentials at 221-223 (CHHOTO_PASSWORD) and 167 (CHHOTO_API_KEY); storage
+      at 55 (CHHOTO_DB_URL), 307 (CHHOTO_SQLITE_USE_WAL_MODE) and 314
+      (CHHOTO_SQLITE_ENSURE_ACID); read_config_wrapper at 41-51 reads
+      `std::env::var`. The shipped deployment files pass them as environment
+      (deploy/compose.yaml:24-35, 56; deploy/chhoto-url.container:23-29;
+      deploy/helm-chart/templates/sts.yml:20-40). Every part of the statement's
+      mechanism holds. Also verified: none of the three is required. With no
+      CHHOTO_SITE_URL the server warns and uses localhost (config.rs:262-273);
+      with no CHHOTO_PASSWORD it warns at 224-226 `"No password was provided.
+      The API will be accessible to the public."` and starts; with no
+      CHHOTO_DB_URL it uses /data/urls.sqlite (64, 105). The ambiguity is in the
+      claim's word "required". Read as a description of the mechanism (set the
+      variables you need), every part holds and the verdict is real. Read as
+      telling the buyer these variables must be set, every part still holds but
+      the reader must know that none is mandatory and that omitting the
+      credential leaves the API open, which §6 makes real_with_caveat (the
+      caveat cites config.rs:224-226). Both readings verified in the files;
+      nothing inferred.
+      Widened 2026-09-26: 'required' is shown false (every named variable has a fallback), which can be read as a part of the claim not as claimed; partial accepted.
+    tier_basis: >
+      Step 1: no stated threshold names the configuration mechanism, and the
+      hardening threshold is about what the README implies, not this site page;
+      the claim falls under the reliance item on configuration through
+      environment variables, which is `uses` and so is not a route. Step 3: no
+      route, so not tier 1; and even following the credentials part to the
+      `depends` item on authentication, the ways the claim could be untrue
+      (configuration by another mechanism, or the variables not being required)
+      are ones a person would notice while setting the software up and correct
+      without changing the code, which step 5 says is not material. Step 6, §3
+      test: a person setting the software up acts on which variables are
+      required and what they configure, and meets their failure at setup, so
+      tier 2. Rated on the practice's reading of the buyer's plan.
+    rating_basis: >
+      The caveat is that none of the three variables is mandatory and that with
+      no CHHOTO_PASSWORD the server warns "No password was provided. The API
+      will be accessible to the public." (config.rs:224-226) and starts. Whether
+      the password is set is an operator setting the buyer's own staff control
+      when they deploy, and the shipped compose file sets one (compose.yaml:56),
+      so the hardening the threshold names is on as shipped and the gap is too
+      small for the buyer to go back to the seller over it; the authentication
+      item (depends) is not defeated. Rated against the buyer's stated
+      threshold: "a hardening step the README implies is on by default but is
+      not".
+
+  - id: insecure-api-key-warning
+    selected: sample
+    source: docs/CLI.md
+    lines: [22, 23]
+    statement: The server contains code that checks the configured API key for weakness and, when it is insecure, outputs a warning together with a newly generated API key.
+    verdict: [real]
+    tier: [2]
+    basis: >
+      The statement is about a code path, which §7 lets source settle. Verified:
+      backend/src/config.rs:167 reads the key
+      (`read_config_wrapper("CHHOTO_API_KEY", "api_key")`); 170 `if
+      score(&analyze(key)) < 90.0 {`; 171-175 `warn!("API key is insecure!
+      Please change it. Current key is: {}. Generated secure key which you may
+      use: {}", key, auth::gen_key())`; 176-178 logs "Secure API key was
+      provided." otherwise. backend/src/auth.rs:100-112 `gen_key` builds a
+      128-character key from letters and digits with the passwords crate's
+      PasswordGenerator. main.rs:45-50 sets the default log filter to
+      "warn,chhoto_url=info,...", so the warn-level line is emitted unless
+      RUST_LOG lowers it. The strength test is the passwords crate 3.1.18
+      (backend/Cargo.toml:45, Cargo.lock:1446-1447); that "insecure" means a
+      score under 90 on that crate's scale is the dependency's behaviour, stated
+      from knowledge, and the claim does not turn on the threshold. Observation
+      not affecting the verdict: the same warning writes the insecure key itself
+      to the log in plaintext (config.rs:172-173).
+    tier_basis: >
+      Step 1: the hardening threshold names what the README implies and, read no
+      wider, does not reach a line in docs/CLI.md; the claim falls under the
+      `depends` item on authentication and access control, which names the API
+      key, so it has a route. Step 4: the claim asserts several things and can
+      fail in any one: no weakness check, a warning with no generated key, or a
+      generated key that does not authenticate. Step 5: none of these defeats
+      the item, since the API key the buyer's staff configure still gates access
+      and the service stays private whether or not the server warns about a weak
+      key; the check guards against an operator's own choice of key, and the
+      plan as the reliance statement states it still holds. Step 6, §3 test: a
+      person operating the service would act on the warning and the offered key
+      and would meet their absence in use, so tier 2. Rated on the buyer's plan
+      as the buyer stated it.
+
+  - id: api-key-responses-json
+    selected: sample
+    source: docs/CLI.md
+    lines: [25, 25]
+    statement: The server serializes its responses to API-key-authenticated requests as JSON.
+    verdict: [contradicted, partial]
+    cites_any:
+      - {document: backend/src/services/get.rs, lines: [73, 90]}
+      - {document: backend/src/services/get.rs, lines: [24, 47]}
+    tier: [2]
+    materiality: [not_material]
+    basis: >
+      Boundary claim ("All responses"). Verified, per route, the branch taken
+      for Auth::ValidAPIKey: backend/src/services/post.rs add_links returns
+      `.json(...)` at 102, 106 and 111, expand at 144, 152 and 160; put.rs
+      edit_link at 31, 39 and 47; delete.rs delete_link at 54, 62 and 70; get.rs
+      getconfig at 109; get.rs getall success at 38
+      (`.content_type("application/json").body(s)`, s from serde_json at
+      utils.rs:140). Two routes cross the boundary. get.rs:73-90 `/api/whoami`,
+      an authenticated route the same document tells API-key clients to call
+      (CLI.md:141-150), answers a valid API-key request with
+      `HttpResponse::Ok().content_type("text/plain") .body(acting_user)`
+      (87-89), the plain word "admin"; backend/src/tests/basics.rs:23-29 has a
+      test written that sends X-API-Key to /api/whoami and asserts the body is
+      "admin". get.rs:24-47 `/api/all` answers an API-key request whose
+      parameters are rejected (for example page_no <= 0, utils.rs:122-128) with
+      `HttpResponse::BadRequest() .content_type("text/plain").body(reason)`
+      (42-44), and a server error with text/plain (39-41); an invalid API key on
+      that route also gets text/plain (34-36). /api/siteurl and /api/version
+      (get.rs:52-71) are text/plain but take no authentication and are described
+      that way at CLI.md:13-14, so I do not count them. §5 lists "all" as a
+      boundary word and §6 makes a crossed boundary contradicted, which is the
+      first verdict. The second reading takes "all responses" as an extent over
+      the API routes: five routes answer JSON in every branch, two do not, which
+      §6 calls a difference of extent, partial, with the gap naming whoami and
+      the /api/all error paths. Nothing inferred; each branch was read. Checked
+      2026-09-26: backend/src/services/get.rs:73-90, /api/whoami answers a valid
+      API-key request with content_type("text/plain") and the body "admin". Both
+      verdicts kept: "all" read as a boundary crossed is contradicted; read as
+      an extent over routes (most JSON, two not) is partial. Either way a right
+      finding must cite the whoami route or the getall text/plain branches.
+    tier_basis: >
+      Step 1: no stated threshold names the API's response format, and the claim
+      falls under the reliance item on the HTTP API and its JSON shapes, which
+      is `uses` and so is not a route. Step 3: no route, so not tier 1. Step 6,
+      §3 test: a person writing against the API parses responses on the strength
+      of this claim and would meet a non-JSON response in use; on its own that
+      changes nothing for the buyer, whose staff could use the web interface
+      instead. Rated on the practice's reading of the buyer's plan.
+    rating_basis: >
+      The gap is two routes: /api/whoami answers a valid API-key request with
+      `content_type("text/plain")` and the body "admin" (get.rs:87-89), and
+      /api/all returns text/plain on its error branches (get.rs:34-44); five
+      routes answer JSON in every branch. This falls under the HTTP API item,
+      which the practice infers the buyer uses; a client script has to read two
+      plain-text bodies, which the buyer's staff would handle without reopening
+      price or terms. Rated on the practice's reading of the buyer's plan.
+
+  - id: api-edit-endpoint
+    selected: sample
+    source: docs/CLI.md
+    lines: [157, 166]
+    statement: The server exposes a `/api/edit` endpoint which edits an existing short link, accepting shortlink, longlink, reset_hits, expiry_time and notes, and requiring an API key.
+    verdict: [real_with_caveat, partial]
+    cites_any:
+      - {document: backend/src/services/put.rs, lines: [17, 21]}
+      - {document: backend/src/services/utils.rs, lines: [35, 42]}
+    tier: [1]
+    materiality: [not_material]
+    basis: >
+      Verified by reading. Route: backend/src/services/put.rs:17-18
+      `#[put("/api/edit")]` / `pub(crate) async fn edit_link(req: String, auth:
+      Auth, data: web::Data<AppState>)`, registered at backend/src/main.rs:126
+      `.service(services::edit_link)`. Fields:
+      backend/src/services/utils.rs:35-42 `struct EditURLRequest { shortlink:
+      String, longlink: String, reset_hits: bool, expiry_time: Option<i64>,
+      notes: Option<String> }`, deserialized from the request body at
+      utils.rs:264. All five names in the claim are present; expiry_time and
+      notes are optional, matching the claim source's next line. Edits an
+      existing link: utils.rs:284-293 calls `database::edit_link(...)`;
+      backend/src/database/events.rs:279-317 runs
+      backend/src/database/queries.rs:91-99 `UPDATE urls SET long_url = :long,
+      hits = COALESCE(:hits, hits), notes = COALESCE(:notes, notes), expiry_time
+      = COALESCE(:expiry, expiry_time) WHERE short_url = :short`;
+      utils.rs:296-298 returns "The shortlink was not found, and could not be
+      edited." when zero rows change, so the endpoint only edits links that
+      already exist. reset_hits sets hits to 0 (events.rs:301 `":hits":
+      reset_hits.then_some(0)`). Authentication: put.rs:20-21 `match auth {
+      Auth::ValidAPIKey | Auth::ValidSession => ...` and put.rs:51-53 returns
+      401 for `Auth::None` and `Auth::InvalidAPIKey`. So a valid API key is
+      accepted (backend/src/auth.rs:19-39, 167-170), but so is a logged-in
+      session (auth.rs:175-179), and auth.rs:115-119 `if
+      config.password.is_none() { return true; }` means that with no password
+      configured no credential at all is needed. The API key path only works
+      when CHHOTO_API_KEY is set (auth.rs:23 `if config.api_key.is_some()`;
+      auth.rs:50-57 rejects any X-API-Key header when none is configured). The
+      shipped deploy/compose.yaml leaves the key commented out (line 61 `# -
+      CHHOTO_API_KEY=SECURE_API_KEY`) and sets a password (line 56 `-
+      password=TopSecretPass`, read through the legacy-name fallback at
+      backend/src/config.rs:41-51 and 221-223), so as shipped the endpoint is
+      reachable by session login only. METHOD §6 decides. Under the ordinary
+      reading of a CLI page (the endpoint is authenticated; the CLI presents an
+      API key), every part holds and the session alternative plus the
+      no-password case is something a reader must know: real_with_caveat. Under
+      the literal reading of "requiring" (an API key is necessary), the evidence
+      shows it is not necessary, one of several things the claim names fails,
+      and §6 gives partial. Tests (backend/src/tests/basics.rs:63,
+      insertion.rs:277-287) show tests are written, not that they pass (§7), and
+      are not needed for the verdict. Checked 2026-09-26:
+      backend/src/services/put.rs:21 accepts `Auth::ValidAPIKey |
+      Auth::ValidSession`, so the endpoint does not require an API key; a
+      session login reaches it, and as shipped (compose.yaml:61 leaves
+      CHHOTO_API_KEY commented out) only a session does. Both verdicts kept:
+      "requiring an API key" read as a sufficient credential is
+      real_with_caveat; read as a necessary one it is a part shown not as
+      claimed, partial.
+    tier_basis: >
+      Step 1: no stated threshold reaches this claim by its words (the hardening
+      threshold names the README, and this source is docs/CLI.md); the endpoint
+      and its fields fall under the HTTP API item, which the buyer uses, but the
+      requirement of an API key falls under the authentication and access
+      control item, which the buyer depends on. Step 4: the claim asserts
+      several things and can fail in any one: the endpoint is absent, it does
+      not edit, it does not accept the listed fields, or it edits without
+      requiring the key. Step 5: the last way, edits accepted without an API
+      key, would let anyone rewrite the buyer's customers' links, so the service
+      would not be private, which is what the buyer said it is paying for; the
+      other ways are met by the web interface and are not material. Rated on the
+      buyer's plan as the buyer stated it.
+    rating_basis: >
+      The caveat is that put.rs:21 accepts `Auth::ValidAPIKey |
+      Auth::ValidSession`, so a logged-in session reaches /api/edit as well as
+      an API key, and auth.rs:115-119 needs no credential when no password is
+      configured; as shipped (compose.yaml:56 sets a password, :61 leaves
+      CHHOTO_API_KEY commented out) the endpoint is reachable by session login
+      only. The endpoint stays behind a credential in the shipped configuration
+      and the no-password case is an operator setting the buyer's staff control,
+      so the authentication item (depends) is not defeated and the gap is too
+      small for the buyer to go back over. Rated against the buyer's stated
+      threshold: "a hardening step the README implies is on by default but is
+      not".
+
+  - id: oci-image-format
+    selected: sample
+    source: docs/INSTALLATION.md
+    lines: [21, 21]
+    statement: The image build configuration produces container images in the OCI image format.
+    verdict: [unverifiable, real]
+    tier: [2]
+    exposure: [not_material]
+    basis: >
+      Disposition: outside_the_materials. The claim is about a property of the
+      built artefact (the format of the published images). No built image, image
+      manifest, registry listing or measurement is in the materials: a
+      structural search of the target tree (find for *.tar, *manifest*, *.oci,
+      index.json) found nothing, and a lexical search for "oci", "podman" and
+      "mediatype" outside the excluded documents hit only Makefile:6-56 (podman
+      build/run targets for local testing), backend/Cargo.toml:17 (the keyword
+      "podman") and deploy/chhoto-url.container:11,18. What the materials do
+      show is the build configuration: deploy/Containerfile (line 27 `FROM
+      scratch`), deploy/Containerfile.scratch:4-20 and
+      deploy/Containerfile.alpine:4-21 in Dockerfile syntax, and
+      .github/workflows/test-and-release.yml:117-129 and 219-244, which build
+      with `docker/setup-buildx-action@v4` and `docker/build-push-action@v7` for
+      `platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/riscv64` and push
+      to Docker Hub and GHCR. Per METHOD §7 a build file shows what a build is
+      configured to be, not the artefact it produced, so the format of the
+      output is not reached. Verified: the files and lines above. Inferred:
+      nothing else. The other readings fare the same. "Built as OCI-compatible
+      images" is the same artefact property. "The images run under Podman and
+      other OCI-compatible container engines" is behaviour in operation with no
+      run record supplied (§7); Makefile:34-37 shows podman is used to build
+      local debug/release images, which is a developer path, not the published
+      images running. Adjudicated: both verdicts. Read as the format of the
+      published images, no image or manifest is supplied: unverifiable,
+      outside_the_materials. Read as what the cited build configuration produces
+      (docker/build-push-action@v7, a version the workflow names), a
+      from_knowledge derived item settles it under METHOD §7: real.
+    tier_basis: >
+      Step 1: the claim is about which container engines can run the images,
+      which the buyer's end-the-deal threshold on a dependency it cannot run on
+      its own hardware reaches, and it falls under the self-hosting item
+      (depends). Step 4: the claim is untrue if the images are not OCI-format
+      and so run only under Docker, not Podman or other OCI engines. Step 5:
+      Docker is another way the seller's documents describe that still meets the
+      plan, which is the example §4 gives, and the reliance statement does not
+      say the buyer's hardware runs anything other than Docker, so this failure
+      is not material. §3: a person setting the software up chooses an engine on
+      this claim and would meet its failure when the image does not load, so
+      tier 2. Rated against the buyer's stated threshold: "a dependency the
+      buyer cannot run on its own hardware".
+    rating_basis: >
+      The finding shows the build configuration (docker/build-push-action@v7 for
+      four platforms, pushed to Docker Hub and GHCR) and no built image or
+      manifest. If the published images were not in OCI format the buyer would
+      lose a format label, not the ability to run the images: the same
+      configuration is what Docker consumes, and the reliance statement records
+      that the buyer can rebuild from the Containerfile; the self-hosting item
+      (depends) is not defeated and no dependency becomes one the buyer cannot
+      run on its own hardware. Rated on the scale alone.
+
+  - id: compose-up-deploys
+    selected: sample
+    source: docs/INSTALLATION.md
+    lines: [23, 27]
+    statement: Running `docker compose up -d` with the provided compose file deploys the service.
+    verdict: [unverifiable, contradicted]
+    tier: [2]
+    materiality: [not_material]
+    exposure: [not_material]
+    basis: >
+      Verified by reading deploy/compose.yaml (I did not run compose). The file
+      defines one service (lines 4-6 `services:` / `chhoto-url:` / `image:
+      sintan1729/chhoto-url:latest`), publishes port 4567 (line 23), sets
+      `CHHOTO_DB_URL=/data/urls.sqlite` (line 28) and mounts a named volume at
+      line 107 `- data:/data`, but the top-level volume declaration at lines
+      116-117 is `volumes:` / `db:`: the volume the service mounts (`data`) is
+      not declared, and the declared one (`db`) is not used. Two further
+      irregularities: line 35 `- CHHOTO_SQLITE_USE_WAL_MODE = True` has spaces
+      around `=`, so the variable name and value as written carry surrounding
+      whitespace (the code trims the value at backend/src/config.rs:307-308 but
+      looks the name up exactly, so WAL mode would not be enabled and
+      config.rs:312 would warn "Using DELETE journaling mode"; this effect is
+      inferred from how compose passes list-form entries, not verified); line 56
+      `- password=TopSecretPass` uses the legacy variable name, which
+      config.rs:41-51 and 221-223 read with a warning, so it works. Two verdicts
+      because the claim is ambiguous. (a) Read as a claim about the effect of
+      running the command, it is behaviour in operation: METHOD §7 says a
+      deployment file shows what a deployment is configured to be, not what
+      runs, no run record is supplied, and that compose rejects a service that
+      references an undeclared named volume is knowledge of the compose tool
+      with no version cited in the materials (no `version:` key, no compose pin
+      anywhere; a lexical search for "compose" outside the excluded documents
+      found nothing). Verdict unverifiable, disposition outside_the_materials.
+      (b) Read as a claim that the provided file is fit for that command, the
+      file itself is the evidence: it references a volume it does not declare
+      (lines 107 vs 116-117), which is citable, and a reader who admits the
+      well-known compose rule that named volumes must be declared reaches
+      contradicted under §6 (the step does not have the stated effect). Under
+      either verdict a right finding records the volume mismatch. Adjudicated:
+      both kept, cites_any dropped (it would bind the unverifiable reading to
+      lines it need not cite). The compose file's undeclared volume
+      (deploy/compose.yaml:107 against 116-117) is visible by reading; that
+      Compose rejects it is tool knowledge with no version to cite.
+    tier_basis: >
+      Step 1: no stated threshold reaches a claim about a deployment command
+      (the threshold names a dependency that cannot be run, not how deployment
+      is started); the compose file is named in the self-hosting item, which the
+      buyer depends on. Step 4: the claim is untrue if the compose file does not
+      start the service, or starts it wrongly configured. Step 5: either failure
+      is one a person meets while setting the software up and corrects by
+      editing the compose file, which the source itself says to modify as
+      needed, or by running the images directly or through the Helm chart, both
+      of which the seller's documents describe; that changes how the software is
+      set up, not whether the plan holds, so it is not material. §3: a person
+      setting up acts on this command and meets its failure in use, so tier 2.
+      Rated on the buyer's plan as the buyer stated it.
+    rating_basis: >
+      Materiality: the gap is that deploy/compose.yaml:107 mounts the volume
+      `data` while lines 116-117 declare only `db`, so the file as provided is
+      rejected and `docker compose up -d` does not deploy the service. The
+      buyer's staff, who run containers, correct this by declaring the volume in
+      one line; the service still runs on the buyer's own hardware, so the
+      self-hosting item (depends) is not defeated and the end-the-deal threshold
+      about a dependency the buyer cannot run is not reached; a shipped file
+      defect of one line is too small to reopen price or terms. Rated on the
+      scale alone. Exposure: if the command did not deploy the service, the
+      buyer would lose the documented one-command deployment path and would fall
+      back on the quadlet container file, the Helm chart or the image run
+      directly, all of which the reliance statement lists under self-hosting;
+      the service would still run on the buyer's hardware. Rated on the scale
+      alone.
+
+  - id: db-location-host-volume
+    selected: sample
+    source: docs/INSTALLATION.md
+    lines: [66, 66]
+    statement: The database location can be set to a path in a volume mounted on the host.
+    verdict: [real, real_with_caveat]
+    tier: [2]
+    materiality: [not_material]
+    basis: >
+      Verified by reading. backend/src/config.rs:54-62 `fn get_db_location()`
+      reads `CHHOTO_DB_URL` (legacy name `db_url`) through read_config_wrapper,
+      and when it is non-empty returns it (line 60-61 `info!("Custom database
+      location was provided."); return db_url;`); config.rs:135 stores it as
+      `db_location`, and backend/src/main.rs:83 and 116 open the database there
+      via `database::open_db(&conf.db_location, ...)`
+      (backend/src/database/utils.rs:337-346, `Connection::open(path)`). Nothing
+      in that path restricts where the file may sit. The shipped deployment
+      files use exactly this: deploy/compose.yaml:28 `-
+      CHHOTO_DB_URL=/data/urls.sqlite` with line 107 `- data:/data`, and
+      deploy/chhoto-url.container:23
+      `Environment=CHHOTO_DB_URL=/data/urls.sqlite` with line 45
+      `Volume=data:/data`. The property the claim asserts (the location is
+      settable, and a mounted volume path is a valid value) is shown by code
+      plus the shipped deployment files; METHOD §6 gives real. That a named
+      volume or a host directory can be mounted at /data is the container
+      runtime's function, not the target's; the claim only needs the target to
+      accept the path, which it does.
+      Widened 2026-09-26: the shipped compose sample's mount does not work as shipped (deploy/compose.yaml:107 against 116-117), which bears on setting the location in a host volume; real_with_caveat accepted.
+    tier_basis: >
+      Step 1: no stated threshold reaches where the database file is kept, and
+      the claim falls under the SQLite storage item, which the buyer uses; a
+      uses item is not a route, so the claim is not tier 1 (step 3). §3: a
+      person setting the software up mounts a volume and sets the path on this
+      claim, and would meet its failure in use when the database is not where
+      they placed it, so the test for tier 2 is met. Rated on the practice's
+      reading of the buyer's plan.
+    rating_basis: >
+      Rated by Claude 2026-09-26: the caveat is the compose sample's undeclared
+      volume, a one-word setup fix under the self-hosting item, which it does
+      not defeat. Rated on the buyer's plan as the buyer stated it.
+
+  - id: api-key-checked-at-start
+    selected: sample
+    source: docs/INSTALLATION.md
+    lines: [118, 119]
+    statement: The API key is checked at startup.
+    verdict: [real, real_with_caveat]
+    tier: [2]
+    materiality: [not_material]
+    basis: >
+      Verified by reading. backend/src/main.rs:81 `let conf = config::read();`
+      runs before the server is built (main.rs:97 `HttpServer::new`). Inside it,
+      backend/src/config.rs:166-179: `let api_key =
+      read_config_wrapper("CHHOTO_API_KEY", "api_key").ok(); if let Some(key) =
+      &api_key { if score(&analyze(key)) < 90.0 { warn!("API key is insecure!
+      Please change it. Current key is: {}. Generated secure key which you may
+      use: {}", key, auth::gen_key()) } else { info!("Secure API key was
+      provided."); } }`. So when a key is set it is scored once at startup and
+      the result logged; `analyze`/`score` come from the `passwords` crate
+      (config.rs:5), version 3.1.18 in backend/Cargo.toml:45 and
+      backend/Cargo.lock:1446-1447. The claim's statement does not depend on
+      what the score measures. METHOD §6: real. Logging reaches the log because
+      main.rs:45-52 sets the default filter "warn,chhoto_url=info,...", which
+      passes warn and info from this crate. The other readings also hold: the
+      strong key is generated by backend/src/auth.rs:100-112 `gen_key()` (128
+      characters, letters and digits) and printed in the same warn line; the
+      weak key stays in use because config.rs:356 stores `api_key` unchanged and
+      auth.rs:69-84 compares requests against that value. Note the check runs
+      only when a key is provided; with none set nothing is checked, which is
+      not contrary to the claim.
+      Widened 2026-09-26: the check warns and keeps the key (config.rs:166-179); a reader may take 'checked' to mean enforced, so real_with_caveat accepted.
+    tier_basis: >
+      Step 1: the hardening threshold names the README and this source is
+      docs/INSTALLATION.md, so by its words it does not reach; the claim falls
+      under the authentication and access control item, which the buyer depends
+      on. Step 4: the claim is untrue if the key is not checked at all, or is
+      checked only later than start; the quote says the check is for security,
+      so the failure is a weak or empty key accepted without warning. Step 5:
+      this is not a failure a person notices at setup, since its whole effect is
+      silence, and it leaves the privacy of the service resting on the
+      operator's unaided choice of key; whether that alone would make the buyer
+      reopen the terms is unclear, and doubt about the effect of a failure under
+      a depends item resolves to tier 1. Rated on the buyer's plan as the buyer
+      stated it. Adjudicated: tier 2, not the agent's 1. The check is advisory
+      (config.rs:166-179 warns and keeps the key); if it were absent the
+      configured key would still gate access, so the access-control item is not
+      defeated, and a person setting the key up meets the failure at start-up.
+    rating_basis: >
+      Rated by Claude 2026-09-26: the caveat (the check warns and keeps the key)
+      leaves the configured key gating access, so the access-control item is not
+      defeated. Rated on the buyer's plan as the buyer stated it.
+
+  - id: wal-single-file-mount-data-loss
+    selected: sample
+    source: docs/INSTALLATION.md
+    lines: [133, 134]
+    statement: The target's database storage path allows a single-file mount to leave some data at risk of loss.
+    verdict: [unverifiable, real, real_with_caveat]
+    tier: [3]
+    materiality: [not_material]
+    exposure: [not_material]
+    basis: >
+      Context (INSTALLATION.md:131-134, read for meaning only): the sentence is
+      the warning under CHHOTO_SQLITE_USE_WAL_MODE: "DO NOT mount a single file,
+      as there will be a small chance of partial data loss in that case." The
+      "case" is WAL mode enabled with the database file bind-mounted on its own.
+      Verified in the code: WAL mode is enabled only when the variable is
+      exactly "True" (backend/src/config.rs:307-308,
+      `read_config_wrapper("CHHOTO_SQLITE_USE_WAL_MODE", "use_wal_mode")
+      .is_ok_and(|s| s.trim() == "True")`), and then
+      backend/src/database/utils.rs:296-303 sets the pragma (`(true, true) =>
+      ("WAL", "FULL")`, `db.pragma_update(None, "journal_mode", journal_mode)`).
+      An hourly task runs `PRAGMA wal_checkpoint(RESTART)` (utils.rs:41-48,
+      background.rs:53-66). The dependency is rusqlite 0.40.2 with the "bundled"
+      feature (backend/Cargo.toml:42; Cargo.lock:1684-1685). Verified in the
+      shipped deployment files: each mounts a directory or named volume, not a
+      single file (deploy/compose.yaml:28 `CHHOTO_DB_URL=/data/urls.sqlite` and
+      :107 `- data:/data`; deploy/chhoto-url.container:23 and :45
+      `Volume=data:/data`; deploy/helm-chart/templates/sts.yml:37-38 and :74-75
+      `mountPath: /db`). Nothing in the code or the deployment files refers to a
+      single-file mount; the code does not detect or handle it (no match for
+      "mount" or "volume" under backend/src). What settles the claim would be
+      the behaviour of the container runtime when one file is bind-mounted while
+      SQLite writes a sibling "-wal" file: that SQLite in WAL mode keeps
+      committed transactions in a file beside the database until checkpoint is
+      documented dependency behaviour (checked at sqlite.org/wal.html: "the name
+      of the database file with an extra '-wal' suffix"), but what a bind mount
+      does with that sibling file is container runtime behaviour, which is not a
+      dependency the materials name and not something §7 lets knowledge supply,
+      and "a small chance of partial data loss" is behaviour in operation, which
+      §7 says a code path does not reach. The materials of the right kind (the
+      code that sets WAL mode, the deployment files) were supplied and none of
+      them settles the claim: §8 disposition not_in_the_materials. Lexical
+      search performed: journal, synchronous, wal, durab, pragma, mount, volume
+      over backend/src and deploy; structural: backend/src/ database/,
+      backend/src/config.rs, deploy/. Every candidate opened. Adjudicated: both
+      verdicts. SQLite's WAL side files beside the database are the dependency's
+      documented behaviour, and the call (backend/src/database/utils.rs:302) and
+      version (rusqlite 0.40.2, Cargo.lock:1684-1685) are cited, so a
+      from_knowledge derived item may state them: real. Whether a bind-mounted
+      single file then loses them is the container engine's behaviour, which
+      §7's rule does not cover: unverifiable, not_in_the_materials.
+      Widened 2026-09-26: the real reading with a caveat that the risk is conditional and the shipped deployments mount directories is accepted.
+    tier_basis: >
+      Step 1: no stated threshold reaches this, and the claim falls under the
+      SQLite storage item, which the buyer uses and which is not a route, so it
+      is not tier 1 (step 3). Step 4: the claim is a disclosure of a risk; a
+      larger loss than "some" is still some data at risk, so the only way it is
+      untrue is that a single-file mount puts no data at risk, which leaves the
+      buyer better off. §3: a person setting up acts on the warning when
+      choosing what to mount, but would meet no failure in use, so the test for
+      tier 2 is not met. Rated on the practice's reading of the buyer's plan.
+    rating_basis: >
+      The claim is a warning; the shipped deployment files all mount a directory
+      or named volume (compose.yaml:107 `data:/data`, chhoto-url.container:45,
+      sts.yml:37-38), not a single file. If the warning were false, a
+      single-file mount would be safe and the buyer would lose nothing; this
+      sits under the SQLite storage item, which the practice infers the buyer
+      uses. Rated on the practice's reading of the buyer's plan. The caveat
+      reading (a conditional risk; shipped deployments mount directories) is
+      not_material for the same reason.
+
+  - id: default-delete-journal-extra-synchronous
+    selected: sample
+    source: docs/INSTALLATION.md
+    lines: [137, 137]
+    statement: When WAL mode is not enabled, the database defaults to DELETE journal mode with the synchronous pragma set to EXTRA.
+    verdict: [real]
+    tier: [2]
+    basis: >
+      Verified in the code. backend/src/config.rs:307-308: `use_wal_mode` is
+      true only when CHHOTO_SQLITE_USE_WAL_MODE (or the legacy `use_wal_mode`)
+      trims to "True", so it is false by default. config.rs:314-315: `let
+      ensure_acid = !read_config_wrapper("CHHOTO_SQLITE_ENSURE_ACID",
+      "ensure_acid").is_ok_and(|s| s.trim() == "False");`, so `ensure_acid` is
+      true by default. backend/src/database/utils.rs:296-300 maps the pair:
+      `(false, true) => ("DELETE", "EXTRA")`, and utils.rs:302-305 applies both:
+      `db.pragma_update(None, "journal_mode", journal_mode)` and
+      `db.pragma_update(None, "synchronous", synchronous)`. main.rs:86-87 passes
+      `conf.use_wal_mode` and `conf.ensure_acid` into `init_db` at startup. So
+      with WAL mode not enabled and nothing else set, the journal mode is DELETE
+      and the synchronous pragma is EXTRA, which is exactly the claim. The claim
+      states its condition ("otherwise", meaning WAL not enabled) and says "by
+      default", which covers the case CHHOTO_SQLITE_ENSURE_ACID=False, where the
+      code uses `(false, false) => ("DELETE", "FULL")` (utils.rs:299). §6: every
+      part holds; nothing needs a caveat to read it correctly. A reader who
+      wants to add that the setting is applied by a pragma call (a code path)
+      rather than observed in operation should note that the claim is about a
+      default configuration, which the code that sets it reaches (§7).
+    tier_basis: >
+      Step 1: no stated threshold reaches a journal-mode default (the hardening
+      threshold names the README and a hardening step, not a durability
+      setting), and the claim falls under the SQLite storage item, which the
+      buyer uses and which is not a route, so it is not tier 1 (step 3). §3:
+      this is a documented default that a person operating the software acts on
+      when deciding whether to enable WAL, and whose failure, a different
+      journal mode or synchronous level than documented, they would meet in use,
+      so the test for tier 2 is met. Rated on the practice's reading of the
+      buyer's plan.
+
+  - id: acid-off-loss-only-on-system-failure
+    selected: sample
+    source: docs/INSTALLATION.md
+    lines: [152, 154]
+    statement: When durability is disabled, partial data loss occurs only following system failure or power loss.
+    verdict: [real, unverifiable, real_with_caveat]
+    tier: [2]
+    materiality: [not_material]
+    exposure: [not_material]
+    basis: >
+      Two facts are separable. (1) Verified, what the code sets: with
+      CHHOTO_SQLITE_ENSURE_ACID=False (config.rs:314-315 makes `ensure_acid`
+      false), backend/src/database/utils.rs:296-300 selects `(true, false) =>
+      ("WAL", "NORMAL")` or `(false, false) => ("DELETE", "FULL")`, and
+      utils.rs:302-305 applies them with `pragma_update`. The dependency and
+      version are cited: rusqlite 0.40.2, bundled SQLite (backend/Cargo.toml:42;
+      Cargo.lock:1684-1685; libsqlite3-sys 0.38.2 at Cargo.lock:1271-1272). (2)
+      Not in the materials, what happens in operation: no file shows a loss or
+      the absence of one after a crash or power loss; §7 says a code path shows
+      the setting, not behaviour in operation. Which verdict follows depends on
+      how the claim is read, and both readings are reasonable. Reading A: the
+      claim describes the durability guarantee that the configured pragma gives,
+      which is "a configuration value the dependency reads", and §7 allows a
+      `derived` item with from_knowledge because the call and the version are
+      cited. I checked SQLite's own documentation
+      (sqlite.org/pragma.html#pragma_synchronous and sqlite.org/wal.html): with
+      synchronous=NORMAL in WAL mode "a transaction committed in WAL mode with
+      synchronous=NORMAL might roll back following a power loss or system
+      crash", and "transactions are durable across application crashes
+      regardless of the synchronous setting or journal mode"; with
+      synchronous=FULL in rollback (DELETE) mode, "a single transaction that
+      commits right before a power loss might get rolled back upon reboot", the
+      database is not corrupted, and application crashes lose nothing. In both
+      configurations the only documented loss case is power loss or an
+      operating-system crash, which matches the claim's boundary. Verdict `real`
+      on a derived item citing utils.rs:296-305, config.rs:314-315 and
+      Cargo.toml:42, with from_knowledge true; I treat the claim's "only" as
+      settled by that documented behaviour, not by a §8 search, because the loss
+      cases are a property of the dependency rather than a thing that could sit
+      elsewhere in the code. Reading B: the claim is about behaviour in
+      operation ("data loss occurs only ..."), and §7 says the code shows which
+      pragma is set, not what happens after a failure; from_knowledge covers
+      documented behaviour of the dependency but the claim is an operational
+      outcome, so it is `unverifiable`, not_in_the_materials (the code that sets
+      the pragma was supplied and does not reach it). The ambiguity is in the
+      claim: whether "partial data loss occurs only in case of X" asserts a
+      configured guarantee or an observed outcome. Searches for reading B:
+      lexical journal, synchronous, durab, pragma, sync over backend/src and
+      deploy; structural backend/src/database/, backend/src/config.rs;
+      candidates utils.rs, config.rs, main.rs, background.rs, all opened.
+      Widened 2026-09-26: hit increments queued in memory (backend/src/background.rs:15-47) are lost on an application crash whatever the durability setting; as a caveat on a claim about the database's durability it is real_with_caveat. Contradicted stretches the claim to all data and is not accepted.
+    tier_basis: >
+      Step 1: no stated threshold reaches this, and the durability settings and
+      the risk of lost links are named in the SQLite storage item, which the
+      buyer uses and which is not a route, so it is not tier 1 (step 3). Step 4:
+      the claim carries "only", so it fails by admitting data loss in other
+      cases, such as an application crash or normal operation; the reliance
+      statement already weighs lost links under this item as restored from
+      backups at a cost the practice rated cheap. §3: a person operating the
+      software acts on this when choosing to disable durability and would meet
+      lost links in use, so the test for tier 2 is met. Rated on the practice's
+      reading of the buyer's plan.
+    rating_basis: >
+      The condition is CHHOTO_SQLITE_ENSURE_ACID=False (config.rs:314-315), an
+      operator setting the buyer's staff choose, which selects synchronous
+      NORMAL or DELETE journaling (utils.rs:296-300). If the claim were false,
+      loss could also follow an application crash while durability is disabled;
+      the buyer would lose links written just before such a crash, and the
+      reliance statement records the remedy as reconfiguring the journal mode, a
+      cheap operation for whoever operates the instance, under the SQLite
+      storage item (uses, the practice's inference). Rated on the practice's
+      reading of the buyer's plan. The caveat reading (queued hits lost on an
+      application crash) falls under the hit-counting item; a rare loss on a
+      crash is too small to reopen the price: not_material.
+
+  - id: tools-doc-spdx-mit
+    selected: sample
+    source: docs/TOOLS.md
+    lines: [2, 2]
+    statement: The document states that it is licensed under the MIT licence.
+    verdict: [unverifiable, real]
+    tier: [3]
+    exposure: [not_material, material]
+    basis: >
+      `about` is document, so the document settles the claim (§7), but
+      docs/TOOLS.md is excluded by the engagement, and for an excluded document
+      only its existence, length and headings count. Verified: the file exists
+      and is 35 lines; its headings are "Software related to Chhoto URL",
+      "Official CLI application", "3rd Party Tools", "Browser extension",
+      "Raycast extension", "FreeBSD port", "NixOS Package" (docs/TOOLS.md:4, 6,
+      11, 16, 21, 26, 32). The quoted line is an HTML comment, `<!--
+      SPDX-License-Identifier: MIT -->` (docs/TOOLS.md:2), not a heading. What
+      the document states about its own licence is content beyond its headings,
+      so §7 gives `unverifiable` with disposition present_but_not_readable: the
+      document is supplied and cannot be read as given. No other admissible file
+      records what TOOLS.md states; LICENSE at the target root is the project
+      licence, not a statement made by TOOLS.md. Adjudicated: both verdicts, as
+      for tools-md-copyright-line: the statement is about what the excluded
+      document says (unverifiable, present_but_not_readable); the assertion the
+      SPDX line makes, that the document is MIT-licensed, LICENSE settles
+      (real).
+    tier_basis: >
+      Step 1: the claim is about a document and states the licence of that
+      documentation file alone, not of the code, so under §4 it has no route;
+      the licence threshold names the code and does not reach it. Step 3: with
+      no route it is not tier 1. §3: no person setting up, operating or writing
+      against the software acts on the licence line of a documentation file, so
+      the test for tier 2 is not met. Rated on the scale alone.
+    rating_basis: >
+      The line is an HTML comment `<!-- SPDX-License-Identifier: MIT -->` at
+      docs/TOOLS.md:2 in an excluded document whose headings list third-party
+      tools. If the document did not state its own licence, the buyer would lose
+      nothing about the code: the project licence is LICENSE at the root, which
+      the reliance item for the MIT licence and clean ownership of the code
+      rests on and which this claim does not reach. Rated on the scale alone.
+      Adjudicated: both values, as for tools-md-copyright-line: a header line of
+      one documentation file, or a sign of a licence problem with part of the
+      asset.
+
   # --- selected: tier-sample. A random draw (random.seed(20260927)) of 18 claims
   # from the 274 on chhoto-full's surface not covered above and not marked as
   # repeats; 12 came out tier 2 and 6 tier 3 on the surface, none tier 1 (only
