@@ -253,6 +253,26 @@ def test_practice_buttons_jobs_and_the_lock(env, tmp_path):
     assert c.post("/p/api/engagements/e1/stage" + _as(PRACTICE), json={"stage": "release", "value": "released"}).status_code == 400
 
 
+def test_the_report_downloads_as_the_pdf_of_the_run_the_page_shows_to_whom_may_read_it(env):
+    c, root = env
+    _new(c)
+    merged = root / "e1" / "merged" / "2026-09-05T01-00-00Z_chain_T"
+    merged.mkdir(parents=True)
+    (merged / "report.md").write_text("# r\n")
+    (merged / "report.pdf").write_bytes(b"%PDF-1.4 the report")
+    FakeSession.merged_dir = merged
+    url = "/e/e1/report/api/report.pdf"
+    assert c.get(url + _as(CLIENT)).status_code == 404                  # not released yet
+    assert c.get(url + _as(OTHER)).status_code == 403                   # not theirs
+    r = c.get(url + _as(PRACTICE))
+    assert r.status_code == 200 and r.content == b"%PDF-1.4 the report"
+    assert r.headers["content-type"] == "application/pdf" and "e1-claims-review.pdf" in r.headers["content-disposition"]
+    assert c.get("/e/e1/report/api/document" + _as(PRACTICE)).json()["pdf"] is True
+    (merged / "report.pdf").unlink()
+    assert c.get(url + _as(PRACTICE)).status_code == 404
+    assert c.get("/e/e1/report/api/document" + _as(PRACTICE)).json()["pdf"] is False
+
+
 def test_report_is_gated_on_release(env):
     c, root = env
     _new(c)

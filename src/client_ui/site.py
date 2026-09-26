@@ -631,6 +631,8 @@ def make_site_app(access: Access, model: Optional[Path] = None,
             if rec and d.get("html"):
                 d["html"] += printable.to_body(signoff.block_md(rec))
                 d["signature"] = rec
+            # The printable copy of the report this page shows, signed when it is.
+            d["pdf"] = (Path(e["session"].merged_dir) / "report.pdf").is_file()
         return d
 
     async def _turn(kind: str, name: str, text: str) -> None:
@@ -671,6 +673,17 @@ def make_site_app(access: Access, model: Optional[Path] = None,
             _allowed(request, name)
             e = await _entry_or_503(kind, name)
             return JSONResponse(_document(kind, name, e))
+
+        if kind == "post":
+            @app.get(prefix + "/api/report.pdf")
+            async def report_pdf(name: str, request: Request):
+                _allowed(request, name)
+                e = await _entry_or_503(kind, name)
+                p = Path(e["session"].merged_dir) / "report.pdf"
+                if not p.is_file():
+                    raise HTTPException(status_code=404, detail="this report has no printable copy")
+                return FileResponse(str(p), media_type="application/pdf",
+                                    filename=f"{name}-claims-review.pdf")
 
         @app.get(prefix + "/api/history")
         async def history(name: str, request: Request):
