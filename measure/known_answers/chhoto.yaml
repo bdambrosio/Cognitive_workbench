@@ -900,6 +900,444 @@ answers:
       for this claim.
       Settled 2026-09-26 by Claude at Bruce's request: tier 3, a header line of a documentation file about that file alone, §4's SPDX example: no route, and not a detail a person acts on.
 
+  # --- the ten remaining tier-1 claims on chhoto-full's surface (every tier-1
+  # claim now has a verdict answer). Answered blind by two agents on
+  # 2026-09-26, then adjudicated by Claude; "Review:" says where and why.
+  - id: custom-short-url
+    selected: sample
+    source: README.md
+    lines: [60, 61]
+    statement: Optionally, the user can choose a custom short URL instead of the randomly generated one.
+    verdict: [real]
+    tier: [1]
+    basis: >
+      Verified in the code. The request type for /api/new carries an optional
+      shortlink: backend/src/services/utils.rs:26-29 "pub(crate) struct
+      NewURLRequest { #[serde(default)] pub(crate) shortlink: String, pub(crate)
+      longlink: String". add_links_helper splits requests by whether a shortlink
+      was supplied, utils.rs:203-207: "else if req.shortlink.is_empty() {
+      without_shortlinks.push((i, req)); } else { with_shortlinks.push((i,
+      req)); }". Supplied shortlinks are inserted as given, utils.rs:210 "for
+      (i, res) in add_links(with_shortlinks, db, false).0"; the missing ones get
+      a generated slug, utils.rs:214-222 "req.shortlink = gen_link(...)". The
+      insert uses the shortlink as the short_url column:
+      backend/src/database/events.rs:232 '":short": req.shortlink'. The web form
+      offers the field: frontend/index.html:95 'Short URL (optional)' with input
+      name "shortUrl" at :99, and frontend/static/script.js:790-794 sends it as
+      "shortlink: shortUrl.value". A test exercises it,
+      backend/src/tests/insertion.rs:12-20 (adding_link_with_shortlink), which
+      per METHOD §7 shows a test is written, not that it passes; the code path
+      above is what settles the claim. METHOD §6: every part of the claim holds,
+      so real. Facts inferred, not verified: that the binary behaves as the
+      source reads (no execution).
+    tier_basis: >
+      Tier 1, rated by Claude on 2026-09-26 against TIERS.md §4 (not blind:
+      these ten were drawn as the surface's remaining tier-1 claims): the
+      shortening item the buyer depends on names a customer-chosen custom alias.
+
+  - id: docker-image-six-mb
+    selected: sample
+    source: README.md
+    lines: [64, 65]
+    statement: The Docker image is approximately 6MB in size.
+    verdict: [unverifiable]
+    tier: [1]
+    basis: >
+      A quantity claim about a built artifact. What the materials hold: the
+      build recipe only. deploy/Containerfile:27-30 "FROM scratch / COPY
+      --from=builder /chhoto-url/release /chhoto-url / COPY ./frontend /frontend
+      / ENTRYPOINT" and deploy/Containerfile.scratch:4-20 (the file the release
+      workflow uses for the `latest` tag,
+      .github/workflows/test-and-release.yml:240 "file:
+      deploy/Containerfile.scratch" and :215 "type=raw,value=latest") show the
+      image is a scratch base plus one static musl binary plus the frontend
+      directory. backend/Cargo.toml:32-37 sets the release profile "lto =
+      \"fat\"", "codegen-units = 1", "panic = \"abort\"", "strip = \"symbols\"".
+      The frontend directory in the materials is 85,605 bytes (du, verified),
+      and the release job minifies it before copying
+      (test-and-release.yml:166-171). What the materials do not hold: a built
+      image, a registry manifest, an image-size record, or the compiled binary,
+      whose size dominates the total and is not derivable from source. METHOD
+      §7: evidence settles a claim only at the scope the claim states, and a
+      build file shows what a build is configured to produce, not the measured
+      result; for numbers, quote the source line, and there is none. METHOD §8
+      disposition: outside_the_materials, because the kind of material needed (a
+      built image or a measurement of it) was not supplied at all. Note the §2
+      badge rule does not remove this claim: it is prose in the README, not a
+      badge that reports a host-computed figure. Searches: lexical over the
+      target for "MB", "size", "image size", "memory" found only the README line
+      and comments; structural over deploy/, .github/workflows/, Makefile,
+      backend/Cargo.toml found no size record.
+    tier_basis: >
+      Tier 1, rated by Claude on 2026-09-26 against TIERS.md §4 (not blind:
+      these ten were drawn as the surface's remaining tier-1 claims): a figure
+      the footprint threshold reaches.
+
+  - id: ram-under-five-mb
+    selected: sample
+    source: README.md
+    lines: [64, 65]
+    statement: RAM usage stays under 5MB under normal use.
+    verdict: [unverifiable]
+    tier: [1]
+    basis: >
+      A quantity claim about behaviour in operation. What the materials hold:
+      source that can be read for what it allocates, and deployment files with
+      no memory figure. The Helm StatefulSet's only resources block is a storage
+      request, deploy/helm-chart/templates/sts.yml:81-83 "resources: requests:
+      storage: 100Mi"; deploy/compose.yaml and deploy/chhoto-url.container set
+      no memory limit. The only memory-related setting in the backend is the
+      SQLite pragma backend/src/database/utils.rs:306 'db.pragma_update(None,
+      "temp_store", "memory")', which puts temporary tables in RAM and says
+      nothing about the total. What the materials do not hold: any measurement,
+      benchmark, profiler output, log or runtime record of resident memory, and
+      no definition of "normal use". METHOD §7: "A code path shows that a
+      capability exists, not the throughput, uptime, usage or behaviour in
+      operation claimed for it", and for numbers the source line must be quoted;
+      there is none. METHOD §8 disposition: outside_the_materials, since no
+      measurement or runtime record of any kind was supplied. Searches: lexical
+      over backend/src, deploy/, .github/ for "memory", "mem", "rss", "heap",
+      "MB", "RAM" found only the pragma line and the README; structural over
+      deploy/ (compose, quadlet, Helm chart) found no memory limit or figure.
+    tier_basis: >
+      Tier 1, rated by Claude on 2026-09-26 against TIERS.md §4 (not blind:
+      these ten were drawn as the surface's remaining tier-1 claims): a figure
+      the footprint threshold reaches.
+
+  - id: available-as-docker-container
+    selected: sample
+    source: README.md
+    lines: [84, 84]
+    statement: The software is distributed as a Docker container.
+    verdict: [real]
+    tier: [1]
+    basis: >
+      Verified in the files. The target ships container build files:
+      deploy/Containerfile:27-30 "FROM scratch ... COPY ./frontend /frontend ...
+      ENTRYPOINT [\"/chhoto-url\"]", deploy/Containerfile.scratch:4-20 and
+      deploy/Containerfile.alpine:4-21 (per-architecture variants). The shipped
+      deployment files reference a published image: deploy/compose.yaml:6
+      "image: sintan1729/chhoto-url:latest", deploy/chhoto-url.container:15
+      "Image=docker.io/sintan1729/chhoto-url:latest",
+      deploy/helm-chart/values.yaml:5-8 "repository: sintan1729/chhoto-url ...
+      tag: \"latest\"". The release workflow builds and pushes images for four
+      platforms to Docker Hub and ghcr.io:
+      .github/workflows/test-and-release.yml:174-184 (logins), :221-244
+      (docker/build-push-action with "push: true" for Containerfile.alpine and
+      Containerfile.scratch, "platforms:
+      linux/amd64,linux/arm64,linux/arm/v7,linux/riscv64"). Read as a reasonable
+      buyer would (METHOD §2), "available as a Docker container" means the
+      software is packaged and delivered as a container image; the build files,
+      the deployment files that pull it and the publish workflow reach that.
+      METHOD §6: real. Inferred, not verified: that the images are present on
+      the registries today, which is a hosted fact the materials cannot reach
+      (§7: a workflow file shows what is configured, not what ran).
+    tier_basis: >
+      Tier 1, rated by Claude on 2026-09-26 against TIERS.md §4 (not blind:
+      these ten were drawn as the surface's remaining tier-1 claims): the
+      self-hosting item the buyer depends on names the Docker image.
+
+  - id: basic-password-authentication
+    selected: sample
+    source: README.md
+    lines: [88, 88]
+    statement: Authentication uses a provided password and is very basic.
+    verdict: [real_with_caveat]
+    cites_any:
+      - {document: backend/src/services/post.rs, lines: [188, 204]}
+      - {document: backend/src/config.rs, lines: [221, 226]}
+      - {document: backend/src/auth.rs, lines: [115, 126]}
+    tier: [1]
+    basis: >
+      Verified in the code. The password is one operator-provided value read
+      from the environment: backend/src/config.rs:221-223 'let password =
+      read_config_wrapper("CHHOTO_PASSWORD", "password") .ok() .filter(|s|
+      !s.trim().is_empty());'. The shipped compose file sets that variable to a
+      sample value (deploy/compose.yaml:56, variable name `password`;
+      deploy/chhoto-url.container:28, `CHHOTO_PASSWORD`). Login compares the
+      request body against it: backend/src/services/post.rs:188-204, plaintext
+      by default, "HashAlgorithm::None => { ... Some(password == &req) }"
+      (:200-203), or Argon2 verification when CHHOTO_HASH_ALGORITHM=Argon2
+      (:190-199). On success a session cookie is set, post.rs:221-223
+      'session.insert("chhoto-url-auth", auth::gen_token_text())', and the
+      session check is backend/src/auth.rs:115-126. There are no user accounts,
+      roles or second factors: one shared secret. "Very basic" is the seller's
+      own characterisation and is borne out by that mechanism. The caveat,
+      METHOD §6 and §2: when no password is configured, authentication is
+      skipped entirely. auth.rs:116-119 "// If there's no password provided,
+      just return true / if config.password.is_none() { return true; }" and
+      config.rs:224-226 'warn!("No password was provided. The API will be
+      accessible to the public.")'. As shipped (compose.yaml:56) a password is
+      set, so this is a setting the operator can change, recorded as a caveat
+      per §2, not a contradiction. A second credential path also exists, the
+      X-API-Key header (auth.rs:19-66, :68-97), which the README states
+      separately at line 72 and which I do not count as this claim's caveat.
+      Facts verified: the lines above. Inferred: runtime behaviour from reading
+      the source; nothing was executed. Review: real_with_caveat only, as for
+      delete-list-need-admin-password: with no password set the code opens every
+      route rather than refusing to start (auth.rs:116-118, config.rs:224-225),
+      which a reader must know to read 'uses a provided password' correctly.
+    tier_basis: >
+      Tier 1, rated by Claude on 2026-09-26 against TIERS.md §4 (not blind:
+      these ten were drawn as the surface's remaining tier-1 claims): the
+      access-control item the buyer depends on.
+
+  - id: site-no-tracking
+    selected: sample
+    source: claim_sources/site_index_html.md
+    lines: [15, 15]
+    statement: The service does no tracking of its users — a boundary claim of absence.
+    verdict: [real_with_caveat]
+    cites_any:
+      - {document: frontend/index.html, lines: [50, 66]}
+      - {document: frontend/static/styles.css, lines: [4, 4]}
+      - {document: frontend/static/404.html, lines: [17, 20]}
+      - {document: backend/src/database/queries.rs, lines: [20, 23]}
+    tier: [1]
+    basis: >
+      Claim of absence, so METHOD section 6 and section 8 decide it: two
+      searches over every place tracking could occur, every candidate opened,
+      and the verdict is real only if nothing is found active as shipped.
+      Reading rule (section 2): the same page says at lines 35-37 "### Hit
+      counting / Track how many times a short link has been used", so a
+      reasonable buyer reads "No tracking" as no tracking of users (no
+      analytics, telemetry or visitor records), not as the absence of the
+      disclosed per-link hit count. Lexical search (verified): grep -rniE
+      'track|analytic|telemetr|metric|beacon|gtag|plausible|umami|matomo|sentry|fingerprint|referer|referrer|user-agent|remote_addr|peer_addr|connection_info'
+      over backend/src, frontend, deploy, backend/Cargo.toml, Makefile, .github.
+      One hit, frontend/index.html:241 rel="noopener noreferrer", which is a
+      link attribute, not tracking. Structural search (verified), every
+      candidate opened: (1) backend/Cargo.toml:39-55 [dependencies] lists
+      actix-web, actix-files, rusqlite, regex, rand, passwords, actix-session,
+      nanoid, serde, serde_json, argon2, chrono, tokio, log, env_logger, url; no
+      HTTP client crate, and grep of backend/Cargo.lock for
+      reqwest|ureq|hyper|curl|isahc|surf|attohttpc|minreq package entries found
+      none; grep of backend/src for reqwest|ureq|TcpStream|connect(|Client::
+      found none, so the server makes no outbound call. (2) The database schema,
+      backend/src/database/queries.rs:37-45 "CREATE TABLE urls ( id ...,
+      short_url ..., long_url ..., hits INTEGER NOT NULL, expiry_time INTEGER,
+      notes TEXT )": no column for a visitor, address, user agent or referrer;
+      the hit path backend/src/database/events.rs:160-163 sends only the
+      shortlink to the hits worker and queries.rs:20-23 ADD_HIT does "SET hits =
+      hits + :count". (3) The session cookie, backend/src/main.rs:105-112, is a
+      CookieSessionStore holding the auth token; backend/src/auth.rs:186-194
+      shows the token is the fixed text "chhoto-url-auth" plus an expiry time,
+      nothing per user. (4) The frontend: every fetch in
+      frontend/static/script.js (lines 102, 225, 309, 754, 837, 863, 908, 950,
+      985) goes to the instance's own /api/ routes; sessionStorage
+      (script.js:47-78) holds only the admin flag and the config. External
+      loads: frontend/index.html:50-66 preconnects to cdn.jsdelivr.net,
+      fonts.googleapis.com and fonts.gstatic.com and loads qrcode.min.js,
+      punycode.min.js and pure-min.css from cdn.jsdelivr.net;
+      frontend/static/styles.css:4 '@import
+      url("https://fonts.googleapis.com/css2?family=Montserrat&display=swap")';
+      frontend/static/404.html:17-20 preconnects to and imports the same Google
+      font. The 404 page is served to any visitor of a missing shortlink
+      (backend/src/services/get.rs:140-144 and services/utils.rs:400-404). (5)
+      deploy/compose.yaml, deploy/chhoto-url.container and
+      deploy/helm-chart/templates/sts.yml configure one container and no
+      sidecar, logging driver or analytics service. Nothing in the software
+      collects, stores or sends user activity, so every part of the claim holds.
+      The caveat a reader must know: the admin page and the public 404 page make
+      the visitor's browser fetch resources from cdn.jsdelivr.net and Google
+      Fonts, which puts the visitor's address in front of those third parties on
+      each uncached load; and the server stores a hit count per link (a count
+      only, no identity). Inferred, not verified: that those third parties log
+      requests; nothing in the materials says what they do.
+    tier_basis: >
+      Tier 1, rated by Claude on 2026-09-26 against TIERS.md §4 (not blind:
+      these ten were drawn as the surface's remaining tier-1 claims): reached by
+      the threshold 'any way visitors are logged or tracked beyond the hit
+      count'.
+
+  - id: site-web-interface-create-edit-manage
+    selected: sample
+    source: claim_sources/site_index_html.md
+    lines: [69, 69]
+    statement: Through that web interface on a running instance, a user can create, edit and manage short URLs.
+    verdict: [unverifiable]
+    tier: [2]
+    basis: >
+      A claim that a capability exists, settled by the code path (METHOD section
+      7: a code path shows a capability exists, which is the scope this claim
+      states). Verified: backend/src/main.rs:138-147 serves ./frontend/ with
+      index.html at "/" unless CHHOTO_DISABLE_FRONTEND is set, and the default
+      at backend/src/config.rs:160-161 is not set. Create:
+      frontend/index.html:78-153 is the new-url-form (long URL, optional short
+      URL, expiry, notes), and frontend/static/script.js:787-808 submitForm
+      posts it to prepSubdir("/api/new") with method "POST"; the route is
+      backend/src/services/post.rs:29-30 '#[post("/api/new")]'. Edit:
+      frontend/index.html:293-343 is the edit-dialog (long URL, notes, expiry,
+      reset hit count) and script.js:885-915 submitEdit sends it to "/api/edit"
+      with method "PUT"; the route is backend/src/services/put.rs:17-18
+      '#[put("/api/edit")]'. Manage: index.html:155-205 is the links table with
+      filter and paging, script.js:305-318 pullData reads "/api/all",
+      script.js:744-757 deleteButton sends DELETE to "/api/del/{shortUrl}", and
+      the route is backend/src/services/delete.rs:35-36
+      '#[delete("/api/del/{shortlink}")]'; the table rows (script.js:481-549)
+      carry copy, QR, info, edit and delete buttons. All three verbs are present
+      in the shipped frontend and backed by a registered route, so the claim
+      holds in full (section 6, real). Nothing needs a caveat: the frontend can
+      be turned off by CHHOTO_DISABLE_FRONTEND, but that is an operator choice
+      against the default and does not change how the claim is read. Review
+      (changes the verdict from real): claim 31 is the behaviour half of the
+      split of claim 21 (implied_by 21, property 'behaviour in operation'), and
+      its statement says what happens on a running instance. As for
+      shortening-behaviour: METHOD §7, a code path shows a capability, not
+      behaviour in operation; no run record was supplied; unverifiable,
+      outside_the_materials. The code facts above belong to the mechanism claim.
+      This split, too, fails BEHAVIOUR_SPLIT.md §3's second test.
+    tier_basis: >
+      Tier 2, rated by Claude on 2026-09-26 against TIERS.md §4 (not blind:
+      these ten were drawn as the surface's remaining tier-1 claims): the web
+      administration interface is an item the buyer uses, not one it depends on;
+      the surface has 1.
+
+  - id: cli-api-key-validation-env
+    selected: sample
+    source: docs/CLI.md
+    lines: [21, 21]
+    statement: The server supports API key validation, enabled by setting the CHHOTO_API_KEY environment variable.
+    verdict: [real]
+    tier: [1]
+    basis: >
+      A claim that a capability exists and how it is enabled; the code path
+      settles it (METHOD section 7). Verified: backend/src/config.rs:167 'let
+      api_key = read_config_wrapper("CHHOTO_API_KEY", "api_key").ok();' reads
+      the variable into Config.api_key (config.rs:123, 356).
+      backend/src/auth.rs:19-27 is_api_ok reads the "X-API-Key" header and, 'if
+      config.api_key.is_some()', calls is_key_valid; auth.rs:69-85 compares the
+      header with the configured key, as plain text (auth.rs:81-84 'api_key ==
+      key') or as an Argon2 hash when CHHOTO_HASH_ALGORITHM is Argon2
+      (auth.rs:73-80). auth.rs:157-182 makes this the Auth extractor every route
+      uses, returning Auth::ValidAPIKey on a match; for example
+      backend/src/services/post.rs:48-49 handles Auth::ValidAPIKey on /api/new.
+      With no key configured, auth.rs:50-64 rejects a supplied header and falls
+      through to session (cookie) auth, which is what the claim's next sentence
+      describes. The tests at backend/src/tests/access.rs and tests/basics.rs
+      exercise the X-API-Key header, but per section 7 they show only that tests
+      are written, and the verdict rests on the code path. Every part holds;
+      nothing needs a caveat (section 6, real). The legacy variable name api_key
+      is also accepted (config.rs:41-51), which widens the claim rather than
+      qualifying it.
+    tier_basis: >
+      Tier 1, rated by Claude on 2026-09-26 against TIERS.md §4 (not blind:
+      these ten were drawn as the surface's remaining tier-1 claims): the
+      access-control item the buyer depends on names the API key.
+
+  - id: cli-no-logs
+    selected: sample
+    source: docs/CLI.md
+    lines: [282, 282]
+    statement: There are no logs; the service keeps no logs from which link creation could be attributed.
+    verdict: [real_with_caveat]
+    cites_any:
+      - {document: backend/src/main.rs, lines: [45, 52]}
+      - {document: backend/src/main.rs, lines: [97, 100]}
+    tier: [1]
+    basis: >
+      A boundary claim of absence, so METHOD section 2 (read against the
+      software as shipped: default behaviour plus the shipped deployment files;
+      an operator setting that crosses the boundary is a caveat) and sections 6
+      and 8 (two searches, every candidate opened) decide it. Two verdicts are
+      listed because the claim itself can be read two ways; see the end of this
+      basis. Lexical search (verified): grep -rnE
+      '\b(trace|debug|info|warn|error)!\(' over backend/src excluding tests
+      lists every log macro call (about 100 lines across main.rs, config.rs,
+      auth.rs, background.rs, services/post.rs, services/delete.rs,
+      services/utils.rs, database/utils.rs, database/events.rs); grep for
+      RUST_LOG|env_logger|Logger|eprintln|println found
+      backend/src/main.rs:45-70 (logger init), main.rs:75 and 78 (eprintln
+      separators) and main.rs:99 '.wrap(middleware::Logger::default())'; grep
+      -rniE 'log|RUST_LOG' over deploy found only the comment at
+      deploy/compose.yaml:105 about TZ in logging, so no shipped deployment file
+      sets RUST_LOG or a logging driver. Structural search (verified): opened
+      every file under backend/src except tests, both frontend script files, and
+      every deploy file. What is written as shipped: backend/src/main.rs:47-50
+      takes RUST_LOG or the default
+      '"warn,chhoto_url=info,actix_session::middleware=error"', and env_logger
+      writes to stderr (main.rs:45-70 sets a format and calls .init(); no file
+      target). At that filter the crate's own info and warn lines are written
+      and its debug lines are not. Every info/warn/error line was read: none
+      records a client address, user or session identity. The lines that mention
+      a link are debug level (backend/src/database/events.rs:160
+      'debug!("Accessed link: {shortlink}.")', events.rs:239-242 'debug!("Added
+      link with shortlink: {}, longlink: {}, ...")', events.rs:311-314, 327) or
+      error level on a failed insert (events.rs:255, 259-262), and the error
+      lines carry the link, not who sent it. Login logs 'info!("Successful
+      login.")' (services/post.rs:230, 247) and 'warn!("Failed login attempt!")'
+      (post.rs:212, 237) with no identity, and under the claim's condition (no
+      CHHOTO_PASSWORD) no login happens at all. The request logger, main.rs:99
+      'middleware::Logger::default()', is wired but silent at the default
+      filter: this is a derived fact from knowledge of the dependencies, per
+      section 7, with the call at main.rs:99 and versions at
+      backend/Cargo.lock:174-175 (actix-web 4.15.0) and Cargo.lock:766-767
+      (env_logger 0.11.11): actix-web's Logger emits each request at info level
+      under the target actix_web::middleware::logger with a default format that
+      begins with the peer address (%a), and env_logger's bare "warn" in the
+      filter string sets the maximum level for every target not named, so those
+      info records are dropped. Under the contextual reading, then, nothing as
+      shipped records who created a link: real_with_caveat. The caveat is the
+      setting that crosses the boundary (section 2): RUST_LOG=info (or any
+      filter admitting actix_web::middleware::logger at info) makes the server
+      write one line per request with the client address, method, path and time,
+      and chhoto_url=debug adds the "Added link" line, so an operator can turn
+      on logs from which creation can be attributed. Also worth stating: logs go
+      to stderr, and the software writes no log file of its own; whether the
+      container runtime keeps stderr is outside the software and the materials.
+      The ambiguity: the quote says "there are no logs", an absolute; the
+      enumerated statement narrows it to logs from which link creation could be
+      attributed, following the sentence's context (proving who created a link).
+      A reader who takes the words literally finds the thing excluded active as
+      shipped: main.rs:45-70 initialises a logger, and main.rs:76-77
+      'info!("Starting Chhoto URL Server v{}", ...)', config.rs:136-151 and
+      post.rs:230 write log lines at the default filter. That reading gives
+      contradicted, citing those lines. I hold the contextual reading to be the
+      one section 2's reasonable buyer takes, so real_with_caveat is listed
+      first. Review: real_with_caveat only. The frozen statement is the
+      contextual reading, 'no logs from which link creation could be
+      attributed', so the literal reading that gives contradicted is not the
+      claim tested. The actix access log is silent under the shipped default
+      filter and an operator setting turns it on: a caveat under METHOD §2.
+    tier_basis: >
+      Tier 1, rated by Claude on 2026-09-26 against TIERS.md §4 (not blind:
+      these ten were drawn as the surface's remaining tier-1 claims): reached by
+      the threshold 'any way visitors are logged or tracked beyond the hit
+      count'.
+
+  - id: install-images-four-architectures
+    selected: sample
+    source: docs/INSTALLATION.md
+    lines: [20, 20]
+    statement: The images are built for linux/amd64, linux/arm64, linux/arm/v7 and linux/riscv64.
+    verdict: [real, unverifiable]
+    tier: [1]
+    basis: >
+      One property naming several things (METHOD section 5), settled by build
+      files (section 7 admits build and deployment files). Verified:
+      .github/workflows/test-and-release.yml:23-36 builds the binary for targets
+      x86_64-unknown-linux-musl, aarch64-unknown-linux-musl,
+      armv7-unknown-linux-musleabihf and riscv64gc-unknown-linux-musl; the
+      release job's two image pushes state 'platforms:
+      linux/amd64,linux/arm64,linux/arm/v7,linux/riscv64' at line 232 (alpine,
+      file deploy/Containerfile.alpine) and line 243 (scratch, file
+      deploy/Containerfile.scratch); the dev job states the same list at line
+      128. deploy/Containerfile.scratch:4-18 and
+      deploy/Containerfile.alpine:4-19 select the binary per TARGETARCH for
+      amd64, arm64, arm and riscv64. All four named platforms appear, none is
+      missing, so the claim holds in full (section 6, real). Scope note: the
+      workflow shows what the release build is configured to produce; the
+      registries that hold the published images are not in the materials, so
+      what is settled is the build configuration, which is what "are built for"
+      states. Review: both verdicts kept. 'Are built for' can be read as the
+      build definition (the workflow and Containerfiles settle it: real) or as
+      the published images (their manifests are outside the materials:
+      unverifiable, outside_the_materials).
+    tier_basis: >
+      Tier 1, rated by Claude on 2026-09-26 against TIERS.md §4 (not blind:
+      these ten were drawn as the surface's remaining tier-1 claims): the
+      self-hosting item the buyer depends on names the published architectures.
+
   # --- selected: tier-sample. A random draw (random.seed(20260927)) of 18 claims
   # from the 274 on chhoto-full's surface not covered above and not marked as
   # repeats; 12 came out tier 2 and 6 tier 3 on the surface, none tier 1 (only
@@ -1250,3 +1688,617 @@ answers:
       volume kind, so the tier 2 test is met; the compose file is the documented
       basic path, so the plan holds without the chart. Rated on the practice's
       reading of the buyer's plan.
+
+  # --- second tier draw (random.seed(20260928)): 30 of the 234 claims not
+  # covered above and not repeats; 13 tier 2 and 17 tier 3 on the surface. Rated
+  # blind as above, then adjudicated; "Adjudicated" at the end of a basis says
+  # where and why the tier differs from the agent's or the surface's. After
+  # adjudication the surface differs on 15 of the 30: three claims the method
+  # reaches (README 6, README 55, CLI 54) it put at 2 or 3, and twelve it put at
+  # 3 where §3's tier-2 test is met. Bruce's review is pending.
+  - id: alpine-image-under-8-5-mb
+    selected: tier-sample
+    source: README.md
+    lines: [22, 22]
+    statement: The compressed size of the alpine-variant Docker image is under 8.5 MB.
+    tier: [1]
+    basis: >
+      Step 1: the threshold "footprint or resource figures materially worse than
+      stated" names a kind of failure this claim could have, since the claim is
+      a footprint figure; the claim also falls under the reliance item "the
+      small resource footprint: compressed image sizes and RAM use", which the
+      buyer depends on. Step 4: a figure can be untrue by a small margin or a
+      large one; take a margin large enough to reach the threshold. Step 5: an
+      image materially larger than stated is the failure the buyer named as one
+      that changes the price or the terms, and no other way the seller's
+      documents describe meets the plan for a smaller footprint; how large the
+      margin would have to be is doubt about the size of the failure, which
+      resolves to tier 1. Rated against the buyer's stated threshold: "footprint
+      or resource figures materially worse than stated". Adjudicated 2026-09-26
+      by Claude: tier 1. A figure the footprint threshold reaches; §4 step 4
+      takes a margin large enough to reach the threshold, and the sibling
+      figures (README image size, site image sizes) are tier 1. The surface's 2
+      judged the size of a failure before any finding, which §4 does not allow.
+
+  - id: links-editable-after-creation
+    selected: tier-sample
+    source: README.md
+    lines: [68, 68]
+    statement: Existing short links can be edited after they are created.
+    tier: [2]
+    basis: >
+      Step 1: no stated threshold names a failure of link editing (the
+      thresholds are logging, footprint, an implied hardening default, licence,
+      and dependencies); the claim falls under the reliance item "editing,
+      deleting and listing existing links, with notes, filtering and
+      pagination", which the buyer uses, and a `uses` item is not a route; the
+      statement of what the buyer is paying for is not a route either. Step 3:
+      with no route the claim is not tier 1. Step 6: editing is a capability a
+      person operating the service would act on and would meet the failure of in
+      use (they would try to change a link and find they cannot), so §3's tier 2
+      test is met; on its own the failure changes nothing for the buyer, whose
+      remedy the reliance item states as managing links by hand. Rated on the
+      practice's reading of the buyer's plan. Adjudicated 2026-09-26 by Claude:
+      tier 2, as the agent held: editing is a capability staff act on and would
+      meet the failure of in use; the surface's 3 reads tier 2 as details only.
+
+  - id: api-json-rpc-adjacent
+    selected: tier-sample
+    source: README.md
+    lines: [73, 73]
+    statement: The service exposes an API, described as JSON-RPC adjacent.
+    tier: [2]
+    basis: >
+      Step 1: no stated threshold names a failure of the API; the claim falls
+      under the reliance item "the HTTP API for programmatic use", which the
+      buyer uses, and a `uses` item is not a route. Step 3: with no route the
+      claim is not tier 1. Step 6: the claim asserts two things, that an API
+      exists and that it is JSON-RPC adjacent in style, and a person writing
+      against the API would act on both (whether to script against it, and in
+      what request shape) and would meet either failure in use, so §3's tier 2
+      test is met; on its own the failure changes nothing for the buyer, whose
+      remedy the reliance item states as using the web interface alone. Rated on
+      the practice's reading of the buyer's plan.
+
+  - id: auth-not-encrypted-in-transport
+    selected: tier-sample
+    source: README.md
+    lines: [88, 88]
+    statement: The authentication is not encrypted in transport.
+    tier: [3]
+    basis: >
+      Step 1: the threshold "a hardening step the README implies is on by
+      default but is not" names the failure of a hardening step being off when
+      the README implies it is on; this claim says the opposite, that transport
+      encryption is off, and read no wider the threshold does not reach it; the
+      claim falls under the reliance item "authentication and access control",
+      which the buyer depends on, so it has a route. Step 4: a "not" claim fails
+      by admitting what it excludes, so the one way this claim could be untrue
+      is that the authentication is encrypted in transport. Step 5: that failure
+      gives the buyer more protection than stated, the plan still holds, and
+      nothing the buyer's staff or customers use is lost, so it is not material.
+      Step 6: a person setting the service up would act on the claim by putting
+      TLS termination in front of it, and would meet its failure in setup, so
+      §3's tier 2 test is met. Rated on the buyer's plan as the buyer stated it.
+      Adjudicated 2026-09-26 by Claude: tier 3, with the surface. The claim
+      discloses a weakness; the only way it could be untrue leaves the buyer
+      better off, so no person meets a failure in use, and §3's tier-2 test is
+      not met.
+
+  - id: word-list-from-docker
+    selected: tier-sample
+    source: README.md
+    lines: [124, 125]
+    statement: The word list used for random short URL generation is derived from (a modified version of) docker's names-generator list.
+    tier: [1]
+    basis: >
+      Step 1: the threshold "a licence or ownership problem with the code" names
+      a kind of failure this claim could have, since the claim states the origin
+      of a part of the code; the claim also falls under the reliance item "slug
+      generation", which the buyer uses and which is not itself a route. Step 4:
+      the claim asserts several things and can fail in any one: the list is not
+      from docker's list at all (it is the seller's own, or it comes from a
+      different third-party source), or it is an unmodified copy rather than a
+      modified one. Step 5: the way that matters is a different, undisclosed
+      third-party source, which leaves the buyer not knowing who owns that part
+      of the code or under what licence; that is the ownership failure the buyer
+      named as ending the deal, and whether the actual source's terms would in
+      fact be a problem is doubt about the effect of the failure, which resolves
+      to tier 1. Rated against the buyer's stated threshold: "a licence or
+      ownership problem with the code". Adjudicated 2026-09-26 by Claude: tier
+      1, as the agent held. The claim is the provenance of part of the code, and
+      the walk-away threshold names a licence or ownership problem with the
+      code: a route exists, and doubt about the effect resolves to tier 1 (§4
+      step 5). The surface's 3 rated on the scale alone and did not look for the
+      route.
+
+  - id: updates-may-mangle-database
+    selected: tier-sample
+    source: README.md
+    lines: [127, 127]
+    statement: Applying some updates can mangle (corrupt) the target's database, though the seller says this is unlikely.
+    tier: [3]
+    basis: >
+      Step 1: no stated threshold names a database corruption failure; the claim
+      falls under the reliance item "SQLite storage with ACID behaviour, WAL
+      mode and the durability settings, including the risk that updates mangle
+      the database", which the buyer uses, and a `uses` item is not a route.
+      Step 3: with no route the claim is not tier 1. Step 6: the claim can be
+      untrue by corruption being more likely than the seller says or by it never
+      happening, and a person operating the service would act on the warning
+      (backing up before an update and checking the database after), meeting its
+      failure in use, so §3's tier 2 test is met; on its own the failure changes
+      nothing for the buyer, whose remedy the reliance item states as restoring
+      from the backups the software keeps. Rated on the practice's reading of
+      the buyer's plan. Adjudicated 2026-09-26 by Claude: tier 3, with the
+      surface. A disclosure of a risk; untrue only in the harmless direction, so
+      no failure is met in use.
+
+  - id: pair-slug-capacity
+    selected: tier-sample
+    source: README.md
+    lines: [129, 131]
+    statement: The target's default slug generation uses a limited name space, so that once roughly a few thousand short links exist it can no longer generate new slugs.
+    tier: [2]
+    basis: >
+      Step 1: no stated threshold reaches this claim; "footprint or resource
+      figures materially worse than stated" is about image size and RAM use as
+      the reliance statement reads it, not about the size of the slug name
+      space, and the claim falls under the reliance item that names the capacity
+      limit past which new links start failing, which the buyer uses and does
+      not depend on. Step 3: no route, so not tier 1, and step 4 and step 5 are
+      not reached; for the record, the ways it could be untrue (the ceiling is
+      lower than a few thousand, the failure is other than new links failing,
+      the recommended style and length do not lift it) are met by a
+      configuration change the reliance statement calls cheap. Step 6: a person
+      setting the software up would act on it by choosing the slug style and
+      length, so §3's tier 2 test is met. Rated on the practice's reading of the
+      buyer's plan.
+
+  - id: notes-and-filtering
+    selected: tier-sample
+    source: claim_sources/site_index_html.md
+    lines: [45, 45]
+    statement: In the running web UI, notes attached to links are present on them and filtering by notes returns the matching links.
+    tier: [2]
+    basis: >
+      Step 1: no stated threshold names notes or filtering, and the claim falls
+      under the reliance item for editing, deleting and listing links with notes
+      and filtering, which the buyer uses and does not depend on. Step 3: no
+      route, so not tier 1; the ways it could be untrue (notes absent, notes not
+      shown, filtering returning wrong or no links) each leave the buyer
+      managing links without that convenience, which the reliance statement
+      treats as a cost the buyer can carry. Step 6: a person operating the
+      service would attach notes and filter by them and would meet the failure
+      in use, so §3's tier 2 test is met. Rated on the practice's reading of the
+      buyer's plan. Adjudicated 2026-09-26 by Claude: tier 2, as the agent held:
+      notes and filtering are used by staff, who would meet their failure in
+      use.
+
+  - id: official-cli-app
+    selected: tier-sample
+    source: docs/CLI.md
+    lines: [6, 6]
+    statement: The product has an official command-line app that runs on Linux, hosted separately from the main source.
+    tier: [2]
+    basis: >
+      Step 1: no stated threshold reaches a companion tool, and the claim falls
+      under the reliance item for the official command-line application, which
+      the buyer uses and does not depend on. Step 3: no route, so not tier 1;
+      the ways it could be untrue (no such app, not official, not for Linux, not
+      hosted separately) each leave the buyer with the web interface or curl,
+      which the reliance statement calls a cheap substitution. Step 6: a person
+      operating the service would act on it by obtaining and installing the app,
+      so §3's tier 2 test is met. Rated on the practice's reading of the buyer's
+      plan. Adjudicated 2026-09-26 by Claude: tier 2, as the agent held: the
+      official CLI is under a `uses` item and staff installing it act on the
+      claim.
+
+  - id: api-new-json-shape
+    selected: tier-sample
+    source: docs/CLI.md
+    lines: [57, 66]
+    statement: On success, /api/new replies with a JSON object containing the fields success, error, shorturl and expiry_time.
+    tier: [2]
+    basis: >
+      Step 1: no stated threshold reaches the shape of an API reply, and the
+      claim falls under the reliance item for the HTTP API, which the buyer uses
+      and does not depend on. Step 3: no route, so not tier 1; the ways it could
+      be untrue (a field missing, named differently, or of another shape) would
+      break a script the buyer's staff write, which the reliance statement
+      treats as a cost the buyer carries and the web interface still meets the
+      plan. Step 6: a field name in a documented reply is what a person writing
+      against the API acts on, so §3's tier 2 test is met. Rated on the
+      practice's reading of the buyer's plan.
+
+  - id: api-parameter-format
+    selected: tier-sample
+    source: docs/CLI.md
+    lines: [232, 232]
+    statement: The /api/all parameter entries should be positive integers.
+    tier: [2]
+    basis: >
+      Step 1: no stated threshold reaches a parameter's format, and the claim
+      falls under the reliance item for the HTTP API, which the buyer uses and
+      does not depend on. Step 3: no route, so not tier 1; the ways it could be
+      untrue (the parameter accepts other values, rejects some positive
+      integers, or is not named entries) are met in use by a person writing the
+      call and change nothing in the buyer's plan. Step 6: a parameter's range
+      or format is what a person writing against the API acts on, so §3's tier 2
+      test is met. Rated on the practice's reading of the buyer's plan.
+
+  - id: api-login-returns-cookie
+    selected: tier-sample
+    source: docs/CLI.md
+    lines: [266, 270]
+    statement: A /api/login endpoint accepts the configured password by POST and returns an authentication cookie that can be stored and reused.
+    tier: [1]
+    basis: >
+      Step 1: no stated threshold reaches it as worded, since "a hardening step
+      the README implies is on by default but is not" names a default in the
+      README and this claim is about how a login endpoint behaves; the claim
+      falls under the reliance item for authentication and access control, which
+      names the admin password and which the buyer depends on, so it has a
+      route. Step 4: it can be untrue by the endpoint being absent, by it
+      accepting something other than the configured password or issuing the
+      cookie without checking it, or by the cookie not being reusable. Step 5:
+      absence alone is met by the API key authentication the seller's documents
+      describe, but the endpoint being present and not working as described,
+      issuing a cookie without the configured password, would leave the service
+      not private, which is what the buyer said it is paying for, and the doubt
+      about that failure's effect resolves to tier 1. Rated on the buyer's plan
+      as the buyer stated it. Adjudicated 2026-09-26 by Claude: tier 1, as the
+      agent held, and consistent with password-env-chhoto-password: the login
+      endpoint accepting the configured password is the access-control mechanism
+      the buyer depends on; a way it could be untrue (a cookie issued for a
+      wrong password) defeats that item, and doubt resolves to tier 1.
+
+  - id: two-image-flavors
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [13, 13]
+    statement: The container images come in exactly two flavors.
+    tier: [3]
+    basis: >
+      The claim falls under the self-hosting item, which the buyer depends on,
+      so it has a route (step 1); no stated threshold names a count of image
+      flavors, since "a dependency the buyer cannot run on its own hardware" is
+      about running, not about how many images are published. It can be untrue
+      by there being one flavor or more than two (step 4): with one flavor the
+      other image the documents describe still meets the plan, and with more
+      than two the buyer loses nothing, so neither way is material (step 5). A
+      person setting the software up chooses between the flavors and would meet
+      a wrong count at that moment, which is the §3 test for tier 2. Rated on
+      the buyer's plan as the buyer stated it. Adjudicated 2026-09-26 by Claude:
+      tier 3, with the surface: nobody acts on the count of image variants; a
+      person chooses from whatever exists.
+
+  - id: latest-tag-is-scratch
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [17, 17]
+    statement: The tag latest is synonymous with scratch, and latest-alpine with alpine.
+    tier: [2]
+    basis: >
+      The claim falls under the self-hosting item the buyer depends on (step 1);
+      no stated threshold names image tag naming. It can be untrue by either
+      pair of tags pointing at different images (step 4), which a person pulling
+      the image would notice while setting up and correct by naming the explicit
+      tag, without changing the code, so it changes how the software is set up
+      and not whether the plan holds (step 5). A person setting the software up
+      picks a tag on this claim and would meet its failure in use, so §3's tier
+      2 test is met. Rated on the buyer's plan as the buyer stated it.
+
+  - id: wal-mode-variable
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [85, 85]
+    statement: The target supports a CHHOTO_SQLITE_USE_WAL_MODE configuration option (enabling SQLite WAL mode), flagged as important.
+    tier: [2]
+    basis: >
+      The claim falls under the SQLite storage item, which the buyer only uses,
+      and a `uses` item is not a route; the threshold about "a hardening step
+      the README implies is on by default" names a security hardening default,
+      not a journal-mode option that this claim says exists rather than is on,
+      so no threshold reaches it (steps 1 and 3). With no route no way it could
+      be untrue is material. A person operating the instance would set this
+      variable on the strength of the claim and would meet a missing or inert
+      option in use, so §3's tier 2 test is met (step 6). Rated on the
+      practice's reading of the buyer's plan.
+
+  - id: site-url-for-clipboard-and-qr
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [111, 112]
+    statement: The frontend is written to use CHHOTO_SITE_URL, when it is set, for copying to clipboard and for QR code generation.
+    tier: [2]
+    basis: >
+      The claim falls under the web interface item, which the buyer only uses,
+      and no stated threshold names the site URL, clipboard copying or QR codes,
+      so it has no route (steps 1 and 3). With no route no way it could be
+      untrue is material; if the frontend ignored the variable, staff would see
+      the wrong URL in copied links and QR codes and could work through the API
+      or patch the plain frontend, which the reliance statement calls cheap. A
+      person setting the software up sets CHHOTO_SITE_URL on this claim and
+      would meet its failure in use, which is §3's tier 2 test (step 6). Rated
+      on the practice's reading of the buyer's plan. Adjudicated 2026-09-26 by
+      Claude: tier 2, as the agent held: a documented effect of a setting a
+      person configures, whose failure (wrong URLs in QR codes and copied links)
+      is met in use.
+
+  - id: punycode-shown-as-unicode
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [113, 114]
+    statement: Punycode entered for CHHOTO_SITE_URL is displayed as the correct unicode in the frontend.
+    tier: [2]
+    basis: >
+      Steps 1-3: no stated threshold reaches how the frontend displays the
+      configured site URL. The claim falls under the web administration
+      interface item, which the buyer `uses`, so it is not tier 1. Step 4, for
+      the record: the frontend could show the punycode form unchanged, or
+      convert it wrongly; either changes what staff see in the interface, not
+      whether links shorten or resolve, and the buyer's plan holds. Step 6 and
+      §3: a person setting CHHOTO_SITE_URL for an internationalised domain would
+      act on the documented format (enter punycode) and would meet a failure of
+      the conversion in use, so tier 2. Rated on the practice's reading of the
+      buyer's plan. Adjudicated 2026-09-26 by Claude: tier 2, as the agent held:
+      a documented behaviour of a setting; a person entering punycode meets its
+      failure in the interface.
+
+  - id: wal-boost-under-load
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [136, 136]
+    statement: Under high load, the software performs significantly better when WAL mode is enabled than it does without it.
+    tier: [2]
+    basis: >
+      Step 1: no stated threshold reaches a claim about throughput under high
+      load; "footprint or resource figures materially worse than stated" names
+      image sizes and RAM figures, not performance, and is read no wider. The
+      claim falls under the reliance item for SQLite storage, WAL mode and
+      durability settings, which the buyer uses, and a uses item is not a route.
+      Step 3: no route, so not tier 1. Step 6, §3 test: a person setting the
+      service up decides whether to enable WAL mode on this claim and would meet
+      its failure (no boost, or a smaller one) in use; on its own that failure
+      changes nothing for the buyer's small service. Rated on the practice's
+      reading of the buyer's plan. Adjudicated 2026-09-26 by Claude: tier 2, as
+      the agent held: the documented effect of a setting a person enables for
+      that effect.
+
+  - id: acid-costs-performance
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [140, 140]
+    statement: ACID compliance comes at a cost to performance.
+    tier: [2]
+    basis: >
+      The claim falls under the SQLite storage item, which the buyer only uses,
+      and the threshold "footprint or resource figures materially worse than
+      stated" names image size and RAM figures, not a performance cost that
+      states no figure, so the claim has no route (steps 1 and 3); doubt about
+      how large the cost is cannot supply one. With no route no way it could be
+      untrue is material. A person operating the instance decides whether to
+      keep ACID compliance on this claim and would meet a cost that is absent or
+      larger than described in use, which is §3's tier 2 test (step 6). Rated on
+      the practice's reading of the buyer's plan. Adjudicated 2026-09-26 by
+      Claude: tier 2: the documented cost of a setting a person chooses; a much
+      larger cost than 'a bit' is met in use. Rated the same as the setting's
+      documented benefits (WAL boost, ACID trade-off), which the surface also
+      put at 3.
+
+  - id: acid-off-throughput
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [147, 147]
+    statement: With CHHOTO_SQLITE_ENSURE_ACID set to False, the software handles a higher rate of read and write operations than it does with durability fully enforced.
+    tier: [2]
+    basis: >
+      Step 1: no stated threshold names throughput or a durability trade-off.
+      The claim falls under the reliance item for SQLite storage and the
+      durability settings, which the buyer uses; a uses item is not a route.
+      Step 3: no route, so not tier 1. Step 6, §3 test: an operator choosing
+      whether to set this variable to False acts on the claim and would meet its
+      failure (no gain in throughput) while running the instance; on its own the
+      failure changes nothing for the buyer's plan, which does not turn on
+      throughput. Rated on the practice's reading of the buyer's plan.
+      Adjudicated 2026-09-26 by Claude: tier 2, as the agent held: the
+      documented effect of a setting.
+
+  - id: slug-style-pair-form
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [171, 171]
+    statement: In Pair mode, auto-generated links use adjective-name pairs such as gifted-ramanujan.
+    tier: [2]
+    basis: >
+      The claim falls under the slug generation item, which the buyer only uses,
+      and no stated threshold names slug style, so it has no route (steps 1 and
+      3). With no route no way it could be untrue is material; if Pair mode
+      produced something other than adjective-name pairs, staff could switch the
+      slug style through configuration, which the reliance statement calls
+      cheap. A person setting the software up chooses Pair mode on this
+      description of what its slugs look like and would meet a different form in
+      use, so §3's tier 2 test is met (step 6). Rated on the practice's reading
+      of the buyer's plan.
+
+  - id: uid-slug-retry
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [187, 187]
+    statement: That default retry uses the same slug length rather than a longer one.
+    tier: [2]
+    basis: >
+      Steps 1-3: no stated threshold names a failure of slug retry behaviour
+      (the thresholds concern visitor logging, footprint figures, an implied
+      hardening default, licence or ownership, and dependencies the buyer cannot
+      run); the claim falls under the slug generation item, which the buyer
+      `uses`, and `uses` is not a route, so the claim is not tier 1. Step 4, for
+      the record: the retry could use a longer slug, or there could be no retry
+      at all; neither reaches a threshold or defeats a `depends` item. Step 6
+      and §3: a person setting slug style and length would act on knowing that a
+      collision retry does not lengthen the slug, since that is what makes the
+      slug length the capacity limit, and would meet a failure of it in
+      operation; so tier 2 rather than tier 3. Rated on the practice's reading
+      of the buyer's plan.
+
+  - id: hash-algorithm-unsupported-value
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [216, 216]
+    statement: Values of CHHOTO_HASH_ALGORITHM that are not supported are ignored.
+    tier: [2]
+    basis: >
+      Steps 1-3: no stated threshold reaches how an invalid configuration value
+      is handled; the "hardening step the README implies is on by default but is
+      not" threshold concerns defaults, and this claim is about an
+      operator-supplied unsupported value. The claim falls under configuration
+      through environment variables, which the buyer `uses`, so it is not tier
+      1. Step 4, for the record: an unsupported value could raise an error
+      instead of being ignored, or could be accepted rather than ignored; the
+      first is a failure a person would notice while setting up and correct
+      without changing the code (step 5), and both arise only when the operator
+      sets a value the documentation does not list. Step 6 and §3: a person
+      configuring the hash algorithm would act on this behaviour and meet its
+      failure at setup, so tier 2. Rated on the practice's reading of the
+      buyer's plan.
+
+  - id: hashing-adds-latency
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [220, 220]
+    statement: When hashed passwords and API keys are used, some requests to Chhoto URL take longer than they otherwise would.
+    tier: [2]
+    basis: >
+      Step 1: no stated threshold names latency; the claim falls under the
+      authentication and access control item, which names hashed credentials and
+      which the buyer depends on, so it has a route. Step 4: the claim could be
+      untrue because hashing adds no latency, which costs the buyer nothing, or
+      because the added latency is far larger than "some", on some or all
+      requests. Step 5: neither way defeats the item, since the service stays
+      private and authenticated either way; the seller's documents describe
+      running with plain credentials as the other path, which still meets the
+      plan of a small private shortener, and an operator would notice the
+      latency in use and switch the option off without changing code. Step 6, §3
+      test: an operator deciding whether to hash credentials acts on this claim.
+      Rated on the buyer's plan as the buyer stated it. Adjudicated 2026-09-26
+      by Claude: tier 2: the documented cost of an option a person chooses,
+      rated the same as ACID's cost (#53).
+
+  - id: hashing-uses-more-resources
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [220, 220]
+    statement: When hashed passwords and API keys are used, Chhoto URL consumes more computing resources overall than it otherwise would.
+    tier: [2]
+    basis: >
+      Step 1: the threshold "footprint or resource figures materially worse than
+      stated" names figures, and this claim states no figure, so read as written
+      it does not reach the claim; the claim falls under the authentication and
+      access control item, which names hashed credentials and which the buyer
+      depends on, so it has a route there. Step 4: the claim could be untrue
+      because hashing adds no resource cost, which costs the buyer nothing, or
+      because the cost is far larger than "more in general" implies. Step 5: a
+      larger cost does not defeat the item, since the service stays private and
+      authenticated; the seller's documents describe running with plain
+      credentials, which still meets the plan, and an operator would see the
+      cost in use and switch the option off without changing code. Step 6, §3
+      test: an operator deciding whether to hash credentials acts on this claim.
+      Rated on the buyer's plan as the buyer stated it. Adjudicated 2026-09-26
+      by Claude: tier 2: the documented cost of an option, as for #146; the
+      threshold names figures and this claim states none, so no route.
+
+  - id: cache-control-header
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [259, 260]
+    statement: Chhoto URL supports a CHHOTO_CACHE_CONTROL_HEADER setting whose value is attached as Cache-Control headers to the server's responses.
+    tier: [2]
+    basis: >
+      Steps 1-3: no stated threshold reaches a response-header setting;
+      Cache-Control is not a way visitors are logged or tracked, and it is not a
+      footprint figure, a hardening default, a licence matter or a dependency.
+      The claim falls under the Cache-Control configuration item, which the
+      buyer `uses`, so it is not tier 1. Step 4, for the record: the setting
+      could be absent, or present and the header not attached, or attached to
+      some responses only; none reaches a threshold or defeats a `depends` item.
+      Step 6 and §3: a capability and setting that a person setting the software
+      up would act on and would meet a failure of in use, so tier 2. Rated on
+      the practice's reading of the buyer's plan.
+
+  - id: malformed-protocols-skipped
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [273, 273]
+    statement: Malformed protocol entries in CHHOTO_EXTRA_PROTOCOLS are skipped rather than causing an error.
+    tier: [2]
+    basis: >
+      Steps 1-3: no stated threshold reaches how a malformed entry in the
+      extra-protocols setting is handled. The claim falls under the
+      allowed-protocols item, which the buyer `uses`, so it is not tier 1. Step
+      4, for the record: a malformed entry could cause an error instead of being
+      skipped, or could be accepted as written; the first is a failure a person
+      would notice while setting up and correct without changing the code (step
+      5), and the buyer's plan still holds either way. Step 6 and §3: a person
+      configuring extra protocols would act on this behaviour and meet its
+      failure at setup, so tier 2. Rated on the practice's reading of the
+      buyer's plan. Adjudicated 2026-09-26 by Claude: tier 2, as the agent held:
+      a parameter's documented format handling, §3's own kind of example.
+
+  - id: backup-at-init
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [301, 301]
+    statement: When the application initialises, a database backup file is actually created.
+    tier: [2]
+    basis: >
+      Step 1: no stated threshold reaches it; backups are not logging or
+      tracking, not a footprint figure, and not a hardening step, and the
+      threshold on hardening is read no wider. The claim falls under the
+      reliance item for automatic backups, which the buyer uses; a uses item is
+      not a route. Step 3: no route, so not tier 1. Step 6, §3 test: an operator
+      relying on the start-up backup instead of taking its own would act on this
+      claim and meet its failure (no file written) when a restore is needed; the
+      reliance statement says staff could back up the data directory themselves
+      at low cost, so on its own the failure changes nothing for the buyer.
+      Rated on the practice's reading of the buyer's plan. Adjudicated
+      2026-09-26 by Claude: tier 2, as the agent held: a documented behaviour
+      under the backups item that an operator relies on and would meet the
+      failure of.
+
+  - id: helm-chart-cert-manager
+    selected: tier-sample
+    source: docs/INSTALLATION.md
+    lines: [320, 321]
+    statement: The Helm chart ships a values file at `deploy/helm-chart/values.yaml` with configurable `password`, `fqdn` and `letsencryptmail` fields.
+    tier: [2]
+    basis: >
+      Steps 1-3: no stated threshold reaches the location or field names of a
+      Helm values file; the "dependency the buyer cannot run on its own
+      hardware" threshold concerns dependencies, not a configuration file's
+      contents. The claim falls under the Helm chart item, which the buyer
+      `uses` and for which the compose file is the documented fallback, so it is
+      not tier 1. Step 4, for the record: the file could be at another path, or
+      any of the three fields could be missing or named differently; each is a
+      failure a person would notice while setting up and correct without
+      changing the code (step 5). Step 6 and §3: a file's location and field
+      names that a person deploying with the chart would act on, so tier 2.
+      Rated on the practice's reading of the buyer's plan.
+
+  - id: raycast-extension-maintainer
+    selected: tier-sample
+    source: docs/TOOLS.md
+    lines: [23, 23]
+    statement: The Raycast extension is maintained by a third party, @paranoidPhantom, rather than the seller (described as unofficial).
+    tier: [3]
+    basis: >
+      Step 1: no stated threshold reaches it; the ownership threshold concerns
+      the code being bought, not who maintains a separate unofficial extension,
+      and is read no wider. The claim falls under the reliance item for the
+      third-party tools, which the buyer uses; a uses item is not a route. Step
+      3: no route, so not tier 1. Step 6, §3 test: who maintains the extension
+      is not a default, parameter, location, option or platform that a person
+      setting up or operating the service acts on; if the maintainer were
+      someone else, nothing about installing or running the service changes, and
+      the reliance statement says the buyer would use the service without the
+      tool at no cost. Rated on the practice's reading of the buyer's plan.

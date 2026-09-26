@@ -25,6 +25,18 @@ For each answer, in this order:
                `harsh` when toward contradicted. `unverifiable` is not on the
                order: where the answer settles the claim it is counted as
                unsettled, not given a distance.
+  materiality  where the answer carries `materiality` (for a gap) or
+               `exposure` (for an unsettled claim), the run's rating in
+               materiality.json is one the answer lists; a miss says whether
+               the run rated lower or higher on the scale not_material,
+               material, decisive. A run that settled a claim the answer leaves
+               unsettled, or the reverse, has no rating of that kind and is
+               reported as "not rated as such".
+  in report    the finding reaches report.md whole: its section (a shown or
+               unsettled claim) carries the record's gap text and every
+               citation, or its row in the "Claims that hold" table carries
+               every citation. This is what the buyer sees; a finding right in
+               merged.json and cut or dropped in the report is not delivered.
   reason       the finding cites at least one of the answer's `cites_any` line
                ranges, as a citation or in a derivation's basis. A right verdict
                that cites none of them is right for a reason the answer does not
@@ -41,6 +53,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -53,11 +66,26 @@ for p in (str(REPO), str(REPO / "src")):
         sys.path.insert(0, p)
 
 from workflowsv2.claims_audit.duplicates import embed      # noqa: E402
+from workflowsv2.audit_report.render import _md_safe, _lines  # noqa: E402  (the report's own formatting)
 
 ENGAGEMENTS = REPO / "workflowsv2" / "claims_audit" / "engagements"
 
 
 ORDER = ("real", "real_with_caveat", "partial", "contradicted")
+SCALE = ("not_material", "material", "decisive")
+
+
+def _rating(ratings: Dict[str, Any], array: str, field: str, src: str, cid: Any) -> Optional[str]:
+    for r in ratings.get(array) or []:
+        if r.get("claim_source") == src and str(r.get("claim_id")) == str(cid):
+            return r.get(field)
+    return None
+
+
+def _scale_off(got: str, accepted: List[str]) -> Optional[int]:
+    if got not in SCALE or not any(a in SCALE for a in accepted):
+        return None
+    return min((SCALE.index(got) - SCALE.index(a) for a in accepted if a in SCALE), key=abs)
 
 
 def _distance(verdict: str, accepted: List[str]) -> Optional[int]:
@@ -85,6 +113,30 @@ def _cited(finding: Dict[str, Any]) -> List[Dict[str, Any]]:
     return out
 
 
+def _section(report: str, heading: str) -> str:
+    m = re.search(rf"^{re.escape(heading)}\n(.*?)(?=^## |\Z)", report, re.S | re.M)
+    return m.group(1) if m else ""
+
+
+def in_report(report: str, f: Dict[str, Any]) -> Dict[str, Any]:
+    """Where the finding appears in report.md and whether it appears whole."""
+    src, cid = f["claim_source"], f["claim_id"]
+    cites = [e for e in f.get("evidence") or [] if isinstance(e, dict) and e.get("form") == "citation"]
+    m = re.search(rf"^### {re.escape(src)}, claim {cid} — .*?(?=^### |^## |\Z)", report, re.S | re.M)
+    if m:
+        sec = m.group(0)
+        gap = (f.get("adjudication") or {}).get("gap")
+        found = sum(1 for e in cites if f"`{e.get('document')}`, {_lines(e.get('lines'))}" in sec)
+        return {"where": "section", "gap": (not gap) or (_md_safe(gap) in sec),
+                "cites": (found, len(cites))}
+    hold = _section(report, "## Claims that hold")
+    row = re.search(rf"^\| {re.escape(src)} \| {cid} \| .*$", hold, re.M)
+    if row:
+        found = sum(1 for e in cites if f"`{e.get('document')}` {_lines(e.get('lines'))}" in row.group(0))
+        return {"where": "hold row", "gap": True, "cites": (found, len(cites))}
+    return {"where": "MISSING", "gap": False, "cites": (0, len(cites))}
+
+
 def score(answers: List[Dict[str, Any]], eng: Path, merged: Path) -> List[Dict[str, Any]]:
     surfaces = {}
     for f in sorted((eng / "surface").glob("*.surface.json")):
@@ -92,6 +144,10 @@ def score(answers: List[Dict[str, Any]], eng: Path, merged: Path) -> List[Dict[s
         surfaces[s["claim_source"]] = s["claims"]
     findings = {(f["claim_source"], f["claim_id"]): f
                 for f in json.loads((merged / "merged.json").read_text(encoding="utf-8"))["findings"]}
+    report_file = merged / "report.md"
+    report = report_file.read_text(encoding="utf-8") if report_file.is_file() else None
+    rating_file = merged / "materiality.json"
+    ratings = json.loads(rating_file.read_text(encoding="utf-8")) if rating_file.is_file() else {}
     rows = []
     for a in answers:
         row: Dict[str, Any] = {"id": a["id"], "source": a["source"], "lines": a["lines"],
@@ -127,6 +183,13 @@ def score(answers: List[Dict[str, Any]], eng: Path, merged: Path) -> List[Dict[s
             continue
         verdict = (f.get("adjudication") or {}).get("verdict")
         row.update(verdict=verdict, review=(f.get("review") or {}).get("outcome"))
+        if report is not None:
+            row["report"] = in_report(report, f)
+        for kind, array in (("materiality", "ratings"), ("exposure", "exposures")):
+            if a.get(kind):
+                got = _rating(ratings, array, kind, a["source"], c["id"])
+                row[kind] = {"expected": a[kind], "got": got,
+                             "off": None if got is None else _scale_off(got, a[kind])}
         ok_verdict = verdict in (a.get("verdict") or [])
         need = a.get("cites_any") or []
         cited = _cited(f)
@@ -164,6 +227,22 @@ def main() -> int:
             detail = f"  #{r['claim']} tier {r.get('tier')} sim {r['similarity']}"
             if "verdict" in r:
                 detail += f"  {r['verdict']} / review {r['review']}"
+            for kind in ("materiality", "exposure"):
+                if r.get(kind):
+                    k = r[kind]
+                    if k["got"] is None:
+                        detail += f"  {kind}: not rated as such"
+                    elif k["off"] == 0:
+                        detail += f"  {kind} ok"
+                    else:
+                        detail += (f"  {kind.upper()} {k['got']} (expected {' or '.join(k['expected'])}"
+                                   + ("" if k["off"] is None else f", rated {'higher' if k['off'] > 0 else 'lower'}") + ")")
+            if r.get("report"):
+                rp = r["report"]; n, m = rp["cites"]
+                whole = rp["where"] != "MISSING" and rp["gap"] and n == m
+                detail += ("  report: whole" if whole else
+                           f"  REPORT: {rp['where']}" + ("" if rp["gap"] else ", gap missing")
+                           + (f", citations {n}/{m}" if n != m else ""))
             if "tier_ok" in r:
                 detail += ("  tier ok" if r["tier_ok"]
                            else f"  TIER {r.get('tier')} (expected {' or '.join(map(str, r['tier_expected']))})")
@@ -185,6 +264,20 @@ def main() -> int:
                   f"rated lower than expected {sum(d > 0 for d in off)}, higher {sum(d < 0 for d in off)}")
         if not tested and all("tier_ok" in r for r in enum):
             continue
+        for kind in ("materiality", "exposure"):
+            rated = [r for r in tested if r.get(kind)]
+            if rated:
+                have = [r for r in rated if r[kind]["got"] is not None]
+                offs = [r[kind]["off"] for r in have if r[kind]["off"]]
+                print(f"  {group} {kind}: right {sum(r[kind]['off'] == 0 for r in have)}/{len(have)}; "
+                      f"rated lower {sum(o < 0 for o in offs)}, higher {sum(o > 0 for o in offs)}; "
+                      f"not rated as such {len(rated) - len(have)}")
+        delivered = [r for r in tested if r.get("report")]
+        whole = [r for r in delivered if r["report"]["where"] != "MISSING" and r["report"]["gap"]
+                 and r["report"]["cites"][0] == r["report"]["cites"][1]]
+        if delivered:
+            print(f"  {group} in report: whole {len(whole)}/{len(delivered)}; "
+                  f"missing {sum(r['report']['where'] == 'MISSING' for r in delivered)}")
         print(f"  {group}: enumerated {len(enum)}/{len(scored)}; tested {len(tested)}; "
               f"right verdict {len(right_v)}/{len(tested)}; right verdict and reason {len(right)}/{len(tested)}; "
               f"unsettled {len(unsettled)}; wrong lenient {sum(d < 0 for d in dist)}, harsh {sum(d > 0 for d in dist)}")
