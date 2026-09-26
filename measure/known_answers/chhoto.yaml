@@ -2,8 +2,9 @@
 # with measure/known_answers.py. Each answer was checked by hand against the
 # target on 2026-09-24; `basis` says how. They are a first set, from the claims
 # the runs of 2026-09-20..24 got wrong at least once, not a sample of the
-# surface. Bruce reviewed them on 2026-09-26: two verdicts widened to accept
-# real_with_caveat, compose-up dropped (its text says to modify the file first).
+# surface. Bruce reviewed them on 2026-09-26: no-personal-info-logged accepts
+# two verdicts because the claim does not say what counts as personal
+# information; compose-up dropped (its text says to modify the file first).
 #
 # Fields:
 #   source, lines   where the claim is made; a frozen claim whose own quote
@@ -49,7 +50,7 @@ answers:
     source: README.md
     lines: [98, 99]
     statement: The software sets no cookies.
-    verdict: [contradicted, real_with_caveat]
+    verdict: [contradicted]
     cites_any:
       - {document: backend/src/main.rs, lines: [104, 112]}
     basis: >
@@ -57,10 +58,11 @@ answers:
       SessionMiddleware with CookieSessionStore and a persistent session; the
       admin login writes a token into it (backend/src/services/post.rs:221).
       The cookie is set only for the admin after login; visitors to short links
-      get none. Read literally the claim is contradicted. The claim sits in a
-      list of practices the author calls anti-user ("Cookies, newsletters, 'we
-      value your privacy' popups"), and read as tracking or consent-banner
-      cookies it is real_with_caveat. Both are right.
+      get none. METHOD §2 reads a claim in its ordinary sense and a boundary
+      claim against the software as shipped, and §8 makes the excluded thing
+      active as shipped `contradicted`. Reading "cookies" as tracking cookies
+      only, because the list calls them anti-user, narrows the claim beyond its
+      words; the context bears on materiality, not on the verdict.
 
   - id: no-tracking
     source: README.md
