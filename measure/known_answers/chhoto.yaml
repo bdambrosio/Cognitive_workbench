@@ -233,11 +233,12 @@ answers:
       handler checks public mode, so public mode does not open them. A session
       becomes valid only through POST /api/login, which compares the password
       (backend/src/services/post.rs:188-207). The shipped deployment files all
-      set a password: deploy/compose.yaml:56 `- password=TopSecretPass` (legacy
-      name, read through the fallback at backend/src/config.rs:41-51 and 221),
-      deploy/chhoto-url.container:28
-      `Environment=CHHOTO_PASSWORD=TopSecretPass`,
-      deploy/helm-chart/values.yaml:12 `password: cGFzc3dvcmQ=`. So as shipped
+      set a placeholder password: deploy/compose.yaml:56 (`password=`, the
+      legacy name, read through the fallback at backend/src/config.rs:41-51 and
+      221), deploy/chhoto-url.container:28 (`Environment=CHHOTO_PASSWORD=`) and
+      deploy/helm-chart/values.yaml:12 (`password:`, base64 of the word
+      "password"). The values are the seller's public sample placeholders and
+      are not quoted here. So as shipped
       the claim holds (METHOD §2, boundary read against default plus shipped
       deployment files). Two things a reader must know, each an operator
       setting, which §2 makes a caveat and not a contradiction: (1) with no
