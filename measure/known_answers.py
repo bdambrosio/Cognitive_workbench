@@ -6,13 +6,16 @@
 
 For each answer, in this order:
 
+  selected     the answer's claim source is one the run selected. A source the
+               run did not select is a sorting miss, counted at the top.
   enumerated   a frozen claim whose own quote overlaps the answer's lines. A
                claim that reaches those lines only through `locations` does not
                count: that is how the README's "only the hit is recorded" was
                lost on 2026-09-24. Among several candidates the one whose
                statement is closest to the answer's is taken (the duplicates
                pass's embedder), and the similarity is printed so a wrong pick
-               can be seen.
+               can be seen; below 0.75, the duplicates pass's own floor, the
+               row is flagged LOW MATCH and left for a person to check.
   tier         where the answer carries `tier`, the surface's tier for the
                claim is one the answer lists; a miss says whether the run
                rated the claim lower (a higher number) or higher. An answer
@@ -37,13 +40,19 @@ For each answer, in this order:
                citation, or its row in the "Claims that hold" table carries
                every citation. This is what the buyer sees; a finding right in
                merged.json and cut or dropped in the report is not delivered.
+  review       the review's outcome agrees with the standard: it held a right
+               verdict or rejected a wrong one. A review that held a wrong
+               verdict, or rejected a right one, is a review miss.
   reason       the finding cites at least one of the answer's `cites_any` line
                ranges, as a citation or in a derivation's basis. A right verdict
                that cites none of them is right for a reason the answer does not
                accept (cmp-chhoto-glm-med INSTALLATION #101).
 
-An answer whose claim source is not one of the engagement's is out of scope and
-not scored. Answers are summed separately by `selected`: `failure` answers were
+Two lines at the top say what the run's report covers: how many of the
+standard's claim sources the run selected, and how many of the claims the run
+tested have an answer here. A run whose full_run.json carries `reliance_from`
+rated its tiers against another engagement's reliance statement and is not an
+end-to-end run; the first line says so. Answers are summed separately by `selected`: `failure` answers were
 chosen because runs got them wrong, so their count says whether a known failure
 came back and is not a rate; `sample` answers are a random draw from the
 reviewed claim surface, and only their counts read as a rate; `tier-sample`
@@ -65,6 +74,7 @@ for p in (str(REPO), str(REPO / "src")):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+from workflowsv2 import engagement_state as state          # noqa: E402
 from workflowsv2.claims_audit.duplicates import embed      # noqa: E402
 from workflowsv2.audit_report.render import _md_safe, _lines  # noqa: E402  (the report's own formatting)
 
@@ -72,6 +82,7 @@ ENGAGEMENTS = REPO / "workflowsv2" / "claims_audit" / "engagements"
 
 
 ORDER = ("real", "real_with_caveat", "partial", "contradicted")
+LOW_MATCH = 0.75          # the duplicates pass's floor for the same embedder
 SCALE = ("not_material", "material", "decisive")
 
 
@@ -155,7 +166,7 @@ def score(answers: List[Dict[str, Any]], eng: Path, merged: Path) -> List[Dict[s
         rows.append(row)
         claims = surfaces.get(a["source"])
         if claims is None:
-            row["result"] = "out of scope"
+            row["result"] = "SOURCE NOT SELECTED"
             continue
         own = [c for c in claims if _overlaps(c.get("lines") or [], a["lines"])]
         if not own:
@@ -168,7 +179,7 @@ def score(answers: List[Dict[str, Any]], eng: Path, merged: Path) -> List[Dict[s
         best = max(range(len(own)), key=lambda i: sims[i])
         c = own[best]
         row.update(claim=c["id"], similarity=round(sims[best], 2), tier=c.get("tier"),
-                   statement=c.get("statement"))
+                   statement=c.get("statement"), low_match=sims[best] < LOW_MATCH)
         if a.get("tier"):
             exp = [int(t) for t in a["tier"]]
             got = c.get("tier")
@@ -196,6 +207,9 @@ def score(answers: List[Dict[str, Any]], eng: Path, merged: Path) -> List[Dict[s
         cited = _cited(f)
         ok_reason = (not need) or any(n["document"] == x["document"] and _overlaps(x.get("lines") or [], n["lines"])
                                       for n in need for x in cited)
+        outcome = row["review"]
+        if outcome in ("holds", "does_not_hold"):
+            row["review_agrees"] = (outcome == "holds") == ok_verdict
         if ok_verdict:
             row["result"] = "right" if ok_reason else "right verdict, reason not cited"
         elif verdict == "unverifiable":
@@ -221,13 +235,31 @@ def main() -> int:
     answers = yaml.safe_load(args.answers.read_text(encoding="utf-8"))["answers"]
     rows = score(answers, eng, merged)
     print(f"{args.engagement}  ({merged.name})")
+    full_run = eng / "full_run.json"
+    if full_run.is_file() and json.loads(full_run.read_text(encoding="utf-8")).get("reliance_from"):
+        print(f"  NOT AN END-TO-END RUN: tiers rated against the reliance statement of "
+              f"{json.loads(full_run.read_text(encoding='utf-8'))['reliance_from']}")
+    standard_sources = sorted({a["source"] for a in answers})
+    selected = state.claim_sources(eng)
+    missing = [s for s in standard_sources if s not in selected]
+    print(f"  claim sources: {len(standard_sources) - len(missing)}/{len(standard_sources)} of the standard's selected"
+          + (f"; not selected: {', '.join(missing)}" if missing else ""))
+    findings = json.loads((merged / "merged.json").read_text(encoding="utf-8"))["findings"]
+    matched = {(r["source"], r["claim"]) for r in rows if "claim" in r}
+    print(f"  tested claims with an answer: {sum((f['claim_source'], f['claim_id']) in matched for f in findings)}"
+          f"/{len(findings)}")
     for r in rows:
         where = f"{r['source']}:{r['lines'][0]}-{r['lines'][1]}"
         detail = ""
         if "claim" in r:
             detail = f"  #{r['claim']} tier {r.get('tier')} sim {r['similarity']}"
+            if r.get("low_match"):
+                detail += " LOW MATCH"
             if "verdict" in r:
                 detail += f"  {r['verdict']} / review {r['review']}"
+                if r.get("review_agrees") is False:
+                    detail += (" (REVIEW held a wrong verdict)" if r["review"] == "holds"
+                               else " (REVIEW rejected a right verdict)")
             for kind in ("materiality", "exposure"):
                 if r.get(kind):
                     k = r[kind]
@@ -249,12 +281,17 @@ def main() -> int:
                            else f"  TIER {r.get('tier')} (expected {' or '.join(map(str, r['tier_expected']))})")
         print(f"  {r['id']:26s} {where:28s} {r['result']}{detail}")
     for group in ("failure", "sample", "tier-sample"):
-        scored = [r for r in rows if r["selected"] == group and r["result"] != "out of scope"]
+        scored = [r for r in rows if r["selected"] == group and r["result"] != "SOURCE NOT SELECTED"]
         if not scored:
             continue
         enum = [r for r in scored if "claim" in r]
         tested = [r for r in enum if "verdict" in r]
         right_v = [r for r in tested if r["result"].startswith("right")]
+        reviewed = [r for r in tested if "review_agrees" in r]
+        if reviewed:
+            print(f"  {group} review: agreed {sum(r['review_agrees'] for r in reviewed)}/{len(reviewed)}; "
+                  f"held a wrong verdict {sum(not r['review_agrees'] and r['review'] == 'holds' for r in reviewed)}, "
+                  f"rejected a right one {sum(not r['review_agrees'] and r['review'] == 'does_not_hold' for r in reviewed)}")
         right = [r for r in tested if r["result"] == "right"]
         unsettled = [r for r in tested if r["result"].startswith("UNSETTLED")]
         dist = [r["distance"] for r in tested if r.get("distance") is not None]
