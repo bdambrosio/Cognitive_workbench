@@ -1,0 +1,173 @@
+{
+ "claim_source": "scripts/README.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "Analysis, audit, and export utilities used to build and validate the benchmark.",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The scripts in this directory are analysis, audit, and export utilities used to build and validate the benchmark.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "No stated threshold reaches a characterisation of what the scripts directory is for, and the buyer only uses these artifacts. A person turning to the methodology artifacts would act on the description of what the scripts do and would meet its failure in use. Rated on the scale alone."
+  },
+  {
+   "id": 2,
+   "quote": "the scripts here query the **full benchmark database**",
+   "lines": [
+    7,
+    7
+   ],
+   "statement": "The scripts in this directory query the full benchmark database (with one stated exception).",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "No stated threshold reaches which database the utility scripts query, and the buyer's plan only uses them. A person running the scripts would act on the statement about what they query and would meet its failure in use. Rated on the scale alone."
+  },
+  {
+   "id": 3,
+   "quote": "the SQLite DB produced by the ETL pipeline",
+   "lines": [
+    8,
+    8
+   ],
+   "statement": "The full benchmark database is a SQLite database produced by the ETL pipeline.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "No stated threshold reaches the format or origin of the database the utility scripts query. A person running the scripts would act on it, since they would need to open the database, and would meet its failure in use. Rated on the scale alone."
+  },
+  {
+   "id": 4,
+   "quote": "with tables such as `diagnoses`,\n`clinical_findings`, `board_questions`, `benchmark_ground_truth`,\n`longitudinal_patients`, and `diagnosis_relations`.",
+   "lines": [
+    8,
+    10
+   ],
+   "statement": "The full benchmark database contains tables including diagnoses, clinical_findings, board_questions, benchmark_ground_truth, longitudinal_patients, and diagnosis_relations.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "No stated threshold reaches the table layout of the database, read as the buyer wrote the threshold: it concerns ground truth and scoring working, not schema contents. A person running the scripts or writing queries would act on the table names and meet their absence in use. Rated on the scale alone."
+  },
+  {
+   "id": 5,
+   "quote": "That database is **not shipped** in this repository",
+   "lines": [
+    12,
+    12
+   ],
+   "statement": "The full benchmark database is not shipped in this repository.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "No stated threshold reaches whether this database is shipped and no depends item covers it; the buyer obtains the distributed database by clone and release assets in any event. The only way the claim could be untrue is that the database is in fact present in the repository, which would cost the buyer nothing and is not a failure a person would meet adversely in use. Rated on the scale alone."
+  },
+  {
+   "id": 7,
+   "quote": "does **not** contain the tables these\nscripts need",
+   "lines": [
+    14,
+    15
+   ],
+   "statement": "patient_profiles.db does not contain the tables these scripts need.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "No stated threshold reaches the contents of patient_profiles.db. A person running the scripts and choosing which database file to point them at would act on it and would meet its failure in use. Rated on the scale alone."
+  },
+  {
+   "id": 8,
+   "quote": "pointing them at `patient_profiles.db` will fail with\n\"no such table\"",
+   "lines": [
+    15,
+    16
+   ],
+   "statement": "Pointing the scripts at patient_profiles.db fails with a \"no such table\" error.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "No stated threshold reaches the error behaviour when the scripts are pointed at the wrong database file. A person running the scripts would act on it and would meet its failure in use. Rated on the scale alone."
+  },
+  {
+   "id": 9,
+   "quote": "rebuild the full benchmark with the ETL pipeline\n(`python -m etl.main --stage 1 … 12`)",
+   "lines": [
+    18,
+    19
+   ],
+   "statement": "The target contains an ETL pipeline that can be invoked as `python -m etl.main --stage 1 … 12` and whose code constructs the full benchmark database from source data.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns the ETL pipeline, which the buyer's plan does not touch: the team adopts the release as shipped and does not rebuild the database or ingest new sources. No stated threshold reaches the pipeline's invocation or its construction of the database from source data. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 10,
+   "quote": "which writes `benchmark_v1.3.db` (repo root)",
+   "lines": [
+    19,
+    19
+   ],
+   "statement": "The ETL pipeline writes benchmark_v1.3.db at the repository root.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns what the ETL pipeline writes, and the buyer's plan does not touch rebuilding; the team adopts the release as shipped and reaches the distributed database by clone and release assets regardless. No stated threshold reaches the pipeline's output path. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 11,
+   "quote": "(the default path most scripts use, overridable via `--db`)",
+   "lines": [
+    20,
+    20
+   ],
+   "statement": "benchmark_v1.3.db at the repository root is the default database path for most scripts, overridable via a --db option.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "**SQLite (full benchmark DB)** — most scripts. Default `benchmark_v1.3.db` (repo root).",
+     "lines": [
+      26,
+      26
+     ]
+    }
+   ],
+   "tier": 2,
+   "tier_basis": "No stated threshold reaches the scripts' default database path or the --db override. A person running the methodology scripts would act on the default path and would meet its failure in use. Rated on the scale alone."
+  },
+  {
+   "id": 12,
+   "quote": "They are included\nas **reproducibility / methodology artifacts**: they document how the released\ndata was constructed and audited.",
+   "lines": [
+    21,
+    22
+   ],
+   "statement": "The scripts are included as reproducibility/methodology artifacts that document how the released data was constructed and audited.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "No stated threshold reaches how the scripts are characterised, and the buyer only uses these artifacts. A person turning to the scripts to check how the released data was constructed and audited would act on the description and would meet its failure in use. Rated on the scale alone."
+  },
+  {
+   "id": 13,
+   "quote": "`build_dataset_tiers.py`, `matcher_diagnostic.py`,\n  `sample_summaries.py`, `sample_all_summaries.py` connect to the running\n  `epic_sim` database via `DATABASE_URL`.",
+   "lines": [
+    27,
+    29
+   ],
+   "statement": "The scripts build_dataset_tiers.py, matcher_diagnostic.py, sample_summaries.py, and sample_all_summaries.py connect to the running epic_sim Postgres database via DATABASE_URL.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "No stated threshold reaches which database four utility scripts connect to or how that connection is configured. A person running those scripts would act on the connection detail and would meet its failure in use. Rated on the scale alone."
+  },
+  {
+   "id": 14,
+   "quote": "rebuild the full benchmark with the ETL pipeline\n(`python -m etl.main --stage 1 … 12`)",
+   "lines": [
+    18,
+    19
+   ],
+   "statement": "Running the ETL pipeline as `python -m etl.main --stage 1 … 12` completes and rebuilds the full benchmark database.",
+   "about": "target",
+   "implied_by": 9,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "The claim concerns whether the ETL pipeline completes and rebuilds the full database, and the buyer's plan does not touch rebuilding: it adopts the release as shipped. No stated threshold reaches the pipeline's completion. Rated on the practice's reading of the buyer's plan."
+  }
+ ]
+}

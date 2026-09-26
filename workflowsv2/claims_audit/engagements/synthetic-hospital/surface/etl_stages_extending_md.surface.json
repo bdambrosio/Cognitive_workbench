@@ -1,0 +1,375 @@
+{
+ "claim_source": "etl/stages/EXTENDING.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "The ETL is source-agnostic: it contains no deck, PDF, or vendor names.",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The ETL codebase contains no source-specific content: no deck, PDF, or vendor names are embedded in it.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns the ETL codebase, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it; the buyer adopts the release as shipped and does not ingest new sources. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 2,
+   "quote": "Every\nsource-specific detail lives in a small declarative **profile**.",
+   "lines": [
+    3,
+    4
+   ],
+   "statement": "All source-specific details are held in small declarative profile files rather than in code.",
+   "about": "target",
+   "within": {
+    "source": "etl/stages/EXTENDING.md",
+    "id": 3,
+    "statement": "The pipeline's source-specific configuration is held in declarative profile files that the pipeline loads, so a new source is configured by adding a profile rather than editing code."
+   },
+   "tier": 3,
+   "tier_basis": "The claim concerns how source-specific details are organised in the ETL, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it. No way it could be untrue would change the price, the terms, or the buyer's plan to evaluate and train on the release as shipped. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 3,
+   "quote": "To run the\npipeline on your own material you add a profile — no code changes.",
+   "lines": [
+    4,
+    5
+   ],
+   "statement": "The pipeline's source-specific configuration is held in declarative profile files that the pipeline loads, so a new source is configured by adding a profile rather than editing code.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "1. Drop a YAML file in `deck_profiles/` (or `pdf_profiles/`).\n2. Set `role`/`layout`, a `parser`, and `filename_globs` (and `tag_config` if the\n   chosen parser needs tokens).\n3. Run the stages — no code edits. If your format matches none of the existing\n   parsers, add one to the stage `PARSERS` map and reference its key.",
+     "lines": [
+      123,
+      127
+     ]
+    }
+   ],
+   "tier": 3,
+   "tier_basis": "The claim describes how to run the pipeline on new material, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it; the buyer's plan does not include ingesting new sources. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 4,
+   "quote": "There are two profile kinds, both loaded by `etl/deck_registry.py`",
+   "lines": [
+    7,
+    7
+   ],
+   "statement": "There are exactly two profile kinds, and both are loaded by etl/deck_registry.py.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns profile kinds and the deck registry loader, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 5,
+   "quote": "**Deck profiles** — `etl/deck_profiles/*.yaml` — for Anki `.apkg` decks.",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "Deck profiles live at etl/deck_profiles/*.yaml and handle Anki .apkg decks.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim gives the location and purpose of deck profiles, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it; the buyer's engineers would not act on it in their plan. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 6,
+   "quote": "**PDF profiles** — `etl/pdf_profiles/*.yaml` — for PDF documents.",
+   "lines": [
+    10,
+    10
+   ],
+   "statement": "PDF profiles live at etl/pdf_profiles/*.yaml and handle PDF documents.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim gives the location and purpose of PDF profiles, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 7,
+   "quote": "Cards/documents are resolved to a profile at runtime; the stages just ask the\nregistry \"what is this, and how do I parse it?\"",
+   "lines": [
+    12,
+    13
+   ],
+   "statement": "Cards and documents are resolved to a profile at runtime by the registry, which the pipeline stages consult to determine parsing.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim describes runtime profile resolution inside the ETL, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 8,
+   "quote": "Each profile tags one source with a role, a parser, match rules, and (optionally)\nits tag conventions.",
+   "lines": [
+    19,
+    20
+   ],
+   "statement": "A profile associates one source with a role, a parser, match rules, and optionally tag conventions.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim describes what a profile associates, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 9,
+   "quote": "name: my_board_deck\nrole: board_exam            # board_exam (question vignettes) | fact (atomic facts)\nparser: mcq_fielded         # which Stage 3/4 parser to use (keys below)\ncard_format: mcq_vignette   # Stage 2 classification hint\nfilename_globs: [\"my_board_*.apkg\"]      # match by filename (supports *)\nnote_model_substrings: [\"my mcq model\"]  # or match by Anki note-model name",
+   "lines": [
+    23,
+    28
+   ],
+   "statement": "A deck profile is configured with these keys: name, role (board_exam or fact), parser (a Stage 3/4 parser key), card_format (a Stage 2 classification hint), filename_globs, and note_model_substrings.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim enumerates deck profile configuration keys, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it; a person running the buyer's plan would not meet its failure in use. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 12,
+   "quote": "Config (`DECK_TYPE_MAP`, `DECK_SPECIFICITY`) and Stage 1\ndiscovery are derived from these profiles automatically.",
+   "lines": [
+    35,
+    36
+   ],
+   "statement": "The DECK_TYPE_MAP and DECK_SPECIFICITY configuration and Stage 1 discovery are derived automatically from the profiles.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns derived ETL configuration and Stage 1 discovery, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 13,
+   "quote": "**Available parser keys** (each is a generic format parser in the stage's `PARSERS` map):\n\n| Role | `parser` | Handles |\n|---|---|---|\n| board_exam | `mcq_fielded` | MCQ with separated fields (stem / answer / explanations) |\n| board_exam | `mcq_freetext` | MCQ where vignette + choices share one field |\n| fact | `cloze_qid` | Cloze cards keyed by a QID-namespaced tag |\n| fact | `cloze_review_hierarchy` | Cloze cards with a `::`-delimited tag hierarchy |\n| fact | `cloze_review_specialty` | Cloze cards with specialty in the deck-name hierarchy |\n| fact | `cloze_resource` | Cloze cards with resource-reference fields + chapter tags |\n| fact | `cloze_specialty_deck` | Single-specialty cloze deck |\n| fact | `cloze_podcast` | Cloze cards derived from lecture/podcast notes |",
+   "lines": [
+    38,
+    49
+   ],
+   "statement": "Eight parser keys are available — mcq_fielded, mcq_freetext, cloze_qid, cloze_review_hierarchy, cloze_review_specialty, cloze_resource, cloze_specialty_deck, cloze_podcast — each a generic format parser registered in the relevant stage's PARSERS map and handling the format described in the table.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim enumerates available parser keys and their formats, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it; the buyer's engineers would not act on it in their plan. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 14,
+   "quote": "To add a genuinely new *format*, write a parser function in `s03`/`s04`, register\nit in that stage's `PARSERS` dict, and reference its key from a profile.",
+   "lines": [
+    51,
+    52
+   ],
+   "statement": "Adding a genuinely new format is done by writing a parser function in s03/s04 and registering it in that stage's PARSERS dict, then referencing its key from a profile.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "If your format matches none of the existing\n   parsers, add one to the stage `PARSERS` map and reference its key.",
+     "lines": [
+      126,
+      127
+     ]
+    }
+   ],
+   "tier": 3,
+   "tier_basis": "The claim describes how to add a new format parser to the ETL, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 15,
+   "quote": "name: my_doc\nlayout: toc                 # toc | bullets | font_headings — selects the parser\ndisplay_name: \"My Notes\"\nfilename_globs: [\"my_doc_*.pdf\"]\ntopic_from: section_title   # section_title | llm (defer topics to LLM enrichment)\ncontext_style: hierarchy    # hierarchy (parent: title) | episode (episode/caps header)",
+   "lines": [
+    59,
+    64
+   ],
+   "statement": "PDF profiles are YAML files carrying the keys name, layout, display_name, filename_globs, topic_from and context_style, with layout taking one of toc/bullets/font_headings, topic_from taking section_title or llm, and context_style taking hierarchy or episode.",
+   "about": "target",
+   "within": {
+    "source": "etl/stages/EXTENDING.md",
+    "id": 16,
+    "statement": "The layout values map to parsers named parse_toc (toc), parse_bullets (bullets) and parse_font_headings (font_headings), each suited to the document kind named in the table."
+   },
+   "tier": 3,
+   "tier_basis": "The claim enumerates PDF profile configuration keys and their values, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 16,
+   "quote": "| `toc` | `parse_toc` | Table-of-contents driven documents |\n| `bullets` | `parse_bullets` | Bullet/point-per-line documents (set `topic_from: llm`) |\n| `font_headings` | `parse_font_headings` | Documents whose headings are font-based |",
+   "lines": [
+    69,
+    71
+   ],
+   "statement": "The layout values map to parsers named parse_toc (toc), parse_bullets (bullets) and parse_font_headings (font_headings), each suited to the document kind named in the table.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim maps layout values to parser functions and document kinds, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 17,
+   "quote": "`s01d` reads `topic_from` / `context_style` from the profile",
+   "lines": [
+    73,
+    73
+   ],
+   "statement": "The s01d stage reads the topic_from and context_style keys from the PDF profile.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim states which stage reads which profile keys, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 18,
+   "quote": "`--enrich-topics` step processes any PDF whose profile sets `topic_from: llm`.",
+   "lines": [
+    74,
+    74
+   ],
+   "statement": "The s01d stage contains an --enrich-topics step that selects for processing any PDF whose profile sets topic_from: llm.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns the s01d --enrich-topics step, which falls under the ETL pipeline for rebuilding or extending the data, an item the buyer does not use and which no stated threshold reaches; no way it could be untrue touches a depends item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 19,
+   "quote": "Source-specific tag/field tokens are **configuration, not code**",
+   "lines": [
+    80,
+    80
+   ],
+   "statement": "Source-specific tag and field tokens are configuration rather than code.",
+   "about": "target",
+   "restates_rejected": 2,
+   "tier": 3,
+   "tier_basis": "Tag and field tokens being configuration rather than code is a detail of the ETL pipeline the buyer does not use and no stated threshold reaches; its failure would not affect any depends item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 20,
+   "quote": "A fact deck's profile carries a `tag_config` block that the Stage 4 parsers read.",
+   "lines": [
+    80,
+    81
+   ],
+   "statement": "A fact deck's profile carries a tag_config block, and the Stage 4 parsers read it.",
+   "about": "target",
+   "within": {
+    "source": "etl/stages/EXTENDING.md",
+    "id": 21,
+    "statement": "The Stage 4 parsers read their tag conventions from the tag_config keys shown, per parser: cloze_qid reads qid_namespace; cloze_review_hierarchy reads hier_root, hier_level2 and subject_namespace; cloze_resource reads resource_fields, shelf_markers and topic_exclude_prefixes; cloze_podcast reads podcast_root, podcast_branch, optional_branch, fixed_source_subjects, subcat_source and keyword_source_prefix."
+   },
+   "tier": 3,
+   "tier_basis": "The tag_config block in a fact deck's profile is a mechanism of the data-extension pipeline the buyer does not use and no stated threshold reaches; its failure would not touch any depends item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 21,
+   "quote": "# cloze_qid\ntag_config:\n  qid_namespace: \"MYNS\"            # leading token: MYNS::pos::Subject::System::Topic\n\n# cloze_review_hierarchy\ntag_config:\n  hier_root: \"ROOT\"                # ROOT::L2::Specialty::SubSpecialty\n  hier_level2: \"L2\"\n  subject_namespace: \"SUBJ\"        # SUBJ::Subject\n\n# cloze_resource\ntag_config:\n  resource_fields: [\"Resource A\", \"Resource B\"]   # field names holding references\n  shelf_markers: [\"!Shelf\", \"Shelf\"]              # marker -> next part is a subject code\n  topic_exclude_prefixes: [\"no \", \"!\"]            # topic-candidate prefixes to ignore\n\n# cloze_podcast\ntag_config:\n  podcast_root: \"PodDeck\"          # leading tag token\n  podcast_branch: \"MAIN\"           # main-content branch\n  optional_branch: \"Optional\"      # supplementary-source branch\n  fixed_source_subjects: {SourceP: \"Pathology\"}   # exact source token -> subject\n  subcat_source: \"SourceQ\"         # source whose subcategory is mapped\n  keyword_source_prefix: \"srck\"    # source prefix -> keyword match on the tag",
+   "lines": [
+    84,
+    107
+   ],
+   "statement": "The Stage 4 parsers read their tag conventions from the tag_config keys shown, per parser: cloze_qid reads qid_namespace; cloze_review_hierarchy reads hier_root, hier_level2 and subject_namespace; cloze_resource reads resource_fields, shelf_markers and topic_exclude_prefixes; cloze_podcast reads podcast_root, podcast_branch, optional_branch, fixed_source_subjects, subcat_source and keyword_source_prefix.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The per-parser tag_config keys are implementation detail of the ETL parsers under the data-extension item the buyer does not use and no stated threshold reaches; no way it could be untrue reaches a depends item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 22,
+   "quote": "If a needed key is absent, that parsing strategy is simply skipped — the parser falls back to keyword matching or leaves the field null.",
+   "lines": [
+    110,
+    111
+   ],
+   "statement": "The Stage 4 parsers contain a path that, when a needed tag_config key is absent, skips that parsing strategy and falls back to keyword matching or leaves the field null.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Fallback behaviour when a tag_config key is absent concerns the ETL parsers under the data-extension item the buyer does not use and no stated threshold reaches; its failure would not affect any depends item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 23,
+   "quote": "The shared taxonomy maps (`_CHAPTER_ORGAN_MAP`, `_TAG_KEYWORD_SUBJECT`, etc.) are generic medical reference data and need no per-source configuration.",
+   "lines": [
+    111,
+    113
+   ],
+   "statement": "The shared taxonomy maps (such as _CHAPTER_ORGAN_MAP and _TAG_KEYWORD_SUBJECT) are generic medical reference data and require no per-source configuration.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Whether the shared taxonomy maps need per-source configuration is a detail of the ETL pipeline the buyer does not use and no stated threshold reaches; its failure would not touch any depends item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 24,
+   "quote": "Stage 2 classification is likewise data-driven: a deck's `note_model_substrings` and `card_format` classify its cards",
+   "lines": [
+    115,
+    116
+   ],
+   "statement": "Stage 2 classification reads a deck's note_model_substrings and card_format profile keys and uses them to classify the deck's cards.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Stage 2 card classification from profile keys is part of the data-extension pipeline the buyer does not use and no stated threshold reaches; no way it could be untrue reaches a depends item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 25,
+   "quote": "only structural fallbacks (cloze detection, age-pattern vignette detection) remain in code.",
+   "lines": [
+    116,
+    117
+   ],
+   "statement": "Only the structural fallbacks — cloze detection and age-pattern vignette detection — remain in code for Stage 2 classification.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Which structural fallbacks remain in code for Stage 2 classification is a detail of the ETL pipeline the buyer does not use and no stated threshold reaches; its failure would not affect any depends item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 26,
+   "quote": "To run the\npipeline on your own material you add a profile — no code changes.",
+   "lines": [
+    4,
+    5
+   ],
+   "statement": "When the pipeline is run on new material, adding a profile is sufficient for it to run on that material, with no changes to the code.",
+   "about": "target",
+   "implied_by": 3,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "Running the pipeline on new material with no code changes concerns extending the data, an item the buyer does not use and no stated threshold reaches; its failure would not touch any depends item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 27,
+   "quote": "`--enrich-topics` step processes any PDF whose profile sets `topic_from: llm`.",
+   "lines": [
+    74,
+    74
+   ],
+   "statement": "When s01d runs with --enrich-topics, every PDF whose profile sets topic_from: llm is processed by that step.",
+   "about": "target",
+   "implied_by": 18,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "The runtime behaviour of --enrich-topics in s01d is part of the ETL pipeline the buyer does not use and no stated threshold reaches; no way it could be untrue reaches a depends item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 28,
+   "quote": "If a needed key is absent, that parsing strategy is simply skipped — the parser falls back to keyword matching or leaves the field null.",
+   "lines": [
+    110,
+    111
+   ],
+   "statement": "When a needed tag_config key is absent in a run, the affected parsing strategy is skipped: the parser falls back to keyword matching or leaves the field null.",
+   "about": "target",
+   "implied_by": 22,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "Runtime fallback when a tag_config key is absent concerns the ETL parsers under the data-extension item the buyer does not use and no stated threshold reaches; its failure would not affect any depends item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 29,
+   "quote": "Stage 2 classification is likewise data-driven: a deck's `note_model_substrings` and `card_format` classify its cards",
+   "lines": [
+    115,
+    116
+   ],
+   "statement": "When Stage 2 classification runs, the deck's cards are classified according to its note_model_substrings and card_format profile keys.",
+   "about": "target",
+   "implied_by": 24,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "Runtime Stage 2 classification from profile keys is part of the ETL pipeline the buyer does not use and no stated threshold reaches; its failure would not touch any depends item. Rated on the practice's reading of the buyer's plan."
+  }
+ ]
+}

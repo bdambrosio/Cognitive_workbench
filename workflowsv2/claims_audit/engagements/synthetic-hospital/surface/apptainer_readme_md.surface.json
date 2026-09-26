@@ -1,0 +1,331 @@
+{
+ "claim_source": "apptainer/README.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "The all-in-one image carries the simulator, the benchmark database, PostgreSQL and Redis",
+   "lines": [
+    3,
+    4
+   ],
+   "statement": "The shipped all-in-one container image contains the simulator, the benchmark database, PostgreSQL and Redis.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The team's plan does not touch alternative packaging: it adopts the release and drives the simulator and environment endpoints directly, and no stated threshold reaches what the all-in-one image carries. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 2,
+   "quote": "starts everything as the calling user",
+   "lines": [
+    4,
+    5
+   ],
+   "statement": "The all-in-one image's startup is arranged so that the container's services are launched as the user who invoked the container.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "How the container launches its services matters only to the alternative packaging the team does not use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 3,
+   "quote": "nothing needs root",
+   "lines": [
+    5,
+    5
+   ],
+   "statement": "Boundary claim: no part of running the container requires root privileges.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Whether root is needed concerns only the alternative packaging the team's plan does not touch, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 4,
+   "quote": "no other services are required",
+   "lines": [
+    5,
+    5
+   ],
+   "statement": "Boundary claim: the image is self-contained and needs no services beyond those it carries.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Self-containment of the all-in-one image matters only to packaging the team does not use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 6,
+   "quote": "so no Docker is needed",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "Building the SIF via the definition file does not require Docker on the build machine.",
+   "about": "target",
+   "within": {
+    "source": "apptainer/README.md",
+    "id": 8,
+    "statement": "The definition file supports bootstrapping from a docker-archive produced by `docker save` on another machine, so neither machine needs Docker installed."
+   },
+   "tier": 3,
+   "tier_basis": "Building the SIF lies within the alternative packaging the team does not use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 7,
+   "quote": "To build from a locally built Docker image instead (for example while developing), build it under the published name and use the local variant of the definition",
+   "lines": [
+    15,
+    16
+   ],
+   "statement": "A local variant of the definition file exists (apptainer/synthetic_hospital.local.def, line 20) for building the SIF from a locally built Docker image tagged under the published name.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "A local build variant of the definition file serves only the alternative packaging the team's plan does not touch, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 8,
+   "quote": "Without Docker on either machine, `docker save` the image elsewhere and bootstrap from the archive (`Bootstrap: docker-archive`)",
+   "lines": [
+    22,
+    24
+   ],
+   "statement": "The definition file supports bootstrapping from a docker-archive produced by `docker save` on another machine, so neither machine needs Docker installed.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Bootstrapping from a docker-archive is a path within the alternative packaging the team does not use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 9,
+   "quote": "The container writes its database cluster under `/var/lib/synthetic-hospital`",
+   "lines": [
+    28,
+    29
+   ],
+   "statement": "The container's default database cluster location inside the container is /var/lib/synthetic-hospital.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The database cluster path inside the container concerns only the alternative packaging the team's plan does not touch, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 10,
+   "quote": "which must be writable",
+   "lines": [
+    28,
+    29
+   ],
+   "statement": "The database cluster path /var/lib/synthetic-hospital must be writable for the container to run.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Writability of that path matters only to running the alternative packaging the team does not use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 11,
+   "quote": "has room for the loaded benchmark (a few hundred MB)",
+   "lines": [
+    29,
+    29
+   ],
+   "statement": "Quantity claim: the loaded benchmark database occupies a few hundred megabytes, so the bound directory needs room of that order.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The disk space the loaded benchmark needs in the image affects only the alternative packaging the team does not use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 12,
+   "quote": "API on http://localhost:8000/docs",
+   "lines": [
+    34,
+    34
+   ],
+   "statement": "The all-in-one image contains an API server configured to serve its documentation UI on port 8000 at the /docs path.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "the API listens on 8000",
+     "lines": [
+      55,
+      55
+     ]
+    }
+   ],
+   "tier": 3,
+   "tier_basis": "The docs UI port and path in the all-in-one image concern packaging the team does not run, and no stated threshold about the simulator's faithfulness reaches a documentation-UI location. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 14,
+   "quote": "apptainer instance start --bind $HOME/sh-state:/var/lib/synthetic-hospital synthetic_hospital.sif sh",
+   "lines": [
+    40,
+    40
+   ],
+   "statement": "The image supports running as a named background Apptainer instance, manageable with `apptainer instance list` and `apptainer instance stop`.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Running the image as a named Apptainer instance is part of the alternative packaging the team's plan does not touch, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 15,
+   "quote": "Any command runs after the services are up, e.g. tests or an evaluation",
+   "lines": [
+    45,
+    45
+   ],
+   "statement": "The container's startup brings up its database, Redis and API services before executing whatever command is passed to the container.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Startup ordering inside the all-in-one image matters only to the alternative packaging the team does not use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 17,
+   "quote": "python -m eval.cli run --task patient_diagnosis --model <model> --split public --strategy cot",
+   "lines": [
+    49,
+    50
+   ],
+   "statement": "The image ships an evaluation CLI (eval.cli) whose `run` command accepts --task (e.g. patient_diagnosis), --model, --split (e.g. public) and --strategy (e.g. cot).",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The claim concerns the documented options of the eval.cli run command; the team's engineers would meet any failure the first time they ran an evaluation and would correct it by reading the CLI, without changing code, so it changes how the software is set up rather than whether the plan holds. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 18,
+   "quote": "PostgreSQL on 127.0.0.1:5432",
+   "lines": [
+    55,
+    55
+   ],
+   "statement": "PostgreSQL inside the container listens on 127.0.0.1:5432.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The address PostgreSQL listens on inside the all-in-one image concerns only the alternative packaging the team does not use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 19,
+   "quote": "Redis on 127.0.0.1:6379",
+   "lines": [
+    55,
+    55
+   ],
+   "statement": "Redis inside the container listens on 127.0.0.1:6379.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns how Redis is configured inside the Apptainer SIF, which falls under alternative packaging the buyer's plan does not touch, and no stated threshold reaches a container's Redis listen address. Any way it could be untrue would be met by a person setting the container up, if they used it at all. Rated on the scale alone."
+  },
+  {
+   "id": 20,
+   "quote": "Override with `PGPORT` and `SH_REDIS_PORT` if those ports are taken on a shared node",
+   "lines": [
+    56,
+    57
+   ],
+   "statement": "The PostgreSQL and Redis ports can be overridden via the PGPORT and SH_REDIS_PORT environment variables.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns port-override environment variables for the Apptainer container, which falls under alternative packaging the buyer's plan does not touch, and no stated threshold reaches port configuration. Any failure would be a setup detail a person could correct without changing code. Rated on the scale alone."
+  },
+  {
+   "id": 21,
+   "quote": "`--writable-tmpfs` works only if the session directory limit in `apptainer.conf` is raised well above the default 64 MiB",
+   "lines": [
+    58,
+    59
+   ],
+   "statement": "Runtime requirement: running the container with --writable-tmpfs needs an Apptainer session directory limit well above the 64 MiB default, i.e. the container's session usage exceeds that default.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns an Apptainer session-directory limit needed to run the SIF, which falls under alternative packaging the buyer's plan does not touch, and no stated threshold reaches container runtime requirements. A person running the container would encounter and adjust the limit at setup. Rated on the scale alone."
+  },
+  {
+   "id": 22,
+   "quote": "Terminology files (SNOMED CT, LOINC) can be bound at `/app/data/ontology` and are loaded on the next start",
+   "lines": [
+    60,
+    61
+   ],
+   "statement": "The container provides a bind point at /app/data/ontology and startup logic that loads terminology files found there into the database.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns a terminology bind point in the Apptainer container; the buyer does not use the Apptainer SIF, and although terminology handling is a reliance item, it is one the buyer only uses rather than depends on, and no stated threshold reaches the bind point or load timing. Any failure would be correctable at setup by the engineers who operate the stack. Rated on the scale alone."
+  },
+  {
+   "id": 23,
+   "quote": "The scorer token defaults to the development value",
+   "lines": [
+    62,
+    62
+   ],
+   "statement": "Default claim: the scorer token ships configured to a development value.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns the scorer token's default value as shipped in the Apptainer container, which falls under alternative packaging the buyer's plan does not touch, and no stated threshold reaches a default token value. A person deploying beyond local use is told to override it, so its failure would be a setup detail. Rated on the scale alone."
+  },
+  {
+   "id": 24,
+   "quote": "set `EPIC_SIM_SCORER_TOKEN` with `--env` for anything beyond local use",
+   "lines": [
+    62,
+    63
+   ],
+   "statement": "The scorer token can be overridden via the EPIC_SIM_SCORER_TOKEN environment variable passed with --env.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns overriding the scorer token via an environment variable in the Apptainer container, which falls under alternative packaging the buyer's plan does not touch, and no stated threshold reaches token configuration mechanics. Any failure would be met and worked around during setup. Rated on the scale alone."
+  },
+  {
+   "id": 25,
+   "quote": "starts everything as the calling user",
+   "lines": [
+    4,
+    5
+   ],
+   "statement": "When the container runs, its services run as the calling user, with no step that switches to another account.",
+   "about": "target",
+   "implied_by": 2,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "The claim concerns the account under which the Apptainer container's services run, which falls under alternative packaging the buyer's plan does not touch, and no stated threshold reaches process-user identity in a container. The buyer drives the simulator and environment endpoints directly rather than through the SIF. Rated on the scale alone."
+  },
+  {
+   "id": 26,
+   "quote": "API on http://localhost:8000/docs",
+   "lines": [
+    34,
+    34
+   ],
+   "statement": "When the container runs, the API serves its documentation UI at http://localhost:8000/docs, reachable without additional setup.",
+   "about": "target",
+   "implied_by": 12,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "The claim concerns the documentation UI's address when the Apptainer container runs, which falls under alternative packaging the buyer's plan does not touch, and no stated threshold reaches where the docs UI is served. Even a failed docs URL would not affect evaluation or training, which do not pass through the SIF. Rated on the scale alone."
+  },
+  {
+   "id": 27,
+   "quote": "Any command runs after the services are up, e.g. tests or an evaluation",
+   "lines": [
+    45,
+    45
+   ],
+   "statement": "When a command such as the tests or an evaluation is run in the container, the services are already up and the command executes only after them.",
+   "about": "target",
+   "implied_by": 15,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "The claim concerns command ordering inside the Apptainer container, which falls under alternative packaging the buyer's plan does not touch, and no stated threshold reaches container startup sequencing. A person running commands in the container would notice and handle any ordering issue at setup. Rated on the scale alone."
+  },
+  {
+   "id": 28,
+   "quote": "Terminology files (SNOMED CT, LOINC) can be bound at `/app/data/ontology` and are loaded on the next start",
+   "lines": [
+    60,
+    61
+   ],
+   "statement": "When the container is started with SNOMED CT and LOINC terminology files bound at /app/data/ontology, those files are loaded into the database on the next start, as they are with Docker.",
+   "about": "target",
+   "implied_by": 22,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "The claim concerns terminology loading on start in the Apptainer container, which falls under alternative packaging the buyer's plan does not touch; terminology handling is a reliance item the buyer only uses, and no stated threshold reaches the load mechanism. Any failure would be a setup detail for the engineers who, on the buyer's plan, do not use the SIF. Rated on the scale alone."
+  }
+ ]
+}

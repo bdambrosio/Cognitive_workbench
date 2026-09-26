@@ -1,0 +1,1904 @@
+{
+ "sources": {
+  "DATA_CARD.md": {
+   "at": "2026-09-25T20-01-05Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 70,
+   "claims_from": "runs/2026-09-25T18-56-37Z_enum_synthetic-hospital_data_card_md_2026-09-25T18-56-37Z/claims.json",
+   "reliance_statement": "2026-09-25T19-49-08Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 2,
+     "basis": "The claim is a figure about the dataset's scale; if untrue, the team's engineers meet it when they load and inspect the shipped SQLite and JSONL files, which they can do cheaply. Its failure alone changes nothing about the adoption. Rated on the scale alone."
+    },
+    {
+     "claim_id": 2,
+     "tier": 2,
+     "basis": "The claim is a figure about the dataset's scale; if untrue, the team's engineers meet it when they load and inspect the shipped files, which they can do cheaply. Its failure alone changes nothing about the adoption. Rated on the scale alone."
+    },
+    {
+     "claim_id": 3,
+     "tier": 2,
+     "basis": "If one of the two named files is absent or differently named, the engineers meet this when setting up and can work from the other format; the claim is a packaging detail an operator acts on. Its failure alone changes nothing for the buyer. Rated on the scale alone."
+    },
+    {
+     "claim_id": 4,
+     "tier": 1,
+     "basis": "The claim could be untrue because the released database is absent or does not actually contain ground truth, relevance judgments or split labels; without ground truth in the release the team's evaluation results and training rewards would be meaningless and no local repair restores them. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+    },
+    {
+     "claim_id": 5,
+     "tier": 1,
+     "basis": "The claim could be untrue because one or more of the four named tasks is not actually supported by the released data with usable ground truth over multi-visit timelines. The team would then have to evaluate on fewer tasks and narrow its publication, and it cannot easily author replacement tasks with credible ground truth. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 6,
+     "tier": 1,
+     "basis": "The claim could be untrue because no training split is released, or the released split does not support training or fine-tuning. Training the agent, including reinforcement learning on the training split, is half the team's stated purpose, and it cannot redraw or repair a missing or unusable split itself without the project's sampling records. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 7,
+     "tier": 1,
+     "basis": "Any way the claim could be untrue admits real patient data in the release. No patch by the team could cure that, and adoption ends under the buyer's stated walk-away condition. Rated against the buyer's stated threshold: \"data that is not fully synthetic\"."
+    },
+    {
+     "claim_id": 8,
+     "tier": 1,
+     "basis": "The claim could be untrue because the records were not generated as described — for example because they were derived from real patient content rather than produced by the stated synthetic generation — in which case the release is not fully synthetic and adoption ends; other deviations would leave the team publishing provenance claims the materials do not support, which it cannot repair itself. Rated against the buyer's stated threshold: \"data that is not fully synthetic\"."
+    },
+    {
+     "claim_id": 9,
+     "tier": 2,
+     "basis": "The claim is a schema detail the engineers act on when querying the patients table; a wrong table or column list is met on first use and corrected in their own queries. Its failure alone changes nothing for the buyer. Rated on the scale alone."
+    },
+    {
+     "claim_id": 10,
+     "tier": 2,
+     "basis": "The claim is a file-structure detail the engineers act on when parsing the JSONL file; a wrong nesting shape is met at setup and corrected in their own reader code. Its failure alone changes nothing for the buyer. Rated on the scale alone."
+    },
+    {
+     "claim_id": 11,
+     "tier": 2,
+     "basis": "The claim is a file-format detail; if the file is not SQLite 3 or does not hold the benchmark tables, the engineers meet this the first time they open it and can obtain or inspect the data another way. Its failure alone changes nothing for the buyer. Rated on the scale alone."
+    },
+    {
+     "claim_id": 12,
+     "tier": 2,
+     "basis": "If the module is absent or fails to migrate the data, the Docker Compose first-boot Postgres schema creation and benchmark load is another way the project's documents describe for getting the data into the simulator, and a broken command is met and worked around at setup. Its failure alone changes nothing for the buyer. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 13,
+     "tier": 2,
+     "basis": "The claim is a column-level schema detail the engineers act on when reading the patients table; a wrong column name or meaning is met in use and corrected in their own code. Its failure alone changes nothing for the buyer. Rated on the scale alone."
+    },
+    {
+     "claim_id": 14,
+     "tier": 2,
+     "basis": "The claim concerns a field that is not in the release; if untrue, the engineers would at most see an extra placeholder column, which no stated threshold reaches and which does not affect evaluation or training. No way it could be untrue is material. Rated on the scale alone."
+    },
+    {
+     "claim_id": 15,
+     "tier": 2,
+     "basis": "The claim describes the content of data that was excluded from the release; the team's engineers never meet it in use, and no way it could be untrue reaches a stated threshold or a part of the buyer's plan. Rated on the scale alone."
+    },
+    {
+     "claim_id": 16,
+     "tier": 2,
+     "basis": "No stated threshold reaches a claim about which field carries provider information, and it falls under no item the buyer depends on. If it failed, the team's engineers would meet the failure while querying the released data and would act on it there. Rated on the scale alone."
+    },
+    {
+     "claim_id": 17,
+     "tier": 2,
+     "basis": "A row count in the released database is reached by no stated threshold and no depended-on item. A discrepancy is something the team's engineers would meet and act on while working with the shipped database. Rated on the scale alone."
+    },
+    {
+     "claim_id": 18,
+     "tier": 2,
+     "basis": "No stated threshold reaches the one-row-per-visit semantics or the per-patient encounter average, and no depended-on item names this part of the release. If it failed, the engineers would meet it while assembling patient timelines and act on it there. Rated on the scale alone."
+    },
+    {
+     "claim_id": 19,
+     "tier": 1,
+     "basis": "The claim asserts the attending_name field is synthetic; if it failed by the names being real, the released data would not be fully synthetic, which under the buyer's terms ends the adoption and which no engineering effort by the team could cure. Rated against the buyer's stated threshold: \"data that is not fully synthetic\"."
+    },
+    {
+     "claim_id": 20,
+     "tier": 2,
+     "basis": "No stated threshold reaches this query recipe and no depended-on item names it. If joining and ordering did not reconstruct the timeline, the engineers would meet it while assembling multi-visit data and act on it there. Rated on the scale alone."
+    },
+    {
+     "claim_id": 21,
+     "tier": 2,
+     "basis": "A table's row count is reached by no stated threshold and no depended-on item. Any discrepancy would be met by the engineers while inspecting the shipped database and acted on there. Rated on the scale alone."
+    },
+    {
+     "claim_id": 22,
+     "tier": 2,
+     "basis": "No stated threshold or depended-on item reaches the existence or row count of this table. A discrepancy is something the team's engineers would meet and act on while using the data. Rated on the scale alone."
+    },
+    {
+     "claim_id": 23,
+     "tier": 2,
+     "basis": "The nature of this field is reached by no stated threshold and no depended-on item. If the keys were not opaque integers into the annotation tables, the engineers would meet it while interpreting the field and act on it there. Rated on the scale alone."
+    },
+    {
+     "claim_id": 24,
+     "tier": 2,
+     "basis": "No stated threshold reaches the row count or the section typing, and no depended-on item names this table. If the sections were not the retrieval passage unit, the engineers would meet that while running the retrieval task and act on it there. Rated on the scale alone."
+    },
+    {
+     "claim_id": 25,
+     "tier": 2,
+     "basis": "The buyer's ground-truth threshold concerns ground truth or scoring not working as described, not a table's existence, row count or columns, and no other threshold or depended-on item reaches those. Any discrepancy would be met and acted on by the engineers while working with the database. Rated on the scale alone."
+    },
+    {
+     "claim_id": 26,
+     "tier": 2,
+     "basis": "A table's row count and the 0–3 relevance scale are reached by no stated threshold and no depended-on item. A discrepancy would be met by the engineers while using the relevance data and acted on there. Rated on the scale alone."
+    },
+    {
+     "claim_id": 27,
+     "tier": 2,
+     "basis": "No stated threshold reaches this table's row count or its keying to ground truth, and no depended-on item names it. Any discrepancy would be met and acted on while running the imaging-indication task. Rated on the scale alone."
+    },
+    {
+     "claim_id": 28,
+     "tier": 2,
+     "basis": "Row counts of the knowledge-graph tables are reached by no stated threshold and no depended-on item. Discrepancies would be met by the engineers while inspecting or querying the graph and acted on there. Rated on the scale alone."
+    },
+    {
+     "claim_id": 29,
+     "tier": 2,
+     "basis": "No stated threshold reaches the ontology coding of the graph — it is not ground truth, scoring, simulator faithfulness, split integrity or provenance — and no depended-on item names it. If the coding differed as described, the engineers would meet it while using the graph and act on it there. Rated on the scale alone."
+    },
+    {
+     "claim_id": 30,
+     "tier": 2,
+     "basis": "The row counts and contents of the annotation tables are reached by no stated threshold and no depended-on item. Any discrepancy would be met and acted on by the engineers while working with the annotation data. Rated on the scale alone."
+    },
+    {
+     "claim_id": 31,
+     "tier": 2,
+     "basis": "No stated threshold reaches the presence or absence of question text in the annotation tables: it is neither a leakage channel between splits nor a licence, scoring, simulator or validation matter. A person working with the annotation tables would act on the boundary and meet any difference in use, but on its own it changes nothing for the buyer's plan. Rated on the scale alone."
+    },
+    {
+     "claim_id": 32,
+     "tier": 2,
+     "basis": "No stated threshold reaches the existence or contents of a release_info table. A person setting up the benchmark would read the version and change notes and would notice a missing table, but its absence changes how the release is inspected, not whether the plan holds. Rated on the scale alone."
+    },
+    {
+     "claim_id": 33,
+     "tier": 2,
+     "basis": "The instance counts fall under the dataset's content and scale, an item the buyer uses rather than depends on, and no stated threshold reaches them. A count error is something the team's engineers can check directly against the shipped database and work around. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 34,
+     "tier": 1,
+     "basis": "The claim could be untrue by the split labels being assigned at encounter level, so that one patient's encounters land in both the training pool and the held-out set. That is exactly the leakage the buyer named, and it would invalidate published results and reinforcement-learning training with no repair the team can make. Rated against the buyer's stated threshold: \"leakage between the public, held-out and training splits\"."
+    },
+    {
+     "claim_id": 35,
+     "tier": 2,
+     "basis": "The public split's size and its role as the reported benchmark fall under the dataset content and scale item the buyer uses, and no stated threshold reaches them. An error is checkable against the shipped database and the team runs its own evaluation regardless of which split the project reported. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 36,
+     "tier": 2,
+     "basis": "The held-out split's size and the instruction not to train on it fall under the dataset content and scale item the buyer uses; no stated threshold reaches them, and the buyer's plan already trains only on the train split. A discrepancy is checkable by the team's engineers in the shipped data. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 37,
+     "tier": 1,
+     "basis": "Beyond the counts, the claim asserts the train split is usable for reinforcement learning with graph-derived rewards; if it is not, half the buyer's stated purpose, training the agent on the benchmark, fails, and the team would have to build its own reward service and episode harness rather than repair the split. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 38,
+     "tier": 2,
+     "basis": "No way the sampling description could be untrue, a different pool, strata or seed, is material: the actual split membership ships in the database and the membership script and can be inspected, so the description's accuracy changes documentation, not whether the plan holds, and a wrong seed does not un-reproduce a split whose members are recorded. Rated on the scale alone."
+    },
+    {
+     "claim_id": 39,
+     "tier": 2,
+     "basis": "This is a claim about a document, and the script is not itself a fact the buyer relies on, such as a licence or ownership text, so it has no route to the buyer. A person determining which patients belong to the reinforcement-learning split would consult the script and meet its absence in use, which is not material on its own. Rated on the scale alone."
+    },
+    {
+     "claim_id": 40,
+     "tier": 2,
+     "basis": "The distinctness of source questions concerns how the released data was built, an item the buyer uses rather than depends on, and no stated threshold reaches it; if encounters shared source questions the team's engineers can detect that in the shipped data, and evaluation on the actual encounters is unaffected. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 41,
+     "tier": 1,
+     "basis": "The claim could be untrue by some patients sharing source material; where such patients fall in different splits, training would expose the source questions that held-out encounters derive from, contaminating the held-out set in a way the team cannot detect or repair without the project's records. That is a leakage channel of the kind the buyer named. Rated against the buyer's stated threshold: \"leakage between the public, held-out and training splits\"."
+    },
+    {
+     "claim_id": 42,
+     "tier": 1,
+     "basis": "The claim could be untrue by the database actually containing some raw source cards, board-question vignettes and answers, fact cards or source EHR sections; that would be source content shipped in the release whose distribution rights are unverified, the licence problem the buyer said ends the adoption and which no engineering effort cures. Rated against the buyer's stated threshold: \"a licence or data-provenance problem, such as source content the project may not distribute\"."
+    },
+    {
+     "claim_id": 43,
+     "tier": 2,
+     "basis": "No stated threshold reaches the exclusion of model outputs and LLM call logs; they are neither patient data raising the synthetic-data threshold nor source content raising the licence threshold. A person using the database would act on knowing what it contains and meet any difference in use, which is not material on its own. Rated on the scale alone."
+    },
+    {
+     "claim_id": 44,
+     "tier": 1,
+     "basis": "The claim could be untrue by the licensed SNOMED CT / LOINC terminology tables actually being shipped with the database; distributing licensed terminology without holding the licence is a licence problem the buyer said ends the adoption, and the team cannot cure it by removing the tables after relying on the release. Rated against the buyer's stated threshold: \"a licence or data-provenance problem\"."
+    },
+    {
+     "claim_id": 45,
+     "tier": 2,
+     "basis": "The loader function falls under terminology handling, an item the buyer uses rather than depends on; if the function were missing or did not work, the team's engineers can obtain the terminology files and load them themselves at modest cost. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 46,
+     "tier": 1,
+     "basis": "The relevance judgments are the ground truth for the evidence-retrieval task; if the chart-section judgments are absent or not as described, that ground truth does not work as described and the team would have to narrow what it publishes. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+    },
+    {
+     "claim_id": 47,
+     "tier": 2,
+     "basis": "The retired single-encounter task is not one of the four tasks the buyer's plan depends on, and no way the claim could be untrue changes the price, the terms or the plan; an engineer configuring evaluation would act on which tasks are present and meet any discrepancy there. Rated on the scale alone."
+    },
+    {
+     "claim_id": 48,
+     "tier": 2,
+     "basis": "The split label names are acted on by anyone selecting data for evaluation or training, but a mismatch is a name difference noticed on first inspection and corrected without changing code, so it changes how the software is set up rather than whether the plan holds. Rated on the scale alone."
+    },
+    {
+     "claim_id": 49,
+     "tier": 1,
+     "basis": "If the disclosed cleaning was not carried out, the shipped charts would carry the self-contradictory medication and history statements, duplicate problem-list entries and fragments the DATA_CARD says were removed, making the clinical content materially worse than described; the team cannot repair the data itself, and its published results would not support the claims it wants to make. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 50,
+     "tier": 1,
+     "basis": "If the release was not built by the pipeline as described — in particular if the profiles and notes were not derived from clustered question vignettes — the clinical content is not what the DATA_CARD says was derived from the education material, and the team could not stand behind the data's provenance in what it publishes; it cannot repair the data itself. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 51,
+     "tier": 2,
+     "basis": "The presence or absence of the provenance pointers matters to an engineer parsing or auditing the profile files, and no way the claim could be untrue defeats an item the buyer depends on: the pointers are identifiers, not shipped content, and the team does not rebuild the data. Rated on the scale alone."
+    },
+    {
+     "claim_id": 52,
+     "tier": 1,
+     "basis": "If the released data is not fully synthetic, the buyer's stated walk-away condition is met and no repair by the team cures it. Rated against the buyer's stated threshold: \"data that is not fully synthetic\"."
+    },
+    {
+     "claim_id": 53,
+     "tier": 1,
+     "basis": "If the generated content reproduces protectable source material, the release carries a copyright problem of the kind the buyer says ends adoption, and the team cannot cure it after the fact. Rated against the buyer's stated threshold: \"a licence or data-provenance problem\"."
+    },
+    {
+     "claim_id": 54,
+     "tier": 1,
+     "basis": "If untrue because the profiles ship SNOMED CT or LOINC codes the project is not entitled to redistribute, the release would carry a licence problem of the kind the buyer says ends adoption, and shipped ICD codes in patient profiles would put the diagnosis reference where the agent can reach it. Rated against the buyer's stated threshold: \"a licence or data-provenance problem\"."
+    },
+    {
+     "claim_id": 55,
+     "tier": 1,
+     "basis": "If the tables do not carry the codes as described, the diagnosis reference and scoring are broken; if the licensing characterizations are wrong — SNOMED CT content beyond identifiers and display names, or LOINC not redistributable — the release carries a licence problem the team cannot repair. Rated against the buyer's stated threshold: \"a licence or data-provenance problem\"."
+    },
+    {
+     "claim_id": 56,
+     "tier": 1,
+     "basis": "If the stated licensing condition is wrong in the adverse direction — restrictions broader than disclosed — the team's use of the knowledge-graph's SNOMED CT content would face a licence problem it cannot repair after adoption. Rated against the buyer's stated threshold: \"a licence or data-provenance problem\"."
+    },
+    {
+     "claim_id": 57,
+     "tier": 1,
+     "basis": "If the problem-list tool, the active_problems field or the FHIR Condition resource is absent or does not return the graph-derived reference, the ground truth and scoring do not work as described and the team's evaluation results and training rewards are meaningless. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+    },
+    {
+     "claim_id": 58,
+     "tier": 1,
+     "basis": "If the /env endpoints do not substitute the chart's documented history for the ground-truth diagnoses, the correct diagnoses reach the agent during episodes, contaminating evaluation results and reinforcement-learning rewards; the team would have to filter or fork the simulator's serving layer, which does not preserve the plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 59,
+     "tier": 1,
+     "basis": "If the assessment and plan sections are not hidden, the chart's diagnostic conclusions reach the agent during episodes, contaminating evaluation results and reinforcement-learning rewards; the team would have to filter or fork the simulator's serving layer, which does not preserve the plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 60,
+     "tier": 2,
+     "basis": "The claim discloses a limit on evaluations that call the raw tool API, a path the team's plan does not use: it drives the environment and scoring through the /env endpoints and the provided client, which remain protected if the claim holds. If the disclosed boundary were different, engineers choosing a call path would meet it in use, and it would change how they run evaluations, not whether the plan holds. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 61,
+     "tier": 3,
+     "basis": "The claim sits under the permitted-use boundary, which the buyer's plan does not touch: the team uses the data only to evaluate and train its agent, not for clinical care. No stated threshold reaches it, and no way it could be untrue would change the price, the terms or the plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 63,
+     "tier": 3,
+     "basis": "The claim sits under the permitted-use boundary, which the buyer's plan does not touch: the team does not use the data for clinical decision-making and does not treat it as real patient data. No stated threshold reaches it, so no way it could be untrue is material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 64,
+     "tier": 1,
+     "basis": "The claim could be untrue because the clinical content derives from real patient records rather than medical education material; that is data that is not fully synthetic, and under the buyer's stated threshold adoption would end, since no repair by the team cures non-synthetic data. Rated against the buyer's stated threshold: \"data that is not fully synthetic\"."
+    },
+    {
+     "claim_id": 65,
+     "tier": 3,
+     "basis": "The claim is a hedged disclosure: as worded it fails only if the content is cleaner than described, which leaves the buyer's plan intact, and it sets no bound that worse artifacts could break. No stated threshold reaches it and no way it could be untrue is material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 66,
+     "tier": 2,
+     "basis": "This is a documented command the team's engineers would run when loading the benchmark database into the simulator; if it were wrong they would meet the failure during setup and correct it — another module or path — without changing code, so no way it could be untrue is material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 67,
+     "tier": 2,
+     "basis": "This is a documented command the team's engineers would run to load their own SNOMED CT / LOINC tables; if it were wrong they would meet the failure during setup and load the tables themselves, which the plan treats as cheap, so no way it could be untrue is material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 68,
+     "tier": 3,
+     "basis": "The claim describes how the released data was built; the team adopts the data as shipped and does not rerun the generation pipeline, so its engineers would not meet a failure of these stages in use. No stated threshold reaches it and no way it could be untrue changes the plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 69,
+     "tier": 1,
+     "basis": "The claim could be untrue because the problem-list tool, the active_problems field or the FHIR Condition resource does not return the graph-derived ground-truth diagnoses with ICD-10 codes; the scoring reference for the diagnosis task would then be missing or wrong, defeating the buyer's evaluation and its reinforcement-learning rewards. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+    },
+    {
+     "claim_id": 70,
+     "tier": 1,
+     "basis": "The claim could be untrue because the /env endpoints or Harbor tasks serve the ground-truth diagnoses instead of the chart's documented history; the agent under test would then read the labels, contaminating rewards and inflating the results the team publishes, and no repair restores contaminated runs. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+    },
+    {
+     "claim_id": 71,
+     "tier": 1,
+     "basis": "The claim could be untrue because the assessment and plan sections are shown during episodes; the agent could then read the admitting assessment, which carries the diagnosis, contaminating rewards and inflating results, and the team's only remedy — filtering or forking the serving layer — is buyer-side engineering and does not hold the plan. Rated on the practice's reading of the buyer's plan."
+    }
+   ],
+   "unrated": []
+  },
+  "README.md": {
+   "at": "2026-09-25T20-19-15Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 175,
+   "claims_from": "runs/2026-09-25T19-05-10Z_enum_synthetic-hospital_readme_md_2026-09-25T18-56-37Z/claims.json",
+   "reliance_statement": "2026-09-25T19-49-08Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 1,
+     "basis": "The claim asserts the pipeline's output records are synthetic; if they are not — if the benchmark database contains real patient data — the buyer's adoption ends and no local repair cures it. Rated against the buyer's stated threshold: \"data that is not fully synthetic\"."
+    },
+    {
+     "claim_id": 2,
+     "tier": 1,
+     "basis": "If the simulation platform is not faithful to Epic's interface in FHIR R4, OAuth2 or RBAC as claimed, evaluation and training against it would not transfer to the Epic-like deployment setting the buyer cares about, and the simulator is the project's core offering. Rated against the buyer's stated threshold: \"a simulator that is not FHIR R4 / OAuth2 / RBAC faithful as claimed\"."
+    },
+    {
+     "claim_id": 5,
+     "tier": 1,
+     "basis": "If the benchmark cannot serve as a verifiable-reward environment, reinforcement learning on the training split — half the buyer's stated purpose — fails, and the buyer would have to build its own reward service and episode harness at significant cost. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 6,
+     "tier": 3,
+     "basis": "No stated threshold reaches the existence, authorship or title of a preprint, and the buyer's comparability with the published paper is an item it only uses, reporting under its own documented protocol if the preprint disappoints. Rated on the scale alone."
+    },
+    {
+     "claim_id": 7,
+     "tier": 1,
+     "basis": "If the source content is in fact distributed with the project, the release ships material it may not be entitled to distribute — the provenance problem the buyer said would end the adoption, which the buyer cannot repair and could only cure by removing the affected material or walking away. Rated against the buyer's stated threshold: \"source content the project may not distribute\"."
+    },
+    {
+     "claim_id": 8,
+     "tier": 3,
+     "basis": "The ETL pipeline is an item the buyer does not use — it adopts the release as shipped and does not rebuild the database — and no stated threshold reaches the stage sequence or its naming. Rated on the scale alone."
+    },
+    {
+     "claim_id": 9,
+     "tier": 2,
+     "basis": "The output database's format and location are details the buyer's engineers act on when loading the released benchmark, and a wrong path or format would surface during setup without changing whether the buyer's plan holds. No stated threshold reaches it and no way it could be untrue defeats an item the buyer depends on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 10,
+     "tier": 1,
+     "basis": "If epic_sim does not support FHIR R4, OAuth2 and RBAC as claimed, the buyer's evaluation and training would not transfer to the Epic-like setting it is adopting the simulator for, and replacing the simulator would be costly. Rated against the buyer's stated threshold: \"a simulator that is not FHIR R4 / OAuth2 / RBAC faithful as claimed\"."
+    },
+    {
+     "claim_id": 11,
+     "tier": 1,
+     "basis": "If eval/ provides no working scoring, the ground truth and scoring the buyer is adopting do not work as described and its evaluation results and training rewards would be meaningless — the core of what it is adopting, which repair would make costly. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+    },
+    {
+     "claim_id": 12,
+     "tier": 1,
+     "basis": "The claim asserts the patients are synthetic; if the released profiles are not fully synthetic — if real patient data is included — the buyer's adoption ends under its own stated threshold and no patch could cure it. Rated against the buyer's stated threshold: \"data that is not fully synthetic\"."
+    },
+    {
+     "claim_id": 13,
+     "tier": 2,
+     "basis": "A note count is a documented figure the buyer's engineers would check when inspecting the shipped data files, and a wrong count on its own changes nothing about the buyer's plan. No stated threshold reaches it and no way it could be untrue defeats an item the buyer depends on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 17,
+     "tier": 1,
+     "basis": "If the splits are not partitioned at the patient level, a patient appears in more than one split — the leakage the buyer said would change the terms, invalidating its published results and any reinforcement-learning training. Rated against the buyer's stated threshold: \"leakage between the public, held-out and training splits\"."
+    },
+    {
+     "claim_id": 19,
+     "tier": 2,
+     "basis": "The held-out split's size is a documented figure the buyer's engineers would act on when running evaluation and would meet any discrepancy in use; a wrong count reaches no stated threshold and on its own leaves a usable evaluation path. Rated on the scale alone."
+    },
+    {
+     "claim_id": 21,
+     "tier": 1,
+     "basis": "If the training split is materially smaller than the 800 patients claimed, it is not usable for the reinforcement-learning training that is half the buyer's stated purpose, and the buyer cannot repair a thin split itself without the project's sampling records. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 24,
+     "tier": 3,
+     "basis": "The ETL pipeline is an item the buyer does not use — it adopts the release as shipped and does not rebuild the database — and no stated threshold reaches the pipeline's existence or location. Rated on the scale alone."
+    },
+    {
+     "claim_id": 25,
+     "tier": 3,
+     "basis": "The ETL pipeline is an item the buyer does_not_use, and no stated threshold reaches a claim about the etl/ directory's contents, so no way it could be untrue reaches the buyer's plan. Rated on the scale alone."
+    },
+    {
+     "claim_id": 26,
+     "tier": 2,
+     "basis": "The migrations and tests are operational details a person setting up or running the simulator would encounter and could correct during setup; their absence would not defeat any item the buyer depends on. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 27,
+     "tier": 1,
+     "basis": "The claim asserts several things, and it could be untrue in ways that defeat items the buyer depends on: if the task definitions are absent or empty the four benchmark tasks cannot run, and if the CLI is absent the eval.cli commands named in the reproducible-evaluation item do not exist, so published evaluation could not be stood behind without significant work. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 28,
+     "tier": 2,
+     "basis": "No stated threshold reaches a claim about the inclusion of ICD-10 validation — the scoring threshold concerns ground truth and scoring working as described, not the presence of a validation feature — and no depends item names it. A person running evaluation would act on the feature and meet its absence in use, without the plan failing. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 29,
+     "tier": 2,
+     "basis": "The auditing and analysis scripts fall under the methodology-artifacts item the buyer uses, not depends on; their absence would cost the team a means of checking how the data was built but would not defeat the plan. A person operating the release would act on the scripts and meet their absence in use. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 30,
+     "tier": 2,
+     "basis": "The compose-stack part falls under an item the buyer uses, and the all-in-one-image part falls under the alternative-packaging item the buyer does_not_use. A person setting up the stack would act on the build files and meet any failure at first run, and could correct it without changing the plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 31,
+     "tier": 3,
+     "basis": "Harbor task templates and the Apptainer definition fall under the alternative-packaging item the buyer does_not_use, and no stated threshold reaches them. Rated on the scale alone."
+    },
+    {
+     "claim_id": 32,
+     "tier": 2,
+     "basis": "The shipped data files fall under items the buyer uses (dataset content and distribution mechanics); the synthetic-data and licence thresholds concern the data's nature, not which files ship, and a missing file would be met during setup. A person setting up the stack would act on the files and meet their absence at first boot. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 33,
+     "tier": 2,
+     "basis": "The compose stack is an item the buyer uses; a person setting it up would act on the build and meet any failure at first run, and the simulator could be served directly without changing the plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 34,
+     "tier": 2,
+     "basis": "The service versions are setup details under the compose-stack item the buyer uses; a person running the stack would meet any failure at first boot and could correct the configuration without changing the plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 35,
+     "tier": 2,
+     "basis": "First-boot loading is part of the compose-stack item the buyer uses; a failure would be met and corrected during setup and does not by itself reach a threshold or a depends item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 36,
+     "tier": 2,
+     "basis": "Serving the simulator through compose falls under the compose-stack item the buyer uses, and the simulator-fidelity threshold concerns how faithfully it simulates, not whether the stack serves it; a failure would be met at setup and the simulator could be served directly without changing the plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 37,
+     "tier": 3,
+     "basis": "A load-time figure is not something a person setting up or operating the stack would act on, and no threshold or depends item reaches it; a slower load would change expectations during setup, not whether the plan holds. Rated on the scale alone."
+    },
+    {
+     "claim_id": 38,
+     "tier": 2,
+     "basis": "The documentation URL is a location detail a person operating the stack would act on and would meet any failure immediately; its failure changes how the stack is accessed, not whether the plan holds. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 39,
+     "tier": 2,
+     "basis": "The log line is a readiness signal a person operating the stack would act on, and the 1,268-patient figure sits under a dataset-scale item the buyer uses; a missing line or a differing count would be met in setup and does not by itself reach a threshold or a depends item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 40,
+     "tier": 2,
+     "basis": "If evaluation or tests do not run inside the image against the loaded database, the team's engineers meet this on first use and correct their compose or entrypoint setup themselves; no stated threshold reaches the container boundary and no depends item turns on it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 41,
+     "tier": 1,
+     "basis": "If the documented `eval.cli run` command does not exist or does not accept the task, split and strategy options shown, the documented evaluation path fails, the buyer's reproducible-runs item is defeated, and published results cannot be produced as described; re-establishing reproducibility unaided is, per the reliance statement, significant work for the team. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 42,
+     "tier": 2,
+     "basis": "A missing or unrunnable test suite would be met by the team's own engineers while setting up and worked around without affecting the plan; no stated threshold reaches it and no depends item covers the tests. Rated on the scale alone."
+    },
+    {
+     "claim_id": 43,
+     "tier": 2,
+     "basis": "Results landing somewhere other than ./results would be noticed immediately in use and corrected by fixing the host mount, a setup change rather than a change to whether the plan holds. Rated on the scale alone."
+    },
+    {
+     "claim_id": 44,
+     "tier": 2,
+     "basis": "Port overrides are a setup convenience; if the variables do not work the engineers would notice while starting the stack and adapt, with no effect on validity, reproducibility or any depends item. Rated on the scale alone."
+    },
+    {
+     "claim_id": 45,
+     "tier": 2,
+     "basis": "Idempotence of the startup load affects restart convenience only; its failure would be met in operation and worked around without changing code or defeating any depends item. Rated on the scale alone."
+    },
+    {
+     "claim_id": 46,
+     "tier": 2,
+     "basis": "A forced-reload flag is an operational convenience; if it does not work the engineers would notice and reload the database by another means, which does not change whether the plan holds. Rated on the scale alone."
+    },
+    {
+     "claim_id": 47,
+     "tier": 2,
+     "basis": "Where the terminology endpoints read from is an implementation detail behind the documented interface; the disclosed emptiness of the table (claim 48) means any failure shows up in use and is a data-loading matter, not a failure of FHIR R4, OAuth2 or RBAC faithfulness. Rated on the scale alone."
+    },
+    {
+     "claim_id": 48,
+     "tier": 2,
+     "basis": "If the release could in fact pre-fill the table the claim's failure only eases setup, and otherwise the team's engineers load the terminology themselves; a person setting the software up would act on the claim and meet its failure there. Rated on the scale alone."
+    },
+    {
+     "claim_id": 49,
+     "tier": 2,
+     "basis": "Licensing requirements for SNOMED CT and LOINC fall under terminology handling the practice rates as cheaply repairable — the engineers obtain the files and hold the licences themselves — and no way the claim could be untrue defeats a depends item or a stated threshold; it concerns third-party terminology the release does not ship, not the project's distribution rights. Rated on the scale alone."
+    },
+    {
+     "claim_id": 50,
+     "tier": 2,
+     "basis": "If parts of the benchmark in fact require SNOMED CT or LOINC, the engineers would meet this while setting up and load the missing terminology without changing code, so the plan as stated still holds. Rated on the scale alone."
+    },
+    {
+     "claim_id": 51,
+     "tier": 1,
+     "basis": "If ICD-10-CM is not public domain, the benchmark's automatically loaded core terminology carries licence restrictions the team's adoption and published results would inherit, and a licence defect is not something the team can repair — the adoption would end under the buyer's own trigger. Rated against the buyer's stated threshold: \"a licence or data-provenance problem, such as source content the project may not distribute or data that is not fully synthetic\"."
+    },
+    {
+     "claim_id": 52,
+     "tier": 2,
+     "basis": "A failed automatic download would be met on first boot and corrected by loading the CMS files by hand, a path the release itself documents; no threshold or depends item turns on the download happening automatically. Rated on the scale alone."
+    },
+    {
+     "claim_id": 53,
+     "tier": 2,
+     "basis": "A disable flag that does not work is a setup detail the engineers would notice and work around in operation, with no effect on the plan. Rated on the scale alone."
+    },
+    {
+     "claim_id": 54,
+     "tier": 2,
+     "basis": "The offline load path is one of two ways to obtain ICD-10-CM; if it fails, the automatic download or a manual load remains, and nothing in a stated threshold or depends item turns on this route. Rated on the scale alone."
+    },
+    {
+     "claim_id": 55,
+     "tier": 2,
+     "basis": "Loading SNOMED CT and LOINC is a setup step the team's engineers would perform, and a failure in the mount-and-restart instructions would surface there; it changes how the stack is set up, not whether the plan holds. No stated threshold reaches terminology loading, and the reliance item for it is a 'uses' item. Rated on the scale alone."
+    },
+    {
+     "claim_id": 56,
+     "tier": 2,
+     "basis": "The filename patterns are what a setting-up engineer would rely on to place the files; a pattern that does not match would be met and corrected during setup. It affects configuration, not the validity of the benchmark or simulator. Rated on the scale alone."
+    },
+    {
+     "claim_id": 57,
+     "tier": 2,
+     "basis": "A release version or layout that does not work would be discovered by the engineer performing the load and worked around by obtaining a different version or flattening files. It is a setup detail with no route to the buyer's thresholds. Rated on the scale alone."
+    },
+    {
+     "claim_id": 58,
+     "tier": 2,
+     "basis": "Idempotence of the terminology loader is an operational behaviour an engineer rerunning the stack would act on and meet any failure of directly. Its failure would not reach the buyer's plan for the benchmark or simulator. Rated on the scale alone."
+    },
+    {
+     "claim_id": 59,
+     "tier": 2,
+     "basis": "'Nothing else needs to change' is a setup instruction; if further configuration were needed, the engineer would meet it while mounting the directory and restarting. It changes the setup effort, not whether the adoption's purpose holds. Rated on the scale alone."
+    },
+    {
+     "claim_id": 60,
+     "tier": 2,
+     "basis": "A skip condition on the terminology tests is a detail a developer running the test suite after loading would act on and notice if wrong. It concerns test behaviour, not benchmark validity, scoring, or simulator fidelity. Rated on the scale alone."
+    },
+    {
+     "claim_id": 61,
+     "tier": 2,
+     "basis": "The manual-install command and its --auto, --download-icd10 and --list options are things an engineer setting up or troubleshooting the terminology load would run and meet a failure of directly. Its failure would be correctable from the host without touching the plan. Rated on the scale alone."
+    },
+    {
+     "claim_id": 62,
+     "tier": 2,
+     "basis": "The requirements file is the first thing an engineer installing the stack uses; a missing or misnamed file surfaces immediately at setup and is trivially worked around. It is a setup detail with no route to a threshold or a 'depends' item. Rated on the scale alone."
+    },
+    {
+     "claim_id": 63,
+     "tier": 2,
+     "basis": "The ASGI application path is what a setting-up engineer invokes to serve the simulator; a wrong module path is met and corrected during setup. It affects how the software is started, not whether the plan holds. Rated on the scale alone."
+    },
+    {
+     "claim_id": 64,
+     "tier": 2,
+     "basis": "The location and test runner of the test suite is a detail an engineer validating the installation would act on; a failure is met and worked around at setup. It carries no consequence for the buyer's thresholds. Rated on the scale alone."
+    },
+    {
+     "claim_id": 65,
+     "tier": 2,
+     "basis": "Whether benchmark_v1.3.db is distributed is something the team's engineers act on when obtaining the release and would meet any failure of immediately, obtaining the file another way if needed. The reliance item on distribution mechanics is a 'uses' item and no stated threshold reaches it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 66,
+     "tier": 1,
+     "basis": "If the evaluation path required data beyond the distributed database, the team could not run any evaluation as planned; building or fetching missing pieces is engineering by the buyer and is not a way the plan still holds. This defeats a reliance item the buyer depends on — running evaluations from the shipped database alone — and no alternative route is described. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 67,
+     "tier": 3,
+     "basis": "The claim concerns rebuilding the database, which the buyer's plan does not touch — it adopts the release as shipped. If untrue in either direction, that the source could be redistributed or that rebuilding needed no such material, nothing in the buyer's plan or thresholds is affected. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 68,
+     "tier": 3,
+     "basis": "The YAML profiles for ingesting new decks and PDFs fall under rebuilding and extending the data, which the buyer's plan does not use; the team adopts the release as shipped and ingests no new sources. No way the claim could be untrue reaches a threshold or a 'depends' item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 69,
+     "tier": 3,
+     "basis": "Local generation of SapBERT embeddings matters only to the ETL pipeline the buyer does not use; the team's plan runs evaluations and training on the shipped release. If the claim were untrue — embeddings needing a download, or a different script — the buyer's plan is untouched. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 70,
+     "tier": 3,
+     "basis": "The ETL pipeline is an item of the reliance statement the buyer does_not_use: the team adopts the release as shipped and does not rebuild the data, and no stated threshold reaches how the ETL is staged or numbered. No way the invocation or stage sequence could be untrue would change the buyer's plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 71,
+     "tier": 2,
+     "basis": "Schema creation is a setup step the team's own engineers would perform when standing the stack up for the first time. If the command, its configuration path or its ordering were wrong, they would meet the failure while setting up and could correct it without changing code, and no way it could be untrue would defeat an item the buyer depends on. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 72,
+     "tier": 2,
+     "basis": "Loading the benchmark database into Postgres is a setup action the engineers would take; if the script or its source path did not work as described they would meet the failure during setup and could obtain or load the files another way. On its own this changes nothing for the buyer's plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 73,
+     "tier": 2,
+     "basis": "Terminology loading is an optional setup step an operator would act on, and if the script were not optional or needed different files the engineers would meet that while setting up and could supply the files themselves, which the plan treats as cheap. No way it could be untrue would defeat an item the buyer depends on. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 74,
+     "tier": 2,
+     "basis": "Whether the compose stack performs the data-setup steps falls under an item the buyer uses, not depends on; if it were untrue the engineers would meet the failure at first boot and could fix or replace the compose files and entrypoint scripts without touching the core offering. On its own the buyer's plan still holds. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 75,
+     "tier": 2,
+     "basis": "Model access configuration is a detail a person setting up evaluation runs would act on, and if the route or the environment variable differed they would meet the failure while configuring and could correct it without changing code. On its own nothing in the buyer's plan fails. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 76,
+     "tier": 2,
+     "basis": "These are optional registry entries; an operator selecting a model would act on the claim and would meet its failure in use, and the documents themselves describe another route to the same models, so the buyer's plan still holds even if the gateway entries were unusable. Its failure changes nothing for the buyer on its own. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 77,
+     "tier": 2,
+     "basis": "This is a registry detail an operator would act on when choosing how to reach the models; if the *-or entries did not work as described the failure would be met in use and the buyer's plan would still hold through the configuration the engineers control. On its own nothing material turns on it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 78,
+     "tier": 1,
+     "basis": "If the run, score, report and matrix subcommands did not exist as described, the evaluation workflow itself would be unavailable: the item the buyer depends on names these commands, the team could not run or score evaluations as planned, and no setup-time correction without writing code would restore them. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 80,
+     "tier": 2,
+     "basis": "The locked prompting strategies fall under comparability with the published paper, an item the buyer uses; if the strategy assignments were wrong the team would meet the failure when replicating the protocol and would report under its own documented protocol instead, which weakens but does not defeat its plan. On its own its failure changes nothing material for the buyer. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 81,
+     "tier": 1,
+     "basis": "If score did not report the paper's primary metrics as described — for example if the chart-neutral rule were not applied or retrieval were not scoped to chart sections only — the scoring would not work as described, the team's evaluation results and published numbers would be invalid, and correcting it would mean auditing and patching the scoring core. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+    },
+    {
+     "claim_id": 82,
+     "tier": 2,
+     "basis": "The claim concerns what the imaging extractor depends on, not whether the metric is computed correctly; if it needed external ontology files or a different source, the engineers would meet that while setting up and could supply the files without changing code, which the plan treats as cheap. No way it could be untrue would defeat an item the buyer depends on. Rated on the buyer's plan as the buyer stated it."
+    },
+    {
+     "claim_id": 84,
+     "tier": 2,
+     "basis": "The granularity flag is a command option an operator would act on and would meet its failure in use; if the flag or its default differed they would correct the invocation without changing code, and the summarization task itself would remain available. On its own its failure changes nothing for the buyer. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 85,
+     "tier": 2,
+     "basis": "The cohort tier option is a command parameter an operator would act on; if the values or behaviour differed the failure would be met in use and corrected by adjusting the invocation, and no item the buyer depends on would be defeated by it alone. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 86,
+     "tier": 2,
+     "basis": "This is a documented invocation; if the parameters or the specialty granularity did not work as shown, the engineers would meet the failure while setting up and could adjust the invocation, and the summarization task would still exist through its other variants, so no item the buyer depends on is defeated on its own. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 87,
+     "tier": 2,
+     "basis": "If agentic evaluation did not run through eval/agents/, the team's engineers would discover this on their first tool-use run and adapt; the item this falls under is one the buyer uses, not one it depends on, and no stated threshold reaches it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 88,
+     "tier": 2,
+     "basis": "Where the sandbox is defined and whether it is read-only are setup mechanics: a deviation would be met and corrected by the team's engineers in configuration, and no way the claim could be untrue defeats an item the buyer depends on or a stated threshold. Rated on the scale alone."
+    },
+    {
+     "claim_id": 89,
+     "tier": 2,
+     "basis": "How the bash_readonly role is created is a setup detail; a role that is not created fails visibly on first use and is fixed by running the setup script or entrypoint, without affecting the buyer's plan. Rated on the scale alone."
+    },
+    {
+     "claim_id": 90,
+     "tier": 1,
+     "basis": "If the scorer were not exposed over HTTP, the team could not obtain a reward for any submission without importing the evaluation code, defeating the reinforcement-learning scoring service its plan depends on; building its own reward service is the costly engineering the reliance statement already weighs, not a way the plan still holds. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 91,
+     "tier": 1,
+     "basis": "If the endpoint carried no shared-secret guard, or the design did not actually keep the scorer token out of the policy's credentials, reward access would not be separated from the policy under training as the plan assumes and training would be contaminated; a renamed variable or header would be a setup correction, but an absent guard would not be. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 92,
+     "tier": 1,
+     "basis": "The claim fails by admitting what it excludes: if the endpoint ever returned the labels themselves, ground truth would reach the agent and the policy under training, invalidating rewards and evaluation in a way the team cannot repair itself. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+    },
+    {
+     "claim_id": 93,
+     "tier": 2,
+     "basis": "Divergent endpoint paths, query parameters or body fields would surface the first time the team's engineers write the client and would be corrected in that client at setup without changing the service, so the scoring service and the plan would still hold. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 94,
+     "tier": 1,
+     "basis": "If the response carried no reward field at all, or a reward outside [0, 1], the HTTP scoring service could not drive reinforcement learning as the plan assumes, and the team could not cure that without importing the evaluation code or building its own scoring path. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 95,
+     "tier": 2,
+     "basis": "Missing metric identification or per-metric breakdowns would cost the team diagnostic detail only; the reward itself would still flow and the plan would hold, and no way this claim could be untrue defeats an item the buyer depends on. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 96,
+     "tier": 1,
+     "basis": "If the rewards were not the named primary metrics — for example a different or chart-dependent F1 — training rewards and published results would be computed against the wrong objective, which is scoring not working as described and not reparable by the team cheaply. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+    },
+    {
+     "claim_id": 97,
+     "tier": 1,
+     "basis": "If the imaging reward were not the paper's ontology-grounded concept F1, scoring for one of the four tasks the buyer depends on would not work as described, and the team would train and publish against the wrong metric for that task. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+    },
+    {
+     "claim_id": 98,
+     "tier": 2,
+     "basis": "NDCG at 10 is supplementary to the primary retrieval metric; its absence would narrow the team's analysis but leave the reward, the scoring service and the plan intact. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 99,
+     "tier": 2,
+     "basis": "Token-level F1 for imaging is supplementary to the primary metric; its absence would cost diagnostic detail only and no way the claim could be untrue defeats an item the buyer depends on. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 100,
+     "tier": 2,
+     "basis": "A mismatch between the submission schemas and the agent-tool schemas would be found the first time a submission is sent and corrected in the team's own client at setup, leaving the scoring service and the plan intact. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 101,
+     "tier": 2,
+     "basis": "If malformed or empty submissions raised errors instead of scoring 0, the team's engineers could catch and handle them in their own harness without changing the service, so the plan would still hold; the failure would be met in ordinary use and corrected outside the code. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 102,
+     "tier": 2,
+     "basis": "If the batch endpoint is absent or the 256-item cap differs, the team's engineers would meet this on the first bulk call and score items individually or resize batches; the scoring results and the RL training are unchanged. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 103,
+     "tier": 2,
+     "basis": "If the in-process function does not exist at that path or under that name, the failure appears at the first import and the documented HTTP scoring endpoint remains as another described way to obtain the same result. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 104,
+     "tier": 1,
+     "basis": "If the simulator cannot in fact be driven as a reinforcement-learning environment, the RL half of the team's stated purpose fails outright and, as the reliance statement records, the team would have to build its own reward service and episode harness — no local repair restores it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 105,
+     "tier": 1,
+     "basis": "If an episode does not correspond to one benchmark instance played as the paper's tool-use task, rewards would not be earned on the benchmark tasks the team is adopting and RL training would not transfer to them; episode semantics are the environment's design and cannot be corrected by setup. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 106,
+     "tier": 2,
+     "basis": "A differing prompt, patient assignment or tool count would be visible on the first reset and absorbed by the team's engineers; the environment and scoring still function, and prompt fidelity touches only comparability, which the reliance statement marks as a uses item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 107,
+     "tier": 1,
+     "basis": "If the submit tool does not end the episode or return the reward from the scoring endpoint, the RL loop receives no reward signal and training on the benchmark cannot run; the reliance statement weighs replacing the reward service and harness as significant engineering. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 108,
+     "tier": 2,
+     "basis": "Where episode state is stored, and whether the compose stack starts that store, are setup facts the engineers would meet immediately in configuration; the environment's behaviour and the team's plan are unaffected either way. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 109,
+     "tier": 2,
+     "basis": "If the class is absent or lives elsewhere, the failure appears at the first import, and the four documented HTTP operations remain as another described way to drive the environment. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 110,
+     "tier": 2,
+     "basis": "A differing constructor signature is met at the first instantiation and corrected in the team's own calling code without touching the project; the scoring token can equally be supplied per the documented header. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 111,
+     "tier": 2,
+     "basis": "If the client's reset takes different or fewer parameters, the engineers would read the actual signature on first use or call the documented POST /env/reset directly, another described way; determinism of a run is a property of the service, not of this signature. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 112,
+     "tier": 2,
+     "basis": "Attribute names on the observation object are met on first access and corrected in the team's own code; the observation content and the training plan are unaffected. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 113,
+     "tier": 1,
+     "basis": "If the reward is not bounded to [0, 1] or info does not carry the metrics, scoring does not behave as described and the team's training rewards and published metrics rest on a contract the release does not honour — a failure the buyer has said would change the terms. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+    },
+    {
+     "claim_id": 114,
+     "tier": 1,
+     "basis": "If the four operations are not exposed as authenticated HTTP endpoints, the environment service the reliance statement names by those endpoints does not exist as described, and the team would have to build its own episode harness and reward service — significant engineering no setup change avoids. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 115,
+     "tier": 2,
+     "basis": "If the demo script is missing or does not run end to end, the engineers would notice on the first run and drive the client or endpoints directly; a template script's absence costs no part of the plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 116,
+     "tier": 1,
+     "basis": "The claim fails by a single observation leaking assessment or plan content, which puts ground truth in front of the policy, contaminates training rewards and inflates evaluation results; the team cannot cure this without filtering or forking the simulator's serving layer. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+    },
+    {
+     "claim_id": 117,
+     "tier": 1,
+     "basis": "The claim could be untrue by the problem list exposing the simulator's graph-derived encounter diagnoses instead of the documented history, which would place ground-truth information in front of the agent and contaminate training rewards. That falls under the label-hygiene item the buyer's plan rests on, and no repair short of forking the serving layer cures it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 118,
+     "tier": 1,
+     "basis": "The claim could be untrue by the environment exposing encounters after the imaging order, which would leak outcome-revealing information into the episode and contaminate rewards for that task. That reaches the label-hygiene and RL-environment items the buyer's plan depends on. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 119,
+     "tier": 2,
+     "basis": "A differing default budget or parameter name would be noticed while configuring episodes and corrected without changing code; it alters setup, not whether the plan holds. No stated threshold reaches it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 120,
+     "tier": 2,
+     "basis": "If tools other than submit remained accepted after the budget was spent, the team's engineers would see it on their first run and could account for it; it does not affect validity, scoring correctness or the buyer's stated thresholds. Rated on the scale alone."
+    },
+    {
+     "claim_id": 121,
+     "tier": 2,
+     "basis": "Error-observation behaviour on bad calls is an operational detail an engineer running the harness would encounter directly and work around; its failure changes nothing for the buyer's plan. Rated on the scale alone."
+    },
+    {
+     "claim_id": 122,
+     "tier": 1,
+     "basis": "The claim could be untrue by the reward being computed elsewhere than at submission or on metrics other than the paper's primary ones, which is scoring not working as described and would make the team's evaluation results and training rewards meaningless. That is within the buyer's stated threshold: \"ground truth or scoring that does not work as described\". Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+    },
+    {
+     "claim_id": 123,
+     "tier": 1,
+     "basis": "The claim could be untrue by the policy under training holding a credential, defeating the token separation the buyer's plan relies on for reinforcement learning and risking contaminated or invalid training. The RL-environment item the plan depends on names this exact property. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 124,
+     "tier": 1,
+     "basis": "The claim could be untrue by reset not sampling deterministically from task, split and seed, which would defeat reproducible runs and leave the team unable to stand behind published numbers without significant work to establish determinism itself. That reaches the reproducible-evaluation item the plan depends on. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 125,
+     "tier": 2,
+     "basis": "A missing or extra instance id in the client's listing is a detail an engineer operating the environment would meet and correct around cheaply; it does not affect validity, leakage or scoring. Rated on the scale alone."
+    },
+    {
+     "claim_id": 127,
+     "tier": 2,
+     "basis": "A Dockerfile with more or fewer than three targets would be seen immediately by an engineer building the images and corrected in setup; it changes nothing about whether the plan holds. Rated on the scale alone."
+    },
+    {
+     "claim_id": 128,
+     "tier": 2,
+     "basis": "Which target is the default and which compose uses is a build detail an engineer would notice and work with directly; its failure would not affect the buyer's plan. Rated on the scale alone."
+    },
+    {
+     "claim_id": 129,
+     "tier": 2,
+     "basis": "How the database is supplied to the app image is a setup mechanism an engineer would meet and adjust while standing up the stack; it is commodity glue the plan does not depend on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 130,
+     "tier": 3,
+     "basis": "The with-data image falls under alternative packaging, which the buyer's plan does not touch: no stated threshold reaches it and the plan does not use it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 131,
+     "tier": 3,
+     "basis": "The exported Harbor tasks fall under alternative packaging, which the buyer's plan does not touch: the team drives the simulator and environment endpoints directly. No stated threshold reaches this claim. Rated on the scale alone."
+    },
+    {
+     "claim_id": 132,
+     "tier": 3,
+     "basis": "The all-in-one image falls under alternative packaging, which the buyer's plan does not touch: it runs the stack through compose instead. No stated threshold reaches this claim. Rated on the scale alone."
+    },
+    {
+     "claim_id": 133,
+     "tier": 3,
+     "basis": "The claim concerns the all-in-one image, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches how the image's services run. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 134,
+     "tier": 3,
+     "basis": "The claim concerns the contents of the all-in-one image, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches the image's service boundary. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 135,
+     "tier": 3,
+     "basis": "The claim concerns the published images, part of the alternative packaging the buyer's plan does not touch; the licence and provenance threshold reaches the project's right to distribute what it ships, not whether images are published to a registry. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 136,
+     "tier": 3,
+     "basis": "The claim concerns a maintainer script for building and pushing the images, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches it. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 137,
+     "tier": 3,
+     "basis": "The claim concerns building the images locally, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches it. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 138,
+     "tier": 3,
+     "basis": "The claim concerns the Harbor export script, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches it. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 139,
+     "tier": 3,
+     "basis": "The claim concerns the prompt file inside exported Harbor tasks, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches it. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 140,
+     "tier": 3,
+     "basis": "The claim concerns the compose environment of exported Harbor tasks, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches it. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 141,
+     "tier": 3,
+     "basis": "The claim concerns network boundaries inside exported Harbor tasks, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches that packaging's boundary. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 142,
+     "tier": 3,
+     "basis": "The claim concerns the agent command line in exported Harbor tasks, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches it. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 143,
+     "tier": 3,
+     "basis": "The claim concerns the verifier output path in exported Harbor tasks, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches it. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 144,
+     "tier": 3,
+     "basis": "The claim concerns the oracle solution in exported Harbor tasks, part of the alternative packaging the buyer's plan does not touch; the ground-truth threshold reaches the benchmark's own ground truth and scoring, not the packaging's oracle. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 145,
+     "tier": 3,
+     "basis": "The claim concerns the command-line options of the Harbor export script, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches it. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 146,
+     "tier": 3,
+     "basis": "The claim concerns the Apptainer definition file, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches it. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 147,
+     "tier": 3,
+     "basis": "The claim concerns how the .sif starts its services, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches it. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 148,
+     "tier": 3,
+     "basis": "The Apptainer SIF is alternative packaging the buyer's plan does not touch, and no stated threshold reaches a bind-mount detail; no way it could be untrue affects the terms or the adopted evaluation and training path. Rated on the scale alone."
+    },
+    {
+     "claim_id": 149,
+     "tier": 3,
+     "basis": "The published all-in-one image is alternative packaging the buyer's plan does not touch — its engineers drive the simulator and the environment endpoints directly — and no stated threshold reaches the run command; a failure here costs nothing the buyer relies on. Rated on the scale alone."
+    },
+    {
+     "claim_id": 150,
+     "tier": 3,
+     "basis": "This boundary claim concerns the all-in-one image, an alternate run form outside the buyer's plan, and no stated threshold reaches it; a person operating the adopted path would never meet its failure. Rated on the scale alone."
+    },
+    {
+     "claim_id": 151,
+     "tier": 3,
+     "basis": "The buyer adopts the release as shipped and does not rebuild the database, so ETL determinism is never met in use, and no stated threshold reaches data-construction determinism. Rated on the scale alone."
+    },
+    {
+     "claim_id": 152,
+     "tier": 3,
+     "basis": "Provenance recording in ETL code the buyer does not run cannot affect the evaluation and training path it adopts, and no stated threshold reaches it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 153,
+     "tier": 3,
+     "basis": "The ablation scripts belong to the methodology artifacts the buyer merely uses and sit off the evaluation and training path; no stated threshold reaches their existence. Rated on the scale alone."
+    },
+    {
+     "claim_id": 157,
+     "tier": 1,
+     "basis": "If the harness does not hide assessment and plan sections on the client side, agentic evaluation and reinforcement-learning training through it are contaminated and the results the team intends to publish would not stand — a failure the team cannot repair cheaply. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 158,
+     "tier": 1,
+     "basis": "If the harness does not simply leave the problem list as served — in particular if it substitutes ground-truth content for documented history — evaluation through the harness is contaminated in the way the buyer's plan cannot absorb; the direction of failure cannot be settled without testing. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 159,
+     "tier": 1,
+     "basis": "No way this claim could be untrue changes the price or the terms on its own: its falsity is either favourable (no inflation) or a refinement, and the environment endpoints remain as the clean path. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 160,
+     "tier": 1,
+     "basis": "If later encounter notes do not carry the documented active problem list by construction, or carry more of the current diagnosis than documented history, the chart the agent sees breaks the described label hygiene and rewards and published results are contaminated, which the team cannot repair cheaply. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 161,
+     "tier": 1,
+     "basis": "The claim fixes what diagnosis material later notes may contain; if less is withheld than stated, the current diagnosis reaches the agent and evaluation and training rewards are inflated, a contamination the team cannot repair without forking the serving layer. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 162,
+     "tier": 1,
+     "basis": "The claim asserts both LLM authorship and anchoring to the graph diagnosis; if the anchoring fails, the imaging-indication task's reference question is not tied to the ground truth as the materials describe and evaluation on that task cannot be trusted. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+    },
+    {
+     "claim_id": 163,
+     "tier": 1,
+     "basis": "If the three tasks' reference labels are not deterministic functions of the knowledge graph, the ground truth does not work as described and the buyer's published results and training rewards lose their foundation, with no cheap repair. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+    },
+    {
+     "claim_id": 164,
+     "tier": 1,
+     "basis": "The claim asserts both full syntheticity and the right to redistribute; either failing — real patient data, or source content the project may not distribute — ends the adoption outright and no engineering by the team cures it. Rated against the buyer's stated threshold: \"data that is not fully synthetic\"."
+    },
+    {
+     "claim_id": 165,
+     "tier": 3,
+     "basis": "No stated threshold reaches an 88 MB file-size figure, the dataset-scale item is one the buyer's engineers can verify by inspecting the shipped files directly, and no one setting up or operating the benchmark would act on the figure or meet its failure in use. Rated on the scale alone."
+    },
+    {
+     "claim_id": 166,
+     "tier": 2,
+     "basis": "A failure here would be met by an engineer cloning the repository and worked around by fetching the file from the release assets; it changes how the release is obtained, not whether the team's plan holds. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 167,
+     "tier": 2,
+     "basis": "A release lacking the attached file would be met while obtaining the data and worked around by cloning instead; on its own it changes nothing for the buyer's plan. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 168,
+     "tier": 3,
+     "basis": "The buyer adopts the release as shipped and does not rebuild the database or ingest new sources, so no way this could be untrue is ever met in the buyer's use. The fully-synthetic threshold, read as the buyer wrote it, concerns the released data, not a pipeline the buyer does not run. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 169,
+     "tier": 2,
+     "basis": "A failed first-boot load would be met during setup by an engineer who can run the load manually; on its own it does not change the buyer's plan. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 170,
+     "tier": 2,
+     "basis": "Results landing elsewhere than the stated path would be met in use and corrected by reading the configuration; it is a detail an engineer acts on, not something the buyer's plan turns on. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 171,
+     "tier": 2,
+     "basis": "A load that reruns or that fails to skip would be met during operation and worked around without changing whether the benchmark is valid or reproducible. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 172,
+     "tier": 2,
+     "basis": "If the terminology is not fetched automatically, the team's engineers can obtain and load the files themselves, which the buyer's plan treats as cheap; the failure is met and corrected at setup. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 173,
+     "tier": 2,
+     "basis": "A double load or a wrongly skipped system would be met in operation and corrected by an engineer without touching the buyer's plan. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 174,
+     "tier": 2,
+     "basis": "A test suite that keeps skipping would be met while verifying the installation and does not by itself change the benchmark's validity or reproducibility. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 175,
+     "tier": 2,
+     "basis": "A failed dependency install would be met immediately at setup by the team's own engineers and resolved by ordinary means. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 176,
+     "tier": 2,
+     "basis": "A serving command that fails would be met at setup and worked around by an engineer running the service another way. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 177,
+     "tier": 2,
+     "basis": "A test invocation that does not run the suite would be met while checking the installation and corrected without touching the buyer's plan. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 178,
+     "tier": 1,
+     "basis": "The claim could be untrue because the evaluations require building or fetching pieces beyond the distributed database, which is the very failure of the item the buyer's plan depends on; the team would have to build or fetch before any evaluation at all, and buyer-side engineering is not a way the plan still holds. That the gap might in some forms be noticed at setup does not remove the ways in which it would defeat the depended-on item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 179,
+     "tier": 3,
+     "basis": "The buyer's plan does not touch the ETL: it adopts the release as shipped and does not ingest its own decks or PDFs, so no way this could be untrue would be met in the buyer's use. No stated threshold reaches this claim. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 180,
+     "tier": 2,
+     "basis": "A failed compose startup would be met during setup by the team's engineers, who can run the manual steps or fix the compose file in about a day. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+    },
+    {
+     "claim_id": 181,
+     "tier": 1,
+     "basis": "If the documented run command does not execute the context_summarization evaluation as described, the reproducible-evaluation path the buyer depends on fails, and the team cannot stand behind the published numbers its adoption exists to produce; repairing the code is not a way the plan still holds. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 182,
+     "tier": 1,
+     "basis": "If the scoring service does not return a reward over HTTP without importing the evaluation code, the reinforcement-learning environment and scoring item the buyer depends on fails, and the team would have to build its own reward service — significant engineering that does not preserve the plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 183,
+     "tier": 2,
+     "basis": "No way this could be untrue is material: the team's own trainer controls what is submitted, so a malformed submission raising an error instead of scoring 0 changes how its engineers operate the client, not whether the plan holds. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 184,
+     "tier": 2,
+     "basis": "The demo script is a template; if it does not run end to end the team's engineers would meet the failure while setting up and could drive the environment and scoring endpoints through the provided client instead, so the plan still holds. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 185,
+     "tier": 1,
+     "basis": "If reset with the same task, split and seed does not yield the same instance, the deterministic-reset item the buyer depends on is defeated: evaluation runs could not be reproduced and published numbers could not be stood behind, and no local repair restores it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 186,
+     "tier": 3,
+     "basis": "The claim concerns exported Harbor tasks, an alternative-packaging item the buyer does_not_use, and no stated threshold reaches it, so no way it could be untrue is material. Rated on the scale alone."
+    },
+    {
+     "claim_id": 187,
+     "tier": 3,
+     "basis": "The claim concerns the oracle solution inside an exported Harbor task, within alternative packaging the buyer does_not_use and no stated threshold reaches; a scoring question about a package the buyer's plan never touches is not material. Rated on the scale alone."
+    },
+    {
+     "claim_id": 188,
+     "tier": 3,
+     "basis": "The claim concerns the all-in-one image, part of the alternative-packaging item the buyer does_not_use, and no stated threshold reaches it, so no way it could be untrue is material. Rated on the scale alone."
+    },
+    {
+     "claim_id": 189,
+     "tier": 3,
+     "basis": "The buyer does not rebuild the data, so no one operating the software would act on ETL determinism or meet its failure in use; the methodology-artifacts item it falls under is only a uses item, which is not a route to tier 1. Rated on the scale alone."
+    },
+    {
+     "claim_id": 190,
+     "tier": 3,
+     "basis": "The buyer never runs the LLM-assisted ETL stages, and the provenance-artifacts item it falls under is a uses item, not a route, so no way it could be untrue is material to this buyer. Rated on the scale alone."
+    }
+   ],
+   "unrated": []
+  },
+  "apptainer/README.md": {
+   "at": "2026-09-25T20-20-11Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 25,
+   "claims_from": "runs/2026-09-25T19-27-33Z_enum_synthetic-hospital_apptainer_readme_md_2026-09-25T18-56-37Z/claims.json",
+   "reliance_statement": "2026-09-25T19-49-08Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 3,
+     "basis": "The team's plan does not touch alternative packaging: it adopts the release and drives the simulator and environment endpoints directly, and no stated threshold reaches what the all-in-one image carries. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 2,
+     "tier": 3,
+     "basis": "How the container launches its services matters only to the alternative packaging the team does not use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 3,
+     "tier": 3,
+     "basis": "Whether root is needed concerns only the alternative packaging the team's plan does not touch, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 4,
+     "tier": 3,
+     "basis": "Self-containment of the all-in-one image matters only to packaging the team does not use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 6,
+     "tier": 3,
+     "basis": "Building the SIF lies within the alternative packaging the team does not use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 7,
+     "tier": 3,
+     "basis": "A local build variant of the definition file serves only the alternative packaging the team's plan does not touch, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 8,
+     "tier": 3,
+     "basis": "Bootstrapping from a docker-archive is a path within the alternative packaging the team does not use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 9,
+     "tier": 3,
+     "basis": "The database cluster path inside the container concerns only the alternative packaging the team's plan does not touch, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 10,
+     "tier": 3,
+     "basis": "Writability of that path matters only to running the alternative packaging the team does not use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 11,
+     "tier": 3,
+     "basis": "The disk space the loaded benchmark needs in the image affects only the alternative packaging the team does not use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 12,
+     "tier": 3,
+     "basis": "The docs UI port and path in the all-in-one image concern packaging the team does not run, and no stated threshold about the simulator's faithfulness reaches a documentation-UI location. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 14,
+     "tier": 3,
+     "basis": "Running the image as a named Apptainer instance is part of the alternative packaging the team's plan does not touch, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 15,
+     "tier": 3,
+     "basis": "Startup ordering inside the all-in-one image matters only to the alternative packaging the team does not use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 17,
+     "tier": 2,
+     "basis": "The claim concerns the documented options of the eval.cli run command; the team's engineers would meet any failure the first time they ran an evaluation and would correct it by reading the CLI, without changing code, so it changes how the software is set up rather than whether the plan holds. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 18,
+     "tier": 3,
+     "basis": "The address PostgreSQL listens on inside the all-in-one image concerns only the alternative packaging the team does not use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 19,
+     "tier": 3,
+     "basis": "The claim concerns how Redis is configured inside the Apptainer SIF, which falls under alternative packaging the buyer's plan does not touch, and no stated threshold reaches a container's Redis listen address. Any way it could be untrue would be met by a person setting the container up, if they used it at all. Rated on the scale alone."
+    },
+    {
+     "claim_id": 20,
+     "tier": 3,
+     "basis": "The claim concerns port-override environment variables for the Apptainer container, which falls under alternative packaging the buyer's plan does not touch, and no stated threshold reaches port configuration. Any failure would be a setup detail a person could correct without changing code. Rated on the scale alone."
+    },
+    {
+     "claim_id": 21,
+     "tier": 3,
+     "basis": "The claim concerns an Apptainer session-directory limit needed to run the SIF, which falls under alternative packaging the buyer's plan does not touch, and no stated threshold reaches container runtime requirements. A person running the container would encounter and adjust the limit at setup. Rated on the scale alone."
+    },
+    {
+     "claim_id": 22,
+     "tier": 3,
+     "basis": "The claim concerns a terminology bind point in the Apptainer container; the buyer does not use the Apptainer SIF, and although terminology handling is a reliance item, it is one the buyer only uses rather than depends on, and no stated threshold reaches the bind point or load timing. Any failure would be correctable at setup by the engineers who operate the stack. Rated on the scale alone."
+    },
+    {
+     "claim_id": 23,
+     "tier": 3,
+     "basis": "The claim concerns the scorer token's default value as shipped in the Apptainer container, which falls under alternative packaging the buyer's plan does not touch, and no stated threshold reaches a default token value. A person deploying beyond local use is told to override it, so its failure would be a setup detail. Rated on the scale alone."
+    },
+    {
+     "claim_id": 24,
+     "tier": 3,
+     "basis": "The claim concerns overriding the scorer token via an environment variable in the Apptainer container, which falls under alternative packaging the buyer's plan does not touch, and no stated threshold reaches token configuration mechanics. Any failure would be met and worked around during setup. Rated on the scale alone."
+    },
+    {
+     "claim_id": 25,
+     "tier": 3,
+     "basis": "The claim concerns the account under which the Apptainer container's services run, which falls under alternative packaging the buyer's plan does not touch, and no stated threshold reaches process-user identity in a container. The buyer drives the simulator and environment endpoints directly rather than through the SIF. Rated on the scale alone."
+    },
+    {
+     "claim_id": 26,
+     "tier": 3,
+     "basis": "The claim concerns the documentation UI's address when the Apptainer container runs, which falls under alternative packaging the buyer's plan does not touch, and no stated threshold reaches where the docs UI is served. Even a failed docs URL would not affect evaluation or training, which do not pass through the SIF. Rated on the scale alone."
+    },
+    {
+     "claim_id": 27,
+     "tier": 3,
+     "basis": "The claim concerns command ordering inside the Apptainer container, which falls under alternative packaging the buyer's plan does not touch, and no stated threshold reaches container startup sequencing. A person running commands in the container would notice and handle any ordering issue at setup. Rated on the scale alone."
+    },
+    {
+     "claim_id": 28,
+     "tier": 3,
+     "basis": "The claim concerns terminology loading on start in the Apptainer container, which falls under alternative packaging the buyer's plan does not touch; terminology handling is a reliance item the buyer only uses, and no stated threshold reaches the load mechanism. Any failure would be a setup detail for the engineers who, on the buyer's plan, do not use the SIF. Rated on the scale alone."
+    }
+   ],
+   "unrated": []
+  },
+  "etl/deck_profiles/README.md": {
+   "at": "2026-09-25T20-20-31Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 13,
+   "claims_from": "runs/2026-09-25T19-29-47Z_enum_synthetic-hospital_etl_deck_profiles_readme_md_2026-09-25T18-56-37Z/claims.json",
+   "reliance_statement": "2026-09-25T19-49-08Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 3,
+     "basis": "The claim concerns the ETL pipeline's deck-profile files, which fall under the reliance item the buyer does_not_use: it adopts the release as shipped and does not rebuild the database or ingest new sources. No stated threshold reaches deck-profile configuration, and no way the claim could be untrue touches leakage, scoring, simulator faithfulness, validation, licence or syntheticity. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 2,
+     "tier": 3,
+     "basis": "How the pipeline obtains deck filenames matters only to a buyer extending or rebuilding the data, which the buyer does_not_use: it adopts the release as shipped. No stated threshold reaches the ETL pipeline's internals. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 3,
+     "tier": 3,
+     "basis": "The documented way to add a new source deck serves only data rebuilding and extension, which the buyer does_not_use; its plan is to evaluate and train on the release as shipped. No stated threshold reaches this claim, and its failure would not affect any depends item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 4,
+     "tier": 3,
+     "basis": "A profile-field format detail is used only by the ETL pipeline the buyer does_not_use; the buyer never authors or edits profiles in its plan. No stated threshold reaches this claim, and a person running the benchmark's evaluation and training path would not meet its failure in use. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 5,
+     "tier": 3,
+     "basis": "The `role` field's permitted values matter only when authoring deck profiles, part of the ETL pipeline the buyer does_not_use. No stated threshold reaches this claim, and the failure of the field documentation would not be met in the buyer's evaluation or training work. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 6,
+     "tier": 3,
+     "basis": "The `parser` field governs extractor selection inside the ETL pipeline, which the buyer does_not_use and would never configure. No stated threshold reaches ETL extractor wiring, and the claim's failure could not affect leakage, scoring, simulator faithfulness, licence or syntheticity. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 7,
+     "tier": 3,
+     "basis": "The `card_format` classification hint operates in Stage 2 of the ETL pipeline, part of the data-rebuilding capability the buyer does_not_use. No stated threshold reaches this claim, and the buyer's evaluation and training plan never touches profile files. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 8,
+     "tier": 3,
+     "basis": "Filename matching by profiles is ETL ingestion mechanics, which the buyer does_not_use; it adopts the data as shipped. No stated threshold reaches this claim, and its failure would not be met by anyone running the evaluation or training path. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 9,
+     "tier": 3,
+     "basis": "Anki note-model substring matching is a detail of the ETL pipeline's profile resolution, which the buyer does_not_use. No stated threshold reaches this claim, and a person operating the benchmark as the buyer plans would not act on it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 10,
+     "tier": 3,
+     "basis": "Deduplication precedence among profiles affects only ETL runs rebuilding the data, which the buyer does_not_use. No stated threshold reaches deduplication behaviour, and the buyer's plan never triggers it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 11,
+     "tier": 3,
+     "basis": "The `specialty_fallback` field is an optional ETL profile setting used only when ingesting new source material, which the buyer does_not_use. No stated threshold reaches this claim, and its failure would not surface in evaluation or training as the buyer plans them. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 12,
+     "tier": 3,
+     "basis": "The `tag_root` namespace token matters only when authoring ETL profiles, part of the data-rebuilding capability the buyer does_not_use. No stated threshold reaches this claim, and the buyer's plan would never encounter the field. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 13,
+     "tier": 3,
+     "basis": "Card-to-profile resolution order is internal ETL behaviour relevant only when running the pipeline over new decks, which the buyer does_not_use. No stated threshold reaches this claim, and its failure could not affect any item the buyer depends on. Rated on the practice's reading of the buyer's plan."
+    }
+   ],
+   "unrated": []
+  },
+  "etl/pdf_profiles/README.md": {
+   "at": "2026-09-25T20-20-48Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 11,
+   "claims_from": "runs/2026-09-25T19-30-59Z_enum_synthetic-hospital_etl_pdf_profiles_readme_md_2026-09-25T18-56-37Z/claims.json",
+   "reliance_statement": "2026-09-25T19-49-08Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 3,
+     "basis": "The claim concerns the PDF profile layer of the ETL pipeline, which falls under the reliance item the buyer does not use: the team adopts the release as shipped and does not ingest new source material, and no stated threshold reaches profile file organisation. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 2,
+     "tier": 3,
+     "basis": "The claim concerns how Stage 1d of the ETL pipeline reads profile files, part of the data-rebuilding path the buyer's plan does not touch, and no stated threshold reaches pipeline stage mechanics. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 3,
+     "tier": 3,
+     "basis": "The claim concerns a field name in the ETL pipeline's PDF profile YAML, used only for ingesting new sources the buyer does not ingest, and no stated threshold reaches profile field names. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 4,
+     "tier": 3,
+     "basis": "The claim concerns parser selection options in the ETL pipeline's PDF profiles, which the buyer does not use and which no stated threshold reaches; even a wholly wrong parser list would not affect evaluation or training on the released data. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 5,
+     "tier": 3,
+     "basis": "The claim concerns the display_name field stored on the ETL deck during data rebuilding, a path the buyer's plan does not touch, and no stated threshold reaches deck metadata. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 6,
+     "tier": 3,
+     "basis": "The claim concerns filename glob matching in the ETL pipeline's PDF profiles, used only when ingesting new source material the buyer does not ingest, and no stated threshold reaches glob support. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 7,
+     "tier": 3,
+     "basis": "The claim concerns topic extraction options in the ETL pipeline's PDF profiles, part of the data-rebuilding path the buyer does not use, and no stated threshold reaches topic extraction settings. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 8,
+     "tier": 3,
+     "basis": "The claim concerns context-style options in the ETL pipeline's PDF profiles, which affect only rebuilding the data the buyer adopts as shipped, and no stated threshold reaches context formatting. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 9,
+     "tier": 3,
+     "basis": "The claim concerns the toc parser's behaviour in the ETL pipeline, a path the buyer's plan does not touch, and no stated threshold reaches document parsing behaviour. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 10,
+     "tier": 3,
+     "basis": "The claim concerns recommended settings for the bullets parser in the ETL pipeline, used only when ingesting new sources the buyer does not ingest, and no stated threshold reaches parser recommendations. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 11,
+     "tier": 3,
+     "basis": "The claim concerns font-based heading detection in the ETL pipeline's font_headings parser, part of the data-rebuilding path the buyer does not use, and no stated threshold reaches heading detection. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+    }
+   ],
+   "unrated": []
+  },
+  "etl/stages/EXTENDING.md": {
+   "at": "2026-09-25T20-21-22Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 27,
+   "claims_from": "runs/2026-09-25T19-32-26Z_enum_synthetic-hospital_etl_stages_extending_md_2026-09-25T18-56-37Z/claims.json",
+   "reliance_statement": "2026-09-25T19-49-08Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 3,
+     "basis": "The claim concerns the ETL codebase, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it; the buyer adopts the release as shipped and does not ingest new sources. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 2,
+     "tier": 3,
+     "basis": "The claim concerns how source-specific details are organised in the ETL, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it. No way it could be untrue would change the price, the terms, or the buyer's plan to evaluate and train on the release as shipped. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 3,
+     "tier": 3,
+     "basis": "The claim describes how to run the pipeline on new material, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it; the buyer's plan does not include ingesting new sources. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 4,
+     "tier": 3,
+     "basis": "The claim concerns profile kinds and the deck registry loader, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 5,
+     "tier": 3,
+     "basis": "The claim gives the location and purpose of deck profiles, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it; the buyer's engineers would not act on it in their plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 6,
+     "tier": 3,
+     "basis": "The claim gives the location and purpose of PDF profiles, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 7,
+     "tier": 3,
+     "basis": "The claim describes runtime profile resolution inside the ETL, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 8,
+     "tier": 3,
+     "basis": "The claim describes what a profile associates, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 9,
+     "tier": 3,
+     "basis": "The claim enumerates deck profile configuration keys, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it; a person running the buyer's plan would not meet its failure in use. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 12,
+     "tier": 3,
+     "basis": "The claim concerns derived ETL configuration and Stage 1 discovery, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 13,
+     "tier": 3,
+     "basis": "The claim enumerates available parser keys and their formats, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it; the buyer's engineers would not act on it in their plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 14,
+     "tier": 3,
+     "basis": "The claim describes how to add a new format parser to the ETL, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 15,
+     "tier": 3,
+     "basis": "The claim enumerates PDF profile configuration keys and their values, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 16,
+     "tier": 3,
+     "basis": "The claim maps layout values to parser functions and document kinds, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 17,
+     "tier": 3,
+     "basis": "The claim states which stage reads which profile keys, which falls under the reliance item 'Rebuilding or extending the data with the ETL pipeline', which the buyer does_not_use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 18,
+     "tier": 3,
+     "basis": "The claim concerns the s01d --enrich-topics step, which falls under the ETL pipeline for rebuilding or extending the data, an item the buyer does not use and which no stated threshold reaches; no way it could be untrue touches a depends item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 19,
+     "tier": 3,
+     "basis": "Tag and field tokens being configuration rather than code is a detail of the ETL pipeline the buyer does not use and no stated threshold reaches; its failure would not affect any depends item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 20,
+     "tier": 3,
+     "basis": "The tag_config block in a fact deck's profile is a mechanism of the data-extension pipeline the buyer does not use and no stated threshold reaches; its failure would not touch any depends item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 21,
+     "tier": 3,
+     "basis": "The per-parser tag_config keys are implementation detail of the ETL parsers under the data-extension item the buyer does not use and no stated threshold reaches; no way it could be untrue reaches a depends item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 22,
+     "tier": 3,
+     "basis": "Fallback behaviour when a tag_config key is absent concerns the ETL parsers under the data-extension item the buyer does not use and no stated threshold reaches; its failure would not affect any depends item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 23,
+     "tier": 3,
+     "basis": "Whether the shared taxonomy maps need per-source configuration is a detail of the ETL pipeline the buyer does not use and no stated threshold reaches; its failure would not touch any depends item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 24,
+     "tier": 3,
+     "basis": "Stage 2 card classification from profile keys is part of the data-extension pipeline the buyer does not use and no stated threshold reaches; no way it could be untrue reaches a depends item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 25,
+     "tier": 3,
+     "basis": "Which structural fallbacks remain in code for Stage 2 classification is a detail of the ETL pipeline the buyer does not use and no stated threshold reaches; its failure would not affect any depends item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 26,
+     "tier": 3,
+     "basis": "Running the pipeline on new material with no code changes concerns extending the data, an item the buyer does not use and no stated threshold reaches; its failure would not touch any depends item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 27,
+     "tier": 3,
+     "basis": "The runtime behaviour of --enrich-topics in s01d is part of the ETL pipeline the buyer does not use and no stated threshold reaches; no way it could be untrue reaches a depends item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 28,
+     "tier": 3,
+     "basis": "Runtime fallback when a tag_config key is absent concerns the ETL parsers under the data-extension item the buyer does not use and no stated threshold reaches; its failure would not affect any depends item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 29,
+     "tier": 3,
+     "basis": "Runtime Stage 2 classification from profile keys is part of the ETL pipeline the buyer does not use and no stated threshold reaches; its failure would not touch any depends item. Rated on the practice's reading of the buyer's plan."
+    }
+   ],
+   "unrated": []
+  },
+  "harbor/README.md": {
+   "at": "2026-09-25T20-23-20Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 30,
+   "claims_from": "runs/2026-09-25T19-36-16Z_enum_synthetic-hospital_harbor_readme_md_2026-09-25T18-56-37Z/claims.json",
+   "reliance_statement": "2026-09-25T19-49-08Z",
+   "tiers": [
+    {
+     "claim_id": 5,
+     "tier": 3,
+     "basis": "The exported task directory layout describes packaging the buyer's plan does not touch: the reliance statement records that it drives the simulator and environment endpoints directly rather than through exported task packages. No stated threshold reaches a directory layout, and no failure of it reaches a part the buyer depends on. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 6,
+     "tier": 3,
+     "basis": "The scorer token's availability is a property of the exported task package, which the buyer does not use; its plan runs the simulator and the /env endpoints directly under its own harness. Even if the token in task.toml were exposed there, nothing in the buyer's stated plan or dependencies is reached. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 7,
+     "tier": 3,
+     "basis": "The contents of instruction.md matter only to a team running the exported task harness, which the buyer's plan does not touch. No stated threshold reaches a prompt file inside an unused package. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 8,
+     "tier": 3,
+     "basis": "The agent container's tooling is part of the exported task packaging the buyer does not adopt; its engineers drive the environment endpoints through their own client. No failure of this claim reaches a threshold or a depended-on item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 9,
+     "tier": 3,
+     "basis": "The published release image in the exported task's compose file falls under alternative packaging, which the reliance statement marks does_not_use: the plan touches neither exported task packages nor the published images. No stated threshold reaches which image an unused compose file references. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 11,
+     "tier": 3,
+     "basis": "Automatic pull and the --image override are mechanics of the exported task harness the buyer does not run; the plan does not touch it. No failure of this claim reaches a stated threshold or a depended-on item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 12,
+     "tier": 3,
+     "basis": "The database-load step sits in the exported task's compose startup, a stack the buyer's plan does not run; the Docker Compose item in the reliance statement is one the buyer only uses, which is not a route. No failure of this claim reaches a threshold or a depended-on item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 13,
+     "tier": 3,
+     "basis": "EPIC_SIM_AUTOSTART_GT_ID autostart is configuration of the app service inside the exported task compose file, which the buyer does not use; it configures its own episodes against the simulator directly. No failure of this claim reaches a stated threshold or a depended-on item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 15,
+     "tier": 1,
+     "basis": "If GET /env/current does not exist or does not serve the episode brief, the /env endpoints fail as described and the RL environment the plan rests on is defeated; building a replacement episode harness is engineering by the buyer, which is not a way the plan still holds. The buyer runs these endpoints directly, so the failure is met in use. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 16,
+     "tier": 1,
+     "basis": "If POST /env/step does not exist or the agent cannot act through it, the /env endpoints fail as described and neither evaluation nor reinforcement learning against the simulator works; replacing the episode harness is engineering by the buyer, not a way the plan holds. The buyer drives this endpoint directly. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 17,
+     "tier": 1,
+     "basis": "If the agent token is not scoped to a single episode, the policy under training holds a standing credential, defeating the token separation the RL environment item names; the team cannot restore that isolation by repair. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 18,
+     "tier": 1,
+     "basis": "If the agent token can read the reward or the labels, training rewards are contaminated and evaluation results inflated, which is exactly the token-separation and label-hygiene failure the plan depends on avoiding; the buyer cannot repair it, as every run already trained on the leaked signal. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 20,
+     "tier": 1,
+     "basis": "If the ground truth in the database is reachable by the agent, the label-hygiene property the RL plan depends on fails: rewards are contaminated and published results are invalidated, and no patch by the team restores runs already affected. The buyer's engineers meet this failure directly in the database they train against. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 21,
+     "tier": 3,
+     "basis": "The verifier and its scorer token belong to the exported task harness, which the buyer's plan does not touch: it scores through the environment endpoints under its own protocol rather than through exported task packages. No failure of this claim reaches a stated threshold or a depended-on item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 22,
+     "tier": 3,
+     "basis": "The verifier reading the episode's reward is a step of the exported task harness the buyer does not run; its own scoring path is the /score service, not the harbor verifier. No failure of this claim reaches a stated threshold or a depended-on item. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 23,
+     "tier": 3,
+     "basis": "The claim describes the reward behaviour of the exported task's verifier, which belongs to the alternative packaging the buyer's plan does not touch; the buyer's threshold on scoring reaches the scoring it relies on for evaluation and training, not the export's. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 24,
+     "tier": 3,
+     "basis": "The claim describes the file the exported task's verifier writes, part of the alternative packaging the buyer does not use; its failure would not be met in the buyer's evaluation or training path. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 25,
+     "tier": 3,
+     "basis": "The claim describes the export's oracle mechanism, part of the alternative packaging the buyer's plan does not touch; its failure would not be met in the buyer's evaluation or training path. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 26,
+     "tier": 3,
+     "basis": "The 1.0 self-check is a check on the exported task packages, which the buyer does not use; no stated threshold reaches a check on packaging the plan does not touch. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 27,
+     "tier": 3,
+     "basis": "The claim concerns where the exporter obtains its prompt inputs, and the buyer does not run the exporter; its failure would not be met in the buyer's plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 29,
+     "tier": 3,
+     "basis": "The claim gives the command for the export's self-check, and the buyer does not run exported tasks; its failure would not be met in the buyer's plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 31,
+     "tier": 3,
+     "basis": "The claim describes an option of the exporter, and the buyer does not run the exporter; its failure would not be met in the buyer's plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 32,
+     "tier": 3,
+     "basis": "The claim concerns a token generated for exported task files, which the buyer does not use; no stated threshold reaches a token embedded in packaging the plan does not touch. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 33,
+     "tier": 3,
+     "basis": "The claim describes an exporter option for choosing the scorer token, and the buyer does not run the exporter; its failure would not be met in the buyer's plan. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 36,
+     "tier": 3,
+     "basis": "The claim concerns how Harbor reports rewards in the exported-task workflow, which the buyer does not use; the rewards in the buyer's own path are a separate matter and no stated threshold reaches Harbor's reporting. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 37,
+     "tier": 3,
+     "basis": "The claim describes running the exported training split with Harbor's agents, part of the alternative packaging the buyer does not use; its failure would not be met in the buyer's evaluation or training path. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 38,
+     "tier": 3,
+     "basis": "The claim describes a reinforcement-learning path through exported task packages and Harbor's trajectory tooling, which the buyer's plan does not touch; the buyer drives the simulator and environment endpoints directly, so no way this could be untrue is material. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 39,
+     "tier": 2,
+     "basis": "Boot-time database load is part of running the stack with Docker Compose, which the buyer's engineers use; a person setting the software up would act on the claim and meet its failure during setup, while the core of the plan holds without it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 40,
+     "tier": 2,
+     "basis": "Autostart of one episode on boot is part of running the stack with Docker Compose, which the buyer's engineers use; a person setting the software up would act on the claim and meet its failure in use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 42,
+     "tier": 3,
+     "basis": "The claim describes running exported tasks with an arbitrary Harbor agent, part of the alternative packaging the buyer does not use; its failure would not be met in the buyer's evaluation or training path. Rated on the practice's reading of the buyer's plan."
+    }
+   ],
+   "unrated": []
+  },
+  "scripts/README.md": {
+   "at": "2026-09-25T20-25-10Z",
+   "model": "accounts/fireworks/models/glm-5p3-flash",
+   "marked": 13,
+   "claims_from": "runs/2026-09-25T19-40-21Z_enum_synthetic-hospital_scripts_readme_md_2026-09-25T18-56-37Z/claims.json",
+   "reliance_statement": "2026-09-25T19-49-08Z",
+   "tiers": [
+    {
+     "claim_id": 1,
+     "tier": 2,
+     "basis": "No stated threshold reaches a characterisation of what the scripts directory is for, and the buyer only uses these artifacts. A person turning to the methodology artifacts would act on the description of what the scripts do and would meet its failure in use. Rated on the scale alone."
+    },
+    {
+     "claim_id": 2,
+     "tier": 2,
+     "basis": "No stated threshold reaches which database the utility scripts query, and the buyer's plan only uses them. A person running the scripts would act on the statement about what they query and would meet its failure in use. Rated on the scale alone."
+    },
+    {
+     "claim_id": 3,
+     "tier": 2,
+     "basis": "No stated threshold reaches the format or origin of the database the utility scripts query. A person running the scripts would act on it, since they would need to open the database, and would meet its failure in use. Rated on the scale alone."
+    },
+    {
+     "claim_id": 4,
+     "tier": 2,
+     "basis": "No stated threshold reaches the table layout of the database, read as the buyer wrote the threshold: it concerns ground truth and scoring working, not schema contents. A person running the scripts or writing queries would act on the table names and meet their absence in use. Rated on the scale alone."
+    },
+    {
+     "claim_id": 5,
+     "tier": 3,
+     "basis": "No stated threshold reaches whether this database is shipped and no depends item covers it; the buyer obtains the distributed database by clone and release assets in any event. The only way the claim could be untrue is that the database is in fact present in the repository, which would cost the buyer nothing and is not a failure a person would meet adversely in use. Rated on the scale alone."
+    },
+    {
+     "claim_id": 7,
+     "tier": 2,
+     "basis": "No stated threshold reaches the contents of patient_profiles.db. A person running the scripts and choosing which database file to point them at would act on it and would meet its failure in use. Rated on the scale alone."
+    },
+    {
+     "claim_id": 8,
+     "tier": 2,
+     "basis": "No stated threshold reaches the error behaviour when the scripts are pointed at the wrong database file. A person running the scripts would act on it and would meet its failure in use. Rated on the scale alone."
+    },
+    {
+     "claim_id": 9,
+     "tier": 3,
+     "basis": "The claim concerns the ETL pipeline, which the buyer's plan does not touch: the team adopts the release as shipped and does not rebuild the database or ingest new sources. No stated threshold reaches the pipeline's invocation or its construction of the database from source data. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 10,
+     "tier": 3,
+     "basis": "The claim concerns what the ETL pipeline writes, and the buyer's plan does not touch rebuilding; the team adopts the release as shipped and reaches the distributed database by clone and release assets regardless. No stated threshold reaches the pipeline's output path. Rated on the practice's reading of the buyer's plan."
+    },
+    {
+     "claim_id": 11,
+     "tier": 2,
+     "basis": "No stated threshold reaches the scripts' default database path or the --db override. A person running the methodology scripts would act on the default path and would meet its failure in use. Rated on the scale alone."
+    },
+    {
+     "claim_id": 12,
+     "tier": 2,
+     "basis": "No stated threshold reaches how the scripts are characterised, and the buyer only uses these artifacts. A person turning to the scripts to check how the released data was constructed and audited would act on the description and would meet its failure in use. Rated on the scale alone."
+    },
+    {
+     "claim_id": 13,
+     "tier": 2,
+     "basis": "No stated threshold reaches which database four utility scripts connect to or how that connection is configured. A person running those scripts would act on the connection detail and would meet its failure in use. Rated on the scale alone."
+    },
+    {
+     "claim_id": 14,
+     "tier": 3,
+     "basis": "The claim concerns whether the ETL pipeline completes and rebuilds the full database, and the buyer's plan does not touch rebuilding: it adopts the release as shipped. No stated threshold reaches the pipeline's completion. Rated on the practice's reading of the buyer's plan."
+    }
+   ],
+   "unrated": []
+  }
+ }
+}

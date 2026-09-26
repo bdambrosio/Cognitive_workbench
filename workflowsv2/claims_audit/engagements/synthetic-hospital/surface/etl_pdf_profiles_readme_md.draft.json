@@ -1,0 +1,162 @@
+{
+ "claim_source": "etl/pdf_profiles/README.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "One YAML file per source PDF (or family of PDFs).",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "The system organises source PDFs as one YAML profile file per PDF (or per family of PDFs).",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns the PDF profile layer of the ETL pipeline, which falls under the reliance item the buyer does not use: the team adopts the release as shipped and does not ingest new source material, and no stated threshold reaches profile file organisation. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 2,
+   "quote": "Stage 1d reads these instead of hardcoding filenames.",
+   "lines": [
+    3,
+    4
+   ],
+   "statement": "Stage 1d of the pipeline reads these profile files rather than hardcoded filenames.",
+   "about": "target",
+   "within": {
+    "source": "etl/stages/EXTENDING.md",
+    "id": 3,
+    "statement": "The pipeline's source-specific configuration is held in declarative profile files that the pipeline loads, so a new source is configured by adding a profile rather than editing code."
+   },
+   "tier": 3,
+   "tier_basis": "The claim concerns how Stage 1d of the ETL pipeline reads profile files, part of the data-rebuilding path the buyer's plan does not touch, and no stated threshold reaches pipeline stage mechanics. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 3,
+   "quote": "`name` | Human-readable profile id",
+   "lines": [
+    8,
+    8
+   ],
+   "statement": "Profile YAML files have a `name` field holding a human-readable profile id.",
+   "about": "target",
+   "within": {
+    "source": "etl/stages/EXTENDING.md",
+    "id": 15,
+    "statement": "PDF profiles are YAML files carrying the keys name, layout, display_name, filename_globs, topic_from and context_style, with layout taking one of toc/bullets/font_headings, topic_from taking section_title or llm, and context_style taking hierarchy or episode."
+   },
+   "tier": 3,
+   "tier_basis": "The claim concerns a field name in the ETL pipeline's PDF profile YAML, used only for ingesting new sources the buyer does not ingest, and no stated threshold reaches profile field names. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 4,
+   "quote": "`layout` | Which parser to use: `toc`, `bullets`, or `font_headings`",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "The `layout` field selects among three parsers: `toc`, `bullets`, and `font_headings`.",
+   "about": "target",
+   "within": {
+    "source": "etl/stages/EXTENDING.md",
+    "id": 15,
+    "statement": "PDF profiles are YAML files carrying the keys name, layout, display_name, filename_globs, topic_from and context_style, with layout taking one of toc/bullets/font_headings, topic_from taking section_title or llm, and context_style taking hierarchy or episode."
+   },
+   "tier": 3,
+   "tier_basis": "The claim concerns parser selection options in the ETL pipeline's PDF profiles, which the buyer does not use and which no stated threshold reaches; even a wholly wrong parser list would not affect evaluation or training on the released data. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 5,
+   "quote": "`display_name` | Human-readable source name stored on the deck",
+   "lines": [
+    10,
+    10
+   ],
+   "statement": "Profile YAML files have a `display_name` field, a human-readable source name stored on the deck.",
+   "about": "target",
+   "within": {
+    "source": "etl/stages/EXTENDING.md",
+    "id": 15,
+    "statement": "PDF profiles are YAML files carrying the keys name, layout, display_name, filename_globs, topic_from and context_style, with layout taking one of toc/bullets/font_headings, topic_from taking section_title or llm, and context_style taking hierarchy or episode."
+   },
+   "tier": 3,
+   "tier_basis": "The claim concerns the display_name field stored on the ETL deck during data rebuilding, a path the buyer's plan does not touch, and no stated threshold reaches deck metadata. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 6,
+   "quote": "`filename_globs` | Filenames this profile matches (supports `*`)",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "Profile YAML files have a `filename_globs` field matching filenames, with `*` wildcard support.",
+   "about": "target",
+   "within": {
+    "source": "etl/stages/EXTENDING.md",
+    "id": 15,
+    "statement": "PDF profiles are YAML files carrying the keys name, layout, display_name, filename_globs, topic_from and context_style, with layout taking one of toc/bullets/font_headings, topic_from taking section_title or llm, and context_style taking hierarchy or episode."
+   },
+   "tier": 3,
+   "tier_basis": "The claim concerns filename glob matching in the ETL pipeline's PDF profiles, used only when ingesting new source material the buyer does not ingest, and no stated threshold reaches glob support. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 7,
+   "quote": "`topic_from` | `section_title` (use the section heading) or `llm` (enrich later)",
+   "lines": [
+    12,
+    12
+   ],
+   "statement": "The `topic_from` field accepts `section_title` (use the section heading) or `llm` (enrich later).",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns topic extraction options in the ETL pipeline's PDF profiles, part of the data-rebuilding path the buyer does not use, and no stated threshold reaches topic extraction settings. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 8,
+   "quote": "`context_style` | `hierarchy` (parent: title) or `episode` (episode/caps header)",
+   "lines": [
+    13,
+    13
+   ],
+   "statement": "The `context_style` field accepts `hierarchy` (parent: title) or `episode` (episode/caps header).",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns context-style options in the ETL pipeline's PDF profiles, which affect only rebuilding the data the buyer adopts as shipped, and no stated threshold reaches context formatting. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 9,
+   "quote": "`toc` — a table-of-contents driven document (headings from the TOC).",
+   "lines": [
+    16,
+    16
+   ],
+   "statement": "The `toc` layout handles table-of-contents driven documents, taking headings from the TOC.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns the toc parser's behaviour in the ETL pipeline, a path the buyer's plan does not touch, and no stated threshold reaches document parsing behaviour. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 10,
+   "quote": "`bullets` — a bullet/point-per-line document; titles aren't reliable topics,\n  so set `topic_from: llm` and `context_style: episode`.",
+   "lines": [
+    17,
+    18
+   ],
+   "statement": "The `bullets` layout handles bullet-per-line documents, for which titles are not reliable topics and `topic_from: llm` with `context_style: episode` should be set.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns recommended settings for the bullets parser in the ETL pipeline, used only when ingesting new sources the buyer does not ingest, and no stated threshold reaches parser recommendations. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 11,
+   "quote": "`font_headings` — headings detected by font size/weight.",
+   "lines": [
+    19,
+    19
+   ],
+   "statement": "The `font_headings` layout detects headings by font size and weight.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns font-based heading detection in the ETL pipeline's font_headings parser, part of the data-rebuilding path the buyer does not use, and no stated threshold reaches heading detection. So no way the claim could be untrue is material. Rated on the practice's reading of the buyer's plan."
+  }
+ ]
+}

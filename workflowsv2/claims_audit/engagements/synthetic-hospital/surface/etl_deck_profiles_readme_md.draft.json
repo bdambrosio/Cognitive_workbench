@@ -1,0 +1,166 @@
+{
+ "claim_source": "etl/deck_profiles/README.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "One YAML file per source deck/format.",
+   "lines": [
+    2,
+    2
+   ],
+   "statement": "Deck configuration lives in profile files, one YAML file per source deck or format.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns the ETL pipeline's deck-profile files, which fall under the reliance item the buyer does_not_use: it adopts the release as shipped and does not rebuild the database or ingest new sources. No stated threshold reaches deck-profile configuration, and no way the claim could be untrue touches leakage, scoring, simulator faithfulness, validation, licence or syntheticity. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 2,
+   "quote": "The pipeline reads these instead of\nhardcoding deck filenames.",
+   "lines": [
+    2,
+    3
+   ],
+   "statement": "The pipeline obtains deck filenames from the YAML profile files rather than having deck filenames hardcoded in it.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "How the pipeline obtains deck filenames matters only to a buyer extending or rebuilding the data, which the buyer does_not_use: it adopts the release as shipped. No stated threshold reaches the ETL pipeline's internals. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 3,
+   "quote": "To add your own deck, copy a file below and edit it.",
+   "lines": [
+    3,
+    3
+   ],
+   "statement": "A new source deck is supported by copying an existing profile file and editing it; the copy-and-edit path is the documented way to add a deck.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The documented way to add a new source deck serves only data rebuilding and extension, which the buyer does_not_use; its plan is to evaluate and train on the release as shipped. No stated threshold reaches this claim, and its failure would not affect any depends item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 4,
+   "quote": "`name` | Human-readable profile id",
+   "lines": [
+    10,
+    10
+   ],
+   "statement": "The profile format has a `name` field serving as a human-readable profile identifier.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "A profile-field format detail is used only by the ETL pipeline the buyer does_not_use; the buyer never authors or edits profiles in its plan. No stated threshold reaches this claim, and a person running the benchmark's evaluation and training path would not meet its failure in use. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 5,
+   "quote": "`role` | `board_exam` (question vignettes) or `fact` (atomic facts)",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The `role` field takes one of two values: `board_exam` for question vignettes or `fact` for atomic facts.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The `role` field's permitted values matter only when authoring deck profiles, part of the ETL pipeline the buyer does_not_use. No stated threshold reaches this claim, and the failure of the field documentation would not be met in the buyer's evaluation or training work. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 6,
+   "quote": "`parser` | Which extractor Stage 3/4 uses (see keys in s03/s04 `PARSERS`)",
+   "lines": [
+    12,
+    12
+   ],
+   "statement": "The `parser` field selects which extractor Stage 3 and Stage 4 use, and its valid values are the keys of `PARSERS` in the s03/s04 stages.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The `parser` field governs extractor selection inside the ETL pipeline, which the buyer does_not_use and would never configure. No stated threshold reaches ETL extractor wiring, and the claim's failure could not affect leakage, scoring, simulator faithfulness, licence or syntheticity. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 7,
+   "quote": "`card_format` | Classification hint for Stage 2 (`mcq_vignette`, `cloze_fact`, ...)",
+   "lines": [
+    13,
+    13
+   ],
+   "statement": "The `card_format` field supplies a classification hint used by Stage 2, with values such as `mcq_vignette` and `cloze_fact`.",
+   "about": "target",
+   "within": {
+    "source": "etl/stages/EXTENDING.md",
+    "id": 9,
+    "statement": "A deck profile is configured with these keys: name, role (board_exam or fact), parser (a Stage 3/4 parser key), card_format (a Stage 2 classification hint), filename_globs, and note_model_substrings."
+   },
+   "tier": 3,
+   "tier_basis": "The `card_format` classification hint operates in Stage 2 of the ETL pipeline, part of the data-rebuilding capability the buyer does_not_use. No stated threshold reaches this claim, and the buyer's evaluation and training plan never touches profile files. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 8,
+   "quote": "`filename_globs` | Filenames this profile matches (supports `*` wildcards)",
+   "lines": [
+    14,
+    14
+   ],
+   "statement": "The `filename_globs` field lists filenames a profile matches, and supports `*` wildcards.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Filename matching by profiles is ETL ingestion mechanics, which the buyer does_not_use; it adopts the data as shipped. No stated threshold reaches this claim, and its failure would not be met by anyone running the evaluation or training path. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 9,
+   "quote": "`note_model_substrings` | Anki note-model name substrings this profile matches",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "The `note_model_substrings` field matches profiles against Anki note-model names by substring.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Anki note-model substring matching is a detail of the ETL pipeline's profile resolution, which the buyer does_not_use. No stated threshold reaches this claim, and a person operating the benchmark as the buyer plans would not act on it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 10,
+   "quote": "`dedup_priority` | Lower = more specific = wins deduplication",
+   "lines": [
+    16,
+    16
+   ],
+   "statement": "In deduplication, the profile with the lower `dedup_priority` value wins, lower meaning more specific.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Deduplication precedence among profiles affects only ETL runs rebuilding the data, which the buyer does_not_use. No stated threshold reaches deduplication behaviour, and the buyer's plan never triggers it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 11,
+   "quote": "`specialty_fallback` | Optional fixed specialty for single-specialty decks",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "The `specialty_fallback` field is optional and assigns a fixed specialty to single-specialty decks.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The `specialty_fallback` field is an optional ETL profile setting used only when ingesting new source material, which the buyer does_not_use. No stated threshold reaches this claim, and its failure would not surface in evaluation or training as the buyer plans them. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 12,
+   "quote": "`tag_root` | Optional namespace token for the source's `::` tag hierarchy",
+   "lines": [
+    18,
+    18
+   ],
+   "statement": "The `tag_root` field is optional and provides the namespace token at the root of the source's `::` tag hierarchy.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The `tag_root` namespace token matters only when authoring ETL profiles, part of the data-rebuilding capability the buyer does_not_use. No stated threshold reaches this claim, and the buyer's plan would never encounter the field. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 13,
+   "quote": "A card is resolved by filename first, then by note-model substring.",
+   "lines": [
+    20,
+    20
+   ],
+   "statement": "Card-to-profile resolution checks filename matches first and note-model substring matches second.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Card-to-profile resolution order is internal ETL behaviour relevant only when running the pipeline over new decks, which the buyer does_not_use. No stated threshold reaches this claim, and its failure could not affect any item the buyer depends on. Rated on the practice's reading of the buyer's plan."
+  }
+ ]
+}

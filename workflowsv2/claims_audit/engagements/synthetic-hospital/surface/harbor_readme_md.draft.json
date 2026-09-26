@@ -1,0 +1,391 @@
+{
+ "claim_source": "harbor/README.md",
+ "claims": [
+  {
+   "id": 5,
+   "quote": "sh-patient-diagnosis-7641/\n├── task.toml                  metadata; scorer token for the verifier and the oracle only\n├── instruction.md             the paper's agent prompt, patient assignment, and how to act\n├── environment/\n│   ├── Dockerfile             agent container (\"main\"): shell, curl, jq, sh-agent\n│   ├── agent_cli.py\n│   └── docker-compose.yaml    app (simulator, autostarts this episode) + postgres + redis\n├── solution/solve.sh          oracle: fetches the label-derived submission and submits it\n└── tests/test.sh              verifier: reads the episode outcome -> /logs/verifier/reward.json",
+   "lines": [
+    13,
+    21
+   ],
+   "statement": "An exported task is a directory containing task.toml, instruction.md, environment/ (with Dockerfile, agent_cli.py and docker-compose.yaml), solution/solve.sh and tests/test.sh, as shown in the layout diagram.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The exported task directory layout describes packaging the buyer's plan does not touch: the reliance statement records that it drives the simulator and environment endpoints directly rather than through exported task packages. No stated threshold reaches a directory layout, and no failure of it reaches a part the buyer depends on. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 6,
+   "quote": "task.toml                  metadata; scorer token for the verifier and the oracle only",
+   "lines": [
+    14,
+    14
+   ],
+   "statement": "The scorer token in task.toml is available only to the verifier and the oracle.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The scorer token's availability is a property of the exported task package, which the buyer does not use; its plan runs the simulator and the /env endpoints directly under its own harness. Even if the token in task.toml were exposed there, nothing in the buyer's stated plan or dependencies is reached. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 7,
+   "quote": "instruction.md             the paper's agent prompt, patient assignment, and how to act",
+   "lines": [
+    15,
+    15
+   ],
+   "statement": "instruction.md contains the paper's agent prompt, the patient assignment, and instructions on how to act.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The contents of instruction.md matter only to a team running the exported task harness, which the buyer's plan does not touch. No stated threshold reaches a prompt file inside an unused package. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 8,
+   "quote": "Dockerfile             agent container (\"main\"): shell, curl, jq, sh-agent",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "The agent container (\"main\") has shell, curl, jq and sh-agent available.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The agent container's tooling is part of the exported task packaging the buyer does not adopt; its engineers drive the environment endpoints through their own client. No failure of this claim reaches a threshold or a depended-on item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 9,
+   "quote": "The `app` service is the published release image with the database baked in\n  (`ghcr.io/sparkcpark/synthetic-hospital:1.3-data`",
+   "lines": [
+    26,
+    27
+   ],
+   "statement": "The compose file's app service runs the published release image ghcr.io/sparkcpark/synthetic-hospital:1.3-data.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The published release image in the exported task's compose file falls under alternative packaging, which the reliance statement marks does_not_use: the plan touches neither exported task packages nor the published images. No stated threshold reaches which image an unused compose file references. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 11,
+   "quote": "pulled automatically; build it locally under that name or pass\n  `--image` to use another",
+   "lines": [
+    27,
+    28
+   ],
+   "statement": "The image is pulled automatically, and an alternative image can be used by building it locally under the same name or passing `--image`.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Automatic pull and the --image override are mechanics of the exported task harness the buyer does not run; the plan does not touch it. No failure of this claim reaches a stated threshold or a depended-on item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 12,
+   "quote": "On boot it\n  loads the database",
+   "lines": [
+    28,
+    29
+   ],
+   "statement": "The app service's startup sequence contains a step that loads the database baked into the release image.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The database-load step sits in the exported task's compose startup, a stack the buyer's plan does not run; the Docker Compose item in the reliance statement is one the buyer only uses, which is not a route. No failure of this claim reaches a threshold or a depended-on item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 13,
+   "quote": "starts one episode for the task's instance\n  (`EPIC_SIM_AUTOSTART_GT_ID`)",
+   "lines": [
+    29,
+    30
+   ],
+   "statement": "The app service is configured via EPIC_SIM_AUTOSTART_GT_ID to autostart the episode for the task's instance.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "EPIC_SIM_AUTOSTART_GT_ID autostart is configuration of the app service inside the exported task compose file, which the buyer does not use; it configures its own episodes against the simulator directly. No failure of this claim reaches a stated threshold or a depended-on item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 15,
+   "quote": "which fetches the episode brief from\n  `GET /env/current`",
+   "lines": [
+    31,
+    32
+   ],
+   "statement": "sh-agent fetches the episode brief from the GET /env/current endpoint.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If GET /env/current does not exist or does not serve the episode brief, the /env endpoints fail as described and the RL environment the plan rests on is defeated; building a replacement episode harness is engineering by the buyer, which is not a way the plan still holds. The buyer runs these endpoints directly, so the failure is met in use. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 16,
+   "quote": "acts through `POST /env/step`",
+   "lines": [
+    32,
+    32
+   ],
+   "statement": "The agent acts on the episode through the POST /env/step endpoint.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If POST /env/step does not exist or the agent cannot act through it, the /env endpoints fail as described and neither evaluation nor reinforcement learning against the simulator works; replacing the episode harness is engineering by the buyer, not a way the plan holds. The buyer drives this endpoint directly. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 17,
+   "quote": "with a per-episode agent\ntoken",
+   "lines": [
+    32,
+    33
+   ],
+   "statement": "The agent token is issued per episode.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the agent token is not scoped to a single episode, the policy under training holds a standing credential, defeating the token separation the RL environment item names; the team cannot restore that isolation by repair. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 18,
+   "quote": "That token cannot read the reward or the labels.",
+   "lines": [
+    33,
+    33
+   ],
+   "statement": "The agent token cannot read the reward or the ground-truth labels.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the agent token can read the reward or the labels, training rewards are contaminated and evaluation results inflated, which is exactly the token-separation and label-hygiene failure the plan depends on avoiding; the buyer cannot repair it, as every run already trained on the leaked signal. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 20,
+   "quote": "so the ground truth in the database is out of the agent's reach.",
+   "lines": [
+    35,
+    35
+   ],
+   "statement": "The ground truth in the database is unreachable by the agent.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the ground truth in the database is reachable by the agent, the label-hygiene property the RL plan depends on fails: rewards are contaminated and published results are invalidated, and no patch by the team restores runs already affected. The buyer's engineers meet this failure directly in the database they train against. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 21,
+   "quote": "The verifier runs after the agent with the scorer token from\n  `[verifier].env`",
+   "lines": [
+    36,
+    37
+   ],
+   "statement": "The verifier runs after the agent and authenticates with the scorer token taken from [verifier].env.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The verifier and its scorer token belong to the exported task harness, which the buyer's plan does not touch: it scores through the environment endpoints under its own protocol rather than through exported task packages. No failure of this claim reaches a stated threshold or a depended-on item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 22,
+   "quote": "reads the episode's reward",
+   "lines": [
+    37,
+    37
+   ],
+   "statement": "The verifier reads the episode's reward.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The verifier reading the episode's reward is a step of the exported task harness the buyer does not run; its own scoring path is the /score service, not the harbor verifier. No failure of this claim reaches a stated threshold or a depended-on item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 23,
+   "quote": "(0 if nothing was submitted)",
+   "lines": [
+    37,
+    37
+   ],
+   "statement": "The reward is 0 if nothing was submitted.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim describes the reward behaviour of the exported task's verifier, which belongs to the alternative packaging the buyer's plan does not touch; the buyer's threshold on scoring reaches the scoring it relies on for evaluation and training, not the export's. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 24,
+   "quote": "writes\n  `reward.json` with `reward`, `steps` and `submitted`",
+   "lines": [
+    37,
+    38
+   ],
+   "statement": "The verifier writes reward.json containing the fields reward, steps and submitted.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim describes the file the exported task's verifier writes, part of the alternative packaging the buyer does not use; its failure would not be met in the buyer's evaluation or training path. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 25,
+   "quote": "The oracle (`harbor run -a oracle`) uses `[solution].env` to fetch a\n  label-derived submission from `GET /env/oracle/{id}` and submits it;",
+   "lines": [
+    39,
+    40
+   ],
+   "statement": "The oracle, run as `harbor run -a oracle`, uses [solution].env to fetch a label-derived submission from GET /env/oracle/{id} and submits it.",
+   "about": "target",
+   "within": {
+    "source": "harbor/README.md",
+    "id": 26,
+    "statement": "The export pairs each task with an oracle that fetches and submits the label-derived submission, making a score of 1.0 the expected self-check result."
+   },
+   "tier": 3,
+   "tier_basis": "The claim describes the export's oracle mechanism, part of the alternative packaging the buyer's plan does not touch; its failure would not be met in the buyer's evaluation or training path. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 26,
+   "quote": "every task\n  should score 1.0, which is the export's self-check.",
+   "lines": [
+    40,
+    41
+   ],
+   "statement": "The export pairs each task with an oracle that fetches and submits the label-derived submission, making a score of 1.0 the expected self-check result.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The 1.0 self-check is a check on the exported task packages, which the buyer does not use; no stated threshold reaches a check on packaging the plan does not touch. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 27,
+   "quote": "exporter reads prompt inputs from the stack",
+   "lines": [
+    46,
+    46
+   ],
+   "statement": "The exporter reads its prompt inputs from the running docker compose stack.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns where the exporter obtains its prompt inputs, and the buyer does not run the exporter; its failure would not be met in the buyer's plan. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 29,
+   "quote": "uvx harbor run -p harbor_tasks -a oracle                          # self-check",
+   "lines": [
+    48,
+    48
+   ],
+   "statement": "The oracle self-check on exported tasks is run with `uvx harbor run -p harbor_tasks -a oracle`.",
+   "about": "target",
+   "restates_rejected": 24,
+   "tier": 3,
+   "tier_basis": "The claim gives the command for the export's self-check, and the buyer does not run exported tasks; its failure would not be met in the buyer's plan. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 31,
+   "quote": "`--task all --limit 0` exports every instance of a split.",
+   "lines": [
+    52,
+    52
+   ],
+   "statement": "Running the exporter with --task all --limit 0 exports every instance of a split.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim describes an option of the exporter, and the buyer does not run the exporter; its failure would not be met in the buyer's plan. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 32,
+   "quote": "A random scorer token is\ngenerated per export and embedded in the task files;",
+   "lines": [
+    52,
+    53
+   ],
+   "statement": "A random scorer token is generated for each export and embedded in the exported task files.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns a token generated for exported task files, which the buyer does not use; no stated threshold reaches a token embedded in packaging the plan does not touch. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 33,
+   "quote": "pass `--token` to choose one.",
+   "lines": [
+    53,
+    53
+   ],
+   "statement": "The `--token` option can be passed to choose the scorer token.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim describes an exporter option for choosing the scorer token, and the buyer does not run the exporter; its failure would not be met in the buyer's plan. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 36,
+   "quote": "so `harbor` reports them directly",
+   "lines": [
+    55,
+    55
+   ],
+   "statement": "Because rewards are in [0, 1], Harbor reports them directly without transformation.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns how Harbor reports rewards in the exported-task workflow, which the buyer does not use; the rewards in the buyer's own path are a separate matter and no stated threshold reaches Harbor's reporting. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 37,
+   "quote": "or any subset can be run\nwith Harbor's agents",
+   "lines": [
+    6,
+    7
+   ],
+   "statement": "When the exported training split, or any subset of it, is run with Harbor's agents, the agents run the tasks.",
+   "about": "target",
+   "implied_by": 3,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "The claim describes running the exported training split with Harbor's agents, part of the alternative packaging the buyer does not use; its failure would not be met in the buyer's evaluation or training path. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 38,
+   "quote": "used as an RL environment through Harbor's trajectory\ntooling",
+   "lines": [
+    7,
+    8
+   ],
+   "statement": "When used through Harbor's trajectory tooling, the exported tasks serve as a reinforcement learning environment.",
+   "about": "target",
+   "implied_by": 4,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "The claim describes a reinforcement-learning path through exported task packages and Harbor's trajectory tooling, which the buyer's plan does not touch; the buyer drives the simulator and environment endpoints directly, so no way this could be untrue is material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 39,
+   "quote": "On boot it\n  loads the database",
+   "lines": [
+    28,
+    29
+   ],
+   "statement": "When the app service boots, the database is loaded.",
+   "about": "target",
+   "implied_by": 12,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "Boot-time database load is part of running the stack with Docker Compose, which the buyer's engineers use; a person setting the software up would act on the claim and meet its failure during setup, while the core of the plan holds without it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 40,
+   "quote": "starts one episode for the task's instance\n  (`EPIC_SIM_AUTOSTART_GT_ID`)",
+   "lines": [
+    29,
+    30
+   ],
+   "statement": "When the app service boots, it starts one episode for the task's instance.",
+   "about": "target",
+   "implied_by": 13,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "Autostart of one episode on boot is part of running the stack with Docker Compose, which the buyer's engineers use; a person setting the software up would act on the claim and meet its failure in use, and no stated threshold reaches it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 42,
+   "quote": "uvx harbor run -p harbor_tasks -a terminus-2 -m <provider/model>   # any Harbor agent",
+   "lines": [
+    49,
+    49
+   ],
+   "statement": "When the exported tasks are run with an arbitrary Harbor agent, such as terminus-2 with a provider model, the agent runs the tasks.",
+   "about": "target",
+   "implied_by": 30,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "within": {
+    "source": "harbor/README.md",
+    "id": 37,
+    "statement": "When the exported training split, or any subset of it, is run with Harbor's agents, the agents run the tasks."
+   },
+   "tier": 3,
+   "tier_basis": "The claim describes running exported tasks with an arbitrary Harbor agent, part of the alternative packaging the buyer does not use; its failure would not be met in the buyer's evaluation or training path. Rated on the practice's reading of the buyer's plan."
+  }
+ ]
+}

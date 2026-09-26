@@ -1,0 +1,2416 @@
+{
+ "claim_source": "README.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "Converts USMLE-style medical education source content into a ground-truth benchmark database of synthetic longitudinal patient records",
+   "lines": [
+    8,
+    8
+   ],
+   "statement": "The target contains an ETL pipeline that ingests USMLE-style medical education source content and is built to produce a ground-truth benchmark database of synthetic longitudinal patient records.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The claim asserts the pipeline's output records are synthetic; if they are not — if the benchmark database contains real patient data — the buyer's adoption ends and no local repair cures it. Rated against the buyer's stated threshold: \"data that is not fully synthetic\"."
+  },
+  {
+   "id": 2,
+   "quote": "served through an Epic-faithful EHR simulation platform (FHIR R4 + OAuth2/RBAC)",
+   "lines": [
+    8,
+    8
+   ],
+   "statement": "The benchmark is served through an EHR simulation platform faithful to Epic's interface, supporting FHIR R4, OAuth2 and RBAC.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the simulation platform is not faithful to Epic's interface in FHIR R4, OAuth2 or RBAC as claimed, evaluation and training against it would not transfer to the Epic-like deployment setting the buyer cares about, and the simulator is the project's core offering. Rated against the buyer's stated threshold: \"a simulator that is not FHIR R4 / OAuth2 / RBAC faithful as claimed\"."
+  },
+  {
+   "id": 5,
+   "quote": "so it can also be used as a verifiable-reward environment",
+   "lines": [
+    8,
+    8
+   ],
+   "statement": "The benchmark can be used as a verifiable-reward environment (for reinforcement learning training).",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the benchmark cannot serve as a verifiable-reward environment, reinforcement learning on the training split — half the buyer's stated purpose — fails, and the buyer would have to build its own reward service and episode harness at significant cost. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 6,
+   "quote": "Park, Chen, Dettmers. _Synthetic Hospital: An Open, Verifiable, Physician-Validated Longitudinal EHR Benchmark._ Preprint, 2026. arXiv link: _to be added_.",
+   "lines": [
+    10,
+    10
+   ],
+   "statement": "The benchmark has an accompanying preprint (2026) by Park, Chen and Dettmers, titled as quoted; the arXiv link is stated as pending.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "No stated threshold reaches the existence, authorship or title of a preprint, and the buyer's comparability with the published paper is an item it only uses, reporting under its own documented protocol if the preprint disappoints. Rated on the scale alone."
+  },
+  {
+   "id": 7,
+   "quote": "(not distributed — see Data Setup)",
+   "lines": [
+    16,
+    16
+   ],
+   "statement": "The source content used by the ETL is not distributed with the project.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "The material the paper used is not included.",
+     "lines": [
+      120,
+      120
+     ]
+    },
+    {
+     "quote": "the source material the pipeline was built from is not included",
+     "lines": [
+      286,
+      286
+     ]
+    }
+   ],
+   "tier": 1,
+   "tier_basis": "If the source content is in fact distributed with the project, the release ships material it may not be entitled to distribute — the provenance problem the buyer said would end the adoption, which the buyer cannot repair and could only cure by removing the affected material or walking away. Rated against the buyer's stated threshold: \"source content the project may not distribute\"."
+  },
+  {
+   "id": 8,
+   "quote": "etl/  (stages s01–s10: ingest → classify → extract → fact cards →\n         ontology mapping → relationships → EHR sections → patients →\n         encounters → ground truth)",
+   "lines": [
+    19,
+    21
+   ],
+   "statement": "The etl/ pipeline comprises stages s01 through s10 performing the named sequence: ingest, classify, extract, fact cards, ontology mapping, relationships, EHR sections, patients, encounters, ground truth.",
+   "about": "target",
+   "within": {
+    "source": "README.md",
+    "id": 25,
+    "statement": "The etl/ directory contains parsers, pipeline stages s01–s10, ontology tooling grounded in SNOMED, ICD-10 and LOINC with SapBERT embeddings, and declarative deck and PDF source descriptions."
+   },
+   "tier": 3,
+   "tier_basis": "The ETL pipeline is an item the buyer does not use — it adopts the release as shipped and does not rebuild the database — and no stated threshold reaches the stage sequence or its naming. Rated on the scale alone."
+  },
+  {
+   "id": 9,
+   "quote": "[SQLite: data/benchmark.db]",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "The ETL pipeline's output database is SQLite, stored at data/benchmark.db.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The output database's format and location are details the buyer's engineers act on when loading the released benchmark, and a wrong path or format would surface during setup without changing whether the buyer's plan holds. No stated threshold reaches it and no way it could be untrue defeats an item the buyer depends on. Rated on the scale alone."
+  },
+  {
+   "id": 10,
+   "quote": "epic_sim/  FastAPI EHR simulator (FHIR R4, OAuth2, RBAC, Postgres)",
+   "lines": [
+    24,
+    24
+   ],
+   "statement": "The epic_sim/ component is a FastAPI EHR simulator supporting FHIR R4, OAuth2 and RBAC, backed by Postgres.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "FastAPI app, FHIR R4 resources, OAuth2 + RBAC",
+     "lines": [
+      46,
+      46
+     ]
+    }
+   ],
+   "tier": 1,
+   "tier_basis": "If epic_sim does not support FHIR R4, OAuth2 and RBAC as claimed, the buyer's evaluation and training would not transfer to the Epic-like setting it is adopting the simulator for, and replacing the simulator would be costly. Rated against the buyer's stated threshold: \"a simulator that is not FHIR R4 / OAuth2 / RBAC faithful as claimed\"."
+  },
+  {
+   "id": 11,
+   "quote": "eval/  task runners, scoring, semantic matching, reports",
+   "lines": [
+    27,
+    27
+   ],
+   "statement": "The eval/ component provides task runners, scoring, semantic matching, and reports.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "scoring, ICD-10 validation, semantic matching, reporting",
+     "lines": [
+      47,
+      47
+     ]
+    }
+   ],
+   "tier": 1,
+   "tier_basis": "If eval/ provides no working scoring, the ground truth and scoring the buyer is adopting do not work as described and its evaluation results and training rewards would be meaningless — the core of what it is adopting, which repair would make costly. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+  },
+  {
+   "id": 12,
+   "quote": "1,268 synthetic longitudinal patients",
+   "lines": [
+    34,
+    34
+   ],
+   "statement": "The released patient_profiles.db and patient_profiles.jsonl contain 1,268 synthetic longitudinal patients.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The claim asserts the patients are synthetic; if the released profiles are not fully synthetic — if real patient data is included — the buyer's adoption ends under its own stated threshold and no patch could cure it. Rated against the buyer's stated threshold: \"data that is not fully synthetic\"."
+  },
+  {
+   "id": 13,
+   "quote": "5,602 clinical notes",
+   "lines": [
+    34,
+    34
+   ],
+   "statement": "The released patient_profiles.db and patient_profiles.jsonl contain 5,602 clinical notes for those patients.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A note count is a documented figure the buyer's engineers would check when inspecting the shipped data files, and a wrong count on its own changes nothing about the buyer's plan. No stated threshold reaches it and no way it could be untrue defeats an item the buyer depends on. Rated on the scale alone."
+  },
+  {
+   "id": 17,
+   "quote": "Patients are partitioned at the patient level",
+   "lines": [
+    39,
+    39
+   ],
+   "statement": "The public, held-out and train splits partition patients at the patient level (each patient appears in exactly one split).",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the splits are not partitioned at the patient level, a patient appears in more than one split — the leakage the buyer said would change the terms, invalidating its published results and any reinforcement-learning training. Rated against the buyer's stated threshold: \"leakage between the public, held-out and training splits\"."
+  },
+  {
+   "id": 19,
+   "quote": "`heldout` (268 patients",
+   "lines": [
+    39,
+    39
+   ],
+   "statement": "The held-out split contains 268 patients.",
+   "about": "target",
+   "within": {
+    "source": "DATA_CARD.md",
+    "id": 36,
+    "statement": "The `heldout` split contains 268 patients and 2,536 instances and serves as a private evaluation set that must not be trained on."
+   },
+   "tier": 2,
+   "tier_basis": "The held-out split's size is a documented figure the buyer's engineers would act on when running evaluation and would meet any discrepancy in use; a wrong count reaches no stated threshold and on its own leaves a usable evaluation path. Rated on the scale alone."
+  },
+  {
+   "id": 21,
+   "quote": "`train` (800 patients",
+   "lines": [
+    39,
+    39
+   ],
+   "statement": "The train split contains 800 patients.",
+   "about": "target",
+   "within": {
+    "source": "DATA_CARD.md",
+    "id": 37,
+    "statement": "The `train` split contains 800 patients and 7,619 instances and is the training pool, usable for reinforcement learning with graph-derived rewards."
+   },
+   "tier": 1,
+   "tier_basis": "If the training split is materially smaller than the 800 patients claimed, it is not usable for the reinforcement-learning training that is half the buyer's stated purpose, and the buyer cannot repair a thin split itself without the project's sampling records. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 24,
+   "quote": "Source content → benchmark DB pipeline",
+   "lines": [
+    45,
+    45
+   ],
+   "statement": "The etl/ directory contains the pipeline that converts source content into the benchmark database.",
+   "about": "target",
+   "restates_rejected": 8,
+   "within": {
+    "source": "README.md",
+    "id": 25,
+    "statement": "The etl/ directory contains parsers, pipeline stages s01–s10, ontology tooling grounded in SNOMED, ICD-10 and LOINC with SapBERT embeddings, and declarative deck and PDF source descriptions."
+   },
+   "tier": 3,
+   "tier_basis": "The ETL pipeline is an item the buyer does not use — it adopts the release as shipped and does not rebuild the database — and no stated threshold reaches the pipeline's existence or location. Rated on the scale alone."
+  },
+  {
+   "id": 25,
+   "quote": "`parsers/`, `stages/` (s01–s10), `ontology/` (SNOMED, ICD-10, LOINC, SapBERT embeddings), `deck_profiles/` and `pdf_profiles/` (declarative source descriptions; see `stages/EXTENDING.md`)",
+   "lines": [
+    45,
+    45
+   ],
+   "statement": "The etl/ directory contains parsers, pipeline stages s01–s10, ontology tooling grounded in SNOMED, ICD-10 and LOINC with SapBERT embeddings, and declarative deck and PDF source descriptions.",
+   "about": "target",
+   "within": {
+    "source": "README.md",
+    "id": 68,
+    "statement": "The ETL accepts declarative YAML profiles placed under `etl/deck_profiles/` and `etl/pdf_profiles/` describing source decks and PDFs."
+   },
+   "tier": 3,
+   "tier_basis": "The ETL pipeline is an item the buyer does_not_use, and no stated threshold reaches a claim about the etl/ directory's contents, so no way it could be untrue reaches the buyer's plan. Rated on the scale alone."
+  },
+  {
+   "id": 26,
+   "quote": "Alembic migrations, SQLite→Postgres migration scripts, tests",
+   "lines": [
+    46,
+    46
+   ],
+   "statement": "The epic_sim/ directory ships Alembic migrations, SQLite-to-Postgres migration scripts and tests.",
+   "about": "target",
+   "within": {
+    "source": "README.md",
+    "id": 64,
+    "statement": "The target contains a test suite under `epic_sim/tests` written to run under pytest."
+   },
+   "tier": 2,
+   "tier_basis": "The migrations and tests are operational details a person setting up or running the simulator would encounter and could correct during setup; their absence would not defeat any item the buyer depends on. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 27,
+   "quote": "CLI, task definitions (`tasks/`), agentic harness (`agents/`)",
+   "lines": [
+    47,
+    47
+   ],
+   "statement": "The eval/ evaluation framework provides a CLI, task definitions under tasks/, and an agentic harness under agents/.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The claim asserts several things, and it could be untrue in ways that defeat items the buyer depends on: if the task definitions are absent or empty the four benchmark tasks cannot run, and if the CLI is absent the eval.cli commands named in the reproducible-evaluation item do not exist, so published evaluation could not be stood behind without significant work. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 28,
+   "quote": "ICD-10 validation",
+   "lines": [
+    47,
+    47
+   ],
+   "statement": "The eval/ evaluation framework includes ICD-10 validation.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "No stated threshold reaches a claim about the inclusion of ICD-10 validation — the scoring threshold concerns ground truth and scoring working as described, not the presence of a validation feature — and no depends item names it. A person running evaluation would act on the feature and meet its absence in use, without the plan failing. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 29,
+   "quote": "Auditing and analysis scripts (ontology mapping QA, dataset tiers, ablations, paper tables, Harbor export, image publishing)",
+   "lines": [
+    48,
+    48
+   ],
+   "statement": "The scripts/ directory contains auditing and analysis scripts for ontology mapping QA, dataset tiers, ablations, paper tables, Harbor export and image publishing.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The auditing and analysis scripts fall under the methodology-artifacts item the buyer uses, not depends on; their absence would cost the team a means of checking how the data was built but would not defeat the plan. A person operating the release would act on the scripts and meet their absence in use. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 30,
+   "quote": "Container build and entrypoints (compose stack, self-contained and all-in-one images)",
+   "lines": [
+    49,
+    49
+   ],
+   "statement": "docker/, Dockerfile and docker-compose.yml provide the container build and entrypoints, including a compose stack and self-contained and all-in-one images.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The compose-stack part falls under an item the buyer uses, and the all-in-one-image part falls under the alternative-packaging item the buyer does_not_use. A person setting up the stack would act on the build files and meet any failure at first run, and could correct it without changing the plan. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 31,
+   "quote": "Harbor task templates and the Apptainer definition",
+   "lines": [
+    50,
+    50
+   ],
+   "statement": "harbor/ and apptainer/ hold Harbor task templates and the Apptainer definition.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Harbor task templates and the Apptainer definition fall under the alternative-packaging item the buyer does_not_use, and no stated threshold reaches them. Rated on the scale alone."
+  },
+  {
+   "id": 32,
+   "quote": "The released data (see `DATA_CARD.md`)",
+   "lines": [
+    51,
+    51
+   ],
+   "statement": "The repository ships the released data files benchmark_v1.3.db, patient_profiles.db and patient_profiles.jsonl.",
+   "about": "target",
+   "within": {
+    "source": "README.md",
+    "id": 65,
+    "statement": "The benchmark database file `benchmark_v1.3.db` is distributed with the release."
+   },
+   "tier": 2,
+   "tier_basis": "The shipped data files fall under items the buyer uses (dataset content and distribution mechanics); the synthetic-data and licence thresholds concern the data's nature, not which files ship, and a missing file would be met during setup. A person setting up the stack would act on the files and meet their absence at first boot. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 33,
+   "quote": "The compose stack builds the simulator image",
+   "lines": [
+    55,
+    55
+   ],
+   "statement": "The Docker compose stack builds the simulator image",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The compose stack is an item the buyer uses; a person setting it up would act on the build and meet any failure at first run, and the simulator could be served directly without changing the plan. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 34,
+   "quote": "starts Postgres 16 and Redis 7",
+   "lines": [
+    55,
+    55
+   ],
+   "statement": "The compose stack starts Postgres 16 and Redis 7 as services",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Infrastructure (Postgres 16 + Redis 7)\ndocker compose up -d",
+     "lines": [
+      105,
+      106
+     ]
+    }
+   ],
+   "tier": 2,
+   "tier_basis": "The service versions are setup details under the compose-stack item the buyer uses; a person running the stack would meet any failure at first boot and could correct the configuration without changing the plan. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 35,
+   "quote": "loads `benchmark_v1.3.db` into Postgres on first boot",
+   "lines": [
+    55,
+    56
+   ],
+   "statement": "The stack's first-boot entrypoint loads the shipped benchmark_v1.3.db database into its Postgres service.",
+   "about": "target",
+   "within": {
+    "source": "README.md",
+    "id": 74,
+    "statement": "The target's compose stack includes the data-setup steps of schema creation and loading the benchmark database."
+   },
+   "tier": 2,
+   "tier_basis": "First-boot loading is part of the compose-stack item the buyer uses; a failure would be met and corrected during setup and does not by itself reach a threshold or a depends item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 36,
+   "quote": "serves the EHR simulator",
+   "lines": [
+    56,
+    56
+   ],
+   "statement": "The compose stack serves the EHR simulator",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Serving the simulator through compose falls under the compose-stack item the buyer uses, and the simulator-fidelity threshold concerns how faithfully it simulates, not whether the stack serves it; a failure would be met at setup and the simulator could be served directly without changing the plan. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 37,
+   "quote": "first boot loads the database (~10 s)",
+   "lines": [
+    59,
+    59
+   ],
+   "statement": "The first-boot database load completes in about 10 seconds",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "A load-time figure is not something a person setting up or operating the stack would act on, and no threshold or depends item reaches it; a slower load would change expectations during setup, not whether the plan holds. Rated on the scale alone."
+  },
+  {
+   "id": 38,
+   "quote": "serves http://localhost:8000/docs",
+   "lines": [
+    59,
+    59
+   ],
+   "statement": "The stack serves the API documentation at http://localhost:8000/docs",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "http://localhost:8000/docs",
+     "lines": [
+      109,
+      109
+     ]
+    }
+   ],
+   "tier": 2,
+   "tier_basis": "The documentation URL is a location detail a person operating the stack would act on and would meet any failure immediately; its failure changes how the stack is accessed, not whether the plan holds. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 39,
+   "quote": "\"[entrypoint] database ready: 1268 patients\" means done",
+   "lines": [
+    60,
+    60
+   ],
+   "statement": "The entrypoint emits the log line \"[entrypoint] database ready: 1268 patients\" when the database load is complete",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The log line is a readiness signal a person operating the stack would act on, and the 1,268-patient figure sits under a dataset-scale item the buyer uses; a missing line or a differing count would be met in setup and does not by itself reach a threshold or a depends item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 40,
+   "quote": "Everything else runs inside the same image, against the loaded database",
+   "lines": [
+    63,
+    63
+   ],
+   "statement": "All other commands (evaluation, tests) run inside the same container image, against the loaded database",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If evaluation or tests do not run inside the image against the loaded database, the team's engineers meet this on first use and correct their compose or entrypoint setup themselves; no stated threshold reaches the container boundary and no depends item turns on it. Rated on the scale alone."
+  },
+  {
+   "id": 41,
+   "quote": "docker compose run --rm app python -m eval.cli run --task patient_diagnosis --model <model> --split public --strategy cot",
+   "lines": [
+    67,
+    67
+   ],
+   "statement": "The eval CLI has a `run` subcommand accepting the options shown (--task, --model, --split, --strategy)",
+   "about": "target",
+   "within": {
+    "source": "README.md",
+    "id": 78,
+    "statement": "The eval.cli tool has the subcommands shown — run, score, report and matrix — accepting the task, model, split, strategy, run-id and format parameters shown."
+   },
+   "tier": 1,
+   "tier_basis": "If the documented `eval.cli run` command does not exist or does not accept the task, split and strategy options shown, the documented evaluation path fails, the buyer's reproducible-runs item is defeated, and published results cannot be produced as described; re-establishing reproducibility unaided is, per the reliance statement, significant work for the team. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 42,
+   "quote": "docker compose run --rm app pytest eval/tests",
+   "lines": [
+    68,
+    68
+   ],
+   "statement": "A test suite exists at eval/tests and is runnable via pytest inside the container",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "pytest eval/tests",
+     "lines": [
+      113,
+      113
+     ]
+    }
+   ],
+   "tier": 2,
+   "tier_basis": "A missing or unrunnable test suite would be met by the team's own engineers while setting up and worked around without affecting the plan; no stated threshold reaches it and no depends item covers the tests. Rated on the scale alone."
+  },
+  {
+   "id": 43,
+   "quote": "results are written to `./results` on the host",
+   "lines": [
+    71,
+    72
+   ],
+   "statement": "The evaluation code writes its results into a results directory that is mounted from ./results on the host.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Results landing somewhere other than ./results would be noticed immediately in use and corrected by fixing the host mount, a setup change rather than a change to whether the plan holds. Rated on the scale alone."
+  },
+  {
+   "id": 44,
+   "quote": "Host ports are configurable if the defaults are taken:\n`POSTGRES_PORT=55432 REDIS_PORT=56379 APP_PORT=58000 docker compose up -d`",
+   "lines": [
+    72,
+    73
+   ],
+   "statement": "The host ports for Postgres, Redis and the app are configurable via the POSTGRES_PORT, REDIS_PORT and APP_PORT environment variables",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Port overrides are a setup convenience; if the variables do not work the engineers would notice while starting the stack and adapt, with no effect on validity, reproducibility or any depends item. Rated on the scale alone."
+  },
+  {
+   "id": 45,
+   "quote": "The load is idempotent: restarting the stack skips it when patients are already present",
+   "lines": [
+    75,
+    75
+   ],
+   "statement": "The stack's startup load checks whether patients are already present in the database and skips the load if they are.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Idempotence of the startup load affects restart convenience only; its failure would be met in operation and worked around without changing code or defeating any depends item. Rated on the scale alone."
+  },
+  {
+   "id": 46,
+   "quote": "`EPIC_SIM_FORCE_RELOAD=1` reloads from the SQLite file",
+   "lines": [
+    76,
+    76
+   ],
+   "statement": "Setting EPIC_SIM_FORCE_RELOAD=1 forces a reload of the database from the SQLite file",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A forced-reload flag is an operational convenience; if it does not work the engineers would notice and reload the database by another means, which does not change whether the plan holds. Rated on the scale alone."
+  },
+  {
+   "id": 47,
+   "quote": "The FHIR terminology endpoints (`$lookup`, `$expand`, `$validate-code`) and the trigram code search read\nfrom a `terminology_codes` table",
+   "lines": [
+    81,
+    82
+   ],
+   "statement": "The FHIR terminology endpoints ($lookup, $expand, $validate-code) and the trigram code search read from a terminology_codes table",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Where the terminology endpoints read from is an implementation detail behind the documented interface; the disclosed emptiness of the table (claim 48) means any failure shows up in use and is a data-loading matter, not a failure of FHIR R4, OAuth2 or RBAC faithfulness. Rated on the scale alone."
+  },
+  {
+   "id": 48,
+   "quote": "a `terminology_codes` table that the release cannot pre-fill",
+   "lines": [
+    82,
+    82
+   ],
+   "statement": "The release cannot pre-fill the terminology_codes table",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "The terminology tables ship empty (licensing)",
+     "lines": [
+      282,
+      282
+     ]
+    }
+   ],
+   "tier": 2,
+   "tier_basis": "If the release could in fact pre-fill the table the claim's failure only eases setup, and otherwise the team's engineers load the terminology themselves; a person setting the software up would act on the claim and meet its failure there. Rated on the scale alone."
+  },
+  {
+   "id": 49,
+   "quote": "SNOMED CT needs a UMLS licence and LOINC a free registration",
+   "lines": [
+    82,
+    83
+   ],
+   "statement": "SNOMED CT requires a UMLS licence and LOINC requires a free registration, which is why they are not pre-filled",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "SNOMED CT US Edition + Transitive Closure — [UMLS license required](https://www.nlm.nih.gov/healthit/snomedct/)\n   - LOINC — [free registration](https://loinc.org/downloads/)",
+     "lines": [
+      122,
+      123
+     ]
+    }
+   ],
+   "tier": 2,
+   "tier_basis": "Licensing requirements for SNOMED CT and LOINC fall under terminology handling the practice rates as cheaply repairable — the engineers obtain the files and hold the licences themselves — and no way the claim could be untrue defeats a depends item or a stated threshold; it concerns third-party terminology the release does not ship, not the project's distribution rights. Rated on the scale alone."
+  },
+  {
+   "id": 50,
+   "quote": "Everything else in the benchmark works without them.",
+   "lines": [
+    83,
+    83
+   ],
+   "statement": "Everything in the benchmark other than the SNOMED CT and LOINC terminology works without those systems",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If parts of the benchmark in fact require SNOMED CT or LOINC, the engineers would meet this while setting up and load the missing terminology without changing code, so the plan as stated still holds. Rated on the scale alone."
+  },
+  {
+   "id": 51,
+   "quote": "**ICD-10-CM** is public domain",
+   "lines": [
+    85,
+    85
+   ],
+   "statement": "ICD-10-CM is public domain",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "ICD-10-CM 2025 tabular XML — [CDC/CMS, public domain](https://www.cms.gov/medicare/coding-billing/icd-10-codes)",
+     "lines": [
+      124,
+      124
+     ]
+    }
+   ],
+   "tier": 1,
+   "tier_basis": "If ICD-10-CM is not public domain, the benchmark's automatically loaded core terminology carries licence restrictions the team's adoption and published results would inherit, and a licence defect is not something the team can repair — the adoption would end under the buyer's own trigger. Rated against the buyer's stated threshold: \"a licence or data-provenance problem, such as source content the project may not distribute or data that is not fully synthetic\"."
+  },
+  {
+   "id": 52,
+   "quote": "is fetched from CMS automatically on first boot",
+   "lines": [
+    85,
+    85
+   ],
+   "statement": "The first-boot entrypoint downloads the ICD-10-CM files from CMS and loads them, unless the download is disabled.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A failed automatic download would be met on first boot and corrected by loading the CMS files by hand, a path the release itself documents; no threshold or depends item turns on the download happening automatically. Rated on the scale alone."
+  },
+  {
+   "id": 53,
+   "quote": "set `EPIC_SIM_DOWNLOAD_ICD10=0` to disable",
+   "lines": [
+    85,
+    86
+   ],
+   "statement": "The automatic ICD-10-CM download can be disabled by setting EPIC_SIM_DOWNLOAD_ICD10=0",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A disable flag that does not work is a setup detail the engineers would notice and work around in operation, with no effect on the plan. Rated on the scale alone."
+  },
+  {
+   "id": 54,
+   "quote": "drop the CMS \"code descriptions in tabular order\" `.txt`\nor `.zip` into the ontology directory to load offline",
+   "lines": [
+    86,
+    87
+   ],
+   "statement": "ICD-10-CM can be loaded offline by placing the CMS tabular-order .txt or .zip file into the ontology directory",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The offline load path is one of two ways to obtain ICD-10-CM; if it fails, the automatic download or a manual load remains, and nothing in a stated threshold or depends item turns on this route. Rated on the scale alone."
+  },
+  {
+   "id": 55,
+   "quote": "**SNOMED CT and LOINC**: download your own copies, unpack them anywhere under a directory, mount it\n  at `/app/data/ontology` (uncomment the volume in `docker-compose.yml`), and restart the stack.",
+   "lines": [
+    88,
+    89
+   ],
+   "statement": "SNOMED CT and LOINC can be loaded into the stack by downloading copies, mounting the directory at /app/data/ontology and restarting the stack",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Loading SNOMED CT and LOINC is a setup step the team's engineers would perform, and a failure in the mount-and-restart instructions would surface there; it changes how the stack is set up, not whether the plan holds. No stated threshold reaches terminology loading, and the reliance item for it is a 'uses' item. Rated on the scale alone."
+  },
+  {
+   "id": 56,
+   "quote": "The\nentrypoint discovers the files by pattern (`sct2_Concept_Snapshot*.txt` with its\n`sct2_Description_Snapshot-en*.txt`; `LoincTable/Loinc.csv`)",
+   "lines": [
+    90,
+    91
+   ],
+   "statement": "The entrypoint discovers SNOMED CT and LOINC files by the stated filename patterns",
+   "about": "target",
+   "within": {
+    "source": "README.md",
+    "id": 55,
+    "statement": "SNOMED CT and LOINC can be loaded into the stack by downloading copies, mounting the directory at /app/data/ontology and restarting the stack"
+   },
+   "tier": 2,
+   "tier_basis": "The filename patterns are what a setting-up engineer would rely on to place the files; a pattern that does not match would be met and corrected during setup. It affects configuration, not the validity of the benchmark or simulator. Rated on the scale alone."
+  },
+  {
+   "id": 57,
+   "quote": "so any release version and either the\noriginal folder layout or flat files work",
+   "lines": [
+    91,
+    92
+   ],
+   "statement": "Any release version of SNOMED CT and LOINC works, in either the original folder layout or as flat files",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A release version or layout that does not work would be discovered by the engineer performing the load and worked around by obtaining a different version or flattening files. It is a setup detail with no route to the buyer's thresholds. Rated on the scale alone."
+  },
+  {
+   "id": 58,
+   "quote": "loads only the systems not yet present",
+   "lines": [
+    92,
+    92
+   ],
+   "statement": "The entrypoint's terminology loader checks which terminology systems are already in the database and loads only the missing ones.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Idempotence of the terminology loader is an operational behaviour an engineer rerunning the stack would act on and meet any failure of directly. Its failure would not reach the buyer's plan for the benchmark or simulator. Rated on the scale alone."
+  },
+  {
+   "id": 59,
+   "quote": "Nothing else needs to change;",
+   "lines": [
+    93,
+    93
+   ],
+   "statement": "No configuration other than mounting the terminology directory needs to change",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "'Nothing else needs to change' is a setup instruction; if further configuration were needed, the engineer would meet it while mounting the directory and restarting. It changes the setup effort, not whether the adoption's purpose holds. Rated on the scale alone."
+  },
+  {
+   "id": 60,
+   "quote": "the terminology tests stop skipping once the\nsystems are loaded",
+   "lines": [
+    93,
+    94
+   ],
+   "statement": "The terminology tests carry a skip condition that applies while the SNOMED CT and LOINC systems are absent from the database.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A skip condition on the terminology tests is a detail a developer running the test suite after loading would act on and notice if wrong. It concerns test behaviour, not benchmark validity, scoring, or simulator fidelity. Rated on the scale alone."
+  },
+  {
+   "id": 61,
+   "quote": "Manual install: `python -m epic_sim.migrate.load_terminology --auto --download-icd10` does the same\nfrom the host; `--list` shows what was found.",
+   "lines": [
+    95,
+    96
+   ],
+   "statement": "The epic_sim.migrate.load_terminology module with --auto --download-icd10 performs the same terminology load from the host, and its --list option shows what was found",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The manual-install command and its --auto, --download-icd10 and --list options are things an engineer setting up or troubleshooting the terminology load would run and meet a failure of directly. Its failure would be correctable from the host without touching the plan. Rated on the scale alone."
+  },
+  {
+   "id": 62,
+   "quote": "pip install -r requirements.txt",
+   "lines": [
+    103,
+    103
+   ],
+   "statement": "The target ships a pip requirements file named requirements.txt at the repository root listing its dependencies.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The requirements file is the first thing an engineer installing the stack uses; a missing or misnamed file surfaces immediately at setup and is trivially worked around. It is a setup detail with no route to a threshold or a 'depends' item. Rated on the scale alone."
+  },
+  {
+   "id": 63,
+   "quote": "uvicorn epic_sim.app.main:app --reload",
+   "lines": [
+    109,
+    109
+   ],
+   "statement": "The target provides an ASGI application object at `epic_sim.app.main:app`.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The ASGI application path is what a setting-up engineer invokes to serve the simulator; a wrong module path is met and corrected during setup. It affects how the software is started, not whether the plan holds. Rated on the scale alone."
+  },
+  {
+   "id": 64,
+   "quote": "pytest epic_sim/tests",
+   "lines": [
+    112,
+    112
+   ],
+   "statement": "The target contains a test suite under `epic_sim/tests` written to run under pytest.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The location and test runner of the test suite is a detail an engineer validating the installation would act on; a failure is met and worked around at setup. It carries no consequence for the buyer's thresholds. Rated on the scale alone."
+  },
+  {
+   "id": 65,
+   "quote": "The benchmark database `benchmark_v1.3.db` **is distributed**",
+   "lines": [
+    118,
+    118
+   ],
+   "statement": "The benchmark database file `benchmark_v1.3.db` is distributed with the release.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Whether benchmark_v1.3.db is distributed is something the team's engineers act on when obtaining the release and would meet any failure of immediately, obtaining the file another way if needed. The reliance item on distribution mechanics is a 'uses' item and no stated threshold reaches it. Rated on the scale alone."
+  },
+  {
+   "id": 66,
+   "quote": "is all you need to run the evaluations",
+   "lines": [
+    118,
+    118
+   ],
+   "statement": "The target's evaluation path draws only on the distributed benchmark database, requiring no other data to be built or fetched.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the evaluation path required data beyond the distributed database, the team could not run any evaluation as planned; building or fetching missing pieces is engineering by the buyer and is not a way the plan still holds. This defeats a reliance item the buyer depends on — running evaluations from the shipped database alone — and no alternative route is described. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 67,
+   "quote": "Rebuilding it from scratch requires source material that cannot be redistributed",
+   "lines": [
+    118,
+    118
+   ],
+   "statement": "Rebuilding the benchmark database from scratch requires source material that cannot be redistributed.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns rebuilding the database, which the buyer's plan does not touch — it adopts the release as shipped. If untrue in either direction, that the source could be redistributed or that rebuilding needed no such material, nothing in the buyer's plan or thresholds is affected. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 68,
+   "quote": "the ETL is source-agnostic. Describe your own Anki decks or PDFs with a small YAML profile (`etl/deck_profiles/`, `etl/pdf_profiles/`; see `etl/stages/EXTENDING.md`)",
+   "lines": [
+    120,
+    120
+   ],
+   "statement": "The ETL accepts declarative YAML profiles placed under `etl/deck_profiles/` and `etl/pdf_profiles/` describing source decks and PDFs.",
+   "about": "target",
+   "restates_rejected": 25,
+   "tier": 3,
+   "tier_basis": "The YAML profiles for ingesting new decks and PDFs fall under rebuilding and extending the data, which the buyer's plan does not use; the team adopts the release as shipped and ingests no new sources. No way the claim could be untrue reaches a threshold or a 'depends' item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 69,
+   "quote": "SapBERT embeddings: generated locally by `etl/ontology/sapbert_embedder.py` (no download needed).",
+   "lines": [
+    125,
+    125
+   ],
+   "statement": "SapBERT embeddings are generated locally by `etl/ontology/sapbert_embedder.py`; no download is needed for them.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Local generation of SapBERT embeddings matters only to the ETL pipeline the buyer does not use; the team's plan runs evaluations and training on the shipped release. If the claim were untrue — embeddings needing a download, or a different script — the buyer's plan is untouched. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 70,
+   "quote": "python -m etl.main --stage 1    # repeat for stages 1..12, in order",
+   "lines": [
+    130,
+    130
+   ],
+   "statement": "The ETL is run stage by stage via `python -m etl.main --stage N`, with stages numbered 1 through 12, executed in order.",
+   "about": "target",
+   "within": {
+    "source": "scripts/README.md",
+    "id": 9,
+    "statement": "The target contains an ETL pipeline that can be invoked as `python -m etl.main --stage 1 … 12` and whose code constructs the full benchmark database from source data."
+   },
+   "tier": 3,
+   "tier_basis": "The ETL pipeline is an item of the reliance statement the buyer does_not_use: the team adopts the release as shipped and does not rebuild the data, and no stated threshold reaches how the ETL is staged or numbered. No way the invocation or stage sequence could be untrue would change the buyer's plan. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 71,
+   "quote": "alembic -c epic_sim/alembic/alembic.ini upgrade head   # creates the schema (run first on a fresh database)",
+   "lines": [
+    136,
+    136
+   ],
+   "statement": "Running Alembic via `epic_sim/alembic/alembic.ini upgrade head` creates the Postgres schema, and is the first step on a fresh database.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Schema creation is a setup step the team's own engineers would perform when standing the stack up for the first time. If the command, its configuration path or its ordering were wrong, they would meet the failure while setting up and could correct it without changing code, and no way it could be untrue would defeat an item the buyer depends on. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 72,
+   "quote": "python -m epic_sim.migrate.sqlite_to_pg                 # loads benchmark_v1.3.db (repo root) into Postgres",
+   "lines": [
+    137,
+    137
+   ],
+   "statement": "The `epic_sim.migrate.sqlite_to_pg` script loads `benchmark_v1.3.db` from the repo root into Postgres.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Loading the benchmark database into Postgres is a setup action the engineers would take; if the script or its source path did not work as described they would meet the failure during setup and could obtain or load the files another way. On its own this changes nothing for the buyer's plan. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 73,
+   "quote": "python -m epic_sim.migrate.load_terminology             # optional; needs the ontology files above",
+   "lines": [
+    138,
+    138
+   ],
+   "statement": "Terminology loading via `epic_sim.migrate.load_terminology` is optional and requires the ontology files listed above.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Terminology loading is an optional setup step an operator would act on, and if the script were not optional or needed different files the engineers would meet that while setting up and could supply the files themselves, which the plan treats as cheap. No way it could be untrue would defeat an item the buyer depends on. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 74,
+   "quote": "Or let the container do all of this: `docker compose up -d` (Quickstart above).",
+   "lines": [
+    141,
+    141
+   ],
+   "statement": "The target's compose stack includes the data-setup steps of schema creation and loading the benchmark database.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Whether the compose stack performs the data-setup steps falls under an item the buyer uses, not depends on; if it were untrue the engineers would meet the failure at first boot and could fix or replace the compose files and entrypoint scripts without touching the core offering. On its own the buyer's plan still holds. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 75,
+   "quote": "Models are accessed via OpenRouter; set `OPENROUTER_API_KEY`.",
+   "lines": [
+    145,
+    145
+   ],
+   "statement": "Evaluation models are reached through OpenRouter, configured with the OPENROUTER_API_KEY environment variable.",
+   "about": "target",
+   "restates": 75,
+   "within": {
+    "source": "README.md",
+    "id": 77,
+    "statement": "The registry also contains *-or entries that reach the same models through OpenRouter."
+   },
+   "tier": 2,
+   "tier_basis": "Model access configuration is a detail a person setting up evaluation runs would act on, and if the route or the environment variable differed they would meet the failure while configuring and could correct it without changing code. On its own nothing in the buyer's plan fails. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 76,
+   "quote": "The registry entries named `kimi-2.5*` and\n`glm-5-agent` were served through a private Anthropic-compatible gateway for the paper; they read\n`SH_LLM_GATEWAY_URL` (default `http://localhost:8080`) and need your own gateway",
+   "lines": [
+    145,
+    147
+   ],
+   "statement": "The model registry contains entries named kimi-2.5* and glm-5-agent that were served through a private Anthropic-compatible gateway for the paper; these entries read SH_LLM_GATEWAY_URL (default http://localhost:8080) and require the user to run their own gateway.",
+   "about": "target",
+   "restates": 76,
+   "tier": 2,
+   "tier_basis": "These are optional registry entries; an operator selecting a model would act on the claim and would meet its failure in use, and the documents themselves describe another route to the same models, so the buyer's plan still holds even if the gateway entries were unusable. Its failure changes nothing for the buyer on its own. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 77,
+   "quote": "`SH_LLM_GATEWAY_URL` (default `http://localhost:8080`) and need your own gateway, whereas the `*-or`\nentries reach the same models through OpenRouter.",
+   "lines": [
+    147,
+    148
+   ],
+   "statement": "The registry also contains *-or entries that reach the same models through OpenRouter.",
+   "about": "target",
+   "restates": 77,
+   "tier": 2,
+   "tier_basis": "This is a registry detail an operator would act on when choosing how to reach the models; if the *-or entries did not work as described the failure would be met in use and the buyer's plan would still hold through the configuration the engineers control. On its own nothing material turns on it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 78,
+   "quote": "python -m eval.cli run --task patient_diagnosis --model <model> --split public --strategy cot\npython -m eval.cli score --run-id <id>\npython -m eval.cli report --split public --format csv\npython -m eval.cli matrix --task patient_diagnosis --split public   # all models",
+   "lines": [
+    151,
+    154
+   ],
+   "statement": "The eval.cli tool has the subcommands shown — run, score, report and matrix — accepting the task, model, split, strategy, run-id and format parameters shown.",
+   "about": "target",
+   "restates": 78,
+   "locations": [
+    {
+     "quote": "Run the eval matrix for each task/model pair reported in the paper.",
+     "lines": [
+      265,
+      265
+     ]
+    }
+   ],
+   "tier": 1,
+   "tier_basis": "If the run, score, report and matrix subcommands did not exist as described, the evaluation workflow itself would be unavailable: the item the buyer depends on names these commands, the team could not run or score evaluations as planned, and no setup-time correction without writing code would restore them. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 80,
+   "quote": "Locked prompting strategies used in the paper: CoT (patient diagnosis), ontology-grounded structured (whole-patient summarization), zero-shot (retrieval, specialty-conditioned summarization), few-shot (imaging).",
+   "lines": [
+    159,
+    159
+   ],
+   "statement": "The paper's results were produced with locked prompting strategies: CoT for patient diagnosis, ontology-grounded structured for whole-patient summarization, zero-shot for retrieval and specialty-conditioned summarization, and few-shot for imaging.",
+   "about": "target",
+   "restates": 81,
+   "tier": 2,
+   "tier_basis": "The locked prompting strategies fall under comparability with the published paper, an item the buyer uses; if the strategy assignments were wrong the team would meet the failure when replicating the protocol and would report under its own documented protocol instead, which weakens but does not defeat its plan. On its own its failure changes nothing material for the buyer. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 81,
+   "quote": "`eval.cli score` reports the paper's primary metrics directly: patient diagnosis under the chart-neutral rule (`weighted_problem_list_f1_neutral`; sets from `eval/chart_neutral.py`), retrieval over chart sections only (`precision_5`, `ndcg_10`), summarization by must-include finding recall (`clinical_f1`), and the imaging clinical question by ontology-grounded concept F1 (`clinical_question_concept_f1`;",
+   "lines": [
+    159,
+    159
+   ],
+   "statement": "eval.cli score reports the paper's primary metrics directly: weighted_problem_list_f1_neutral for patient diagnosis (sets from eval/chart_neutral.py), precision_5 and ndcg_10 for retrieval over chart sections only, clinical_f1 for summarization, and clinical_question_concept_f1 for the imaging clinical question.",
+   "about": "target",
+   "restates": 82,
+   "tier": 1,
+   "tier_basis": "If score did not report the paper's primary metrics as described — for example if the chart-neutral rule were not applied or retrieval were not scoped to chart sections only — the scoring would not work as described, the team's evaluation results and published numbers would be invalid, and correcting it would mean auditing and patching the scoring core. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+  },
+  {
+   "id": 82,
+   "quote": "extractor in `eval/imaging_concepts.py`, built from the loaded database with no external ontology files).",
+   "lines": [
+    159,
+    159
+   ],
+   "statement": "The imaging concept extractor in eval/imaging_concepts.py is built from the loaded database and requires no external ontology files.",
+   "about": "target",
+   "restates": 83,
+   "tier": 2,
+   "tier_basis": "The claim concerns what the imaging extractor depends on, not whether the metric is computed correctly; if it needed external ontology files or a different source, the engineers would meet that while setting up and could supply the files without changing code, which the plan treats as cheap. No way it could be untrue would defeat an item the buyer depends on. Rated on the buyer's plan as the buyer stated it."
+  },
+  {
+   "id": 84,
+   "quote": "selected via `--granularity`: whole-patient (default), `encounter` (current-visit, point-in-time), and `specialty` (specialty-conditioned",
+   "lines": [
+    161,
+    161
+   ],
+   "statement": "The three context_summarization variants are selected via the --granularity flag, with whole-patient as the default.",
+   "about": "target",
+   "restates": 84,
+   "within": {
+    "source": "DATA_CARD.md",
+    "id": 5,
+    "statement": "The released data supports evaluating clinical AI on four named tasks — patient diagnosis, context summarization, evidence retrieval, and imaging indication — over multi-visit patient timelines."
+   },
+   "tier": 2,
+   "tier_basis": "The granularity flag is a command option an operator would act on and would meet its failure in use; if the flag or its default differed they would correct the invocation without changing code, and the summarization task itself would remain available. On its own its failure changes nothing for the buyer. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 85,
+   "quote": "optionally scope to a frozen cohort with `--tier small|medium|large`",
+   "lines": [
+    161,
+    161
+   ],
+   "statement": "The specialty variant can optionally be scoped to a frozen cohort using --tier with values small, medium or large.",
+   "about": "target",
+   "restates": 85,
+   "tier": 2,
+   "tier_basis": "The cohort tier option is a command parameter an operator would act on; if the values or behaviour differed the failure would be met in use and corrected by adjusting the invocation, and no item the buyer depends on would be defeated by it alone. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 86,
+   "quote": "python -m eval.cli run --task context_summarization --granularity specialty --model <model> --split public",
+   "lines": [
+    164,
+    164
+   ],
+   "statement": "The target's eval.cli provides a run command that accepts the context_summarization task with --granularity specialty, --model and --split public as shown in the documented invocation.",
+   "about": "target",
+   "restates_rejected": 85,
+   "tier": 2,
+   "tier_basis": "This is a documented invocation; if the parameters or the specialty granularity did not work as shown, the engineers would meet the failure while setting up and could adjust the invocation, and the summarization task would still exist through its other variants, so no item the buyer depends on is defeated on its own. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 87,
+   "quote": "Agentic (tool-use) evaluation against the live EHR simulator uses `eval/agents/`",
+   "lines": [
+    167,
+    167
+   ],
+   "statement": "Agentic (tool-use) evaluation against the live EHR simulator is performed using the code in eval/agents/.",
+   "about": "target",
+   "restates": 87,
+   "tier": 2,
+   "tier_basis": "If agentic evaluation did not run through eval/agents/, the team's engineers would discover this on their first tool-use run and adapt; the item this falls under is one the buyer uses, not one it depends on, and no stated threshold reaches it. Rated on the scale alone."
+  },
+  {
+   "id": 88,
+   "quote": "with the read-only bash sandbox defined in `docker-compose.override.yml`.",
+   "lines": [
+    167,
+    167
+   ],
+   "statement": "The agentic evaluation's bash sandbox is read-only and is defined in docker-compose.override.yml.",
+   "about": "target",
+   "restates": 88,
+   "tier": 2,
+   "tier_basis": "Where the sandbox is defined and whether it is read-only are setup mechanics: a deviation would be met and corrected by the team's engineers in configuration, and no way the claim could be untrue defeats an item the buyer depends on or a stated threshold. Rated on the scale alone."
+  },
+  {
+   "id": 89,
+   "quote": "The `bash_readonly` role that the sandbox uses is created automatically by the container entrypoint (or by `scripts/setup_bash_readonly.sql` in a manual install).",
+   "lines": [
+    167,
+    167
+   ],
+   "statement": "The bash_readonly database role used by the sandbox is created automatically by the container entrypoint, or manually via scripts/setup_bash_readonly.sql.",
+   "about": "target",
+   "restates": 89,
+   "tier": 2,
+   "tier_basis": "How the bash_readonly role is created is a setup detail; a role that is not created fails visibly on first use and is fixed by running the setup script or entrypoint, without affecting the buyer's plan. Rated on the scale alone."
+  },
+  {
+   "id": 90,
+   "quote": "The simulator exposes the paper's scorer over HTTP so that an external trainer can obtain a reward for any submission without importing the evaluation code.",
+   "lines": [
+    171,
+    172
+   ],
+   "statement": "The EHR simulator exposes the paper's scorer as an HTTP service, so that scoring a submission over HTTP does not require importing the evaluation code.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the scorer were not exposed over HTTP, the team could not obtain a reward for any submission without importing the evaluation code, defeating the reinforcement-learning scoring service its plan depends on; building its own reward service is the costly engineering the reliance statement already weighs, not a way the plan still holds. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 91,
+   "quote": "It is guarded by a shared secret (`EPIC_SIM_SCORER_TOKEN`, sent as `X-Scorer-Token`) that the policy under training must not hold",
+   "lines": [
+    172,
+    173
+   ],
+   "statement": "The scoring endpoint is guarded by a shared secret set in `EPIC_SIM_SCORER_TOKEN` and sent as the `X-Scorer-Token` header, and the design requires that the policy under training not hold that secret.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the endpoint carried no shared-secret guard, or the design did not actually keep the scorer token out of the policy's credentials, reward access would not be separated from the policy under training as the plan assumes and training would be contaminated; a renamed variable or header would be a setup correction, but an absent guard would not be. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 92,
+   "quote": "the labels themselves are never returned",
+   "lines": [
+    173,
+    174
+   ],
+   "statement": "The scoring endpoint never returns the ground-truth labels.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "Labels are never returned",
+     "lines": [
+      226,
+      226
+     ]
+    }
+   ],
+   "tier": 1,
+   "tier_basis": "The claim fails by admitting what it excludes: if the endpoint ever returned the labels themselves, ground truth would reach the agent and the policy under training, invalidating rewards and evaluation in a way the team cannot repair itself. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+  },
+  {
+   "id": 93,
+   "quote": "curl -s -H \"X-Scorer-Token: $TOKEN\" \"http://localhost:8000/score/tasks\"\ncurl -s -H \"X-Scorer-Token: $TOKEN\" \"http://localhost:8000/score/instances?task=patient_diagnosis&split=train&limit=3\"\ncurl -s -H \"X-Scorer-Token: $TOKEN\" -H \"Content-Type: application/json\" http://localhost:8000/score \\\n  -d '{\"gt_id\": 123, \"prediction\": {\"active_diagnoses\": [{\"icd10\": \"E11.01\", \"acuity\": \"acute\"}], \"chronic_conditions\": []}}'",
+   "lines": [
+    178,
+    181
+   ],
+   "statement": "The scoring service serves a `/score/tasks` endpoint, a `/score/instances` endpoint accepting `task`, `split` and `limit` query parameters, and a `POST /score` endpoint accepting a JSON body with `gt_id` and a `prediction` object as shown, all authenticated by the `X-Scorer-Token` header.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Divergent endpoint paths, query parameters or body fields would surface the first time the team's engineers write the client and would be corrected in that client at setup without changing the service, so the scoring service and the plan would still hold. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 94,
+   "quote": "The response carries `reward` in [0, 1]",
+   "lines": [
+    184,
+    184
+   ],
+   "statement": "The scoring response carries a `reward` value bounded to the interval [0, 1].",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the response carried no reward field at all, or a reward outside [0, 1], the HTTP scoring service could not drive reinforcement learning as the plan assumes, and the team could not cure that without importing the evaluation code or building its own scoring path. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 95,
+   "quote": "the metric it was taken from, and every metric the scorer\ncomputed",
+   "lines": [
+    184,
+    185
+   ],
+   "statement": "The scoring response also identifies which metric the reward was taken from and includes every metric the scorer computed.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Missing metric identification or per-metric breakdowns would cost the team diagnostic detail only; the reward itself would still flow and the plan would hold, and no way this claim could be untrue defeats an item the buyer depends on. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 96,
+   "quote": "Rewards are the tasks' primary metrics: severity-weighted, chart-neutral F1 for patient\ndiagnosis; must-include finding recall for summarization (conditioned F1 or abstention accuracy for the\nspecialty variant); precision at 5 over chart sections for retrieval",
+   "lines": [
+    185,
+    187
+   ],
+   "statement": "The rewards returned by the scoring endpoint are the tasks' primary metrics: severity-weighted chart-neutral F1 for patient diagnosis, must-include finding recall for summarization (conditioned F1 or abstention accuracy for the specialty variant), and precision at 5 over chart sections for retrieval.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the rewards were not the named primary metrics — for example a different or chart-dependent F1 — training rewards and published results would be computed against the wrong objective, which is scoring not working as described and not reparable by the team cheaply. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+  },
+  {
+   "id": 97,
+   "quote": "ontology-grounded concept F1 of the inferred clinical question for imaging (the paper's metric;",
+   "lines": [
+    188,
+    188
+   ],
+   "statement": "For the imaging task, the reward is the ontology-grounded concept F1 of the inferred clinical question, which is the paper's metric.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the imaging reward were not the paper's ontology-grounded concept F1, scoring for one of the four tasks the buyer depends on would not work as described, and the team would train and publish against the wrong metric for that task. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+  },
+  {
+   "id": 98,
+   "quote": "NDCG at 10 is also returned",
+   "lines": [
+    187,
+    187
+   ],
+   "statement": "For retrieval, NDCG at 10 is also returned by the scorer in addition to the primary metric.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "NDCG at 10 is supplementary to the primary retrieval metric; its absence would narrow the team's analysis but leave the reward, the scoring service and the plan intact. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 99,
+   "quote": "token-level\nF1 is also returned",
+   "lines": [
+    188,
+    189
+   ],
+   "statement": "For imaging, token-level F1 is also returned by the scorer in addition to the primary metric.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Token-level F1 for imaging is supplementary to the primary metric; its absence would cost diagnostic detail only and no way the claim could be untrue defeats an item the buyer depends on. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 100,
+   "quote": "Submissions use the same JSON schemas the\nagent tools accept (`submit_diagnosis`, `submit_summary`, `submit_rankings`, `submit_pre_read`)",
+   "lines": [
+    189,
+    190
+   ],
+   "statement": "Submissions to the scoring endpoint use the same JSON schemas as the agent tools `submit_diagnosis`, `submit_summary`, `submit_rankings` and `submit_pre_read`.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A mismatch between the submission schemas and the agent-tool schemas would be found the first time a submission is sent and corrected in the team's own client at setup, leaving the scoring service and the plan intact. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 101,
+   "quote": "a malformed\nor empty submission scores 0 rather than raising",
+   "lines": [
+    190,
+    191
+   ],
+   "statement": "The scoring endpoint contains handling for malformed and empty submissions that assigns them a score of 0 instead of raising an error.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "a malformed or missing\nsubmission scores 0.",
+     "lines": [
+      225,
+      226
+     ]
+    }
+   ],
+   "tier": 2,
+   "tier_basis": "If malformed or empty submissions raised errors instead of scoring 0, the team's engineers could catch and handle them in their own harness without changing the service, so the plan would still hold; the failure would be met in ordinary use and corrected outside the code. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 102,
+   "quote": "`POST /score/batch` scores up to 256 items per call.",
+   "lines": [
+    191,
+    191
+   ],
+   "statement": "A `POST /score/batch` endpoint exists and scores up to 256 items per call.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If the batch endpoint is absent or the 256-item cap differs, the team's engineers would meet this on the first bulk call and score items individually or resize batches; the scoring results and the RL training are unchanged. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 103,
+   "quote": "The same function is available in-process as `eval.score_one.score_submission`.",
+   "lines": [
+    192,
+    192
+   ],
+   "statement": "The same scoring function is available in-process as `eval.score_one.score_submission`.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If the in-process function does not exist at that path or under that name, the failure appears at the first import and the documented HTTP scoring endpoint remains as another described way to obtain the same result. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 104,
+   "quote": "The simulator can be driven as a reinforcement-learning environment.",
+   "lines": [
+    196,
+    197
+   ],
+   "statement": "The EHR simulator is usable as a reinforcement-learning environment.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the simulator cannot in fact be driven as a reinforcement-learning environment, the RL half of the team's stated purpose fails outright and, as the reliance statement records, the team would have to build its own reward service and episode harness — no local repair restores it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 105,
+   "quote": "An episode is one benchmark instance played as the paper's tool-use task",
+   "lines": [
+    196,
+    197
+   ],
+   "statement": "One episode of the RL environment corresponds to one benchmark instance played as the paper's tool-use task.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If an episode does not correspond to one benchmark instance played as the paper's tool-use task, rewards would not be earned on the benchmark tasks the team is adopting and RL training would not transfer to them; episode semantics are the environment's design and cannot be corrected by setup. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 106,
+   "quote": "the policy gets the paper's agent system prompt, the patient assignment, and the 13 EHR tools as function schemas",
+   "lines": [
+    197,
+    198
+   ],
+   "statement": "The environment presents the policy with the paper's agent system prompt, the patient assignment, and 13 EHR tools exposed as function schemas.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A differing prompt, patient assignment or tool count would be visible on the first reset and absorbed by the team's engineers; the environment and scoring still function, and prompt fidelity touches only comparability, which the reliance statement marks as a uses item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 107,
+   "quote": "the task's submit tool ends the episode and returns the reward from the scoring endpoint above",
+   "lines": [
+    198,
+    199
+   ],
+   "statement": "Calling the task's submit tool terminates the episode and returns the reward obtained from the scoring endpoint.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the submit tool does not end the episode or return the reward from the scoring endpoint, the RL loop receives no reward signal and training on the benchmark cannot run; the reliance statement weighs replacing the reward service and harness as significant engineering. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 108,
+   "quote": "Episode state lives in Redis (started by `docker compose`).",
+   "lines": [
+    199,
+    200
+   ],
+   "statement": "Episode state for the RL environment is stored in Redis, which the docker compose stack starts.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Where episode state is stored, and whether the compose stack starts that store, are setup facts the engineers would meet immediately in configuration; the environment's behaviour and the team's plan are unaffected either way. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 109,
+   "quote": "from eval.env_client import SyntheticHospitalEnv",
+   "lines": [
+    203,
+    203
+   ],
+   "statement": "A Python RL environment client class `SyntheticHospitalEnv` is provided, importable from `eval.env_client`.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If the class is absent or lives elsewhere, the failure appears at the first import, and the four documented HTTP operations remain as another described way to drive the environment. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 110,
+   "quote": "env = SyntheticHospitalEnv(\"http://localhost:8000\", scorer_token=TOKEN)",
+   "lines": [
+    205,
+    205
+   ],
+   "statement": "The `SyntheticHospitalEnv` client constructor takes a base URL and a `scorer_token` argument.",
+   "about": "target",
+   "within": {
+    "source": "README.md",
+    "id": 109,
+    "statement": "A Python RL environment client class `SyntheticHospitalEnv` is provided, importable from `eval.env_client`."
+   },
+   "tier": 2,
+   "tier_basis": "A differing constructor signature is met at the first instantiation and corrected in the team's own calling code without touching the project; the scoring token can equally be supplied per the documented header. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 111,
+   "quote": "obs = env.reset(task=\"patient_diagnosis\", split=\"train\", seed=0)   # or reset(gt_id=...)",
+   "lines": [
+    206,
+    206
+   ],
+   "statement": "The client's `reset` method accepts `task`, `split` and `seed` parameters, and alternatively a `gt_id` parameter.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If the client's reset takes different or fewer parameters, the engineers would read the actual signature on first use or call the documented POST /env/reset directly, another described way; determinism of a run is a property of the service, not of this signature. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 112,
+   "quote": "# obs.instructions (system prompt), obs.intro (first user message), obs.tools (function schemas)",
+   "lines": [
+    207,
+    207
+   ],
+   "statement": "The reset observation object exposes `instructions` (the system prompt), `intro` (the first user message) and `tools` (the function schemas); the example also reads `obs.patient_id` and `obs.submit_tool`.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Attribute names on the observation object are met on first access and corrected in the team's own code; the observation content and the training plan are unaffected. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 113,
+   "quote": "o, reward, done, info = env.step(obs.submit_tool, {\"active_diagnoses\": [...], \"chronic_conditions\": []})\n# done is True, reward in [0, 1], info[\"metrics\"] holds every metric",
+   "lines": [
+    209,
+    210
+   ],
+   "statement": "`step` returns an observation, a reward, a done flag and an info dict; on submission done is True, the reward is in [0, 1], and info[\"metrics\"] holds every metric.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the reward is not bounded to [0, 1] or info does not carry the metrics, scoring does not behave as described and the team's training rewards and published metrics rest on a contract the release does not honour — a failure the buyer has said would change the terms. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+  },
+  {
+   "id": 114,
+   "quote": "The same four calls are plain HTTP (`POST /env/reset`, `POST /env/step`, `GET /env/state/{id}`,\n`POST /env/close`, all with `X-Scorer-Token`), so any language works.",
+   "lines": [
+    213,
+    214
+   ],
+   "statement": "The environment's four operations (reset, step, state, close) are exposed as plain HTTP endpoints, all authenticated with the `X-Scorer-Token` header, so any language can drive the environment.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the four operations are not exposed as authenticated HTTP endpoints, the environment service the reliance statement names by those endpoints does not exist as described, and the team would have to build its own episode harness and reward service — significant engineering no setup change avoids. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 115,
+   "quote": "`scripts/env_demo.py` runs a\nscripted policy end to end and is the template to replace with a model.",
+   "lines": [
+    214,
+    215
+   ],
+   "statement": "The target ships a script, scripts/env_demo.py, that drives a scripted policy through the RL environment's reset, step and submission calls.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If the demo script is missing or does not run end to end, the engineers would notice on the first run and drive the client or endpoints directly; a template script's absence costs no part of the plan. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 116,
+   "quote": "Assessment and plan sections are stripped from every observation",
+   "lines": [
+    217,
+    217
+   ],
+   "statement": "Assessment and plan sections are removed from every observation the environment returns.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The claim fails by a single observation leaking assessment or plan content, which puts ground truth in front of the policy, contaminates training rewards and inflates evaluation results; the team cannot cure this without filtering or forking the simulator's serving layer. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+  },
+  {
+   "id": 117,
+   "quote": "the problem list returned by `open_chart` / `view_problem_list` is the chart's\ndocumented history (the profile's chronic conditions) rather than the simulator's graph-derived\nencounter diagnoses",
+   "lines": [
+    218,
+    220
+   ],
+   "statement": "The problem list returned by the `open_chart` and `view_problem_list` tools is the chart's documented history (the profile's chronic conditions), not the simulator's graph-derived encounter diagnoses.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The claim could be untrue by the problem list exposing the simulator's graph-derived encounter diagnoses instead of the documented history, which would place ground-truth information in front of the agent and contaminate training rewards. That falls under the label-hygiene item the buyer's plan rests on, and no repair short of forking the serving layer cures it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 118,
+   "quote": "Imaging-indication episodes\ncannot observe encounters after the imaging order.",
+   "lines": [
+    220,
+    221
+   ],
+   "statement": "In imaging-indication episodes, the environment does not expose encounters that occur after the imaging order.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The claim could be untrue by the environment exposing encounters after the imaging order, which would leak outcome-revealing information into the episode and contaminate rewards for that task. That reaches the label-hygiene and RL-environment items the buyer's plan depends on. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 119,
+   "quote": "Default 40 actions (`budget=` on reset).",
+   "lines": [
+    222,
+    222
+   ],
+   "statement": "The environment's default action budget is 40 actions, configurable via a `budget=` parameter on reset.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A differing default budget or parameter name would be noticed while configuring episodes and corrected without changing code; it alters setup, not whether the plan holds. No stated threshold reaches it. Rated on the scale alone."
+  },
+  {
+   "id": 120,
+   "quote": "Once spent, only the submit tool is accepted",
+   "lines": [
+    222,
+    223
+   ],
+   "statement": "Once the action budget is spent, the environment accepts only the submit tool.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "If tools other than submit remained accepted after the budget was spent, the team's engineers would see it on their first run and could account for it; it does not affect validity, scoring correctness or the buyer's stated thresholds. Rated on the scale alone."
+  },
+  {
+   "id": 121,
+   "quote": "unknown tools and bad arguments come back as error\nobservations and still cost a step.",
+   "lines": [
+    223,
+    224
+   ],
+   "statement": "Calls with unknown tools or bad arguments return error observations and still consume one step of budget.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Error-observation behaviour on bad calls is an operational detail an engineer running the harness would encounter directly and work around; its failure changes nothing for the buyer's plan. Rated on the scale alone."
+  },
+  {
+   "id": 122,
+   "quote": "Computed once at submission with the paper's primary metrics;",
+   "lines": [
+    225,
+    225
+   ],
+   "statement": "The reward is computed once, at submission, using the paper's primary metrics.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The claim could be untrue by the reward being computed elsewhere than at submission or on metrics other than the paper's primary ones, which is scoring not working as described and would make the team's evaluation results and training rewards meaningless. That is within the buyer's stated threshold: \"ground truth or scoring that does not work as described\". Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+  },
+  {
+   "id": 123,
+   "quote": "the policy holds no credential: the harness\nkeeps the scorer token.",
+   "lines": [
+    226,
+    227
+   ],
+   "statement": "The policy under training holds no credential; the harness retains the scorer token.",
+   "about": "target",
+   "restates_rejected": 91,
+   "tier": 1,
+   "tier_basis": "The claim could be untrue by the policy under training holding a credential, defeating the token separation the buyer's plan relies on for reinforcement learning and risking contaminated or invalid training. The RL-environment item the plan depends on names this exact property. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 124,
+   "quote": "`reset(task=, split=, seed=)` samples deterministically;",
+   "lines": [
+    228,
+    228
+   ],
+   "statement": "The target's reset procedure samples benchmark instances using the supplied task, split and seed as inputs to its sampling logic.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The claim could be untrue by reset not sampling deterministically from task, split and seed, which would defeat reproducible runs and leave the team unable to stand behind published numbers without significant work to establish determinism itself. That reaches the reproducible-evaluation item the plan depends on. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 125,
+   "quote": "`env.instances()` lists\nevery instance id",
+   "lines": [
+    228,
+    229
+   ],
+   "statement": "The client's `instances()` method lists every instance id.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A missing or extra instance id in the client's listing is a detail an engineer operating the environment would meet and correct around cheaply; it does not affect validity, leakage or scoring. Rated on the scale alone."
+  },
+  {
+   "id": 127,
+   "quote": "The Dockerfile has three targets:",
+   "lines": [
+    233,
+    233
+   ],
+   "statement": "The repository's Dockerfile defines exactly three build targets.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A Dockerfile with more or fewer than three targets would be seen immediately by an engineer building the images and corrected in setup; it changes nothing about whether the plan holds. Rated on the scale alone."
+  },
+  {
+   "id": 128,
+   "quote": "`app` (default, used by compose)",
+   "lines": [
+    237,
+    237
+   ],
+   "statement": "The `app` build target is the Dockerfile's default and is the target used by the compose setup.",
+   "about": "target",
+   "within": {
+    "source": "README.md",
+    "id": 127,
+    "statement": "The repository's Dockerfile defines exactly three build targets."
+   },
+   "tier": 2,
+   "tier_basis": "Which target is the default and which compose uses is a build detail an engineer would notice and work with directly; its failure would not affect the buyer's plan. Rated on the scale alone."
+  },
+  {
+   "id": 129,
+   "quote": "code and dependencies; the database is bind-mounted",
+   "lines": [
+    237,
+    237
+   ],
+   "statement": "The `app` image contains the code and dependencies, and the database is supplied via a bind mount rather than baked in.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "How the database is supplied to the app image is a setup mechanism an engineer would meet and adjust while standing up the stack; it is commodity glue the plan does not depend on. Rated on the scale alone."
+  },
+  {
+   "id": 130,
+   "quote": "plus `benchmark_v1.3.db` baked in; self-contained",
+   "lines": [
+    238,
+    238
+   ],
+   "statement": "The `with-data` image contains the benchmark database baked into the image, making it self-contained.",
+   "about": "target",
+   "within": {
+    "source": "harbor/README.md",
+    "id": 11,
+    "statement": "The image is pulled automatically, and an alternative image can be used by building it locally under the same name or passing `--image`."
+   },
+   "tier": 3,
+   "tier_basis": "The with-data image falls under alternative packaging, which the buyer's plan does not touch: no stated threshold reaches it and the plan does not use it. Rated on the scale alone."
+  },
+  {
+   "id": 131,
+   "quote": "used by Harbor tasks",
+   "lines": [
+    238,
+    238
+   ],
+   "statement": "The `with-data` image is the image used by the exported Harbor tasks.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The exported Harbor tasks fall under alternative packaging, which the buyer's plan does not touch: the team drives the simulator and environment endpoints directly. No stated threshold reaches this claim. Rated on the scale alone."
+  },
+  {
+   "id": 132,
+   "quote": "plus PostgreSQL and Redis inside the image",
+   "lines": [
+    239,
+    239
+   ],
+   "statement": "The `allinone` image contains PostgreSQL and Redis inside the image itself.",
+   "about": "target",
+   "within": {
+    "source": "apptainer/README.md",
+    "id": 1,
+    "statement": "The shipped all-in-one container image contains the simulator, the benchmark database, PostgreSQL and Redis."
+   },
+   "tier": 3,
+   "tier_basis": "The all-in-one image falls under alternative packaging, which the buyer's plan does not touch: it runs the stack through compose instead. No stated threshold reaches this claim. Rated on the scale alone."
+  },
+  {
+   "id": 133,
+   "quote": "run as an unprivileged user",
+   "lines": [
+    239,
+    239
+   ],
+   "statement": "Inside the `allinone` image, the services run as an unprivileged user.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns the all-in-one image, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches how the image's services run. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 134,
+   "quote": "with no other services",
+   "lines": [
+    239,
+    239
+   ],
+   "statement": "The `allinone` image runs no services besides PostgreSQL and Redis (a boundary claim about the image's contents).",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns the contents of the all-in-one image, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches the image's service boundary. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 135,
+   "quote": "The two data-bearing images are published to GitHub Container Registry;",
+   "lines": [
+    241,
+    241
+   ],
+   "statement": "The `with-data` and `allinone` images are published to GitHub Container Registry under the tags shown in the table.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns the published images, part of the alternative packaging the buyer's plan does not touch; the licence and provenance threshold reaches the project's right to distribute what it ships, not whether images are published to a registry. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 136,
+   "quote": "`scripts/publish_images.sh`\nbuilds and pushes them (maintainers)",
+   "lines": [
+    241,
+    242
+   ],
+   "statement": "The script `scripts/publish_images.sh` builds and pushes the two data-bearing images, for use by maintainers.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns a maintainer script for building and pushing the images, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches it. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 137,
+   "quote": "To build them locally instead, use the same tags:",
+   "lines": [
+    242,
+    242
+   ],
+   "statement": "The data-bearing images can be built locally using the same registry tags as the published images.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns building the images locally, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches it. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 138,
+   "quote": "turns benchmark instances into\n[Harbor](https://harborframework.com) tasks, one directory per instance",
+   "lines": [
+    245,
+    246
+   ],
+   "statement": "The script `scripts/harbor_export.py` converts benchmark instances into Harbor tasks, creating one directory per instance.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns the Harbor export script, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches it. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 139,
+   "quote": "with the paper's agent\nprompt as `instruction.md`",
+   "lines": [
+    246,
+    247
+   ],
+   "statement": "Each exported Harbor task includes the paper's agent prompt, placed as `instruction.md`.",
+   "about": "target",
+   "within": {
+    "source": "harbor/README.md",
+    "id": 7,
+    "statement": "instruction.md contains the paper's agent prompt, the patient assignment, and instructions on how to act."
+   },
+   "tier": 3,
+   "tier_basis": "The claim concerns the prompt file inside exported Harbor tasks, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches it. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 140,
+   "quote": "a compose environment (simulator with the episode pre-started",
+   "lines": [
+    247,
+    247
+   ],
+   "statement": "Each exported Harbor task includes a compose environment configured so that the simulator's episode is started before the agent begins.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns the compose environment of exported Harbor tasks, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches it. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 141,
+   "quote": "Postgres and\nRedis on a network the agent cannot reach",
+   "lines": [
+    247,
+    248
+   ],
+   "statement": "In the exported task environment, Postgres and Redis sit on a network the agent cannot reach (a boundary claim about agent access).",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns network boundaries inside exported Harbor tasks, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches that packaging's boundary. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 142,
+   "quote": "an `sh-agent` command line for the agent",
+   "lines": [
+    248,
+    248
+   ],
+   "statement": "Each exported Harbor task includes an `sh-agent` command line for running the agent.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns the agent command line in exported Harbor tasks, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches it. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 143,
+   "quote": "a verifier that\nwrites the episode reward to `/logs/verifier/reward.json`",
+   "lines": [
+    248,
+    249
+   ],
+   "statement": "Each exported Harbor task includes a verifier that writes the episode reward to `/logs/verifier/reward.json`.",
+   "about": "target",
+   "within": {
+    "source": "harbor/README.md",
+    "id": 24,
+    "statement": "The verifier writes reward.json containing the fields reward, steps and submitted."
+   },
+   "tier": 3,
+   "tier_basis": "The claim concerns the verifier output path in exported Harbor tasks, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches it. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 144,
+   "quote": "an oracle solution that scores 1.0",
+   "lines": [
+    249,
+    249
+   ],
+   "statement": "Each exported Harbor task includes an oracle solution for the task.",
+   "about": "target",
+   "within": {
+    "source": "harbor/README.md",
+    "id": 26,
+    "statement": "The export pairs each task with an oracle that fetches and submits the label-derived submission, making a score of 1.0 the expected self-check result."
+   },
+   "tier": 3,
+   "tier_basis": "The claim concerns the oracle solution in exported Harbor tasks, part of the alternative packaging the buyer's plan does not touch; the ground-truth threshold reaches the benchmark's own ground truth and scoring, not the packaging's oracle. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 145,
+   "quote": "python scripts/harbor_export.py --out harbor_tasks --task patient_diagnosis --split train --limit 50",
+   "lines": [
+    253,
+    253
+   ],
+   "statement": "`scripts/harbor_export.py` accepts `--out`, `--task`, `--split` and `--limit` options as shown in the example command.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns the command-line options of the Harbor export script, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches it. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 146,
+   "quote": "`apptainer/synthetic_hospital.def` converts the all-in-one\nimage into a `.sif`",
+   "lines": [
+    257,
+    258
+   ],
+   "statement": "The Apptainer definition file `apptainer/synthetic_hospital.def` converts the all-in-one image into a `.sif` container file.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns the Apptainer definition file, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches it. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 147,
+   "quote": "starts everything as the calling user",
+   "lines": [
+    258,
+    258
+   ],
+   "statement": "The resulting `.sif` starts all services as the calling user.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim concerns how the .sif starts its services, part of the alternative packaging the buyer's plan does not touch, and no stated threshold reaches it. No way it could be untrue would be material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 148,
+   "quote": "with a bound state directory",
+   "lines": [
+    258,
+    258
+   ],
+   "statement": "The resulting `.sif` binds a state directory into the container.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The Apptainer SIF is alternative packaging the buyer's plan does not touch, and no stated threshold reaches a bind-mount detail; no way it could be untrue affects the terms or the adopted evaluation and training path. Rated on the scale alone."
+  },
+  {
+   "id": 149,
+   "quote": "works anywhere Docker does",
+   "lines": [
+    260,
+    260
+   ],
+   "statement": "The all-in-one image can be run with the single command `docker run --rm -p 8000:8000 ghcr.io/sparkcpark/synthetic-hospital:1.3-allinone`, with no compose file involved.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The published all-in-one image is alternative packaging the buyer's plan does not touch — its engineers drive the simulator and the environment endpoints directly — and no stated threshold reaches the run command; a failure here costs nothing the buyer relies on. Rated on the scale alone."
+  },
+  {
+   "id": 150,
+   "quote": "needs no compose file",
+   "lines": [
+    260,
+    260
+   ],
+   "statement": "Running the all-in-one image via plain `docker run` requires no compose file (a boundary claim about what the run form needs).",
+   "about": "target",
+   "within": {
+    "source": "README.md",
+    "id": 149,
+    "statement": "The all-in-one image can be run with the single command `docker run --rm -p 8000:8000 ghcr.io/sparkcpark/synthetic-hospital:1.3-allinone`, with no compose file involved."
+   },
+   "tier": 3,
+   "tier_basis": "This boundary claim concerns the all-in-one image, an alternate run form outside the buyer's plan, and no stated threshold reaches it; a person operating the adopted path would never meet its failure. Rated on the scale alone."
+  },
+  {
+   "id": 151,
+   "quote": "The ETL that built it is deterministic for non-LLM stages",
+   "lines": [
+    264,
+    264
+   ],
+   "statement": "The ETL pipeline that produced benchmark_v1.3.db implements its non-LLM stages deterministically, with no randomness or run-dependent state in those stages.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The buyer adopts the release as shipped and does not rebuild the database, so ETL determinism is never met in use, and no stated threshold reaches data-construction determinism. Rated on the scale alone."
+  },
+  {
+   "id": 152,
+   "quote": "LLM-assisted stages record model + prompt provenance",
+   "lines": [
+    264,
+    264
+   ],
+   "statement": "The ETL's LLM-assisted stages include code that records, for each output they produce, which model and prompt were used.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "Provenance recording in ETL code the buyer does not run cannot affect the evaluation and training path it adopts, and no stated threshold reaches it. Rated on the scale alone."
+  },
+  {
+   "id": 153,
+   "quote": "Ablations: `scripts/ablation_relevance.py`, `scripts/run_specialty_sweep.py`",
+   "lines": [
+    266,
+    266
+   ],
+   "statement": "The repository includes the named ablation scripts, `scripts/ablation_relevance.py` and `scripts/run_specialty_sweep.py` (the ablation scripts the analysis tooling is said to include).",
+   "about": "target",
+   "restates_rejected": 29,
+   "tier": 3,
+   "tier_basis": "The ablation scripts belong to the methodology artifacts the buyer merely uses and sit off the evaluation and training path; no stated threshold reaches their existence. Rated on the scale alone."
+  },
+  {
+   "id": 157,
+   "quote": "it hides assessment/plan client-side",
+   "lines": [
+    275,
+    275
+   ],
+   "statement": "The `eval/agents` harness used for the paper's agentic runs hides assessment/plan sections on the client side.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the harness does not hide assessment and plan sections on the client side, agentic evaluation and reinforcement-learning training through it are contaminated and the results the team intends to publish would not stand — a failure the team cannot repair cheaply. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 158,
+   "quote": "leaves the problem list",
+   "lines": [
+    275,
+    275
+   ],
+   "statement": "The `eval/agents` harness leaves the problem list in place (it does not replace or hide it).",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the harness does not simply leave the problem list as served — in particular if it substitutes ground-truth content for documented history — evaluation through the harness is contaminated in the way the buyer's plan cannot absorb; the direction of failure cannot be settled without testing. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 159,
+   "quote": "agentic patient-diagnosis scores obtained through that harness are inflated",
+   "lines": [
+    276,
+    276
+   ],
+   "statement": "Patient-diagnosis scores obtained through the `eval/agents` harness are inflated relative to scores obtained through the environment endpoints.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "No way this claim could be untrue changes the price or the terms on its own: its falsity is either favourable (no inflation) or a refinement, and the environment endpoints remain as the clean path. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 160,
+   "quote": "Later encounter notes carry an \"Active Problem List\" of earlier encounters' diagnoses by construction (that is the chart)",
+   "lines": [
+    278,
+    279
+   ],
+   "statement": "Later encounter notes carry an \"Active Problem List\" of earlier encounters' diagnoses by construction, as part of the chart itself.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If later encounter notes do not carry the documented active problem list by construction, or carry more of the current diagnosis than documented history, the chart the agent sees breaks the described label hygiene and rewards and published results are contaminated, which the team cannot repair cheaply. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 161,
+   "quote": "only the current encounter's diagnosis and the coded list are withheld",
+   "lines": [
+    279,
+    279
+   ],
+   "statement": "The only diagnosis material withheld from later encounter notes is the current encounter's diagnosis and the coded list.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The claim fixes what diagnosis material later notes may contain; if less is withheld than stated, the current diagnosis reaches the agent and evaluation and training rewards are inflated, a contamination the team cannot repair without forking the serving layer. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 162,
+   "quote": "The imaging-indication reference question is LLM-authored (anchored to the graph diagnosis)",
+   "lines": [
+    280,
+    280
+   ],
+   "statement": "The reference question for the imaging-indication task was authored by an LLM, anchored to the graph diagnosis.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The claim asserts both LLM authorship and anchoring to the graph diagnosis; if the anchoring fails, the imaging-indication task's reference question is not tied to the ground truth as the materials describe and evaluation on that task cannot be trusted. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+  },
+  {
+   "id": 163,
+   "quote": "the other three tasks' labels are deterministic functions of the graph",
+   "lines": [
+    280,
+    281
+   ],
+   "statement": "The reference labels for the other three tasks (patient diagnosis, summarization, retrieval) are deterministic functions of the knowledge graph.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the three tasks' reference labels are not deterministic functions of the knowledge graph, the ground truth does not work as described and the buyer's published results and training rewards lose their foundation, with no cheap repair. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+  },
+  {
+   "id": 164,
+   "quote": "The released data files are fully synthetic and redistributable",
+   "lines": [
+    286,
+    286
+   ],
+   "statement": "The released data files may be redistributed.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The claim asserts both full syntheticity and the right to redistribute; either failing — real patient data, or source content the project may not distribute — ends the adoption outright and no engineering by the team cures it. Rated against the buyer's stated threshold: \"data that is not fully synthetic\"."
+  },
+  {
+   "id": 165,
+   "quote": "`benchmark_v1.3.db` (88 MB)",
+   "lines": [
+    288,
+    288
+   ],
+   "statement": "The benchmark database file `benchmark_v1.3.db` is 88 MB in size.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "No stated threshold reaches an 88 MB file-size figure, the dataset-scale item is one the buyer's engineers can verify by inspecting the shipped files directly, and no one setting up or operating the benchmark would act on the figure or meet its failure in use. Rated on the scale alone."
+  },
+  {
+   "id": 166,
+   "quote": "is committed directly (under GitHub's 100 MB file limit), so a plain `git clone` brings the data with no Git LFS setup",
+   "lines": [
+    288,
+    288
+   ],
+   "statement": "`benchmark_v1.3.db` is committed directly to the repository, so a plain git clone retrieves the data without Git LFS setup.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A failure here would be met by an engineer cloning the repository and worked around by fetching the file from the release assets; it changes how the release is obtained, not whether the team's plan holds. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+  },
+  {
+   "id": 167,
+   "quote": "it is also attached to each GitHub release as a downloadable asset",
+   "lines": [
+    288,
+    288
+   ],
+   "statement": "`benchmark_v1.3.db` is attached to each GitHub release of the repository as a downloadable asset.",
+   "about": "seller",
+   "within": {
+    "source": "README.md",
+    "id": 65,
+    "statement": "The benchmark database file `benchmark_v1.3.db` is distributed with the release."
+   },
+   "tier": 2,
+   "tier_basis": "A release lacking the attached file would be met while obtaining the data and worked around by cloning instead; on its own it changes nothing for the buyer's plan. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+  },
+  {
+   "id": 168,
+   "quote": "Converts USMLE-style medical education source content into a ground-truth benchmark database of synthetic longitudinal patient records",
+   "lines": [
+    8,
+    8
+   ],
+   "statement": "When the ETL is run, it converts the USMLE-style medical education source content into a ground-truth benchmark database of synthetic longitudinal patient records.",
+   "about": "target",
+   "implied_by": 1,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "The buyer adopts the release as shipped and does not rebuild the database or ingest new sources, so no way this could be untrue is ever met in the buyer's use. The fully-synthetic threshold, read as the buyer wrote it, concerns the released data, not a pipeline the buyer does not run. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 169,
+   "quote": "loads `benchmark_v1.3.db` into Postgres on first boot",
+   "lines": [
+    55,
+    56
+   ],
+   "statement": "On the first boot, the benchmark_v1.3.db database is loaded into Postgres, so the stack runs against the shipped data.",
+   "about": "target",
+   "implied_by": 35,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "A failed first-boot load would be met during setup by an engineer who can run the load manually; on its own it does not change the buyer's plan. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+  },
+  {
+   "id": 170,
+   "quote": "results are written to `./results` on the host",
+   "lines": [
+    71,
+    72
+   ],
+   "statement": "Running an evaluation produces result files in ./results on the host machine.",
+   "about": "target",
+   "implied_by": 43,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "Results landing elsewhere than the stated path would be met in use and corrected by reading the configuration; it is a detail an engineer acts on, not something the buyer's plan turns on. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+  },
+  {
+   "id": 171,
+   "quote": "The load is idempotent: restarting the stack skips it when patients are already present",
+   "lines": [
+    75,
+    75
+   ],
+   "statement": "When the stack is restarted with patients already in the database, the database load does not run again.",
+   "about": "target",
+   "implied_by": 45,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "A load that reruns or that fails to skip would be met during operation and worked around without changing whether the benchmark is valid or reproducible. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+  },
+  {
+   "id": 172,
+   "quote": "is fetched from CMS automatically on first boot",
+   "lines": [
+    85,
+    85
+   ],
+   "statement": "On first boot, the ICD-10-CM terminology is fetched from CMS automatically, without a person fetching it.",
+   "about": "target",
+   "implied_by": 52,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "If the terminology is not fetched automatically, the team's engineers can obtain and load the files themselves, which the buyer's plan treats as cheap; the failure is met and corrected at setup. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+  },
+  {
+   "id": 173,
+   "quote": "loads only the systems not yet present",
+   "lines": [
+    92,
+    92
+   ],
+   "statement": "When the terminology load runs with a system such as SNOMED CT already present in the database, that system is not loaded again and only the missing systems are loaded.",
+   "about": "target",
+   "implied_by": 58,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "A double load or a wrongly skipped system would be met in operation and corrected by an engineer without touching the buyer's plan. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+  },
+  {
+   "id": 174,
+   "quote": "the terminology tests stop skipping once the\nsystems are loaded",
+   "lines": [
+    93,
+    94
+   ],
+   "statement": "Once the terminology systems are loaded, running the test suite executes the terminology tests instead of skipping them.",
+   "about": "target",
+   "implied_by": 60,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "A test suite that keeps skipping would be met while verifying the installation and does not by itself change the benchmark's validity or reproducibility. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+  },
+  {
+   "id": 175,
+   "quote": "pip install -r requirements.txt",
+   "lines": [
+    103,
+    103
+   ],
+   "statement": "Running `pip install -r requirements.txt` installs the project's dependencies.",
+   "about": "target",
+   "implied_by": 62,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "A failed dependency install would be met immediately at setup by the team's own engineers and resolved by ordinary means. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+  },
+  {
+   "id": 176,
+   "quote": "uvicorn epic_sim.app.main:app --reload",
+   "lines": [
+    109,
+    109
+   ],
+   "statement": "Running `uvicorn epic_sim.app.main:app` serves the EHR simulator.",
+   "about": "target",
+   "implied_by": 63,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "A serving command that fails would be met at setup and worked around by an engineer running the service another way. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+  },
+  {
+   "id": 177,
+   "quote": "pytest epic_sim/tests",
+   "lines": [
+    112,
+    112
+   ],
+   "statement": "Running `pytest epic_sim/tests` executes the simulator's test suite.",
+   "about": "target",
+   "implied_by": 64,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "A test invocation that does not run the suite would be met while checking the installation and corrected without touching the buyer's plan. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+  },
+  {
+   "id": 178,
+   "quote": "is all you need to run the evaluations",
+   "lines": [
+    118,
+    118
+   ],
+   "statement": "With only the distributed database loaded, the evaluations run and nothing else must be built or fetched.",
+   "about": "target",
+   "implied_by": 66,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "The claim could be untrue because the evaluations require building or fetching pieces beyond the distributed database, which is the very failure of the item the buyer's plan depends on; the team would have to build or fetch before any evaluation at all, and buyer-side engineering is not a way the plan still holds. That the gap might in some forms be noticed at setup does not remove the ways in which it would defeat the depended-on item. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 179,
+   "quote": "the ETL is source-agnostic. Describe your own Anki decks or PDFs with a small YAML profile (`etl/deck_profiles/`, `etl/pdf_profiles/`; see `etl/stages/EXTENDING.md`)",
+   "lines": [
+    120,
+    120
+   ],
+   "statement": "The ETL ingests a buyer's own Anki decks or PDFs described through such YAML profiles.",
+   "about": "target",
+   "implied_by": 68,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "The buyer's plan does not touch the ETL: it adopts the release as shipped and does not ingest its own decks or PDFs, so no way this could be untrue would be met in the buyer's use. No stated threshold reaches this claim. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 180,
+   "quote": "Or let the container do all of this: `docker compose up -d` (Quickstart above).",
+   "lines": [
+    141,
+    141
+   ],
+   "statement": "Running `docker compose up -d` performs the data setup automatically, without the manual commands.",
+   "about": "target",
+   "implied_by": 74,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "A failed compose startup would be met during setup by the team's engineers, who can run the manual steps or fix the compose file in about a day. No stated threshold reaches this claim and the buyer's depended-on items do not cover it. Rated on the scale alone."
+  },
+  {
+   "id": 181,
+   "quote": "python -m eval.cli run --task context_summarization --granularity specialty --model <model> --split public",
+   "lines": [
+    164,
+    164
+   ],
+   "statement": "When the documented eval.cli command is run, it executes a context_summarization evaluation with the specialty granularity and the public split.",
+   "about": "target",
+   "implied_by": 86,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "If the documented run command does not execute the context_summarization evaluation as described, the reproducible-evaluation path the buyer depends on fails, and the team cannot stand behind the published numbers its adoption exists to produce; repairing the code is not a way the plan still holds. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 182,
+   "quote": "The simulator exposes the paper's scorer over HTTP so that an external trainer can obtain a reward for any submission without importing the evaluation code.",
+   "lines": [
+    171,
+    172
+   ],
+   "statement": "When an external trainer submits a submission to the scoring service over HTTP, it receives a reward for that submission without ever importing the evaluation code.",
+   "about": "target",
+   "implied_by": 90,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "If the scoring service does not return a reward over HTTP without importing the evaluation code, the reinforcement-learning environment and scoring item the buyer depends on fails, and the team would have to build its own reward service — significant engineering that does not preserve the plan. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 183,
+   "quote": "a malformed\nor empty submission scores 0 rather than raising",
+   "lines": [
+    190,
+    191
+   ],
+   "statement": "When a malformed or empty submission is sent to the scoring endpoint while it is running, it is scored 0 and no error is raised.",
+   "about": "target",
+   "implied_by": 101,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "No way this could be untrue is material: the team's own trainer controls what is submitted, so a malformed submission raising an error instead of scoring 0 changes how its engineers operate the client, not whether the plan holds. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 184,
+   "quote": "`scripts/env_demo.py` runs a\nscripted policy end to end and is the template to replace with a model.",
+   "lines": [
+    214,
+    215
+   ],
+   "statement": "Executing scripts/env_demo.py runs a scripted policy through a complete episode, from reset through submission, end to end.",
+   "about": "target",
+   "implied_by": 115,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "The demo script is a template; if it does not run end to end the team's engineers would meet the failure while setting up and could drive the environment and scoring endpoints through the provided client instead, so the plan still holds. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 185,
+   "quote": "`reset(task=, split=, seed=)` samples deterministically;",
+   "lines": [
+    228,
+    228
+   ],
+   "statement": "Calling reset with the same task, split and seed yields the same instance on each run.",
+   "about": "target",
+   "implied_by": 124,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "If reset with the same task, split and seed does not yield the same instance, the deterministic-reset item the buyer depends on is defeated: evaluation runs could not be reproduced and published numbers could not be stood behind, and no local repair restores it. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 186,
+   "quote": "a compose environment (simulator with the episode pre-started",
+   "lines": [
+    247,
+    247
+   ],
+   "statement": "When an exported Harbor task's environment runs, the simulator is running with its episode already started before the agent acts.",
+   "about": "target",
+   "implied_by": 140,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "The claim concerns exported Harbor tasks, an alternative-packaging item the buyer does_not_use, and no stated threshold reaches it, so no way it could be untrue is material. Rated on the scale alone."
+  },
+  {
+   "id": 187,
+   "quote": "an oracle solution that scores 1.0",
+   "lines": [
+    249,
+    249
+   ],
+   "statement": "When an exported Harbor task's oracle solution is run against the task, it achieves a reward of 1.0.",
+   "about": "target",
+   "implied_by": 144,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "The claim concerns the oracle solution inside an exported Harbor task, within alternative packaging the buyer does_not_use and no stated threshold reaches; a scoring question about a package the buyer's plan never touches is not material. Rated on the scale alone."
+  },
+  {
+   "id": 188,
+   "quote": "works anywhere Docker does",
+   "lines": [
+    260,
+    260
+   ],
+   "statement": "That plain `docker run` invocation of the all-in-one image works in any environment where Docker works.",
+   "about": "target",
+   "implied_by": 149,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "The claim concerns the all-in-one image, part of the alternative-packaging item the buyer does_not_use, and no stated threshold reaches it, so no way it could be untrue is material. Rated on the scale alone."
+  },
+  {
+   "id": 189,
+   "quote": "The ETL that built it is deterministic for non-LLM stages",
+   "lines": [
+    264,
+    264
+   ],
+   "statement": "When the ETL's non-LLM stages are run, repeated runs on the same inputs produce the same outputs.",
+   "about": "target",
+   "implied_by": 151,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "The buyer does not rebuild the data, so no one operating the software would act on ETL determinism or meet its failure in use; the methodology-artifacts item it falls under is only a uses item, which is not a route to tier 1. Rated on the scale alone."
+  },
+  {
+   "id": 190,
+   "quote": "LLM-assisted stages record model + prompt provenance",
+   "lines": [
+    264,
+    264
+   ],
+   "statement": "When the LLM-assisted ETL stages run, they write provenance records identifying the model and prompt behind each output.",
+   "about": "target",
+   "implied_by": 152,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "The buyer never runs the LLM-assisted ETL stages, and the provenance-artifacts item it falls under is a uses item, not a route, so no way it could be untrue is material to this buyer. Rated on the scale alone."
+  }
+ ]
+}

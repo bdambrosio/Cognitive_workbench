@@ -1,0 +1,956 @@
+{
+ "claim_source": "DATA_CARD.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "1,268 synthetic patients",
+   "lines": [
+    5,
+    5
+   ],
+   "statement": "The released dataset contains 1,268 synthetic patients.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "`patients` (1,268 rows — one per synthetic patient)",
+     "lines": [
+      28,
+      28
+     ]
+    }
+   ],
+   "tier": 2,
+   "tier_basis": "The claim is a figure about the dataset's scale; if untrue, the team's engineers meet it when they load and inspect the shipped SQLite and JSONL files, which they can do cheaply. Its failure alone changes nothing about the adoption. Rated on the scale alone."
+  },
+  {
+   "id": 2,
+   "quote": "5,602 clinical encounters",
+   "lines": [
+    5,
+    5
+   ],
+   "statement": "The released dataset contains 5,602 clinical encounters.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The claim is a figure about the dataset's scale; if untrue, the team's engineers meet it when they load and inspect the shipped files, which they can do cheaply. Its failure alone changes nothing about the adoption. Rated on the scale alone."
+  },
+  {
+   "id": 3,
+   "quote": "distributed as SQLite\n(`patient_profiles.db`) and JSON Lines (`patient_profiles.jsonl`)",
+   "lines": [
+    5,
+    6
+   ],
+   "statement": "The patient data is distributed in two formats: a SQLite database file named patient_profiles.db and a JSON Lines file named patient_profiles.jsonl.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "`patient_profiles.db`    | SQLite 3",
+     "lines": [
+      20,
+      20
+     ]
+    },
+    {
+     "quote": "`patient_profiles.jsonl` | JSON Lines",
+     "lines": [
+      21,
+      21
+     ]
+    }
+   ],
+   "tier": 2,
+   "tier_basis": "If one of the two named files is absent or differently named, the engineers meet this when setting up and can work from the other format; the claim is a packaging detail an operator acts on. Its failure alone changes nothing for the buyer. Rated on the scale alone."
+  },
+  {
+   "id": 4,
+   "quote": "the benchmark\ndatabase (`benchmark_v1.3.db`) holding the chart sections, ground truth, relevance\njudgments, imaging orders, knowledge graph, and split labels",
+   "lines": [
+    6,
+    8
+   ],
+   "statement": "A benchmark database file named benchmark_v1.3.db exists in the release and contains chart sections, ground truth, relevance judgments, imaging orders, a knowledge graph, and split labels.",
+   "about": "target",
+   "within": {
+    "source": "README.md",
+    "id": 65,
+    "statement": "The benchmark database file `benchmark_v1.3.db` is distributed with the release."
+   },
+   "tier": 1,
+   "tier_basis": "The claim could be untrue because the released database is absent or does not actually contain ground truth, relevance judgments or split labels; without ground truth in the release the team's evaluation results and training rewards would be meaningless and no local repair restores them. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+  },
+  {
+   "id": 5,
+   "quote": "The data supports evaluation\nof clinical AI on patient diagnosis, context summarization, evidence retrieval, and imaging\nindication over multi-visit patient timelines",
+   "lines": [
+    8,
+    10
+   ],
+   "statement": "The released data supports evaluating clinical AI on four named tasks — patient diagnosis, context summarization, evidence retrieval, and imaging indication — over multi-visit patient timelines.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The claim could be untrue because one or more of the four named tasks is not actually supported by the released data with usable ground truth over multi-visit timelines. The team would then have to evaluate on fewer tasks and narrow its publication, and it cannot easily author replacement tasks with credible ground truth. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 6,
+   "quote": "training on the released training split",
+   "lines": [
+    10,
+    10
+   ],
+   "statement": "The released data includes a training split that supports training (including fine-tuning) of clinical AI.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The claim could be untrue because no training split is released, or the released split does not support training or fine-tuning. Training the agent, including reinforcement learning on the training split, is half the team's stated purpose, and it cannot redraw or repair a missing or unusable split itself without the project's sampling records. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 7,
+   "quote": "The records are fully synthetic.",
+   "lines": [
+    12,
+    12
+   ],
+   "statement": "All records in the release are synthetic; no real patient data is included.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "Any way the claim could be untrue admits real patient data in the release. No patch by the team could cure that, and adoption ends under the buyer's stated walk-away condition. Rated against the buyer's stated threshold: \"data that is not fully synthetic\"."
+  },
+  {
+   "id": 8,
+   "quote": "generated from AI-generated question vignettes\ncombined with a knowledge graph derived from medical facts",
+   "lines": [
+    12,
+    13
+   ],
+   "statement": "The records were generated by combining AI-generated question vignettes with a knowledge graph derived from medical facts.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The claim could be untrue because the records were not generated as described — for example because they were derived from real patient content rather than produced by the stated synthetic generation — in which case the release is not fully synthetic and adoption ends; other deviations would leave the team publishing provenance claims the materials do not support, which it cannot repair itself. Rated against the buyer's stated threshold: \"data that is not fully synthetic\"."
+  },
+  {
+   "id": 9,
+   "quote": "Two tables: `patients`, `encounters`",
+   "lines": [
+    20,
+    20
+   ],
+   "statement": "The patient_profiles.db SQLite database contains exactly two tables: patients and encounters.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The claim is a schema detail the engineers act on when querying the patients table; a wrong table or column list is met on first use and corrected in their own queries. Its failure alone changes nothing for the buyer. Rated on the scale alone."
+  },
+  {
+   "id": 10,
+   "quote": "One patient object per line; encounters nested under `encounters`",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "The JSON Lines file contains one patient object per line, with that patient's encounters nested under an \"encounters\" key.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "The JSONL already nests encounters in that order.",
+     "lines": [
+      69,
+      69
+     ]
+    }
+   ],
+   "tier": 2,
+   "tier_basis": "The claim is a file-structure detail the engineers act on when parsing the JSONL file; a wrong nesting shape is met at setup and corrected in their own reader code. Its failure alone changes nothing for the buyer. Rated on the scale alone."
+  },
+  {
+   "id": 11,
+   "quote": "`benchmark_v1.3.db`      | SQLite 3   | Benchmark tables (below)",
+   "lines": [
+    22,
+    22
+   ],
+   "statement": "The file benchmark_v1.3.db is a SQLite 3 database containing the benchmark tables described later in the document.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The claim is a file-format detail; if the file is not SQLite 3 or does not hold the benchmark tables, the engineers meet this the first time they open it and can obtain or inspect the data another way. Its failure alone changes nothing for the buyer. Rated on the scale alone."
+  },
+  {
+   "id": 12,
+   "quote": "load into the simulator with `python -m epic_sim.migrate.sqlite_to_pg`",
+   "lines": [
+    22,
+    22
+   ],
+   "statement": "The release contains a migration module runnable as python -m epic_sim.migrate.sqlite_to_pg that migrates the benchmark database into the simulator.",
+   "about": "target",
+   "within": {
+    "source": "README.md",
+    "id": 72,
+    "statement": "The `epic_sim.migrate.sqlite_to_pg` script loads `benchmark_v1.3.db` from the repo root into Postgres."
+   },
+   "tier": 2,
+   "tier_basis": "If the module is absent or fails to migrate the data, the Docker Compose first-boot Postgres schema creation and benchmark load is another way the project's documents describe for getting the data into the simulator, and a broken command is met and worked around at setup. Its failure alone changes nothing for the buyer. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 13,
+   "quote": "| `patient_id`        | Unique patient identifier                                                                         |\n| `profile`           | JSON blob: demographics, chronic conditions, surgical/family history, allergies, home medications |\n| `age`               | Age at first encounter                                                                            |\n| `sex`               | Patient sex                                                                                       |\n| `race_ethnicity`    | Race / ethnicity                                                                                  |\n| `insurance`         | Insurance type                                                                                    |\n| `num_encounters`    | Number of encounters for this patient                                                             |\n| `primary_diagnoses` | JSON array of the patient's primary diagnoses                                                     |\n| `comorbidities`     | JSON array of comorbid conditions                                                                 |\n| `generation_seed`   | Seed used for reproducible generation                                                             |",
+   "lines": [
+    33,
+    42
+   ],
+   "statement": "The patients table contains the ten listed columns with the stated meanings: patient_id (unique identifier), profile (JSON blob holding demographics, chronic conditions, surgical/family history, allergies, home medications), age (age at first encounter), sex, race_ethnicity, insurance, num_encounters, primary_diagnoses (JSON array), comorbidities (JSON array), and generation_seed (seed for reproducible generation).",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The claim is a column-level schema detail the engineers act on when reading the patients table; a wrong column name or meaning is met in use and corrected in their own code. Its failure alone changes nothing for the buyer. Rated on the scale alone."
+  },
+  {
+   "id": 14,
+   "quote": "a `pcp_name` field exists in the internal database but is **intentionally\n> excluded** from this release",
+   "lines": [
+    45,
+    46
+   ],
+   "statement": "An internal database field named pcp_name exists but has been deliberately removed from the released data.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The claim concerns a field that is not in the release; if untrue, the engineers would at most see an extra placeholder column, which no stated threshold reaches and which does not affect evaluation or training. No way it could be untrue is material. Rated on the scale alone."
+  },
+  {
+   "id": 15,
+   "quote": "it was a non-informative placeholder (`Dr. Smith-<id>`)",
+   "lines": [
+    46,
+    46
+   ],
+   "statement": "The excluded pcp_name field carried no information: its values were placeholders of the form Dr. Smith-<id>.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The claim describes the content of data that was excluded from the release; the team's engineers never meet it in use, and no way it could be untrue reaches a stated threshold or a part of the buyer's plan. Rated on the scale alone."
+  },
+  {
+   "id": 16,
+   "quote": "The meaningful provider field is `encounters.attending_name`.",
+   "lines": [
+    47,
+    47
+   ],
+   "statement": "Provider information in the released data is carried by the encounters.attending_name field.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "No stated threshold reaches a claim about which field carries provider information, and it falls under no item the buyer depends on. If it failed, the team's engineers would meet the failure while querying the released data and would act on it there. Rated on the scale alone."
+  },
+  {
+   "id": 17,
+   "quote": "`encounters` (5,602 rows",
+   "lines": [
+    51,
+    51
+   ],
+   "statement": "The `encounters` table contains 5,602 rows.",
+   "about": "target",
+   "restates_rejected": 2,
+   "tier": 2,
+   "tier_basis": "A row count in the released database is reached by no stated threshold and no depended-on item. A discrepancy is something the team's engineers would meet and act on while working with the shipped database. Rated on the scale alone."
+  },
+  {
+   "id": 18,
+   "quote": "`encounters` (5,602 rows — one per clinical visit, ~4.4 per patient)",
+   "lines": [
+    51,
+    51
+   ],
+   "statement": "Each `encounters` row corresponds to exactly one clinical visit, and patients average approximately 4.4 encounters each.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "No stated threshold reaches the one-row-per-visit semantics or the per-patient encounter average, and no depended-on item names this part of the release. If it failed, the engineers would meet it while assembling patient timelines and act on it there. Rated on the scale alone."
+  },
+  {
+   "id": 19,
+   "quote": "| Column              | Description                                                                       |\n| ------------------- | --------------------------------------------------------------------------------- |\n| `encounter_id`      | Unique encounter identifier                                                       |\n| `patient_id`        | Foreign key to `patients`                                                         |\n| `encounter_date`    | Date of the visit                                                                 |\n| `encounter_type`    | `outpatient`, `ed`, `inpatient`, `icu`, `telehealth`, `procedure`, or `follow_up` |\n| `chief_complaint`   | Presenting complaint                                                              |\n| `attending_name`    | Attending provider (synthetic)                                                    |\n| `department`        | Clinical department                                                               |\n| `encounter_order`   | 0-based sequence position within the patient's timeline                           |\n| `note_text`         | Full clinical note for the visit                                                  |\n| `generation_method` | `hybrid` (template assembly + LLM prose polish) or `template`                     |",
+   "lines": [
+    54,
+    65
+   ],
+   "statement": "The `encounters` table has the eleven listed columns with the stated semantics: a unique `encounter_id`, `patient_id` as a foreign key to `patients`, `encounter_date`, `encounter_type` restricted to the seven listed values, `chief_complaint`, a synthetic `attending_name`, `department`, a 0-based per-patient `encounter_order`, `note_text` holding the full clinical note, and `generation_method` being either `hybrid` (template assembly plus LLM prose polish) or `template`.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The claim asserts the attending_name field is synthetic; if it failed by the names being real, the released data would not be fully synthetic, which under the buyer's terms ends the adoption and which no engineering effort by the team could cure. Rated against the buyer's stated threshold: \"data that is not fully synthetic\"."
+  },
+  {
+   "id": 20,
+   "quote": "To reconstruct a patient's full record, join on `patient_id` and order by `encounter_order`.",
+   "lines": [
+    68,
+    68
+   ],
+   "statement": "A patient's full visit timeline can be reconstructed from the `encounters` table by joining on `patient_id` and ordering by `encounter_order`.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "No stated threshold reaches this query recipe and no depended-on item names it. If joining and ordering did not reconstruct the timeline, the engineers would meet it while assembling multi-visit data and act on it there. Rated on the scale alone."
+  },
+  {
+   "id": 21,
+   "quote": "| `longitudinal_patients` | 1,268 | Patient profiles (same fields as `patients` above) |",
+   "lines": [
+    76,
+    76
+   ],
+   "statement": "The benchmark database contains a `longitudinal_patients` table with 1,268 rows of patient profiles using the same fields as the `patients` table.",
+   "about": "target",
+   "within": {
+    "source": "scripts/README.md",
+    "id": 4,
+    "statement": "The full benchmark database contains tables including diagnoses, clinical_findings, board_questions, benchmark_ground_truth, longitudinal_patients, and diagnosis_relations."
+   },
+   "tier": 2,
+   "tier_basis": "A table's row count is reached by no stated threshold and no depended-on item. Any discrepancy would be met by the engineers while inspecting the shipped database and acted on there. Rated on the scale alone."
+  },
+  {
+   "id": 22,
+   "quote": "| `longitudinal_encounters` | 5,602 | Encounters with `note_text`",
+   "lines": [
+    77,
+    77
+   ],
+   "statement": "The benchmark database contains a `longitudinal_encounters` table with 5,602 encounters, each carrying `note_text`.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "No stated threshold or depended-on item reaches the existence or row count of this table. A discrepancy is something the team's engineers would meet and act on while using the data. Rated on the scale alone."
+  },
+  {
+   "id": 23,
+   "quote": "`source_question_ids` are opaque integer keys into the annotation tables",
+   "lines": [
+    77,
+    77
+   ],
+   "statement": "In `longitudinal_encounters`, the `source_question_ids` field holds opaque integer keys into the annotation tables.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "in `benchmark_v1.3.db` they are kept as opaque integer keys because the annotation tables are keyed on them",
+     "lines": [
+      108,
+      109
+     ]
+    }
+   ],
+   "tier": 2,
+   "tier_basis": "The nature of this field is reached by no stated threshold and no depended-on item. If the keys were not opaque integers into the annotation tables, the engineers would meet it while interpreting the field and act on it there. Rated on the scale alone."
+  },
+  {
+   "id": 24,
+   "quote": "| `encounter_ehr_sections` | 59,964 | The note split into typed sections (`hpi`, `pmh`, `medications`, `labs`, ...) — the passage unit for retrieval |",
+   "lines": [
+    78,
+    78
+   ],
+   "statement": "The benchmark database contains an `encounter_ehr_sections` table with 59,964 rows holding the notes split into typed sections, which serve as the passage unit for retrieval.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "No stated threshold reaches the row count or the section typing, and no depended-on item names this table. If the sections were not the retrieval passage unit, the engineers would meet that while running the retrieval task and act on it there. Rated on the scale alone."
+  },
+  {
+   "id": 25,
+   "quote": "| `benchmark_ground_truth` | 12,014 | One row per task instance: `task`, `granularity`, `patient_id` / `encounter_id`, `ground_truth` (JSON), `split` |",
+   "lines": [
+    79,
+    79
+   ],
+   "statement": "The benchmark database contains a `benchmark_ground_truth` table with 12,014 rows, one per task instance, carrying task, granularity, patient/encounter ids, ground truth JSON and split.",
+   "about": "target",
+   "within": {
+    "source": "scripts/README.md",
+    "id": 4,
+    "statement": "The full benchmark database contains tables including diagnoses, clinical_findings, board_questions, benchmark_ground_truth, longitudinal_patients, and diagnosis_relations."
+   },
+   "tier": 2,
+   "tier_basis": "The buyer's ground-truth threshold concerns ground truth or scoring not working as described, not a table's existence, row count or columns, and no other threshold or depended-on item reaches those. Any discrepancy would be met and acted on by the engineers while working with the database. Rated on the scale alone."
+  },
+  {
+   "id": 26,
+   "quote": "| `relevance_judgments` | 58,926 | Graded relevance (0–3) of each chart section for the evidence-retrieval instance it belongs to |",
+   "lines": [
+    80,
+    80
+   ],
+   "statement": "The benchmark database contains a `relevance_judgments` table with 58,926 rows of graded relevance (scale 0–3) for chart sections relative to their evidence-retrieval instances.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "A table's row count and the 0–3 relevance scale are reached by no stated threshold and no depended-on item. A discrepancy would be met by the engineers while using the relevance data and acted on there. Rated on the scale alone."
+  },
+  {
+   "id": 27,
+   "quote": "| `imaging_orders` | 1,865 | Underspecified imaging orders for the imaging-indication task, keyed to their ground truth |",
+   "lines": [
+    81,
+    81
+   ],
+   "statement": "The benchmark database contains an `imaging_orders` table with 1,865 underspecified imaging orders for the imaging-indication task, keyed to their ground truth.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "No stated threshold reaches this table's row count or its keying to ground truth, and no depended-on item names it. Any discrepancy would be met and acted on while running the imaging-indication task. Rated on the scale alone."
+  },
+  {
+   "id": 28,
+   "quote": "`diagnoses`, `clinical_findings`, `diagnosis_findings` | 9,623 / 36,620 / 52,082",
+   "lines": [
+    82,
+    82
+   ],
+   "statement": "The knowledge-graph tables have these row counts: `diagnoses` 9,623, `clinical_findings` 36,620, `diagnosis_findings` 52,082.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "Row counts of the knowledge-graph tables are reached by no stated threshold and no depended-on item. Discrepancies would be met by the engineers while inspecting or querying the graph and acted on there. Rated on the scale alone."
+  },
+  {
+   "id": 29,
+   "quote": "The ontology-grounded knowledge graph: diagnoses (ICD-10-CM, SNOMED CT), findings (SNOMED CT, LOINC), and typed diagnosis–finding relations",
+   "lines": [
+    82,
+    82
+   ],
+   "statement": "The knowledge graph is ontology-grounded: diagnoses are coded to ICD-10-CM and SNOMED CT, findings to SNOMED CT and LOINC, and diagnosis–finding relations are typed.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "No stated threshold reaches the ontology coding of the graph — it is not ground truth, scoring, simulator faithfulness, split integrity or provenance — and no depended-on item names it. If the coding differed as described, the engineers would meet it while using the graph and act on it there. Rated on the scale alone."
+  },
+  {
+   "id": 30,
+   "quote": "| `question_findings`, `question_diagnoses`, `board_questions` | 138,777 / 51,075 / 7,003 | Per-source-question annotation links (finding and diagnosis ids with roles) and question metadata (subject, organ system, difficulty).",
+   "lines": [
+    83,
+    83
+   ],
+   "statement": "The benchmark database contains annotation tables with these row counts — `question_findings` 138,777, `question_diagnoses` 51,075, `board_questions` 7,003 — holding per-source-question annotation links and question metadata (subject, organ system, difficulty).",
+   "about": "target",
+   "within": {
+    "source": "scripts/README.md",
+    "id": 4,
+    "statement": "The full benchmark database contains tables including diagnoses, clinical_findings, board_questions, benchmark_ground_truth, longitudinal_patients, and diagnosis_relations."
+   },
+   "tier": 2,
+   "tier_basis": "The row counts and contents of the annotation tables are reached by no stated threshold and no depended-on item. Any discrepancy would be met and acted on by the engineers while working with the annotation data. Rated on the scale alone."
+  },
+  {
+   "id": 31,
+   "quote": "No question text is included",
+   "lines": [
+    83,
+    83
+   ],
+   "statement": "The annotation tables include no question text (a boundary claim about what the release contains).",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "but no question text is included.",
+     "lines": [
+      109,
+      110
+     ]
+    }
+   ],
+   "tier": 2,
+   "tier_basis": "No stated threshold reaches the presence or absence of question text in the annotation tables: it is neither a leakage channel between splits nor a licence, scoring, simulator or validation matter. A person working with the annotation tables would act on the boundary and meet any difference in use, but on its own it changes nothing for the buyer's plan. Rated on the scale alone."
+  },
+  {
+   "id": 32,
+   "quote": "| `release_info` | — | Version, export date, task list, split definitions, and change notes |",
+   "lines": [
+    84,
+    84
+   ],
+   "statement": "The benchmark database contains a `release_info` table recording version, export date, task list, split definitions and change notes.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "No stated threshold reaches the existence or contents of a release_info table. A person setting up the benchmark would read the version and change notes and would notice a missing table, but its absence changes how the release is inspected, not whether the plan holds. Rated on the scale alone."
+  },
+  {
+   "id": 33,
+   "quote": "**Tasks** (`benchmark_ground_truth.task`): `patient_diagnosis` (1,268 instances), `context_summarization` (7,613: 1,268 whole-patient plus 6,345 specialty-conditioned), `evidence_retrieval` (1,268), `imaging_indication` (1,865).",
+   "lines": [
+    86,
+    86
+   ],
+   "statement": "The benchmark's tasks have these instance counts: patient_diagnosis 1,268; context_summarization 7,613 (1,268 whole-patient plus 6,345 specialty-conditioned); evidence_retrieval 1,268; imaging_indication 1,865.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The instance counts fall under the dataset's content and scale, an item the buyer uses rather than depends on, and no stated threshold reaches them. A count error is something the team's engineers can check directly against the shipped database and work around. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 34,
+   "quote": "**Splits** (`benchmark_ground_truth.split`), assigned at the patient level:",
+   "lines": [
+    88,
+    88
+   ],
+   "statement": "Benchmark split labels are assigned at the patient level, not the encounter level.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The claim could be untrue by the split labels being assigned at encounter level, so that one patient's encounters land in both the training pool and the held-out set. That is exactly the leakage the buyer named, and it would invalidate published results and reinforcement-learning training with no repair the team can make. Rated against the buyer's stated threshold: \"leakage between the public, held-out and training splits\"."
+  },
+  {
+   "id": 35,
+   "quote": "| `public` | 200 | 1,859 | The reported benchmark |",
+   "lines": [
+    92,
+    92
+   ],
+   "statement": "The `public` split contains 200 patients and 1,859 instances and is the reported benchmark.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The public split's size and its role as the reported benchmark fall under the dataset content and scale item the buyer uses, and no stated threshold reaches them. An error is checkable against the shipped database and the team runs its own evaluation regardless of which split the project reported. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 36,
+   "quote": "| `heldout` | 268 | 2,536 | Private evaluation set; do not train on it |",
+   "lines": [
+    93,
+    93
+   ],
+   "statement": "The `heldout` split contains 268 patients and 2,536 instances and serves as a private evaluation set that must not be trained on.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The held-out split's size and the instruction not to train on it fall under the dataset content and scale item the buyer uses; no stated threshold reaches them, and the buyer's plan already trains only on the train split. A discrepancy is checkable by the team's engineers in the shipped data. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 37,
+   "quote": "| `train` | 800 | 7,619 | Training pool, including RL with the graph-derived rewards |",
+   "lines": [
+    94,
+    94
+   ],
+   "statement": "The `train` split contains 800 patients and 7,619 instances and is the training pool, usable for reinforcement learning with graph-derived rewards.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "Beyond the counts, the claim asserts the train split is usable for reinforcement learning with graph-derived rewards; if it is not, half the buyer's stated purpose, training the agent on the benchmark, fails, and the team would have to build its own reward service and episode harness rather than repair the split. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 38,
+   "quote": "The held-out split was drawn from the same pool as the training split by stratified sampling over dominant ICD-10 chapter and encounter count (seed 20260922)",
+   "lines": [
+    96,
+    96
+   ],
+   "statement": "The held-out split was sampled from the same patient pool as the training split, using stratified sampling over dominant ICD-10 chapter and encounter count with seed 20260922.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "No way the sampling description could be untrue, a different pool, strata or seed, is material: the actual split membership ships in the database and the membership script and can be inspected, so the description's accuracy changes documentation, not whether the plan holds, and a wrong seed does not un-reproduce a split whose members are recorded. Rated on the scale alone."
+  },
+  {
+   "id": 39,
+   "quote": "membership is in `scripts/build_rl_split.py`",
+   "lines": [
+    96,
+    96
+   ],
+   "statement": "The script `scripts/build_rl_split.py` records the split membership.",
+   "about": "document",
+   "tier": 2,
+   "tier_basis": "This is a claim about a document, and the script is not itself a fact the buyer relies on, such as a licence or ownership text, so it has no route to the buyer. A person determining which patients belong to the reinforcement-learning split would consult the script and meet its absence in use, which is not material on its own. Rated on the scale alone."
+  },
+  {
+   "id": 40,
+   "quote": "Every encounter derives from a distinct source question",
+   "lines": [
+    96,
+    96
+   ],
+   "statement": "Every encounter in the benchmark derives from a distinct source question.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The distinctness of source questions concerns how the released data was built, an item the buyer uses rather than depends on, and no stated threshold reaches it; if encounters shared source questions the team's engineers can detect that in the shipped data, and evaluation on the actual encounters is unaffected. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 41,
+   "quote": "no patient shares source material with any other",
+   "lines": [
+    96,
+    96
+   ],
+   "statement": "No patient shares source material with any other patient (a boundary claim about patient-level independence of the source material).",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The claim could be untrue by some patients sharing source material; where such patients fall in different splits, training would expose the source questions that held-out encounters derive from, contaminating the held-out set in a way the team cannot detect or repair without the project's records. That is a leakage channel of the kind the buyer named. Rated against the buyer's stated threshold: \"leakage between the public, held-out and training splits\"."
+  },
+  {
+   "id": 42,
+   "quote": "source text of any kind (raw source cards, board-question vignettes and answers, fact cards and their links, source EHR sections)",
+   "lines": [
+    98,
+    98
+   ],
+   "statement": "The benchmark database excludes source text of any kind: raw source cards, board-question vignettes and answers, fact cards and their links, and source EHR sections.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The claim could be untrue by the database actually containing some raw source cards, board-question vignettes and answers, fact cards or source EHR sections; that would be source content shipped in the release whose distribution rights are unverified, the licence problem the buyer said ends the adoption and which no engineering effort cures. Rated against the buyer's stated threshold: \"a licence or data-provenance problem, such as source content the project may not distribute\"."
+  },
+  {
+   "id": 43,
+   "quote": "model outputs, and LLM call logs",
+   "lines": [
+    98,
+    98
+   ],
+   "statement": "The benchmark database excludes model outputs and LLM call logs.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "No stated threshold reaches the exclusion of model outputs and LLM call logs; they are neither patient data raising the synthetic-data threshold nor source content raising the licence threshold. A person using the database would act on knowing what it contains and meet any difference in use, which is not material on its own. Rated on the scale alone."
+  },
+  {
+   "id": 44,
+   "quote": "the licensed SNOMED CT / LOINC terminology tables",
+   "lines": [
+    98,
+    98
+   ],
+   "statement": "The licensed SNOMED CT / LOINC terminology tables are not shipped with the benchmark database.",
+   "about": "target",
+   "locations": [
+    {
+     "quote": "The full terminology tables are not included.",
+     "lines": [
+      114,
+      114
+     ]
+    }
+   ],
+   "tier": 1,
+   "tier_basis": "The claim could be untrue by the licensed SNOMED CT / LOINC terminology tables actually being shipped with the database; distributing licensed terminology without holding the licence is a licence problem the buyer said ends the adoption, and the team cannot cure it by removing the tables after relying on the release. Rated against the buyer's stated threshold: \"a licence or data-provenance problem\"."
+  },
+  {
+   "id": 45,
+   "quote": "load your own with `epic_sim.migrate.load_terminology`",
+   "lines": [
+    98,
+    98
+   ],
+   "statement": "The released software contains a function `epic_sim.migrate.load_terminology` intended for loading the SNOMED CT / LOINC terminology tables into the benchmark database.",
+   "about": "target",
+   "within": {
+    "source": "README.md",
+    "id": 61,
+    "statement": "The epic_sim.migrate.load_terminology module with --auto --download-icd10 performs the same terminology load from the host, and its --list option shows what was found"
+   },
+   "tier": 2,
+   "tier_basis": "The loader function falls under terminology handling, an item the buyer uses rather than depends on; if the function were missing or did not work, the team's engineers can obtain the terminology files and load them themselves at modest cost. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 46,
+   "quote": "Relevance judgments are restricted to chart sections; fact-card judgments are not shipped.",
+   "lines": [
+    98,
+    98
+   ],
+   "statement": "Relevance judgments cover chart sections only; judgments of fact cards are not included in the release.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The relevance judgments are the ground truth for the evidence-retrieval task; if the chart-section judgments are absent or not as described, that ground truth does not work as described and the team would have to narrow what it publishes. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+  },
+  {
+   "id": 47,
+   "quote": "the single-encounter diagnosis-accuracy task was retired",
+   "lines": [
+    100,
+    100
+   ],
+   "statement": "Version 1.3 retired the single-encounter diagnosis-accuracy task, which is therefore absent from this release.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The retired single-encounter task is not one of the four tasks the buyer's plan depends on, and no way the claim could be untrue changes the price, the terms or the plan; an engineer configuring evaluation would act on which tasks are present and meet any discrepancy there. Rated on the scale alone."
+  },
+  {
+   "id": 48,
+   "quote": "split labels are `public` / `heldout` / `train` (formerly `val` / `test`)",
+   "lines": [
+    100,
+    100
+   ],
+   "statement": "In version 1.3 the split labels are `public` / `heldout` / `train`, renamed from the former `val` / `test` labels.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The split label names are acted on by anyone selecting data for evaluation or training, but a mismatch is a name difference noticed on first inspection and corrected without changing code, so it changes how the software is set up rather than whether the plan holds. Rated on the scale alone."
+  },
+  {
+   "id": 49,
+   "quote": "the chart text was cleaned of self-contradictory medication and history statements, sentence fragments, leading whitespace, and duplicate problem-list entries, with every note rebuilt from its sections",
+   "lines": [
+    100,
+    100
+   ],
+   "statement": "In version 1.3 the chart text was cleaned of self-contradictory medication and history statements, sentence fragments, leading whitespace and duplicate problem-list entries, and every note was rebuilt from its sections.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the disclosed cleaning was not carried out, the shipped charts would carry the self-contradictory medication and history statements, duplicate problem-list entries and fragments the DATA_CARD says were removed, making the clinical content materially worse than described; the team cannot repair the data itself, and its published results would not support the claims it wants to make. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 50,
+   "quote": "Each patient is formed by deterministically clustering compatible question vignettes into one person (Stage 8a, no LLM), writing a coherent profile from that cluster (Stage 8b, LLM), planning a dated visit timeline (Stage 9a, LLM), and generating each visit note by template assembly plus LLM polish (Stage 9b).",
+   "lines": [
+    104,
+    106
+   ],
+   "statement": "The target contains a generation pipeline implementing the four stated stages: deterministic clustering of compatible question vignettes into one patient without an LLM (Stage 8a), LLM writing of a coherent profile from that cluster (Stage 8b), LLM planning of a dated visit timeline (Stage 9a), and visit-note generation by template assembly plus LLM polish (Stage 9b).",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the release was not built by the pipeline as described — in particular if the profiles and notes were not derived from clustered question vignettes — the clinical content is not what the DATA_CARD says was derived from the education material, and the team could not stand behind the data's provenance in what it publishes; it cannot repair the data itself. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 51,
+   "quote": "Provenance pointers back to source questions (`source_question_ids`) are removed from the profile files",
+   "lines": [
+    107,
+    108
+   ],
+   "statement": "The profile files do not contain the `source_question_ids` provenance pointers; they were removed.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The presence or absence of the provenance pointers matters to an engineer parsing or auditing the profile files, and no way the claim could be untrue defeats an item the buyer depends on: the pointers are identifiers, not shipped content, and the team does not rebuild the data. Rated on the scale alone."
+  },
+  {
+   "id": 52,
+   "quote": "The released data is fully synthetic",
+   "lines": [
+    114,
+    114
+   ],
+   "statement": "The released data is fully synthetic.",
+   "about": "target",
+   "restates_rejected": 7,
+   "tier": 1,
+   "tier_basis": "If the released data is not fully synthetic, the buyer's stated walk-away condition is met and no repair by the team cures it. Rated against the buyer's stated threshold: \"data that is not fully synthetic\"."
+  },
+  {
+   "id": 53,
+   "quote": "The released data is fully synthetic and carries no copyright concern.",
+   "lines": [
+    114,
+    114
+   ],
+   "statement": "The released data carries no copyright concern.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the generated content reproduces protectable source material, the release carries a copyright problem of the kind the buyer says ends adoption, and the team cannot cure it after the fact. Rated against the buyer's stated threshold: \"a licence or data-provenance problem\"."
+  },
+  {
+   "id": 54,
+   "quote": "The profile files contain no terminology codes.",
+   "lines": [
+    114,
+    114
+   ],
+   "statement": "The profile files contain no terminology codes (no ICD-10-CM, LOINC or SNOMED CT codes).",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If untrue because the profiles ship SNOMED CT or LOINC codes the project is not entitled to redistribute, the release would carry a licence problem of the kind the buyer says ends adoption, and shipped ICD codes in patient profiles would put the diagnosis reference where the agent can reach it. Rated against the buyer's stated threshold: \"a licence or data-provenance problem\"."
+  },
+  {
+   "id": 55,
+   "quote": "The benchmark database's knowledge-graph tables carry per-concept ICD-10-CM codes (US public domain), LOINC codes (redistributable with attribution), and SNOMED CT identifiers (concept ids only, no descriptions beyond the display names; use of SNOMED CT content requires a UMLS/affiliate license in non-member countries).",
+   "lines": [
+    114,
+    114
+   ],
+   "statement": "The knowledge-graph tables in the benchmark database carry per-concept ICD-10-CM codes, LOINC codes, and SNOMED CT identifiers only (no descriptions beyond display names).",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the tables do not carry the codes as described, the diagnosis reference and scoring are broken; if the licensing characterizations are wrong — SNOMED CT content beyond identifiers and display names, or LOINC not redistributable — the release carries a licence problem the team cannot repair. Rated against the buyer's stated threshold: \"a licence or data-provenance problem\"."
+  },
+  {
+   "id": 56,
+   "quote": "use of SNOMED CT content requires a UMLS/affiliate license in non-member countries",
+   "lines": [
+    114,
+    114
+   ],
+   "statement": "Use of the SNOMED CT content included in the benchmark requires a UMLS/affiliate license in non-member countries.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the stated licensing condition is wrong in the adverse direction — restrictions broader than disclosed — the team's use of the knowledge-graph's SNOMED CT content would face a licence problem it cannot repair after adoption. Rated against the buyer's stated threshold: \"a licence or data-provenance problem\"."
+  },
+  {
+   "id": 57,
+   "quote": "The simulator's problem-list tool and the `active_problems` field of the chart summary (and the FHIR Condition resource) return the graph-derived correct diagnoses with ICD-10 codes, i.e. the patient-diagnosis reference.",
+   "lines": [
+    118,
+    120
+   ],
+   "statement": "The simulator's problem-list tool, the `active_problems` field of the chart summary, and the FHIR Condition resource are implemented and wired to return the graph-derived correct diagnoses with ICD-10 codes.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the problem-list tool, the active_problems field or the FHIR Condition resource is absent or does not return the graph-derived reference, the ground truth and scoring do not work as described and the team's evaluation results and training rewards are meaningless. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+  },
+  {
+   "id": 58,
+   "quote": "The `/env` endpoints and the Harbor tasks substitute the chart's documented history",
+   "lines": [
+    120,
+    121
+   ],
+   "statement": "The `/env` endpoints and the Harbor tasks are implemented to substitute the chart's documented history in place of the ground-truth diagnoses.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the /env endpoints do not substitute the chart's documented history for the ground-truth diagnoses, the correct diagnoses reach the agent during episodes, contaminating evaluation results and reinforcement-learning rewards; the team would have to filter or fork the simulator's serving layer, which does not preserve the plan. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 59,
+   "quote": "and hide assessment/plan sections",
+   "lines": [
+    121,
+    121
+   ],
+   "statement": "The `/env` endpoints and the Harbor tasks are implemented to hide the assessment/plan sections of the chart.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "If the assessment and plan sections are not hidden, the chart's diagnostic conclusions reach the agent during episodes, contaminating evaluation results and reinforcement-learning rewards; the team would have to filter or fork the simulator's serving layer, which does not preserve the plan. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 60,
+   "quote": "agent evaluations that call the raw tool API directly are not protected",
+   "lines": [
+    121,
+    122
+   ],
+   "statement": "Agent evaluations that call the raw simulator tool API directly are not protected against the label exposure described above.",
+   "about": "target",
+   "tier": 2,
+   "tier_basis": "The claim discloses a limit on evaluations that call the raw tool API, a path the team's plan does not use: it drives the environment and scoring through the /env endpoints and the provided client, which remain protected if the claim holds. If the disclosed boundary were different, engineers choosing a call path would meet it in use, and it would change how they run evaluations, not whether the plan holds. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 61,
+   "quote": "Intended for benchmarking clinical AI agents.",
+   "lines": [
+    124,
+    124
+   ],
+   "statement": "The data's stated intended use is benchmarking clinical AI agents.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim sits under the permitted-use boundary, which the buyer's plan does not touch: the team uses the data only to evaluate and train its agent, not for clinical care. No stated threshold reaches it, and no way it could be untrue would change the price, the terms or the plan. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 63,
+   "quote": "must **not** be used for clinical decision-making or treated as real patient data.",
+   "lines": [
+    124,
+    125
+   ],
+   "statement": "The data must not be used for clinical decision-making or treated as real patient data.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim sits under the permitted-use boundary, which the buyer's plan does not touch: the team does not use the data for clinical decision-making and does not treat it as real patient data. No stated threshold reaches it, so no way it could be untrue is material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 64,
+   "quote": "Clinical content originates in medical education material",
+   "lines": [
+    125,
+    126
+   ],
+   "statement": "The clinical content in the data originates in medical education material.",
+   "about": "target",
+   "tier": 1,
+   "tier_basis": "The claim could be untrue because the clinical content derives from real patient records rather than medical education material; that is data that is not fully synthetic, and under the buyer's stated threshold adoption would end, since no repair by the team cures non-synthetic data. Rated against the buyer's stated threshold: \"data that is not fully synthetic\"."
+  },
+  {
+   "id": 65,
+   "quote": "and may contain simplifications or artifacts of the generation process.",
+   "lines": [
+    126,
+    127
+   ],
+   "statement": "The clinical content may contain simplifications or artifacts of the generation process.",
+   "about": "target",
+   "tier": 3,
+   "tier_basis": "The claim is a hedged disclosure: as worded it fails only if the content is cleaner than described, which leaves the buyer's plan intact, and it sets no bound that worse artifacts could break. No stated threshold reaches it and no way it could be untrue is material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 66,
+   "quote": "load into the simulator with `python -m epic_sim.migrate.sqlite_to_pg`",
+   "lines": [
+    22,
+    22
+   ],
+   "statement": "Running the module python -m epic_sim.migrate.sqlite_to_pg loads the benchmark database into the simulator.",
+   "about": "target",
+   "implied_by": 12,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "This is a documented command the team's engineers would run when loading the benchmark database into the simulator; if it were wrong they would meet the failure during setup and correct it — another module or path — without changing code, so no way it could be untrue is material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 67,
+   "quote": "load your own with `epic_sim.migrate.load_terminology`",
+   "lines": [
+    98,
+    98
+   ],
+   "statement": "Running `epic_sim.migrate.load_terminology` loads the buyer's SNOMED CT / LOINC terminology tables into the benchmark database.",
+   "about": "target",
+   "implied_by": 45,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 2,
+   "tier_basis": "This is a documented command the team's engineers would run to load their own SNOMED CT / LOINC tables; if it were wrong they would meet the failure during setup and load the tables themselves, which the plan treats as cheap, so no way it could be untrue is material. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 68,
+   "quote": "Each patient is formed by deterministically clustering compatible question vignettes into one person (Stage 8a, no LLM), writing a coherent profile from that cluster (Stage 8b, LLM), planning a dated visit timeline (Stage 9a, LLM), and generating each visit note by template assembly plus LLM polish (Stage 9b).",
+   "lines": [
+    104,
+    106
+   ],
+   "statement": "When the generation pipeline runs, each patient it produces is formed by those four stages: deterministic clustering without an LLM, an LLM-written profile, an LLM-planned dated visit timeline, and visit notes produced by template assembly plus LLM polish.",
+   "about": "target",
+   "implied_by": 50,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 3,
+   "tier_basis": "The claim describes how the released data was built; the team adopts the data as shipped and does not rerun the generation pipeline, so its engineers would not meet a failure of these stages in use. No stated threshold reaches it and no way it could be untrue changes the plan. Rated on the practice's reading of the buyer's plan."
+  },
+  {
+   "id": 69,
+   "quote": "The simulator's problem-list tool and the `active_problems` field of the chart summary (and the FHIR Condition resource) return the graph-derived correct diagnoses with ICD-10 codes, i.e. the patient-diagnosis reference.",
+   "lines": [
+    118,
+    120
+   ],
+   "statement": "When the simulator runs, calls to the problem-list tool, reads of the chart summary's `active_problems` field, and reads of the FHIR Condition resource return the graph-derived correct diagnoses with ICD-10 codes — the ground-truth patient-diagnosis reference — exposing the labels.",
+   "about": "target",
+   "implied_by": 57,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "The claim could be untrue because the problem-list tool, the active_problems field or the FHIR Condition resource does not return the graph-derived ground-truth diagnoses with ICD-10 codes; the scoring reference for the diagnosis task would then be missing or wrong, defeating the buyer's evaluation and its reinforcement-learning rewards. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+  },
+  {
+   "id": 70,
+   "quote": "The `/env` endpoints and the Harbor tasks substitute the chart's documented history",
+   "lines": [
+    120,
+    121
+   ],
+   "statement": "When the `/env` endpoints serve a chart or a Harbor task runs, the chart's documented history is substituted for the ground-truth diagnoses in what is returned.",
+   "about": "target",
+   "implied_by": 58,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "The claim could be untrue because the /env endpoints or Harbor tasks serve the ground-truth diagnoses instead of the chart's documented history; the agent under test would then read the labels, contaminating rewards and inflating the results the team publishes, and no repair restores contaminated runs. Rated against the buyer's stated threshold: \"ground truth or scoring that does not work as described\"."
+  },
+  {
+   "id": 71,
+   "quote": "and hide assessment/plan sections",
+   "lines": [
+    121,
+    121
+   ],
+   "statement": "When the `/env` endpoints serve a chart or a Harbor task runs, the assessment/plan sections of the chart are not shown in what is returned.",
+   "about": "target",
+   "implied_by": 59,
+   "property": "behaviour in operation",
+   "approved_by": "behaviour split, automatic",
+   "tier": 1,
+   "tier_basis": "The claim could be untrue because the assessment and plan sections are shown during episodes; the agent could then read the admitting assessment, which carries the diagnosis, contaminating rewards and inflating results, and the team's only remedy — filtering or forking the serving layer — is buyer-side engineering and does not hold the plan. Rated on the practice's reading of the buyer's plan."
+  }
+ ]
+}

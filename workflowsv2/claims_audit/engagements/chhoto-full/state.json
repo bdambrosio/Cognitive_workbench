@@ -28,7 +28,7 @@
   },
   "chain": {
    "value": "done",
-   "at": "2026-09-21T02-17-29Z",
+   "at": "2026-09-25T17-55-52Z",
    "by": "job"
   }
  },
@@ -196,6 +196,152 @@
     {
      "label": "report",
      "pid": 292671,
+     "exit": 0
+    }
+   ]
+  },
+  {
+   "id": "2026-09-23T17-12-25Z",
+   "kind": "chain",
+   "state": "done",
+   "by": "claude 2026-09-23, for Bruce: chain rerun under current METHOD (5d3b7f3c), same frozen surface",
+   "started": "2026-09-23T17-12-25Z",
+   "ended": "2026-09-23T19-29-40Z",
+   "exit": 0,
+   "error": null,
+   "log": "/home/bruce/Downloads/Cognitive_workbench/workflowsv2/claims_audit/engagements/chhoto-full/jobs/2026-09-23T17-12-25Z.log",
+   "steps": [
+    {
+     "label": "audit README.md",
+     "pid": 201573,
+     "exit": 0
+    },
+    {
+     "label": "review README.md",
+     "pid": 205265,
+     "exit": 0
+    },
+    {
+     "label": "audit docs/CLI.md",
+     "pid": 217628,
+     "exit": 0
+    },
+    {
+     "label": "review docs/CLI.md",
+     "pid": 219179,
+     "exit": 0
+    },
+    {
+     "label": "audit docs/INSTALLATION.md",
+     "pid": 219833,
+     "exit": 0
+    },
+    {
+     "label": "review docs/INSTALLATION.md",
+     "pid": 221002,
+     "exit": 0
+    },
+    {
+     "label": "audit docs/TOOLS.md",
+     "pid": 221628,
+     "exit": 0
+    },
+    {
+     "label": "review docs/TOOLS.md",
+     "pid": 222065,
+     "exit": 0
+    },
+    {
+     "label": "audit claim_sources/site_index_html.md",
+     "pid": 222424,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site_index_html.md",
+     "pid": 223261,
+     "exit": 0
+    },
+    {
+     "label": "materiality",
+     "pid": 223708,
+     "exit": 0
+    },
+    {
+     "label": "report",
+     "pid": 223916,
+     "exit": 0
+    }
+   ]
+  },
+  {
+   "id": "2026-09-25T15-20-12Z",
+   "kind": "chain",
+   "state": "done",
+   "by": "claude 2026-09-25, for Bruce: chain rerun under v2.4 + 7261773f, same frozen surface, candidate demo",
+   "started": "2026-09-25T15-20-12Z",
+   "ended": "2026-09-25T17-55-52Z",
+   "exit": 0,
+   "error": null,
+   "log": "/home/bruce/Downloads/Cognitive_workbench/workflowsv2/claims_audit/engagements/chhoto-full/jobs/2026-09-25T15-20-12Z.log",
+   "steps": [
+    {
+     "label": "audit README.md",
+     "pid": 49797,
+     "exit": 0
+    },
+    {
+     "label": "review README.md",
+     "pid": 72971,
+     "exit": 0
+    },
+    {
+     "label": "audit docs/CLI.md",
+     "pid": 81527,
+     "exit": 0
+    },
+    {
+     "label": "review docs/CLI.md",
+     "pid": 82254,
+     "exit": 0
+    },
+    {
+     "label": "audit docs/INSTALLATION.md",
+     "pid": 82907,
+     "exit": 0
+    },
+    {
+     "label": "review docs/INSTALLATION.md",
+     "pid": 83826,
+     "exit": 0
+    },
+    {
+     "label": "audit docs/TOOLS.md",
+     "pid": 84697,
+     "exit": 0
+    },
+    {
+     "label": "review docs/TOOLS.md",
+     "pid": 84866,
+     "exit": 0
+    },
+    {
+     "label": "audit claim_sources/site_index_html.md",
+     "pid": 85265,
+     "exit": 0
+    },
+    {
+     "label": "review claim_sources/site_index_html.md",
+     "pid": 86411,
+     "exit": 0
+    },
+    {
+     "label": "materiality",
+     "pid": 114344,
+     "exit": 0
+    },
+    {
+     "label": "report",
+     "pid": 120937,
      "exit": 0
     }
    ]

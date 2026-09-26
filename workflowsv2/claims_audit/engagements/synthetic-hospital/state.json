@@ -1,0 +1,176 @@
+{
+ "current_intake": null,
+ "current_run": {},
+ "cancelled": {
+  "intakes": [],
+  "runs": []
+ },
+ "stages": {
+  "created": {
+   "value": "done",
+   "at": "2026-09-25T18-54-40Z",
+   "by": "claude 2026-09-25, for Bruce: full end-to-end run, the model's proposals unchanged"
+  },
+  "sorting": {
+   "value": "confirmed",
+   "at": "2026-09-25T18-56-13Z",
+   "by": "claude 2026-09-25, for Bruce: full end-to-end run, the model's proposals unchanged"
+  },
+  "enumeration": {
+   "value": "done",
+   "at": "2026-09-25T20-25-10Z",
+   "by": "job"
+  },
+  "surface": {
+   "value": "frozen",
+   "at": "2026-09-25T20-25-10Z",
+   "by": "claude 2026-09-25, for Bruce: full end-to-end run, the model's proposals unchanged"
+  },
+  "chain": {
+   "value": "done",
+   "at": "2026-09-26T01-13-20Z",
+   "by": "job"
+  }
+ },
+ "jobs": [
+  {
+   "id": "2026-09-25T18-54-42Z",
+   "kind": "sort",
+   "state": "done",
+   "by": "claude 2026-09-25, for Bruce: full end-to-end run, the model's proposals unchanged",
+   "started": "2026-09-25T18-54-42Z",
+   "ended": "2026-09-25T18-56-13Z",
+   "exit": 0,
+   "error": null,
+   "log": "/home/bruce/Downloads/Cognitive_workbench/workflowsv2/claims_audit/engagements/synthetic-hospital/jobs/2026-09-25T18-54-42Z.log",
+   "steps": [
+    {
+     "label": "sort the materials",
+     "pid": 145870,
+     "exit": 0
+    }
+   ]
+  },
+  {
+   "id": "2026-09-25T18-56-37Z",
+   "kind": "enumerate",
+   "state": "done",
+   "by": "claude 2026-09-25, for Bruce: full end-to-end run, the model's proposals unchanged",
+   "started": "2026-09-25T18-56-37Z",
+   "ended": "2026-09-25T20-25-10Z",
+   "exit": 0,
+   "error": null,
+   "log": "/home/bruce/Downloads/Cognitive_workbench/workflowsv2/claims_audit/engagements/synthetic-hospital/jobs/2026-09-25T18-56-37Z.log",
+   "steps": [
+    {
+     "label": "enumerate DATA_CARD.md",
+     "pid": 146002,
+     "exit": 0
+    },
+    {
+     "label": "enumerate README.md",
+     "pid": 146571,
+     "exit": 0
+    },
+    {
+     "label": "enumerate apptainer/README.md",
+     "pid": 151022,
+     "exit": 0
+    },
+    {
+     "label": "enumerate etl/deck_profiles/README.md",
+     "pid": 151214,
+     "exit": 0
+    },
+    {
+     "label": "enumerate etl/pdf_profiles/README.md",
+     "pid": 151391,
+     "exit": 0
+    },
+    {
+     "label": "enumerate etl/stages/EXTENDING.md",
+     "pid": 151585,
+     "exit": 0
+    },
+    {
+     "label": "enumerate harbor/README.md",
+     "pid": 151930,
+     "exit": 0
+    },
+    {
+     "label": "enumerate scripts/README.md",
+     "pid": 155821,
+     "exit": 0
+    },
+    {
+     "label": "mark repeated claims",
+     "pid": 156086,
+     "exit": 0
+    },
+    {
+     "label": "state what the buyer relies on",
+     "pid": 156318,
+     "exit": 0
+    },
+    {
+     "label": "rate the claims into tiers",
+     "pid": 156448,
+     "exit": 0
+    }
+   ]
+  },
+  {
+   "id": "2026-09-25T20-25-10Z",
+   "kind": "chain",
+   "state": "done",
+   "by": "claude 2026-09-25, for Bruce: full end-to-end run, the model's proposals unchanged",
+   "started": "2026-09-25T20-25-10Z",
+   "ended": "2026-09-26T01-13-20Z",
+   "exit": 0,
+   "error": null,
+   "log": "/home/bruce/Downloads/Cognitive_workbench/workflowsv2/claims_audit/engagements/synthetic-hospital/jobs/2026-09-25T20-25-10Z.log",
+   "steps": [
+    {
+     "label": "audit DATA_CARD.md",
+     "pid": 158073,
+     "exit": 0
+    },
+    {
+     "label": "review DATA_CARD.md",
+     "pid": 199901,
+     "exit": 0
+    },
+    {
+     "label": "audit README.md",
+     "pid": 206245,
+     "exit": 0
+    },
+    {
+     "label": "review README.md",
+     "pid": 209237,
+     "exit": 0
+    },
+    {
+     "label": "audit harbor/README.md",
+     "pid": 213926,
+     "exit": 0
+    },
+    {
+     "label": "review harbor/README.md",
+     "pid": 215301,
+     "exit": 0
+    },
+    {
+     "label": "materiality",
+     "pid": 216710,
+     "exit": 0
+    },
+    {
+     "label": "report",
+     "pid": 217482,
+     "exit": 0
+    }
+   ]
+  }
+ ]
+}

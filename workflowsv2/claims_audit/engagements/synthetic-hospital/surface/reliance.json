@@ -1,0 +1,175 @@
+{
+ "at": "2026-09-25T19-49-08Z",
+ "model": "accounts/fireworks/models/glm-5p3-flash",
+ "use": "The buyer is an AI team that builds a clinical AI agent. It is adopting the released benchmark, its data and its EHR simulator \"to evaluate the team's clinical agent and to train it, including reinforcement learning on the training split.\" The team's own engineers will run and operate the benchmark, the data and the simulator; the team commits engineering time and will \"publish results on the benchmark, assuming the README and DATA_CARD are accurate.\" What the team is paying for is \"a valid, reproducible benchmark for clinical agents, with an Epic-faithful FHIR simulator, as the README and DATA_CARD describe it.\"",
+ "items": [
+  {
+   "item": "A valid, reproducible benchmark for clinical agents, as the README and DATA_CARD describe it",
+   "reliance": "depends",
+   "if_it_failed": "If the benchmark is not valid and reproducible as described, the whole basis of the adoption fails, and no local repair by the team's engineers restores it; the team would have to renegotiate the terms or abandon the adoption.",
+   "source": "buyer",
+   "buyer_words": "a valid, reproducible benchmark for clinical agents, with an Epic-faithful FHIR simulator, as the README and DATA_CARD describe it"
+  },
+  {
+   "item": "That all released patient data is fully synthetic, with no real patient data",
+   "reliance": "depends",
+   "if_it_failed": "Adoption ends under the team's stated threshold; no patch by the team could cure data that is not fully synthetic.",
+   "source": "buyer",
+   "buyer_words": "data that is not fully synthetic"
+  },
+  {
+   "item": "Licence and provenance of the release, including the project's right to distribute everything it ships",
+   "reliance": "depends",
+   "if_it_failed": "Adoption ends under the team's stated threshold; the team cannot repair a licence or provenance defect and would have to remove the affected material or walk away.",
+   "source": "buyer",
+   "buyer_words": "a licence or data-provenance problem, such as source content the project may not distribute"
+  },
+  {
+   "item": "Freedom from leakage between the public, held-out and training splits",
+   "reliance": "depends",
+   "if_it_failed": "Published results and any reinforcement-learning training would be invalidated; the team would have to redraw the splits itself, which is costly engineering and may be impossible without the project's sampling records.",
+   "source": "buyer",
+   "buyer_words": "leakage between the public, held-out and training splits"
+  },
+  {
+   "item": "That the ground truth and scoring work as described",
+   "reliance": "depends",
+   "if_it_failed": "The team's evaluation results and training rewards would be meaningless; its engineers could audit and patch the scoring code, but scoring correctness is the core of what it is adopting, so repair would be costly.",
+   "source": "buyer",
+   "buyer_words": "ground truth or scoring that does not work as described"
+  },
+  {
+   "item": "Epic-faithful FHIR simulation in the epic_sim simulator (FHIR R4, OAuth2, RBAC)",
+   "reliance": "depends",
+   "if_it_failed": "Evaluation and training against the simulator would not transfer to the Epic-like deployment setting the team cares about; an Epic-faithful FHIR simulator is the project's core offering and replacing it would be costly for the team.",
+   "source": "buyer",
+   "buyer_words": "a simulator that is not FHIR R4 / OAuth2 / RBAC faithful as claimed"
+  },
+  {
+   "item": "That validation claims in the materials are supported",
+   "reliance": "depends",
+   "if_it_failed": "The team would discount or withdraw reliance on the affected claims and revisit the terms; an unsupported validation claim is not something the team can repair itself.",
+   "source": "buyer",
+   "buyer_words": "a validation claim (such as physician validation) the materials do not support"
+  },
+  {
+   "item": "A training split usable for training the team's agent, including reinforcement learning with graph-derived rewards",
+   "reliance": "depends",
+   "if_it_failed": "Half of the team's stated purpose would fail; it could fall back to evaluation only, which would cost it much of the value it adopted the benchmark for.",
+   "source": "inference",
+   "buyer_words": "to train it, including reinforcement learning on the training split"
+  },
+  {
+   "item": "The reinforcement-learning environment and scoring service: the /env and /score HTTP endpoints, the SyntheticHospitalEnv client, rewards bounded to [0, 1], and token separation so the policy under training holds no credential",
+   "reliance": "depends",
+   "if_it_failed": "The team would have to build its own reward service and episode harness on top of the simulator, which is significant engineering even though the ground truth and metrics are in the open code.",
+   "source": "inference",
+   "buyer_words": "reinforcement learning on the training split"
+  },
+  {
+   "item": "Label hygiene in what the simulator serves during episodes: assessment and plan sections hidden, the problem list showing the chart's documented history rather than ground-truth diagnoses, and ground truth unreachable by the agent",
+   "reliance": "depends",
+   "if_it_failed": "Training rewards would be contaminated and evaluation results inflated; the team would have to filter or fork the simulator's serving layer, which is costly.",
+   "source": "inference",
+   "buyer_words": "ground truth or scoring that does not work as described"
+  },
+  {
+   "item": "Reproducible evaluation runs: deterministic reset by task, split and seed, and the eval.cli run, score, report and matrix commands",
+   "reliance": "depends",
+   "if_it_failed": "The team could not stand behind published numbers; it could pin seeds and rerun experiments itself, but establishing reproducibility unaided would be significant work.",
+   "source": "inference",
+   "buyer_words": "publish results on the benchmark"
+  },
+  {
+   "item": "The released dataset's content and scale (1,268 patients, 5,602 encounters, the profile files in two formats, and the benchmark database's tables)",
+   "reliance": "uses",
+   "if_it_failed": "The team's engineers can inspect the shipped SQLite files themselves cheaply, but if the data is materially thinner than described the benchmark's value to the team drops.",
+   "source": "inference",
+   "buyer_words": "adopting the released benchmark, its data and its EHR simulator"
+  },
+  {
+   "item": "The four benchmark tasks (patient diagnosis, context summarization, evidence retrieval, imaging indication) with their ground truth over multi-visit patient timelines",
+   "reliance": "depends",
+   "if_it_failed": "The team would have to evaluate on fewer tasks and narrow its publication, which costs it much of the benchmark's value; it cannot easily author replacement tasks with credible ground truth.",
+   "source": "inference",
+   "buyer_words": "to evaluate the team's clinical agent"
+  },
+  {
+   "item": "That the evaluation path runs from the distributed database alone, with nothing else to build or fetch",
+   "reliance": "depends",
+   "if_it_failed": "The team's engineers would have to build or fetch the missing pieces before any evaluation, an unwelcome but tractable job for a team of their kind.",
+   "source": "inference",
+   "buyer_words": "a valid, reproducible benchmark for clinical agents"
+  },
+  {
+   "item": "Running the stack with Docker Compose: first-boot Postgres schema creation and benchmark load, Redis, the simulator served on port 8000, and results written to ./results on the host",
+   "reliance": "uses",
+   "if_it_failed": "The team's engineers can fix or replace compose files and entrypoint scripts in about a day; this is commodity glue around the core simulator.",
+   "source": "inference",
+   "buyer_words": "adopting the released benchmark, its data and its EHR simulator"
+  },
+  {
+   "item": "Terminology handling: automatic ICD-10-CM download from CMS, self-loading of SNOMED CT and LOINC from a mounted directory, and the associated UMLS and LOINC licensing",
+   "reliance": "uses",
+   "if_it_failed": "The team's engineers can obtain the files and load them themselves, which is cheap, though using SNOMED CT requires the team to hold a UMLS licence.",
+   "source": "inference",
+   "buyer_words": "a simulator that is not FHIR R4 / OAuth2 / RBAC faithful as claimed"
+  },
+  {
+   "item": "Comparability with the published paper: the documented primary metrics, the locked prompting strategies, and the cited preprint",
+   "reliance": "uses",
+   "if_it_failed": "The team would report under its own documented protocol instead, which weakens but does not destroy the value of its published results.",
+   "source": "inference",
+   "buyer_words": "publish results on the benchmark"
+  },
+  {
+   "item": "Rebuilding or extending the data with the ETL pipeline, including the declarative deck and PDF profiles for ingesting new source material",
+   "reliance": "does_not_use",
+   "if_it_failed": "The team's plan does not touch it: it adopts the release as shipped and does not rebuild the database or ingest new sources.",
+   "source": "inference",
+   "buyer_words": "adopting the released benchmark, its data and its EHR simulator"
+  },
+  {
+   "item": "The methodology, audit and provenance artifacts (the scripts/ directory, the ablation scripts, and per-output records of model and prompt) documenting how the released data was built",
+   "reliance": "uses",
+   "if_it_failed": "The team could still evaluate and train, but would lose its main means of checking how the data was constructed and would have to rely on the preprint or ask the project.",
+   "source": "inference",
+   "buyer_words": "a valid, reproducible benchmark for clinical agents"
+  },
+  {
+   "item": "Alternative packaging: exported Harbor tasks, the Apptainer SIF, and the published all-in-one and with-data images",
+   "reliance": "does_not_use",
+   "if_it_failed": "The team's plan does not touch it: it drives the simulator and the environment endpoints directly rather than through exported task packages or alternate container formats.",
+   "source": "inference",
+   "buyer_words": "adopting the released benchmark, its data and its EHR simulator"
+  },
+  {
+   "item": "The agentic harness in eval/agents and its read-only bash sandbox",
+   "reliance": "uses",
+   "if_it_failed": "If it failed, the team's engineers could drive the environment and scoring endpoints through the provided client instead, at modest cost. The buyer has not said; a person should ask.",
+   "source": "inference",
+   "buyer_words": "to evaluate the team's clinical agent"
+  },
+  {
+   "item": "Distribution mechanics for the data: benchmark_v1.3.db committed to the repository and attached to releases, retrievable by a plain clone without Git LFS",
+   "reliance": "uses",
+   "if_it_failed": "The team can obtain the files another way, such as the release assets or a fresh clone, which is cheap for its engineers.",
+   "source": "inference",
+   "buyer_words": "adopting the released benchmark, its data and its EHR simulator"
+  },
+  {
+   "item": "That the clinical content is as described: derived from medical education material, with the simplifications and generation artifacts the DATA_CARD discloses",
+   "reliance": "depends",
+   "if_it_failed": "If the content is materially worse than described, the team's results would not support the claims it wants to publish; it cannot repair the data itself and would have to restrict its claims or ask the project.",
+   "source": "inference",
+   "buyer_words": "as the README and DATA_CARD describe it"
+  },
+  {
+   "item": "The permitted-use boundary that the data serves benchmarking only and must not be used for clinical decision-making or treated as real patient data",
+   "reliance": "does_not_use",
+   "if_it_failed": "The team's plan does not touch it: it uses the data only to evaluate and train its agent, not for clinical care.",
+   "source": "inference",
+   "buyer_words": "to evaluate the team's clinical agent and to train it"
+  }
+ ]
+}

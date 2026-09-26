@@ -163,3 +163,7 @@ site/media/*.mp4
 
 # Outreach prospect records hold personal data and relationship notes; they stay on this machine.
 workflowsv2/outreach/prospects/
+# Model-comparison and tier-crossing experiment engagements: made by measure/ runs, not client work
+workflowsv2/claims_audit/engagements/cmp-*/
+workflowsv2/claims_audit/engagements/tiercross-*/
+workflowsv2/claims_audit/engagements/*/.logs/

@@ -1,0 +1,52 @@
+# claims-audit engagement: synthetic-hospital
+#
+# Created 2026-09-25T18-54-40Z. The practice fills `claim_sources:` (the documents in the
+# target that carry the seller's claims, by path from the target root) and,
+# where the materials are not under target/, `target:`. `transaction:` and
+# `thresholds:` come from the current intake's blocks.yaml, not from here.
+
+target: target
+
+claim_sources:
+  - DATA_CARD.md
+  - README.md
+  - apptainer/README.md
+  - etl/deck_profiles/README.md
+  - etl/pdf_profiles/README.md
+  - etl/stages/EXTENDING.md
+  - harbor/README.md
+  - scripts/README.md
+
+# Who may open this engagement's pages on the client site, by email. The
+# client is the buyer: letter, intake, claim surface, report. The seller
+# supplies and maintains the materials under target/ on the materials page
+# and sees nothing of the client's pages. An address in both lists has both.
+client_emails: []
+seller_emails: []
+
+retention: keep
+
+transaction: |
+  Client: an illustrative buyer, written by the practice: an AI team that builds a clinical AI agent
+  Acting for the client: the practice
+  Counterparty: the project's authors, as the party whose description is relied on
+  Subject: adopting the released benchmark, its data and its EHR simulator to evaluate the team's clinical agent and to train it, including reinforcement learning on the training split
+  Price and basis: no price; the team would commit engineering time and publish results on the benchmark, assuming the README and DATA_CARD are accurate
+  Structure: adoption of an open-source benchmark
+  Timetable: none; illustrative
+
+thresholds: |
+  Paying for: a valid, reproducible benchmark for clinical agents, with an Epic-faithful FHIR simulator, as the README and DATA_CARD describe it
+  Would change the terms: leakage between the public, held-out and training splits; ground truth or scoring that does not work as described; a simulator that is not FHIR R4 / OAuth2 / RBAC faithful as claimed; a validation claim (such as physician validation) the materials do not support
+  Would end the adoption: a licence or data-provenance problem, such as source content the project may not distribute or data that is not fully synthetic
+
+evidence_excludes:
+  - DATA_CARD.md
+  - README.md
+  - apptainer/README.md
+  - etl/deck_profiles/README.md
+  - etl/pdf_profiles/README.md
+  - etl/stages/EXTENDING.md
+  - harbor/README.md
+  - scripts/README.md
+  - claim_sources/
