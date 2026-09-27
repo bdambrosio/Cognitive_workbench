@@ -287,7 +287,7 @@ Asked once for each firm that fits. You are given the firm's name, kind and prof
 
 Asked when a first message has had no response after about six days. The practice follows up once; if the follow-up also has no response, it stops. You are given the candidate record, the contact record, the first message as it was sent with its date, or a statement that its text was not recorded, and the qualification and the evidence files when the practice has them.
 
-The follow-up is short, usually 40 to 60 words, from Bruce in the first person, in the voice of §11, and written for the reader's understanding as §11 says. It says plainly that it follows his earlier message, and does not describe Tuuyi again. It adds one thing the first message did not say: the comparison in §2 with giving a general-purpose AI model the contents of a data room, the public demo and its link if the first message did not mention it, or another use from §10 that fits the person. It makes not replying easy: if this is not relevant to them, there is no need to answer. It may ask one question under §11 part 5, or none. When the text of the first message was not recorded, you cannot know what the person was told, so say in one sentence what Tuuyi is, from §2. The last two paragraphs of §11 apply.
+The follow-up is short, usually 40 to 60 words, from Bruce in the first person, in the voice of §11, and written for the reader's understanding as §11 says. It says plainly that it follows his earlier message, and does not describe Tuuyi again. It adds one thing the first message did not say: the comparison in §2 with giving a general-purpose AI model the contents of a data room, the public demo and its link if the first message did not mention it, or another use from §10 that fits the person. It makes not replying easy: if this is not relevant to them, there is no need to answer. It may ask one question under §11 part 5, or none. When the text of the first message was not recorded, you cannot know what the person was told, so say in one sentence what Tuuyi is, from §2. The two paragraphs of §11, the ones that begin "The first reviews are free" and "Do not state anything about the person", apply.
 
 | Field | Contents |
 |---|---|
@@ -324,25 +324,26 @@ Emit nothing outside the JSON object.
 
 ## 23. Output: the answer to a reply
 
-Asked after a reply has been recorded under §22. You are given the candidate record, the messages the practice sent, the reply with line numbers, the record of what the reply gives, and the qualification when the practice has one.
+Asked after a reply has been recorded under §22. You are given the candidate record, the messages the practice sent, the reply with line numbers, the record of what the reply gives, the qualification when the practice has one, and the practice's approved answers: what it has approved saying about Tuuyi in answer to questions people ask.
 
 The answer is usually 60 to 90 words, from Bruce in the first person, in the voice of §11, and written for the reader's understanding as §11 says. It thanks the person in a few words, without flattery. It responds to what the person said, and where it refers to that, it uses the person's own words. What it does depends on what the reply gives:
 
 - `opinion`, `new_use`: say what the practice takes from it. When the person proposes a way to describe or position Tuuyi, adopt it if §2 supports it.
 - `objection`: do not argue, and do not repeat the description of Tuuyi. Thank the person for saying so, and say what the practice takes from the objection.
-- `question`: answer it from §2. When §2 does not hold the answer, write the marker `[answer needed]` at that place in the message, and state the question in `assumes`.
+- `question`: answer it from §2 or from the approved answers, in words that fit the question as the person asked it. Reword freely, but state no fact the source does not state and change none it does. When the question is about price, fees, timing or other terms, or when neither §2 nor the approved answers hold the answer, write the marker `[answer needed]` at that place in the message, and list the question in `needed`.
 - `introduction`: thank the person, and ask whether the practice may use their name when it writes to the person they named.
 - `test_case`: propose a small exercise with a fixed scope, on the code or the case offered. Do not mention payment.
 - `meeting`: when the next step recorded for the reply is to accept, accept and ask the person to name a time that suits them. Otherwise leave the meeting for the practice to decide, and say so in `assumes`.
 - `declined`: one line of thanks, and nothing else.
 
-Ask at most one question, which the person can answer in a line, and none when the reply gives `declined`. Offer no use of Tuuyi that neither the person nor an earlier message raised. State nothing about what Tuuyi does beyond §2: when the person credits Tuuyi with something §2 does not say, do not confirm it. The voice and the last two paragraphs of §11 apply.
+Ask at most one question, which the person can answer in a line, and none when the reply gives `declined`. Offer no use of Tuuyi that neither the person nor an earlier message raised. State nothing about what Tuuyi does beyond §2 and the approved answers: when the person credits Tuuyi with something neither says, do not confirm it. The voice of §11 applies, and so do its two paragraphs, the ones that begin "The first reviews are free" and "Do not state anything about the person", except that an answer may say where the work runs and how materials are handled when an approved answer says it.
 
 | Field | Contents |
 |---|---|
 | `takes_up` | One sentence: which parts of the reply the answer responds to, and why those |
 | `message` | The answer. Plain text, no greeting line beyond the person's first name, no signature block beyond "Bruce" |
-| `assumes` | Anything the message takes to be true that you were not shown, and the question behind each `[answer needed]` marker, so the practice can check before sending. Empty when there is nothing |
+| `needed[]` | The question behind each `[answer needed]` marker, one per marker, in the order they appear, each written as a question anyone might ask, without the person's name. Empty when there is no marker |
+| `assumes` | Anything the message takes to be true that you were not shown, so the practice can check before sending. Empty when there is nothing |
 
 Emit nothing outside the JSON object.
 

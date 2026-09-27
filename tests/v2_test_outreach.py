@@ -644,3 +644,20 @@ def test_someone_who_opted_out_is_not_pushed_again_nor_added_again(tmp_path, mon
     with pytest.raises(app.HTTPException):
         app.add(app.Add(name="Jane Smith"))
     assert store.entry_of(cid) is None
+
+
+def test_an_approved_answer_is_added_only_as_edited_and_cancel_writes_nothing(tmp_path, monkeypatch):
+    # Bruce reviews every entry: what is added is his edited text, and Cancel leaves ANSWERS.md as it was.
+    from workflowsv2.outreach import app
+    monkeypatch.setattr(app.runner, "DATA", tmp_path)
+    monkeypatch.setattr(app.runner, "ANSWERS_PATH", tmp_path / "ANSWERS.md")
+    monkeypatch.setattr(app, "today", lambda: "2026-09-27")
+    (tmp_path / "ANSWERS.md").write_text("# Approved answers\n")
+    (tmp_path / "jane_smith").mkdir()
+    (tmp_path / "jane_smith" / "replies.json").write_text(json.dumps([{"note_id": "n1"}, {"note_id": "n2"}]))
+    app.faq(app.Faq(name="Jane Smith", note_id="n1", add=False, question="Q?", answer="A."))
+    assert (tmp_path / "ANSWERS.md").read_text() == "# Approved answers\n"
+    app.faq(app.Faq(name="Jane Smith", note_id="n2", add=True, question="Does it  run the code?", answer="No, it reads it."))
+    text = (tmp_path / "ANSWERS.md").read_text()
+    assert text.startswith("# Approved answers\n\n## Does it run the code?\n\nNo, it reads it.\n")
+    assert [r["faq"] for r in json.loads((tmp_path / "jane_smith" / "replies.json").read_text())] == ["cancelled", "added"]

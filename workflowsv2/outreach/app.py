@@ -250,6 +250,30 @@ def _in_reply(name: str, note_id: str, values: Dict[str, Any]) -> None:
     atomic_write_text(f, json.dumps(have, indent=1, ensure_ascii=False) + "\n")
 
 
+class Faq(BaseModel):
+    name: str
+    note_id: str                       # the reply whose answer filled [answer needed]
+    add: bool                          # False: the practice cancelled; nothing is written
+    question: str = ""
+    answer: str = ""
+
+
+@app.post("/api/faq")
+def faq(body: Faq) -> Dict[str, Any]:
+    """Add the entry the person edited to ANSWERS.md, or record that they
+    cancelled it. Either way the offer is not made again for this reply."""
+    if body.add:
+        if not body.question.strip() or not body.answer.strip():
+            raise HTTPException(422, "a question and an answer are needed")
+        f = runner.ANSWERS_PATH
+        have = f.read_text(encoding="utf-8") if f.is_file() else ""
+        entry = (f"## {' '.join(body.question.split())}\n\n{body.answer.strip()}\n\n"
+                 f"Source: Bruce's answer to {body.name}, {today()}. Checked {today()}.\n")
+        atomic_write_text(f, have.rstrip("\n") + "\n\n" + entry)
+    _in_reply(body.name, body.note_id, {"faq": "added" if body.add else "cancelled", "faq_at": today()})
+    return {"ok": True}
+
+
 class Record(BaseModel):
     record_id: str
 

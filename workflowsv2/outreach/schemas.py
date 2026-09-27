@@ -123,8 +123,9 @@ def followup_schema() -> Dict[str, Any]:
 
 
 def answer_schema() -> Dict[str, Any]:
-    return {"type": "object", "properties": {"takes_up": _STR, "message": _STR, "assumes": _STR},
-            "required": ["takes_up", "message", "assumes"]}
+    return {"type": "object", "properties": {"takes_up": _STR, "message": _STR,
+                                             "needed": {"type": "array", "items": _STR}, "assumes": _STR},
+            "required": ["takes_up", "message", "needed", "assumes"]}
 
 
 def reply_schema() -> Dict[str, Any]:
@@ -274,7 +275,12 @@ def clean_followup(obj: Any) -> Tuple[Dict[str, Any], List[str]]:
 
 
 def clean_answer(obj: Any) -> Tuple[Dict[str, Any], List[str]]:
-    return clean_message(obj, "takes_up", ANSWER_WORDS, "answer")
+    """As clean_message, and `needed`: the question behind each [answer needed]
+    marker (PROSPECT.md §23), which the page offers as a new approved answer."""
+    a, flags = clean_message(obj, "takes_up", ANSWER_WORDS, "answer")
+    needed = (obj or {}).get("needed") if isinstance(obj, dict) else None
+    a["needed"] = [str(q).strip() for q in needed or [] if str(q).strip()]
+    return a, flags
 
 
 def clean_reply(obj: Any, reply_lines: List[str]) -> Tuple[Dict[str, Any], List[str]]:

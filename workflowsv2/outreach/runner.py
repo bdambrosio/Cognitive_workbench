@@ -121,6 +121,9 @@ from utils.file_utils import append_jsonl, atomic_write_text, read_jsonl  # noqa
 logger = logging.getLogger("outreach")
 
 METHOD_PATH = HERE / "method" / "PROSPECT.md"
+#: The practice's approved answers to questions about Tuuyi, read whole by the
+#: answering step (PROSPECT.md §23). Bruce edits it; the page appends to it.
+ANSWERS_PATH = HERE / "method" / "ANSWERS.md"
 DATA = HERE / "prospects"
 STAGES = ("research", "qualify", "draft", "brief")
 #: Words of one evidence file shown to the model, as sorting shows 1500.
@@ -681,6 +684,8 @@ def answer(backend, c: Dict[str, Any], cand_dir: Path, sent: str, rec: Dict[str,
             f"What the reply gives, as recorded:\n\n{json.dumps(gave, indent=1, ensure_ascii=False)}\n\n"
             + (f"The qualification:\n\n" + json.dumps({k: q.get(k) for k in ("prospect_type", "why_person", "use_case")},
                                                        indent=1, ensure_ascii=False) + "\n\n" if q else "")
+            + (f"The practice's approved answers (ANSWERS.md):\n\n{ANSWERS_PATH.read_text(encoding='utf-8')}\n\n"
+               if ANSWERS_PATH.is_file() else "")
             + "This step drafts the practice's answer to the reply. Emit your output per PROSPECT.md §23.")
     for _ in range(2):                                     # asked again once, as `draft` is
         out = _ask(backend, user, schemas.answer_schema(), 16000)

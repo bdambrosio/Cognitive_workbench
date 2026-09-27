@@ -163,7 +163,7 @@ function replyBox(i, label) {
 function answerBox(c, i, r, isLast) {
   // the suggested answer to one reply; only the latest reply's answer can be edited and sent
   const a = r.answer;
-  if (r.answer_sent) return `<div class="meta">Answered ${esc(r.answer_sent)}.</div>`;
+  if (r.answer_sent) return `<div class="meta">Answered ${esc(r.answer_sent)}.</div>` + faqBox(c, i, r);
   if (!a || !isLast) return "";
   const text = r.edited_answer || a.message;
   return `<div class="meta" style="margin:10px 0 0">Suggested answer</div>
@@ -177,6 +177,23 @@ function answerBox(c, i, r, isLast) {
       <button onclick="saveMsg(${i}, 'answer', '${esc(r.note_id)}')">Save edit</button>
       <button class="go" onclick="answerSent(${i}, '${esc(r.note_id)}')">Answer sent</button>
     </div>`;
+}
+function faqBox(c, i, r) {
+  // after an answer that filled [answer needed] is sent: offer it as an approved answer, to edit, add or cancel
+  const needed = (r.answer && r.answer.needed) || [];
+  if (!needed.length || r.faq) return "";
+  const k = `${i}_${esc(r.note_id)}`;
+  return `<div class="card" style="margin-top:8px">
+    <div class="meta" style="margin:0 0 6px">Save as an approved answer? It goes into ANSWERS.md as you leave it here. Leave out prices, fees, timing and other terms.</div>
+    <input id="fq_q${k}" value="${esc(needed.join(" / "))}" placeholder="The question">
+    <textarea id="fq_a${k}" style="min-height:110px; margin-top:6px" placeholder="The answer, written for anyone who asks">${esc(r.edited_answer || r.answer.message)}</textarea>
+    <div class="row"><button class="go" onclick="faq(${i}, '${esc(r.note_id)}', true)">Add</button>
+      <button onclick="faq(${i}, '${esc(r.note_id)}', false)">Cancel</button></div></div>`;
+}
+async function faq(i, note_id, add) {
+  const k = `${i}_${note_id}`;
+  await call("/api/faq", {name: cards[i].name, note_id, add, question: $("fq_q" + k).value, answer: $("fq_a" + k).value});
+  note(add ? "Added to ANSWERS.md." : "Not added."); load();
 }
 const FIELDS = [["title", "Title"], ["firm", "Firm"], ["domain", "Firm web domain, e.g. acme.com"],
                 ["linkedin", "LinkedIn URL"], ["email", "Email"], ["phone", "Phone"], ["location", "Location"]];
