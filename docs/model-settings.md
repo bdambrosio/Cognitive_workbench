@@ -40,6 +40,7 @@ numbers are trusted.**
 | `Qwen3.8-27B` (local) | 0.25 | Bruce, 2026-08-24. Key **narrowed** from the bare `Qwen3.8` on 2026-08-26: that spelling also matched `qwen3.8-flash` and `qwen3.8-max`, handing each a temperature nobody chose |
 | `gemma-4-31B` | 0.25 | Bruce, 2026-08-24 |
 | `DeepSeek-V4-Flash` | 1.0 | publisher, for agentic scenarios |
+| `ember-1` | 1.0 | Bruce, 2026-09-27. **Fireworks publishes no recommendation** — checked the Ember-1 announcement and model page. Its base model's card (Kimi K3) reports evaluations at 1.0, with top_p 1.0 for agentic tasks; Bruce kept the global top_p 0.95. Route `measure/models/fw_ember1_low.yaml` |
 | `nemotron-3-ultra` | 1.0 | publisher (NVIDIA examples run 1.0 / 0.95) |
 | `nemotron-3-super` | 1.0 | Bruce, 2026-08-24, same publisher as Ultra |
 | `minimax-m3` | 1.0 | publisher, 2026-08-26 — the MiniMax-M3 card gives 1.0 / top_p 0.95 as general guidance for best performance, not a benchmark config. Confirmed by Bruce. Their top_p equals our global, so nothing per-model is recorded for it |

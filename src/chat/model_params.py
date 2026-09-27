@@ -96,6 +96,12 @@ MODEL_TEMPERATURE: Dict[str, float] = {
     # temperature 1.0 and top_p 0.95 for its agentic evals. Bruce confirmed
     # 2026-09-12. `v4p1` does not match the V4 key above.
     "deepseek-v4p1-flash": 1.0,
+    # Ember-1 on Fireworks (accounts/fireworks/models/ember-1), Fireworks'
+    # retraining of Kimi K3 for shorter reasoning. NO PUBLISHER RECOMMENDATION
+    # EXISTS: the Fireworks announcement and model page give none (checked
+    # 2026-09-27). Kimi K3's card reports its evaluations at 1.0, top_p 1.0 for
+    # agentic tasks. Bruce chose 1.0 with the global top_p 0.95 on 2026-09-27.
+    "ember-1": 1.0,
     "nemotron-3-ultra": 1.0,
     "nemotron-3-super": 1.0,
     # MiniMax publishes 1.0 / top_p 0.95 as general guidance rather than as a

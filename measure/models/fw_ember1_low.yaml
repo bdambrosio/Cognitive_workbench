@@ -1,0 +1,24 @@
+# Ember-1 served by Fireworks directly, added 2026-09-27: Fireworks'
+# retraining of Kimi K3 to write shorter reasoning ("Research Preview" on
+# serverless, so the artifact behind this id may change).
+#
+# Prescreened 2026-09-27 with the real payload (measure/prescreen.py, direct
+# URL): schema-valid 5/5; low 102-938 completion tokens in 2-17 s, medium
+# 645-773 in 11-13 s; 49-59 tok/s.
+#
+# EFFORT `low`, for gate 3. Kimi K3 documents low / high / max; whether
+# Fireworks honours other values for Ember-1 is not verified.
+#
+# PRICE $3.00 in / $0.30 cached / $15.00 out per M tokens (model page,
+# 2026-09-27), well above the other routes here.
+#
+# TEMPERATURE resolves through src/chat/model_params.py ("ember-1" -> 1.0;
+# no publisher value, Bruce chose it 2026-09-27).
+llm_config:
+  server: local
+  model: "accounts/fireworks/models/ember-1"
+  vllm_url: https://api.fireworks.ai/inference/v1
+  # NAME of the env var holding the bearer token, not the token.
+  api_key: FIREWORKS_API_KEY
+  is_reasoning_model: true
+  reasoning_effort: low
