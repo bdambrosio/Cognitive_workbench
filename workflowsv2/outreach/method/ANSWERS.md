@@ -126,6 +126,6 @@ Checked 2026-09-27.
 Bruce D'Ambrosio, Professor Emeritus of Computer Science/Artificial Intelligence at Oregon State
 University, has worked in artificial intelligence for four decades. He
 founded CleverSet, acquired by Art Technology Group in 2008, and has done
-technical due diligence from both sides of software acquisition.
+technical due diligence from both sides of software acquisitions.
 
 Source: site /about. Checked 2026-09-27.
