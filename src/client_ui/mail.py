@@ -23,6 +23,7 @@ import os
 import smtplib
 import sys
 from email.message import EmailMessage
+from email.utils import make_msgid
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("client_ui.mail")
@@ -44,15 +45,18 @@ def site_url() -> str:
     return os.environ.get("SITE_URL", "http://127.0.0.1:8803").rstrip("/")
 
 
-def send(to: List[str], subject: str, body: str, link: Optional[str] = None) -> Dict[str, Any]:
-    """Send one plain-text notice. `link` is appended on its own line. Returns
-    the record kept in `sent`. Never raises on delivery failure: the site's
-    stages do not depend on mail, so a failed notice is logged and the
-    record says so."""
+def send(to: List[str], subject: str, body: str, link: Optional[str] = None,
+         headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    """Send one plain-text notice. `link` is appended on its own line;
+    `headers` are added to the message as given. Returns the record kept in
+    `sent`, whose `message_id` is the Message-ID header sent. Never raises on
+    delivery failure: the site's stages do not depend on mail, so a failed
+    notice is logged and the record says so."""
     to = [t for t in to if t]
     text = body.rstrip() + (f"\n\n{link}\n" if link else "\n")
     rec: Dict[str, Any] = {"to": to, "subject": subject, "body": text,
-                           "dry_run": dry_run(), "error": None}
+                           "dry_run": dry_run(), "error": None,
+                           "message_id": make_msgid(domain="tuuyi.com")}
     if not to:
         rec["error"] = "no recipient"
         logger.warning("mail: no recipient for %r", subject)
@@ -63,6 +67,9 @@ def send(to: List[str], subject: str, body: str, link: Optional[str] = None) -> 
         msg["From"] = os.environ.get("MAIL_FROM") or os.environ["SMTP_USER"]
         msg["To"] = ", ".join(to)
         msg["Subject"] = subject
+        msg["Message-ID"] = rec["message_id"]
+        for k, v in (headers or {}).items():
+            msg[k] = v
         msg.set_content(text)
         host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
         port = int(os.environ.get("SMTP_PORT", "465"))

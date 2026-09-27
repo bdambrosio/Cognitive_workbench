@@ -39,11 +39,19 @@
   section.empty { display:none; }
   #note { position:fixed; bottom:14px; left:50%; transform:translateX(-50%); background:var(--ink); color:var(--bg); padding:8px 14px; border-radius:6px; display:none; max-width:90%; }
   #runlog { font:12px/1.4 ui-monospace, monospace; color:var(--soft); white-space:pre-wrap; margin-top:8px; }
+  dialog { background:var(--card); color:var(--ink); border:1px solid var(--line); border-radius:8px; max-width:720px; width:92%; }
+  dialog pre { white-space:pre-wrap; font:14px/1.5 system-ui, sans-serif; background:var(--bg); padding:10px; border-radius:6px; }
   .grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   @media (max-width:640px) { .grid { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
+<dialog id="mailbox">
+  <div class="meta" id="mb_head"></div>
+  <pre id="mb_text"></pre>
+  <div class="flag" id="mb_dry"></div>
+  <div class="row"><button class="go" id="mb_send">Confirm send</button><button onclick="$('mailbox').close()">Cancel</button></div>
+</dialog>
 <header>
   <h1>Tuuyi outreach</h1>
   <span id="counts">loading…</span>
@@ -180,7 +188,10 @@ function contactBox(c, i) {
     <div class="grid" style="margin-top:6px">${inputs}</div>
     <div class="row"><input class="grow" id="cf_how${i}" placeholder="How you know them, or who introduced them" value="${esc(c.how_known)}"></div>
     <div class="row"><textarea class="grow" id="cf_description${i}" placeholder="Description" style="min-height:60px">${esc(c.contact.description)}</textarea></div>
-    <div class="row"><button onclick="saveContact(${i})">Save contact</button></div></details>`;
+    <div class="row"><button onclick="saveContact(${i})">Save contact</button>
+      ${c.contact.email ? "" : `<button onclick="findEmail(${i})" title="ask Exa for their work address; about $0.045">Find email</button>`}
+      ${c.opted_out ? `<span class="flag">Asked not to be contacted again.</span>`
+                    : `<button class="stop" onclick="optedOut(${i})" title="they asked not to be contacted again">Opted out</button>`}</div></details>`;
 }
 async function saveContact(i) {
   const values = {};
@@ -192,6 +203,14 @@ function closeRow(i, placeholder) {
   return `<input class="grow" id="why${i}" placeholder="${placeholder}"><button class="stop" onclick="skip(${i})">Close</button>`;
 }
 
+function emailBox(c, i, which) {
+  // the email form of a message: a subject, and a send that shows the whole email first
+  if (!c.email_ok) return c.contact.email ? `<div class="meta">Email not offered: ${esc(c.email_why_not)}.</div>` : "";
+  const ph = which === "draft" ? "Subject" : "Subject (leave empty to reply in the thread of the first email)";
+  return `<div class="row"><input class="grow" id="subj${i}" placeholder="${ph}" value="${esc(which === "draft" ? c.subject : "")}">
+    <button class="go" onclick="previewEmail(${i}, '${which}')">Send email…</button></div>
+    <div class="meta">The email adds a footer with the postal address and an opt-out link.</div>`;
+}
 function card(c, i) {
   const links = [c.linkedin ? `<a href="${esc(c.linkedin)}" target="_blank" rel="noopener">LinkedIn</a>` : "",
                  c.contact.email ? `<a href="mailto:${esc(c.contact.email)}">${esc(c.contact.email)}</a>` : ""].filter(Boolean).join(" · ");
@@ -205,6 +224,7 @@ function card(c, i) {
   if (c.group === "ready") return `<div class="card" id="card${i}">${head}${why}${flags}
     <textarea class="msg" id="msg${i}" oninput="$('w${i}').textContent = words(this.value) + ' words'">${esc(c.message)}</textarea>
     <div class="words" id="w${i}">${words(c.message)} words</div>
+    ${emailBox(c, i, "draft")}
     <div class="row">
       <button onclick="copyMsg(${i})">Copy</button>
       <button onclick="saveMsg(${i}, 'draft')">Save edit</button>
@@ -222,7 +242,7 @@ function card(c, i) {
          <div class="words" id="w${i}">${words(c.followup)} words</div>`
       : `<div class="flag">No follow-up is drafted yet. "Run today's work" drafts it; or write your own here.</div>
          <textarea class="msg" id="msg${i}" style="min-height:100px"></textarea>`;
-    return `<div class="card" id="card${i}">${head}${dates}${body}
+    return `<div class="card" id="card${i}">${head}${dates}${body}${emailBox(c, i, "followup")}
       <div class="row">
         <button onclick="copyMsg(${i})">Copy</button>
         ${c.followup ? `<button onclick="saveMsg(${i}, 'followup')">Save edit</button>` : ""}
@@ -281,7 +301,36 @@ async function load() {
   if (!$("r_kind").options.length) $("r_kind").innerHTML = q.kinds.map(k => `<option>${esc(k)}</option>`).join("");
 }
 async function copyMsg(i) { await navigator.clipboard.writeText($("msg" + i).value); note("Copied. Paste it into LinkedIn, then press Sent."); }
-async function saveMsg(i, which, note_id) { await call("/api/edit", {name: cards[i].name, message: $("msg" + i).value, which, note_id: note_id || ""}); note("Edit saved."); }
+async function saveMsg(i, which, note_id) {
+  const subj = which === "draft" && $("subj" + i) ? {subject: $("subj" + i).value} : {};
+  await call("/api/edit", {name: cards[i].name, message: $("msg" + i).value, which, note_id: note_id || "", ...subj});
+  note("Edit saved.");
+}
+async function previewEmail(i, which) {
+  const ask = {record_id: cards[i].record_id, which, subject: $("subj" + i).value, message: $("msg" + i).value};
+  const m = await call("/api/send_email", ask);
+  if (!m) return;
+  $("mb_head").innerHTML = `From ${esc(m.from)}<br>To ${esc(m.to)}<br>Subject: <b>${esc(m.subject)}</b>`;
+  $("mb_text").textContent = m.text;
+  $("mb_dry").textContent = m.dry_run ? "Dry run: SMTP_PASS is not set, so Confirm send sends nothing and records nothing." : "";
+  $("mb_send").onclick = async () => {
+    $("mb_send").disabled = true;
+    try {
+      const r = await call("/api/send_email", {...ask, confirm: true});
+      note(r.sent ? "Sent, and recorded." : (r.note || "Not sent.")); load();
+    } finally { $("mb_send").disabled = false; $("mailbox").close(); }
+  };
+  $("mailbox").showModal();
+}
+async function optedOut(i) {
+  if (!confirm(`Record that ${cards[i].name} asked not to be contacted again? Nothing will be sent to them after this.`)) return;
+  await call("/api/opted_out", {record_id: cards[i].record_id}); note("Recorded."); load();
+}
+async function findEmail(i) {
+  note("Looking up the address; this takes about ten seconds.");
+  const r = await call("/api/find_email", {record_id: cards[i].record_id});
+  if (r) { note(r.email ? `Found ${r.email} (${r.confidence || "no confidence given"}). Its sources are in a note.` : "No address found."); load(); }
+}
 async function answerSent(i, note_id) {
   const message = $("msg" + i).value.trim();
   if (!message) { note("There is no answer text to record."); return; }

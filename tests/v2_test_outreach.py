@@ -420,6 +420,17 @@ def test_an_email_is_kept_only_when_a_checked_quote_shows_it():
     assert q["email"] == "" and q["email_citations"] == [] and dropped[-1]["in"] == "email"
 
 
+def test_a_region_stands_only_on_a_checked_citation():
+    # The region decides whether the person is emailed; a region the evidence does not show would email them on a guess.
+    ev = {"01_page.md": BODY + ["Jane works from our Boston office."]}
+    shown = {**_qualification(), "region": "us",
+             "region_citations": [_cite("Jane works from our Boston office.", (6, 6))]}
+    q, _ = schemas.clean_qualification(shown, ev)
+    assert q["region"] == "us"
+    q, dropped = schemas.clean_qualification({**shown, "region_citations": [_cite("Jane works from Boston.", (6, 6))]}, ev)
+    assert q["region"] == "unknown" and dropped[-1]["in"] == "region"
+
+
 def test_the_daily_kind_takes_turns_by_date():
     import datetime
     kinds = [runner.next_kind(datetime.date(2026, 9, 21) + datetime.timedelta(days=i))
@@ -580,3 +591,56 @@ def test_the_page_records_an_answer_and_keeps_an_edit(tmp_path, monkeypatch, sto
     assert c["entry"]["stage"] == "Conversation"
     rec = json.loads(log.read_text())[0]
     assert rec["answer_sent"] == "2026-09-21" and rec["answer"]["message"] == "model's answer"
+
+
+def _emailable(tmp_path, monkeypatch, region="us"):
+    """Jane Smith, Ready to contact, with an address and a qualification in `region`."""
+    from workflowsv2.outreach import app
+    monkeypatch.setattr(app.runner, "DATA", tmp_path)
+    monkeypatch.setenv("POSTAL_ADDRESS", "PO Box 1, Town")
+    cid = _person("Jane Smith", "Ready to contact")
+    contacts.update_person(cid, {"email": "jane@acme.example"})
+    (tmp_path / cid).mkdir()
+    (tmp_path / cid / "qualification.json").write_text(json.dumps({"category": "strong", "region": region}))
+    sent = []
+    monkeypatch.setattr(app.mail, "send", lambda *a, **k: sent.append(a) or {"error": None, "dry_run": False,
+                                                                                "message_id": "<m1@tuuyi.com>"})
+    return app, cid, sent
+
+
+def test_an_email_is_sent_only_on_confirm_and_is_recorded_with_its_text(tmp_path, monkeypatch, store):
+    app, cid, sent = _emailable(tmp_path, monkeypatch)
+    ask = dict(record_id=cid, subject="Tuuyi", message="Jane, a line.")
+    shown = app.send_email(app.Email(**ask))
+    assert sent == [] and shown["text"].startswith("Jane, a line.") and "PO Box 1, Town" in shown["text"]
+    app.send_email(app.Email(**ask, confirm=True))
+    assert sent[0][2] == shown["text"]                               # what was read is what went
+    note = store.get(cid)["notes"][-1]
+    assert note["text"] == "Jane, a line." and note["channel"] == "email" and note["message_id"] == "<m1@tuuyi.com>"
+    assert store.stage_of(store.entry_of(cid)) == "Initial sent"
+
+
+def test_no_email_goes_to_someone_who_opted_out_or_is_outside_the_email_regions(tmp_path, monkeypatch, store):
+    app, cid, sent = _emailable(tmp_path, monkeypatch, region="other")
+    ask = dict(record_id=cid, subject="Tuuyi", message="Jane, a line.", confirm=True)
+    with pytest.raises(app.HTTPException):
+        app.send_email(app.Email(**ask))
+    (tmp_path / cid / "qualification.json").write_text(json.dumps({"category": "strong", "region": "us"}))
+    store.opt_out(cid, "2026-09-27")
+    with pytest.raises(app.HTTPException):
+        app.send_email(app.Email(**ask))
+    assert sent == []
+
+
+def test_someone_who_opted_out_is_not_pushed_again_nor_added_again(tmp_path, monkeypatch, store):
+    from workflowsv2.outreach import app
+    cid = _person("Jane Smith", "Initial sent")
+    store.opt_out(cid, "2026-09-27")
+    d = tmp_path / "jane_smith"
+    d.mkdir()
+    (d / "qualification.json").write_text(json.dumps({"category": "strong"}))
+    (d / "draft.json").write_text(json.dumps({"message": "Jane, a line."}))
+    assert runner.push({"name": "Jane Smith"}, d) is None and store.entry_of(cid) is None
+    with pytest.raises(app.HTTPException):
+        app.add(app.Add(name="Jane Smith"))
+    assert store.entry_of(cid) is None

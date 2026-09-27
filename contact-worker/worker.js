@@ -1,8 +1,18 @@
-// Contact form receiver for tuuyi.com. Runs on Cloudflare Workers at
-// tuuyi.com/api/contact. Takes the POST from /contact, checks the Turnstile
-// token, and mails the submission to the practice through the Worker email
-// binding. Nothing is stored. Responds with a redirect back to /contact so
-// the page can show the outcome.
+// Contact form and opt-out receiver for tuuyi.com. Runs on Cloudflare
+// Workers at tuuyi.com/api/contact and tuuyi.com/api/optout.
+//
+// /api/contact takes the POST from /contact, checks the Turnstile token, and
+// mails the submission to the practice through the Worker email binding.
+// Responds with a redirect back to /contact so the page can show the outcome.
+//
+// /api/optout takes a request not to be emailed again, from the form on
+// /optout or from a mail program's one-click unsubscribe (RFC 8058: a POST
+// whose body is "List-Unsubscribe=One-Click", the address in the URL's `e`).
+// It has no Turnstile check, because a one-click POST cannot carry one. It
+// mails the address to the practice, which records it by hand. The form gets
+// a redirect back to /optout; a one-click POST gets 200.
+//
+// Nothing is stored.
 //
 // Bindings (set in deploy.sh): SEND (send_email, destination = the practice's
 // inbox), TURNSTILE_SECRET (secret text).
@@ -12,11 +22,15 @@ import { EmailMessage } from "cloudflare:email";
 const FROM = "contact@tuuyi.com";
 const TO = "info@tuuyi.com";
 const PAGE = "https://tuuyi.com/contact";
+const OPTOUT_PAGE = "https://tuuyi.com/optout";
 const LIMITS = { name: 200, email: 254, company: 300, link: 500, message: 5000 };
 const REASONS = { beta: "Beta claims review", seller: "Seller claims check", contact: "Contact" };
 
 export default {
   async fetch(request, env) {
+    if (new URL(request.url).pathname.startsWith("/api/optout")) {
+      return optout(request, env);
+    }
     if (request.method !== "POST") {
       return Response.redirect(PAGE, 303);
     }
@@ -56,6 +70,37 @@ export default {
   },
 };
 
+async function optout(request, env) {
+  if (request.method !== "POST") {
+    return Response.redirect(OPTOUT_PAGE, 303);
+  }
+  let form;
+  try {
+    form = await request.formData();
+  } catch (e) {
+    form = new FormData();
+  }
+  const oneClick = (form.get("List-Unsubscribe") || "").toString() === "One-Click";
+  const address = ((form.get("e") || new URL(request.url).searchParams.get("e") || "") + "").trim();
+  const done = (query) => oneClick ? new Response(query === "done=1" ? "ok" : "bad request",
+                                                  { status: query === "done=1" ? 200 : 400 })
+                                   : Response.redirect(OPTOUT_PAGE + "?" + query, 303);
+  if (!address || address.length > LIMITS.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
+    return done("error=fields");
+  }
+  const how = oneClick ? "the unsubscribe control of their mail program" : "the form at tuuyi.com/optout";
+  try {
+    await env.SEND.send(new EmailMessage(FROM, TO, message(
+      `[tuuyi.com] opt-out: ${address}`,
+      `Opt-out request\nAddress: ${address}\nSent through: ${how}\n\n` +
+      `Record it on the outreach page: press "Opted out" on this person's card.\n`, null)));
+  } catch (e) {
+    console.log("send failed: " + (e && e.message));
+    return done("error=send");
+  }
+  return done("done=1");
+}
+
 function back(query) {
   return Response.redirect(PAGE + "?" + query, 303);
 }
@@ -80,12 +125,14 @@ function mime(reason, x) {
     `Company: ${x.company || "-"}\n` +
     `Link: ${x.link || "-"}\n\n` +
     `${x.message}\n`;
-  const subject = `[tuuyi.com] ${reason} from ${x.name}`;
-  const replyTo = x.email.replace(/[\r\n<>]/g, "");
+  return message(`[tuuyi.com] ${reason} from ${x.name}`, text, x.email);
+}
+
+function message(subject, text, replyTo) {
   return [
     `From: Tuuyi contact form <${FROM}>`,
     `To: <${TO}>`,
-    `Reply-To: <${replyTo}>`,
+    ...(replyTo ? [`Reply-To: <${replyTo.replace(/[\r\n<>]/g, "")}>`] : []),
     `Subject: =?utf-8?B?${b64(subject)}?=`,
     `Date: ${new Date().toUTCString()}`,
     `Message-ID: <${crypto.randomUUID()}@tuuyi.com>`,

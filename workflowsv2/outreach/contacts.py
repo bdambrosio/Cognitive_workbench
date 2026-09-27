@@ -64,6 +64,9 @@ EVIDENCE_NOTE = "Evidence"
 #: follows. The page writes them with the exact text; the runner reads them.
 SENT_NOTE, FOLLOWUP_NOTE, REPLY_NOTE = "Message sent", "Follow-up sent", "Reply received"
 ANSWER_NOTE = "Answer sent"
+#: The note that records a request not to be contacted again, and the one
+#: that records where an email address found by lookup came from.
+OPTED_OUT_NOTE, EMAIL_FOUND_NOTE = "Opted out", "Email found"
 
 
 class ContactError(RuntimeError):
@@ -286,8 +289,10 @@ def upsert_entry(cid: str, values: Dict[str, Any]) -> Dict[str, Any]:
     return _change(cid, fn)
 
 
-def create_note(cid: str, title: str, text: str) -> Dict[str, Any]:
-    note = {"note_id": uuid.uuid4().hex, "title": title, "date": _today(), "text": text}
+def create_note(cid: str, title: str, text: str, **fields: str) -> Dict[str, Any]:
+    """Add a note. `fields` are kept beside the text, such as the channel and
+    Message-ID of an email, so that `text` stays exactly what was sent."""
+    note = {"note_id": uuid.uuid4().hex, "title": title, "date": _today(), "text": text, **fields}
     _change(cid, lambda c: c.setdefault("notes", []).append(note))
     return note
 
@@ -305,3 +310,16 @@ def not_pursuing(cid: str, reason: str, on: str) -> None:
                                           "date": _today(), "text": reason.strip() + was})
         c["entry"] = None
     _change(cid, fn)
+
+
+def opted_out(cid: str) -> bool:
+    """True when the person asked not to be contacted again (opt_out)."""
+    return any(str(n.get("title") or "").startswith(OPTED_OUT_NOTE) for n in notes(cid))
+
+
+def opt_out(cid: str, on: str) -> None:
+    """Record a request not to be contacted again: a note "Opted out <date>",
+    then the entry removed as not pursued. Nothing is sent to the person
+    afterwards; the page and the runner check `opted_out`."""
+    create_note(cid, f"{OPTED_OUT_NOTE} {on}", "The person asked not to be contacted again.")
+    not_pursuing(cid, "The person asked not to be contacted again.", on)

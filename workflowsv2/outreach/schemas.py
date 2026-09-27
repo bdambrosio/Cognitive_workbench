@@ -16,6 +16,8 @@ TYPES = ("M&A adviser", "Repeat acquirer", "Searcher", "Small PE-family office",
          "Exit or diligence consultant", "Founder preparing a sale", "Connector", "Technical feedback", "none")
 #: Which side of a transaction the person works for (PROSPECT.md §4).
 SIDES = ("buy", "sell", "both", "unknown")
+#: Where the person is based (PROSPECT.md §14); the channel follows from it.
+REGIONS = ("us", "uk_eu", "other", "unknown")
 RELATIONSHIPS = ("Warm", "Cold", "Referral")
 RECOGNITION = ("Unknown", "Weak", "Strong", "Immediate need")
 CATEGORIES = ("strong", "plausible", "weak", "reject")
@@ -99,19 +101,20 @@ def qualification_schema() -> Dict[str, Any]:
         "category": {"type": "string", "enum": list(CATEGORIES)},
         "side": {"type": "string", "enum": list(SIDES)}, "side_citations": _CITATIONS,
         "email": _STR, "email_citations": _CITATIONS,
+        "region": {"type": "string", "enum": list(REGIONS)}, "region_citations": _CITATIONS,
         "why_person": _STR, "why_now": _STR,
         "why_now_citations": _CITATIONS,
         "use_case": _STR, "concerns": _STR, "reject_reason": _STR,
         "better_contact_name": _STR, "better_contact_role": _STR},
         "required": ["answers", "prospect_type", "relationship", "problem_recognition", "category",
-                     "side", "side_citations", "email", "email_citations", "why_person", "why_now", "why_now_citations", "use_case", "concerns",
+                     "side", "side_citations", "email", "email_citations", "region", "region_citations", "why_person", "why_now", "why_now_citations", "use_case", "concerns",
                      "reject_reason", "better_contact_name", "better_contact_role"]}
 
 
 def draft_schema() -> Dict[str, Any]:
     return {"type": "object", "properties": {
-        "angle": _STR, "message": _STR, "rests_on": _CITATIONS, "assumes": _STR},
-        "required": ["angle", "message", "rests_on", "assumes"]}
+        "angle": _STR, "subject": _STR, "message": _STR, "rests_on": _CITATIONS, "assumes": _STR},
+        "required": ["angle", "subject", "message", "rests_on", "assumes"]}
 
 
 def followup_schema() -> Dict[str, Any]:
@@ -206,6 +209,11 @@ def clean_qualification(obj: Any, evidence: Dict[str, List[str]]
         dropped.append({"file": "", "lines": [], "quote": email, "in": "email",
                         "why": "no checked quote contains the address"})
         email, kept_email = "", []
+    # The region decides whether the person may be emailed, so it stands only
+    # on a checked citation.
+    kept_region, bad_region = check_citations(obj.get("region_citations"), evidence)
+    dropped += [{**b, "in": "region"} for b in bad_region]
+    region = obj.get("region") if obj.get("region") in REGIONS and kept_region else "unknown"
 
     def s(key: str) -> str:
         return str(obj.get(key) or "").strip()
@@ -219,6 +227,7 @@ def clean_qualification(obj: Any, evidence: Dict[str, List[str]]
             "category": obj.get("category") if obj.get("category") in CATEGORIES else None,
             "side": obj.get("side") if obj.get("side") in SIDES else "unknown",
             "side_citations": kept_side, "email": email, "email_citations": kept_email,
+            "region": region, "region_citations": kept_region if region != "unknown" else [],
             "why_person": s("why_person"), "why_now": s("why_now"),
             "why_now_citations": kept_now,
             "use_case": s("use_case"), "concerns": s("concerns"),
@@ -243,7 +252,8 @@ def clean_draft(obj: Any, evidence: Dict[str, List[str]]
     words = len(message.split())
     if words > MESSAGE_WORDS:
         flags.append(f"the message is {words} words")
-    return {"angle": str(obj.get("angle") or "").strip(), "message": message,
+    return {"angle": str(obj.get("angle") or "").strip(), "subject": str(obj.get("subject") or "").strip(),
+            "message": message,
             "rests_on": kept, "assumes": str(obj.get("assumes") or "").strip()}, bad, flags
 
 

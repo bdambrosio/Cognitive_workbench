@@ -6,8 +6,15 @@ The page keeps nothing of its own. What it shows comes from the contacts
 (contacts.py: who is at which stage, the notes of each exchange) and from the
 runner's records under prospects/ (the brief, the evidence, the draft); what
 it writes goes to the same two places, and only when a person presses a
-button. It sends no message to anyone: the
-person copies the text into LinkedIn and then presses Sent.
+button. A LinkedIn message is copied by the person into LinkedIn, who then
+presses Sent. An email is sent only by /api/send_email with `confirm` set,
+which the page calls when the person presses Confirm send after reading the
+whole email as it will go; nothing else here sends mail.
+
+Email needs SMTP_USER, SMTP_PASS and MAIL_FROM (bruce@tuuyi.com) and
+POSTAL_ADDRESS in the environment; daily.sh reads them from
+~/.config/tuuyi-outreach.env. Without SMTP_PASS the send is a dry run and
+nothing is recorded.
 
 It binds to 127.0.0.1 and has no login. It is not part of the client site.
 """
@@ -17,6 +24,7 @@ import argparse
 import datetime
 import json
 import logging
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -32,8 +40,9 @@ from fastapi import FastAPI, HTTPException                              # noqa: 
 from fastapi.responses import FileResponse                              # noqa: E402
 from pydantic import BaseModel                                          # noqa: E402
 
-from workflowsv2.outreach import contacts, runner, schemas                # noqa: E402
+from workflowsv2.outreach import contacts, exa, runner, schemas           # noqa: E402
 from utils.file_utils import atomic_write_text                          # noqa: E402
+from client_ui import mail                                              # noqa: E402
 
 logger = logging.getLogger("outreach.app")
 
@@ -48,6 +57,8 @@ GROUP_OF = {"Ready to contact": "ready", "Qualified": "qualified", "Research": "
             "Replied": "replies", "Conversation": "replies"}
 FOLLOWUP_AFTER_DAYS = 6
 CLOSE_AFTER_DAYS = 7
+OPTOUT_URL = "https://tuuyi.com/optout"
+OPTOUT_API = "https://tuuyi.com/api/optout"
 
 app = FastAPI()
 _run: Dict[str, Any] = {"proc": None, "what": None, "started": None}
@@ -128,6 +139,10 @@ def _card(e: Dict[str, Any], stage: str, group: str) -> Dict[str, Any]:
             "category": _text(e, "category"),
             "fit_rationale": _text(e, "fit_rationale"),
             "message": draft.get("edited_message") or draft.get("message"),
+            "subject": draft.get("edited_subject") or draft.get("subject") or "",
+            "opted_out": contacts.opted_out(rid),
+            "email_ok": _email_refusal(rid, local) is None,
+            "email_why_not": _email_refusal(rid, local),
             "flags": ((local.get("qualification") or {}).get("flags", []) + draft.get("flags", [])
                       if group in ("ready", "qualified", "research") else follow.get("flags", [])
                       if group == "followup" else []),
@@ -248,6 +263,105 @@ def conversation(body: Record) -> Dict[str, Any]:
     return {"ok": True}
 
 
+def _email_refusal(cid: str, local: Optional[Dict[str, Any]] = None) -> Optional[str]:
+    """Why this person may not be emailed, or None when they may."""
+    if contacts.opted_out(cid):
+        return "they asked not to be contacted again"
+    if not contacts.get(cid).get("email"):
+        return "no email address"
+    q = (local if local is not None else _local(cid)).get("qualification") or {}
+    if not runner.email_allowed(q):
+        return f"their region ({q.get('region') or 'not recorded'}) is contacted on LinkedIn"
+    if not os.environ.get("POSTAL_ADDRESS", "").strip():
+        return "POSTAL_ADDRESS is not set, and an email must carry it"
+    return None
+
+
+def footer(address: str) -> str:
+    """The text every email ends with: who sent it, the postal address, and how to opt out."""
+    return (f"--\nBruce D'Ambrosio, Tuuyi · {os.environ.get('POSTAL_ADDRESS', '').strip()}\n"
+            f"If you'd rather not hear from me again: {OPTOUT_URL}?e={address}")
+
+
+class Email(BaseModel):
+    record_id: str
+    which: str = "draft"               # or "followup"
+    subject: str
+    message: str
+    confirm: bool = False
+
+
+@app.post("/api/send_email")
+def send_email(body: Email) -> Dict[str, Any]:
+    """Without `confirm`: the email exactly as it would go, for the person to
+    read. With `confirm`: send that email and record it as /api/sent or
+    /api/followup_sent would, with the channel and Message-ID beside the text."""
+    try:
+        why_not = _email_refusal(body.record_id)
+        if why_not:
+            raise HTTPException(409, f"not sent: {why_not}")
+        if body.which not in ("draft", "followup"):
+            raise HTTPException(422, "which must be draft or followup")
+        if not body.message.strip() or (body.which == "draft" and not body.subject.strip()):
+            raise HTTPException(422, "the subject and the message are needed")
+        address = contacts.get(body.record_id)["email"]
+        headers = {"List-Unsubscribe": f"<mailto:info@tuuyi.com?subject=unsubscribe>, <{OPTOUT_API}?e={address}>",
+                   "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"}
+        subject = body.subject.strip()
+        if body.which == "followup":
+            first = [n for n in contacts.notes(body.record_id)
+                     if str(n.get("title") or "").startswith(contacts.SENT_NOTE) and n.get("message_id")]
+            if first:                  # a reply in the thread of the first email
+                headers.update({"In-Reply-To": first[-1]["message_id"], "References": first[-1]["message_id"]})
+                subject = subject or f"Re: {first[-1].get('subject', '')}".strip()
+            if not subject:
+                raise HTTPException(422, "the first message did not go by email: give the follow-up a subject")
+        text = body.message.strip() + "\n\n" + footer(address)
+        shown = {"from": os.environ.get("MAIL_FROM") or os.environ.get("SMTP_USER") or "(not set)",
+                 "to": address, "subject": subject, "text": text, "dry_run": mail.dry_run()}
+        if not body.confirm:
+            return shown
+        rec = mail.send([address], subject, text, headers=headers)
+        if rec["error"]:
+            raise HTTPException(502, f"not sent: {rec['error']}")
+        if rec["dry_run"]:
+            return {**shown, "sent": False, "note": "dry run: SMTP_PASS is not set, so nothing was sent or recorded"}
+        title, stage, action, days = ((contacts.SENT_NOTE, "Initial sent", "Follow up if no response", FOLLOWUP_AFTER_DAYS)
+                                      if body.which == "draft" else
+                                      (contacts.FOLLOWUP_NOTE, "Follow-up sent", "Close if no response", CLOSE_AFTER_DAYS))
+        contacts.create_note(body.record_id, f"{title} {today()}", body.message.strip(), channel="email",
+                             to=address, subject=subject, message_id=rec["message_id"])
+        contacts.upsert_entry(body.record_id, {"stage": stage, "last_contact": today(), "next_action": action,
+                                               "next_action_date": (datetime.date.today() + datetime.timedelta(
+                                                   days=days)).isoformat()})
+    except contacts.ContactError as e:
+        raise HTTPException(422, str(e))
+    return {**shown, "sent": True}
+
+
+@app.post("/api/opted_out")
+def opted_out(body: Record) -> Dict[str, Any]:
+    """The person asked not to be contacted again (the opt-out page mails info@)."""
+    try:
+        contacts.opt_out(body.record_id, today())
+    except contacts.ContactError as e:
+        raise HTTPException(422, str(e))
+    return {"ok": True}
+
+
+@app.post("/api/find_email")
+def find_email(body: Record) -> Dict[str, Any]:
+    """Look up the contact's work address with Exa (about $0.045 a lookup)."""
+    if contacts.opted_out(body.record_id):
+        raise HTTPException(409, "they asked not to be contacted again")
+    try:
+        return runner.look_up_email(body.record_id)
+    except exa.ExaError as e:
+        raise HTTPException(502, f"lookup failed: {e}")
+    except contacts.ContactError as e:
+        raise HTTPException(422, str(e))
+
+
 class Skip(BaseModel):
     record_id: str
     reason: str
@@ -279,6 +393,7 @@ def later(body: Later) -> Dict[str, Any]:
 class Edit(BaseModel):
     name: str
     message: str
+    subject: Optional[str] = None      # for a draft that may go by email
     which: str = "draft"               # or "followup", or "answer" with the reply's note_id
     note_id: str = ""
 
@@ -297,6 +412,8 @@ def edit(body: Edit) -> Dict[str, Any]:
         raise HTTPException(404, f"no {body.which} on record for this person")
     d = json.loads(f.read_text(encoding="utf-8"))
     d["edited_message"], d["edited_at"] = body.message, today()
+    if body.subject is not None:
+        d["edited_subject"] = body.subject
     atomic_write_text(f, json.dumps(d, indent=1, ensure_ascii=False) + "\n")
     return {"ok": True}
 
@@ -324,6 +441,8 @@ def add(body: Add) -> Dict[str, Any]:
         person = contacts.find_person(name) or contacts.create_person(
             name, body.title, body.linkedin, firm=body.firm, domain=body.domain, email=body.email)
         rid = person["id"]
+        if contacts.opted_out(rid):
+            raise HTTPException(409, f"{name} asked not to be contacted again")
         entry = contacts.entry_of(rid)
         if entry is not None and contacts.stage_of(entry) != "Research":
             raise HTTPException(409, f"{name} is already in the list at '{contacts.stage_of(entry)}'")

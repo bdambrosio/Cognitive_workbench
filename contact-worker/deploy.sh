@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Deploy the contact-form Worker to Cloudflare and route tuuyi.com/api/contact
-# to it. Needs: ~/.config/cloudflare/token (API token: Workers Scripts edit,
+# and tuuyi.com/api/optout to it. Needs: ~/.config/cloudflare/token (API token: Workers Scripts edit,
 # Workers Routes edit) and ~/.config/cloudflare/turnstile_tuuyi.json holding
 # {"sitekey": ..., "secret": ...}. Idempotent: re-run after editing worker.js.
 set -euo pipefail
@@ -29,13 +29,15 @@ curl -sS -X PUT "$API/accounts/$ACCOUNT/workers/scripts/$NAME" \
   -F "worker.js=@worker.js;type=application/javascript+module" \
   | python3 -c 'import json,sys; j=json.load(sys.stdin); print(" ok" if j["success"] else j["errors"]); sys.exit(0 if j["success"] else 1)'
 rm -f /tmp/cw-metadata.json
-echo "route"
-EXISTING=$(curl -sS "$API/zones/$ZONE/workers/routes" -H "Authorization: Bearer $TOKEN" \
-  | python3 -c 'import json,sys; print(" ".join(r["id"] for r in json.load(sys.stdin)["result"] if r["pattern"]=="tuuyi.com/api/contact*"))')
-if [ -z "$EXISTING" ]; then
-  curl -sS -X POST "$API/zones/$ZONE/workers/routes" -H "Authorization: Bearer $TOKEN" \
-    -H "Content-Type: application/json" -d "{\"pattern\":\"tuuyi.com/api/contact*\",\"script\":\"$NAME\"}" \
-    | python3 -c 'import json,sys; j=json.load(sys.stdin); print(" created" if j["success"] else j["errors"])'
-else
-  echo " exists ($EXISTING)"
-fi
+for PATTERN in "tuuyi.com/api/contact*" "tuuyi.com/api/optout*"; do
+  echo "route $PATTERN"
+  EXISTING=$(curl -sS "$API/zones/$ZONE/workers/routes" -H "Authorization: Bearer $TOKEN" \
+    | python3 -c 'import json,sys; p=sys.argv[1]; print(" ".join(r["id"] for r in json.load(sys.stdin)["result"] if r["pattern"]==p))' "$PATTERN")
+  if [ -z "$EXISTING" ]; then
+    curl -sS -X POST "$API/zones/$ZONE/workers/routes" -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" -d "{\"pattern\":\"$PATTERN\",\"script\":\"$NAME\"}" \
+      | python3 -c 'import json,sys; j=json.load(sys.stdin); print(" created" if j["success"] else j["errors"])'
+  else
+    echo " exists ($EXISTING)"
+  fi
+done

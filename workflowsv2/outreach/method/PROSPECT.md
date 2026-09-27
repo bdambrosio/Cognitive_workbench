@@ -144,7 +144,7 @@ Within a kind, fit the use to the person's role. Someone who does the diligence 
 
 ## 11. The message
 
-The first message is a LinkedIn message short enough to read in under a minute: aim for about 100 words, and never more than 130. It is from Bruce D'Ambrosio, who runs Tuuyi, in the first person. He is the only person at the practice; another person named Bruce in the evidence is someone else.
+The first message is sent as a LinkedIn message or as an email, and the same text serves both. It is short enough to read in under a minute: aim for about 100 words, and never more than 130. For an email the practice adds a footer with its postal address and a way to opt out; do not write one. It is from Bruce D'Ambrosio, who runs Tuuyi, in the first person. He is the only person at the practice; another person named Bruce in the evidence is someone else.
 
 Write as Bruce would to a professional he respects and has not met: direct, plain, and glad about what the work turns up. He thinks the service is good and shows it with facts, not adjectives. No marketing phrases, no manufactured urgency, no pretence of acquaintance, and nothing whose purpose is to get a reply rather than to say something true.
 
@@ -203,6 +203,8 @@ A **citation** has `file` (the evidence file's name as given), `lines` (the firs
 | `side_citations[]` | The citations `side` rests on when the evidence decides it. Empty when §4 fixes the side, or when it is `unknown` |
 | `email` | The person's own email address when an evidence file shows it, copied exactly. Not a general address of the firm, such as info@. Empty when none is shown |
 | `email_citations[]` | One citation whose quote contains the address. Empty when `email` is empty |
+| `region` | Where the person is based, as the evidence shows it: `us` for the United States; `uk_eu` for the United Kingdom or a country of the European Union; `other` for anywhere else; `unknown` when the evidence does not say. When the evidence shows only where their firm is, use that |
+| `region_citations[]` | One citation to the lines that show where the person is based. Empty when `region` is `unknown` |
 | `relationship` | `Warm` when the relationship note shows the practice already knows the person. `Referral` when the note names someone who introduced the person or suggested them. `Cold` otherwise, including when there is no note |
 | `problem_recognition` | How far the evidence shows the person recognises a problem Tuuyi addresses (§5). `Unknown`: the evidence does not say. `Weak`: they discuss diligence or software risk in general terms. `Strong`: they have stated such a problem. `Immediate need`: they have stated it about a transaction or decision that is under way now |
 | `category` | One of `strong`, `plausible`, `weak`, `reject` (§8) |
@@ -224,6 +226,7 @@ Asked only for a candidate the qualification found `strong`. You are given the c
 | Field | Contents |
 |---|---|
 | `angle` | One sentence: the use from §10 the message offers, and why that one |
+| `subject` | The subject line, used when the message is sent by email: a few plain words that say what the message is about. Nothing the message does not support, and no question written to get an answer |
 | `message` | The message, per §11. Plain text, no greeting line beyond the person's first name, no signature block beyond "Bruce" |
 | `rests_on[]` | The citations, in the form given in §14, for each thing the message states about the person or their work beyond their role. Empty when the message states nothing beyond their role, or rests on the relationship note alone |
 | `assumes` | Anything the message takes to be true that the evidence does not show outright, so the practice can check it before sending. Empty when there is nothing |
@@ -367,7 +370,7 @@ Record each response by what it gives, under the names in §22. The answer is dr
 
 For every prospect surfaced, the contact system holds: name, role, organisation, kind of prospect, links, why this person, why now, the use proposed, concerns, relationship context, the channel, the date, the exact message sent, the response, the follow-up date, and any introduction or next action. Another person should be able to see why the approach was made without repeating the research.
 
-A day's output is normally two to four prospects, and fewer when fewer meet the standard in §1.
+A day's output is normally five strong prospects, and fewer when fewer meet the standard in §1.
 
 ## 28. What to learn from the responses
 

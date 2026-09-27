@@ -28,6 +28,9 @@ if ! curl -s -m 5 "http://127.0.0.1:5000/v1/models" > /dev/null; then
 fi
 
 if ! curl -s -m 5 "http://127.0.0.1:$PORT/api/run" > /dev/null; then
+  # The page's email settings (SMTP_USER, SMTP_PASS, MAIL_FROM, POSTAL_ADDRESS);
+  # without the file the page offers no email and sends nothing.
+  [ -f "$HOME/.config/tuuyi-outreach.env" ] && { set -a; . "$HOME/.config/tuuyi-outreach.env"; set +a; }
   setsid nohup "$PY" "$REPO/workflowsv2/outreach/app.py" --port "$PORT" > "$LOG/app.log" 2>&1 < /dev/null &
   echo "Started the page."
 fi

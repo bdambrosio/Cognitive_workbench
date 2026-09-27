@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stop emails — Tuuyi</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="stylesheet" href="/site.css?v=20260925">
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="/">Tuuyi</a>
+  <nav><a href="/">Home</a><a href="/how-it-works">How it works</a><a href="/pricing">Pricing</a><a href="/demo">Demo</a><a href="/sellers">For sellers</a><a href="/about">About</a><a class="pill" href="/pricing">Beta: free claims reviews, limited</a></nav>
+</header>
+<main>
+
+<h1>Stop emails from Tuuyi.</h1>
+<p class="lede">Press the button and Tuuyi will not email this address again.</p>
+
+<div class="notice" id="done" hidden><p><strong>Done.</strong> Tuuyi will not email this address again. You don't need to do anything else.</p></div>
+<div class="notice error" id="err-fields" hidden><p><strong>Not recorded.</strong> That does not look like an email address. Please check it and try again.</p></div>
+<div class="notice error" id="err-send" hidden><p><strong>Not recorded.</strong> Something failed on our side. Please write to <span class="mono">info@tuuyi.com</span> with the word "unsubscribe", and we will stop.</p></div>
+
+<form class="contact" id="optout" method="post" action="/api/optout">
+  <label>Email address <input name="e" id="e" type="email" required maxlength="254" autocomplete="email"></label>
+  <p><button class="btn primary" type="submit">Stop emails to this address</button></p>
+</form>
+
+<p class="note">The address goes by email to the practice and nowhere else; see <a href="/privacy">Privacy</a>.</p>
+
+</main>
+<footer>
+  <div>© 2026 Tuuyi · <a href="/contact">Contact</a></div>
+  <div><a href="/privacy">Privacy</a><a href="/demo">Demo</a><a href="/about">About</a></div>
+</footer>
+</div>
+<script>
+// Fill in the address from the link in the email, and show the outcome the
+// receiver reported in the query string after a submission.
+(function () {
+  const q = new URLSearchParams(location.search);
+  if (q.get("e")) document.getElementById("e").value = q.get("e");
+  const show = q.get("done") ? "done" : q.get("error") ? "err-" + q.get("error") : null;
+  if (!show) return;
+  const el = document.getElementById(show);
+  if (el) el.hidden = false;
+  if (show === "done") document.getElementById("optout").hidden = true;
+})();
+</script>
+</body>
+</html>

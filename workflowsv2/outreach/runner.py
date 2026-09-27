@@ -485,6 +485,36 @@ CATEGORIES_PUSHED = ("strong", "plausible", "weak", "reject")
 OURS = (None, "Research")
 
 
+#: The regions (PROSPECT.md §14) where the practice sends a first message by
+#: email. Anyone else is approached on LinkedIn, unless the evidence shows
+#: their own address, which they published themselves.
+EMAIL_REGIONS = ("us", "uk_eu")
+
+
+def email_allowed(q: Dict[str, Any]) -> bool:
+    """Whether the practice may email the person the qualification `q` is about."""
+    return q.get("region") in EMAIL_REGIONS or bool(q.get("email"))
+
+
+def look_up_email(cid: str) -> Dict[str, Any]:
+    """Ask Exa for the work address of a contact who has none; write it to the
+    contact with a note saying where it came from. Returns what Exa gave.
+    Raises exa.ExaError when the lookup fails."""
+    person = contacts.get(cid)
+    if person.get("email"):
+        return {"email": person["email"], "sources": [], "confidence": "", "cost": 0, "run": ""}
+    found = exa.find_email(person["name"], str(person.get("firm") or ""), str(person.get("title") or ""),
+                           str(person.get("linkedin") or ""))
+    logger.info("%s: email lookup gave %r (%s, $%s)", person["name"], found["email"], found["confidence"], found["cost"])
+    if found["email"]:
+        contacts.update_person(cid, {"email": found["email"]})
+        contacts.create_note(cid, f"{contacts.EMAIL_FOUND_NOTE} {today()}",
+                             f"Exa's lookup gave {found['email']} (confidence: {found['confidence'] or 'not given'}; "
+                             f"cost ${found['cost']}; run {found['run']}). The sources it cites, which need not show "
+                             "the address itself:\n" + "\n".join(found["sources"] or ["(none)"]))
+    return found
+
+
 def push(c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]]:
     """Write one qualified candidate into the contacts: the list stage for its
     category, the rationale and the three selects, and for a strong or
@@ -508,8 +538,17 @@ def push(c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]]:
         person = contacts.create_person(c["name"], str(c.get("title") or ""), linkedin,
                                         firm=str(c.get("firm") or ""), domain=firm_domain(c))
     rid = person["id"]
+    if contacts.opted_out(rid):
+        logger.info("%s: asked not to be contacted again; nothing is pushed", c["name"])
+        _write_json(cand_dir / "pushed.json", {"at": today(), "contact_id": rid, "opted_out": True})
+        return None
     if q.get("email") and not person.get("email"):
         contacts.update_person(rid, {"email": q["email"]})   # an address a checked quote shows; never overwrites
+    elif category == "strong" and email_allowed(q) and not person.get("email"):
+        try:
+            look_up_email(rid)
+        except exa.ExaError as e:
+            logger.warning("%s: email lookup failed: %s", c["name"], e)
     entry = None if created else contacts.entry_of(rid)
     if entry is not None and contacts.stage_of(entry) not in OURS:
         logger.info("%s: the entry is at '%s', set by a person; left alone", c["name"], contacts.stage_of(entry))
