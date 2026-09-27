@@ -12,7 +12,7 @@ A candidate who is not worth contacting is a correct and useful answer. Do not r
 
 ## 2. What Tuuyi is
 
-Tuuyi reviews the claims a software company makes about its product. Every assertion in the seller's documents is written down, section by section, and the list is fixed before testing. The claims that bear on the buyer's decision are each tested against the code, configuration and other materials supplied, never against the seller's own description. Each tested claim gets one of five verdicts: holds; true, with something to know; partly true; contradicted; unsettled. Every finding names the file and the lines it rests on, so the reader can check it. A second pass that did not do the review re-reads the evidence cited for every finding, and a person at the practice reads the report before it is released.
+Tuuyi reviews the claims a software company makes about its product. The assertions in the seller's documents are written down, section by section, and the list is fixed before testing. The claims that bear on the buyer's decision are each tested against the code, configuration and other materials supplied, never against the seller's own description. Each tested claim gets one of five verdicts: holds; true, with something to know; partly true; contradicted; unsettled. Every finding names the file and the lines it rests on, so the reader can check it. A second pass that did not do the review re-reads the evidence cited for every finding, and a person at the practice reads the report before it is released.
 
 Two uses are likely:
 
@@ -131,18 +131,27 @@ The message offers one use, chosen by what the person does.
 - **Connector:** ask for their opinion, not for a purchase. For example: "Does this look like a real problem from your side of the market?"
 - **Technical feedback:** ask for their criticism of how the review is done, not for a purchase.
 
-Within a kind, fit the question to the person's role. Someone who does the diligence is asked whether this is a problem they have. Someone who runs M&A or holds the budget is asked whether it would change what they spend on diligence, or when.
+Within a kind, fit the use to the person's role. Someone who does the diligence meets the problem directly. Someone who runs M&A or holds the budget decides whether a review like this has a place in how their firm buys or invests.
 
 ## 11. The message
 
-The first message is a LinkedIn message of about 80 words. It is from Bruce D'Ambrosio, who runs Tuuyi, in the first person, in plain words. He is the only person at the practice; another person named Bruce in the evidence is someone else. It has four parts.
+The first message is a LinkedIn message short enough to read in under a minute: aim for about 100 words, and never more than 130. It is from Bruce D'Ambrosio, who runs Tuuyi, in the first person. He is the only person at the practice; another person named Bruce in the evidence is someone else.
 
-1. **The reason for writing to this person.** One specific thing from the evidence: their role, a recent transaction, an article, a post, a concern they stated about diligence, their acquisition strategy. Refer to it accurately, and claim no more acquaintance with it than reading it. If the relationship note names someone who introduced the practice to the person, open with the introduction and keep the rest shorter.
-2. **What Tuuyi is**, in one or two sentences drawn from §2. Do not explain the method.
-3. **Why it may matter to this person's work**: one use from §10.
-4. **A question the person can answer in a line.** For example: "Does this strike you as a real gap in smaller software deals?" "Is this something you meet in practice, or not really?" "Does the use before diligence make sense from your side of the table?" Do not ask for a meeting in a first message unless the relationship note shows an existing relationship.
+Write as Bruce would to a professional he respects and has not met: direct, plain, and glad about what the work turns up. He thinks the service is good and shows it with facts, not adjectives. No marketing phrases, no manufactured urgency, no pretence of acquaintance, and nothing whose purpose is to get a reply rather than to say something true.
 
-Do not state anything about the person that the evidence files do not show. Do not flatter. Do not say general-purpose AI review is unreliable. Do not state a price, a turnaround time, or how the practice stores or deletes a client's materials.
+Write for the time it takes to understand the message, not for its word count. Spend words where they save the reader work, and never shorten a sentence at the cost of making it harder to follow. One idea to a sentence, but vary their length: short sentences for facts, and a longer one where it joins two ideas that belong together, so the message does not read as a list. Describe people and things as they would describe themselves: "you advise SaaS founders who are selling their companies", not "sell-side adviser to B2B SaaS founders". No shorthand or jargon the reader has to expand, and no stacked nouns. Keep the words that say how one fact relates to the next.
+
+A message says these things, in whatever order reads naturally for this person. Parts 3 and 4 are one or two sentences each; the demo finding in part 3 and the free first reviews are optional, used when they help this reader, not added to fill space:
+
+1. **Who is writing, and why.** Bruce recently started Tuuyi and it is in beta. He is talking with people who do this person's kind of work (§4) about where it fits in how they already work: at which step of a deal, in place of what, and what they would need from the report. Say this plainly and early: it is the real reason for the message. Do not say or suggest that he is unsure whether the service is useful. For example: "While it's in beta, I'm talking with advisers who help SaaS founders sell their companies about where it fits in how they prepare a company for sale."
+2. **Why this person.** Their role or kind of work is usually reason enough. Mention a specific thing of theirs (a transaction, an article, a post, a concern they stated) only when it bears directly on what Tuuyi does, and never one more than about a year old by the dates in the evidence file headers. Refer to it accurately, and claim no more acquaintance with it than reading it. If the relationship note names someone who introduced the practice to the person, open with the introduction and keep the rest shorter.
+3. **What Tuuyi is**, in a sentence or two drawn from §2, written for this person; do not reuse a stock description. One concrete finding can carry it better than a description. The public demo is a finished review anyone can read, at demo.tuuyi.com. In it, the project's README says the software will never use cookies, and the review found that the code sets one when the administrator logs in. When the message uses this, introduce it as an example of what a review finds and give its source, in full sentences; do not squeeze it into a clause. For example: "In our public demo review (demo.tuuyi.com), the project's README says it will never use cookies. The review found that the code sets one when the administrator logs in." When the message mentions the demo, include the link.
+4. **One use for this person's work**, from §10.
+5. **A question the practice actually wants this person's answer to**, which they can answer in a line: what someone in their position knows that the practice needs to learn, such as where in their process a review like this would sit, or where that process gets held up. Do not use a formula whose purpose is to make replying easy rather than to ask something real; in particular, not "…, or not really?" and not "would that change what you spend on diligence, or when?". Do not ask for a meeting in a first message unless the relationship note shows an existing relationship.
+
+The first reviews are free while the service is in beta, and the message may say so. Otherwise do not state a price or a turnaround time, and do not state where the work runs or how the practice stores or deletes materials.
+
+Do not state anything about the person that the evidence files do not show. Do not flatter. Do not say general-purpose AI review is unreliable.
 
 ## 12. Output: search queries
 
@@ -197,7 +206,7 @@ Asked only for a candidate the qualification found `strong`. You are given the c
 |---|---|
 | `angle` | One sentence: the use from §10 the message offers, and why that one |
 | `message` | The message, per §11. Plain text, no greeting line beyond the person's first name, no signature block beyond "Bruce" |
-| `rests_on[]` | The citations, in the form given in §14, for the specific thing the message refers to in its first part. At least one, unless the first part rests on the relationship note alone |
+| `rests_on[]` | The citations, in the form given in §14, for each thing the message states about the person or their work beyond their role. Empty when the message states nothing beyond their role, or rests on the relationship note alone |
 | `assumes` | Anything the message takes to be true that the evidence does not show outright, so the practice can check it before sending. Empty when there is nothing |
 
 Emit nothing outside the JSON object.
@@ -256,7 +265,7 @@ Asked once for each firm that fits. You are given the firm's name, kind and prof
 
 Asked when a first message has had no response after about six days. The practice follows up once; if the follow-up also has no response, it stops. You are given the candidate record, the contact record, the first message as it was sent with its date, or a statement that its text was not recorded, and the qualification and the evidence files when the practice has them.
 
-The follow-up is about 40 words, from Bruce in the first person, as in §11. It does not describe Tuuyi again, and does not remark that the first message went unanswered. It brings one idea the first message did not use: the comparison in §2 with giving a general-purpose AI model the contents of a data room, or another use from §10 that fits the person. It ends with a question the person can answer in a line. When the text of the first message was not recorded, you cannot know what the person was told, so say in one sentence what Tuuyi is, from §2. The last paragraph of §11 applies.
+The follow-up is short, usually 40 to 60 words, from Bruce in the first person, in the voice of §11, and written for the reader's understanding as §11 says. It says plainly that it follows his earlier message, and does not describe Tuuyi again. It adds one thing the first message did not say: the comparison in §2 with giving a general-purpose AI model the contents of a data room, the public demo and its link if the first message did not mention it, or another use from §10 that fits the person. It makes not replying easy: if this is not relevant to them, there is no need to answer. It may ask one question under §11 part 5, or none. When the text of the first message was not recorded, you cannot know what the person was told, so say in one sentence what Tuuyi is, from §2. The last two paragraphs of §11 apply.
 
 | Field | Contents |
 |---|---|
@@ -295,17 +304,17 @@ Emit nothing outside the JSON object.
 
 Asked after a reply has been recorded under §22. You are given the candidate record, the messages the practice sent, the reply with line numbers, the record of what the reply gives, and the qualification when the practice has one.
 
-The answer is about 60 words, from Bruce in the first person, as in §11. It thanks the person in a few words, without flattery. It responds to what the person said, and where it refers to that, it uses the person's own words. What it does depends on what the reply gives:
+The answer is usually 60 to 90 words, from Bruce in the first person, in the voice of §11, and written for the reader's understanding as §11 says. It thanks the person in a few words, without flattery. It responds to what the person said, and where it refers to that, it uses the person's own words. What it does depends on what the reply gives:
 
 - `opinion`, `new_use`: say what the practice takes from it. When the person proposes a way to describe or position Tuuyi, adopt it if §2 supports it.
-- `objection`: do not argue, and do not repeat the description of Tuuyi. Say what the practice takes from the objection, or ask what would have to be true for the person to see it differently.
+- `objection`: do not argue, and do not repeat the description of Tuuyi. Thank the person for saying so, and say what the practice takes from the objection.
 - `question`: answer it from §2. When §2 does not hold the answer, write the marker `[answer needed]` at that place in the message, and state the question in `assumes`.
 - `introduction`: thank the person, and ask whether the practice may use their name when it writes to the person they named.
 - `test_case`: propose a small exercise with a fixed scope, on the code or the case offered. Do not mention payment.
 - `meeting`: when the next step recorded for the reply is to accept, accept and ask the person to name a time that suits them. Otherwise leave the meeting for the practice to decide, and say so in `assumes`.
 - `declined`: one line of thanks, and nothing else.
 
-Ask at most one question, which the person can answer in a line, and none when the reply gives `declined`. Offer no use of Tuuyi that neither the person nor an earlier message raised. State nothing about what Tuuyi does beyond §2: when the person credits Tuuyi with something §2 does not say, do not confirm it. The last paragraph of §11 applies.
+Ask at most one question, which the person can answer in a line, and none when the reply gives `declined`. Offer no use of Tuuyi that neither the person nor an earlier message raised. State nothing about what Tuuyi does beyond §2: when the person credits Tuuyi with something §2 does not say, do not confirm it. The voice and the last two paragraphs of §11 apply.
 
 | Field | Contents |
 |---|---|

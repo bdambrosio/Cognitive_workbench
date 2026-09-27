@@ -113,13 +113,20 @@ def test_draft_only_for_strong_and_flags(tmp_path, monkeypatch):
     assert runner.draft(Backend(), CAND, tmp_path) is None and len(seen) == 1
 
     monkeypatch.setattr(runner, "emit", _fake([_qualification(), {
-        "angle": "Review before diligence.", "message": "word " * 120,
+        "angle": "Review before diligence.", "message": "word " * 150,
         "rests_on": [], "assumes": ""}], seen))
     runner.qualify(Backend(), CAND, tmp_path)
     d = runner.draft(Backend(), CAND, tmp_path)
     assert "PROSPECT.md §15" in seen[-1]["user"]
-    assert len(d["flags"]) == 2                              # no checked citation, and too long
+    assert d["flags"] == ["the message is 150 words"]        # no citation is allowed (§15)
     assert "Suggested message" in runner.brief(CAND, tmp_path)
+
+    monkeypatch.setattr(runner, "emit", _fake([{
+        "angle": "Review before diligence.", "message": "Jane, a short message.",
+        "rests_on": [{"file": "01.txt", "lines": [1, 1], "quote": "words the page does not hold"}],
+        "assumes": ""}], seen))
+    d = runner.draft(Backend(), CAND, tmp_path)
+    assert d["flags"] == ["a fact the message states about the person rests on no checked citation"]
 
 
 def test_research_saves_pages_and_leaves_out_another_person(tmp_path, monkeypatch):
@@ -430,10 +437,10 @@ def test_followup_prompt_record_and_flags(tmp_path, monkeypatch):
     assert "Jane, I read your post." in seen[0]["user"] and "stage 'Initial sent'" in seen[0]["user"]
     assert rec["first_message_recorded"] and not rec["flags"]
     assert json.loads((tmp_path / "followup.json").read_text())["message"].startswith("Jane, one more")
-    monkeypatch.setattr(runner, "emit", _fake([{**good, "message": "word " * 70}], seen))
+    monkeypatch.setattr(runner, "emit", _fake([{**good, "message": "word " * 80}], seen))
     rec = runner.followup(Backend(), CAND, tmp_path, "", "")
     assert "its text was not recorded" in seen[-1]["user"] and not rec["first_message_recorded"]
-    assert rec["flags"] == ["the follow-up is 70 words"]
+    assert rec["flags"] == ["the follow-up is 80 words"]
 
 
 def test_followups_are_drafted_once_for_those_whose_date_has_come(tmp_path, monkeypatch, store):
@@ -486,10 +493,10 @@ def test_a_reply_is_read_once_and_its_quotes_are_checked(tmp_path, monkeypatch, 
     have = json.loads(log.read_text())
     del have[0]["answer"]
     log.write_text(json.dumps(have))
-    monkeypatch.setattr(runner, "emit", _fake([{"takes_up": "t", "message": "word " * 95, "assumes": ""}], seen))
+    monkeypatch.setattr(runner, "emit", _fake([{"takes_up": "t", "message": "word " * 115, "assumes": ""}], seen))
     assert runner.replies(Backend(), Backend(), tmp_path) == ["Jane Smith"]
     assert len(store.get("jane_smith")["notes"]) == 3                                     # nothing more written to the contact
-    assert json.loads(log.read_text())[0]["answer"]["flags"] == ["the answer is 95 words"]
+    assert json.loads(log.read_text())[0]["answer"]["flags"] == ["the answer is 115 words"]
 
 
 def test_the_page_records_a_follow_up_and_a_reply(tmp_path, monkeypatch, store):

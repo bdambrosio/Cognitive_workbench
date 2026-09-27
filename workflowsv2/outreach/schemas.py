@@ -18,12 +18,13 @@ RECOGNITION = ("Unknown", "Weak", "Strong", "Immediate need")
 CATEGORIES = ("strong", "plausible", "weak", "reject")
 ABOUT = ("yes", "no", "unsure")
 QUESTIONS = 9
-#: PROSPECT.md §11 asks for about 80 words; a draft over this is flagged.
-MESSAGE_WORDS = 100
-#: PROSPECT.md §21 asks for about 40 words.
-FOLLOWUP_WORDS = 60
-#: PROSPECT.md §23 asks for about 60 words.
-ANSWER_WORDS = 90
+#: PROSPECT.md §11 asks for about 100 words and never more than 130; a draft over
+#: the ceiling is flagged.
+MESSAGE_WORDS = 130
+#: PROSPECT.md §21 asks for 40 to 60 words.
+FOLLOWUP_WORDS = 75
+#: PROSPECT.md §23 asks for 60 to 90 words.
+ANSWER_WORDS = 110
 #: What a reply gives, PROSPECT.md §22.
 GIVES = ("opinion", "objection", "new_use", "introduction", "test_case", "meeting", "question",
          "declined", "other")
@@ -216,8 +217,11 @@ def clean_draft(obj: Any, evidence: Dict[str, List[str]]
     kept, bad = check_citations(obj.get("rests_on"), evidence)
     message = str(obj.get("message") or "").strip()
     flags: List[str] = []
-    if not kept:
-        flags.append("the message's opening rests on no checked citation")
+    if bad and not kept:
+        # PROSPECT.md §15: rests_on may be empty when the message states nothing
+        # about the person beyond their role; a citation that fails the check
+        # means a stated fact is unsupported.
+        flags.append("a fact the message states about the person rests on no checked citation")
     words = len(message.split())
     if words > MESSAGE_WORDS:
         flags.append(f"the message is {words} words")

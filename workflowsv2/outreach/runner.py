@@ -449,7 +449,7 @@ def brief(c: Dict[str, Any], cand_dir: Path) -> str:
         rows += ["## Suggested message", "", d["message"], "", f"**Angle:** {d['angle']}", ""]
         if d.get("assumes"):
             rows += [f"**The message assumes:** {d['assumes']}", ""]
-        rows += ["**The opening rests on:**"] + _cite_lines(cand_dir, d["rests_on"], sources) + [""]
+        rows += ["**What the message says about the person rests on:**"] + _cite_lines(cand_dir, d["rests_on"], sources) + [""]
     rows += ["## The research questions", ""]
     for a in q.get("answers") or []:
         rows += [f"{a['question']}. {a['answer']}"] + _cite_lines(cand_dir, a["citations"], sources)
