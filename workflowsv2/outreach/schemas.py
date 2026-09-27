@@ -18,9 +18,9 @@ RECOGNITION = ("Unknown", "Weak", "Strong", "Immediate need")
 CATEGORIES = ("strong", "plausible", "weak", "reject")
 ABOUT = ("yes", "no", "unsure")
 QUESTIONS = 9
-#: PROSPECT.md §11 asks for about 100 words and never more than 130; a draft over
-#: the ceiling is flagged.
-MESSAGE_WORDS = 130
+#: PROSPECT.md §11 asks for about 100 words and never more than 130; the flag allows a
+#: few words over the ceiling, which read no worse (Bruce, 2026-09-26).
+MESSAGE_WORDS = 135
 #: PROSPECT.md §21 asks for 40 to 60 words.
 FOLLOWUP_WORDS = 75
 #: PROSPECT.md §23 asks for 60 to 90 words.
