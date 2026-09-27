@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Questions — Tuuyi</title>
+<meta name="description" content="Answers to questions people ask about Tuuyi's claims review of software.">
+<link rel="canonical" href="https://tuuyi.com/faq">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Tuuyi">
+<meta property="og:title" content="Questions — Tuuyi">
+<meta property="og:description" content="Answers to questions people ask about Tuuyi's claims review of software.">
+<meta property="og:url" content="https://tuuyi.com/faq">
+<meta property="og:image" content="https://tuuyi.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="/site.css?v=20260925">
+<style>
+  .faq h2 { font-size: 21px; margin: 40px 0 8px; }
+  .faq p { max-width: 68ch; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="/">Tuuyi</a>
+  <nav><a href="/">Home</a><a href="/how-it-works">How it works</a><a href="/pricing">Pricing</a><a href="/demo">Demo</a><a href="/faq" aria-current="page">FAQ</a><a href="/sellers">For sellers</a><a href="/about">About</a><a class="pill" href="/pricing">Beta: free claims reviews, limited</a></nav>
+</header>
+<main class="faq">
+
+<h1>Questions about Tuuyi.</h1>
+<p class="lede">Answers to questions people ask about the claims review. Something not here? <a href="/contact">Write to us</a>.</p>
+
+<h2>We already ask Claude or GPT about the data room. How is this different?</h2>
+<p>Many teams already do. The difference is what you can check afterwards. Tuuyi writes down the seller's claims before testing any of them, tests each one that matters against the code, and every finding names the file and lines it rests on. What it could not settle, and what it did not examine, are listed too, so you can see where the answer stops. A second pass that did not do the review re-reads the evidence behind every finding, and a person reads the report before it is released.</p>
+
+<h2>Why are only some of the claims tested?</h2>
+<p>Every claim in the seller's documents is listed and rated, before any testing, by what it would change for the buyer if it were false. The claims that could change the price, the terms or the decision to close are tested against the code. The rest are listed with the reason they were not tested, and the buyer can ask for any of them to be tested. In the public demo, 312 claims were listed and 38 were tested; each of the 38 has a finding with its evidence.</p>
+
+<h2>Can I see an example?</h2>
+<p>Yes. The public demo at <a href="https://demo.tuuyi.com">demo.tuuyi.com</a> is a finished review of a small open-source project, and you can put questions to it. For example, the project's README promises the software will never use cookies, and the review found the code that sets one when the administrator logs in.</p>
+
+<h2>What does a finding look like?</h2>
+<p>Each finding states one claim as the seller wrote it, gives one of five verdicts (holds; true, with something to know; partly true; contradicted; unsettled), and quotes the file and lines of the materials it rests on, so you can check it yourself in a few minutes. A gap is rated by what it would change for this buyer.</p>
+
+<h2>What happens when the materials can't settle a claim?</h2>
+<p>It is reported as unsettled, not as false, with what the review searched and why that did not settle it. Where the claim is about something the materials cannot reach, such as a running system or the seller's own conduct, the report gives the question to put to the seller.</p>
+
+<h2>Does it run the code?</h2>
+<p>No. The review reads the code and the other materials; nothing is compiled or run. A claim that only a running system could settle, such as a memory figure or an image size, is reported as unsettled.</p>
+
+<h2>Is this a replacement for technical due diligence?</h2>
+<p>No. For a smaller deal, where full technical diligence would cost too much for the size of the transaction, it can be a lower-cost first review. For a larger deal, it can come before the main diligence and show where that work should concentrate. It is not a penetration test and not a review of code quality or architecture.</p>
+
+<h2>What about a seller checking their own claims?</h2>
+<p>A seller can have the claims in their own README, documentation or deck checked against their code privately, before a buyer, investor or large customer does, so they can correct the words or the code first. The report is theirs alone and is not an independent assessment for anyone else to rely on. It is described at <a href="https://tuuyi.com/sellers">tuuyi.com/sellers</a>.</p>
+
+<h2>Where does the code go? Who sees it?</h2>
+<p>For a buyer's paid claims review, the repository is examined on single-tenant hardware the practice controls, in an environment created for the engagement and deleted at the end of the period set in the engagement letter. The buyer never sees the environment or the materials in it. The code goes to a cloud model service only when the client and the seller both agree, and then only to one that retains no data. A review done during the beta may run on a hosted model instead; the engagement letter says which applies. A seller's own claims check is handled privately.</p>
+
+<h2>Does the seller have to take part?</h2>
+<p>The seller supplies the repository and the documents, on a page that only the seller and the practice can open. The seller is not consulted on how the claims are read, and the report says so.</p>
+
+<h2>Who is behind Tuuyi?</h2>
+<p>Bruce D'Ambrosio, Professor Emeritus of Computer Science at Oregon State University, who has worked in artificial intelligence for four decades. He founded CleverSet, acquired by Art Technology Group in 2008, and has done technical due diligence from both sides of that kind of transaction.</p>
+</main>
+<footer>
+  <div>© 2026 Tuuyi · <a href="/contact">Contact</a></div>
+  <div><a href="/privacy">Privacy</a><a href="/demo">Demo</a><a href="/about">About</a></div>
+</footer>
+</div>
+</body>
+</html>
