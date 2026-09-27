@@ -118,6 +118,9 @@ def test_draft_only_for_strong_and_flags(tmp_path, monkeypatch):
     runner.qualify(Backend(), CAND, tmp_path)
     d = runner.draft(Backend(), CAND, tmp_path)
     assert "PROSPECT.md §15" in seen[-1]["user"]
+    # The choices recorded with the draft are the ones the model was told to follow.
+    assert set(d["choices"]) == set(runner.CHOICES)
+    assert all(f"{k} = `{v}`" in seen[-1]["user"] for k, v in d["choices"].items())
     assert d["flags"] == ["the message is 150 words"]        # no citation is allowed (§15)
     assert "Suggested message" in runner.brief(CAND, tmp_path)
 

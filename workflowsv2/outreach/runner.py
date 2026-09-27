@@ -93,6 +93,7 @@ import argparse
 import datetime
 import json
 import logging
+import random
 import sys
 import types
 import urllib.request
@@ -383,6 +384,14 @@ def qualify(backend, c: Dict[str, Any], cand_dir: Path, contact: str = "") -> Di
     return rec
 
 
+#: The three things a first message varies on purpose (PROSPECT.md §11), each
+#: with its values. One value of each is drawn at random per draft and recorded
+#: in draft.json, so replies can later be counted by choice.
+CHOICES = {"opening": ("purpose", "their_work"),
+           "showing": ("demo", "description"),
+           "question": ("where_it_fits", "where_it_sticks")}
+
+
 def draft(backend, c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]]:
     q = _read_json(cand_dir / "qualification.json")
     if not q or q.get("category") != "strong":
@@ -391,9 +400,12 @@ def draft(backend, c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]
     evidence = load_evidence(cand_dir, [f["file"] for f in files])
     shown = {k: q[k] for k in ("prospect_type", "relationship", "problem_recognition", "category", "why_person", "why_now",
                                "why_now_citations", "use_case", "concerns")}
+    choices = {k: random.choice(v) for k, v in CHOICES.items()}
     user = (f"{candidate_text(c)}\n\nThe qualification:\n\n"
             f"{json.dumps(shown, indent=1, ensure_ascii=False)}\n\n"
             f"{evidence_block(cand_dir, files)}\n\n"
+            "The choices for this message (PROSPECT.md §11): "
+            + ", ".join(f"{k} = `{v}`" for k, v in choices.items()) + ".\n\n"
             f"This step drafts the first message. Emit the answer per PROSPECT.md §15.")
     for _ in range(2):
         # Asked again once when nothing usable comes back: a strong candidate
@@ -404,7 +416,7 @@ def draft(backend, c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]
             break
     else:
         flags.append("the draft returned nothing usable")
-    rec = {**d, "at": today(), "model": backend.resolved_model(),
+    rec = {**d, "choices": choices, "at": today(), "model": backend.resolved_model(),
            "citations_dropped": dropped, "flags": flags}
     _write_json(cand_dir / "draft.json", rec)
     return rec
@@ -447,6 +459,8 @@ def brief(c: Dict[str, Any], cand_dir: Path) -> str:
         rows += ["**Concerns:** " + (q.get("concerns") or "")] + [f"- CHECK: {f}" for f in flags] + [""]
     if d:
         rows += ["## Suggested message", "", d["message"], "", f"**Angle:** {d['angle']}", ""]
+        if d.get("choices"):
+            rows += ["**Choices:** " + ", ".join(f"{k} {v}" for k, v in d["choices"].items()), ""]
         if d.get("assumes"):
             rows += [f"**The message assumes:** {d['assumes']}", ""]
         rows += ["**What the message says about the person rests on:**"] + _cite_lines(cand_dir, d["rests_on"], sources) + [""]

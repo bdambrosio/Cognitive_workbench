@@ -141,7 +141,7 @@ Write as Bruce would to a professional he respects and has not met: direct, plai
 
 Write for the time it takes to understand the message, not for its word count. Spend words where they save the reader work, and never shorten a sentence at the cost of making it harder to follow. One idea to a sentence, but vary their length: short sentences for facts, and a longer one where it joins two ideas that belong together, so the message does not read as a list. Describe people and things as they would describe themselves: "you advise SaaS founders who are selling their companies", not "sell-side adviser to B2B SaaS founders". No shorthand or jargon the reader has to expand, and no stacked nouns. Keep the words that say how one fact relates to the next.
 
-A message says these things, in whatever order reads naturally for this person. Parts 3 and 4 are one or two sentences each; the demo finding in part 3 and the free first reviews are optional, used when they help this reader, not added to fill space:
+A message says these things, in whatever order reads naturally for this person. Parts 3 and 4 are one or two sentences each. Whether part 3 uses the demo finding is set by the choices below; the free first reviews are optional, mentioned when they help this reader, not added to fill space:
 
 1. **Who is writing, and why.** Bruce recently started Tuuyi and it is in beta. He is talking with people who do this person's kind of work (§4) about where it fits in how they already work: at which step of a deal, in place of what, and what they would need from the report. Say this plainly and early: it is the real reason for the message. Do not say or suggest that he is unsure whether the service is useful. For example: "While it's in beta, I'm talking with advisers who help SaaS founders sell their companies about where it fits in how they prepare a company for sale."
 2. **Why this person.** Their role or kind of work is usually reason enough. Mention a specific thing of theirs (a transaction, an article, a post, a concern they stated) only when it bears directly on what Tuuyi does, and never one more than about a year old by the dates in the evidence file headers. Refer to it accurately, and claim no more acquaintance with it than reading it. If the relationship note names someone who introduced the practice to the person, open with the introduction and keep the rest shorter.
@@ -152,6 +152,12 @@ A message says these things, in whatever order reads naturally for this person. 
 The first reviews are free while the service is in beta, and the message may say so. Otherwise do not state a price or a turnaround time, and do not state where the work runs or how the practice stores or deletes materials.
 
 Do not state anything about the person that the evidence files do not show. Do not flatter. Do not say general-purpose AI review is unreliable.
+
+**The choices for this message.** The practice varies three things between messages on purpose, so that it can learn from the replies which ways of writing work. The request names one value of each, chosen at random, and the message follows them. Each value is still written under everything above; a choice never licenses a weaker message.
+
+- **`opening`**: `purpose` opens with part 1, who is writing and why, and then says why this person. `their_work` opens with part 2, the person's work, and then says who is writing and why.
+- **`showing`**: `demo` uses the demo finding in part 3, with the link. `description` describes Tuuyi in part 3 without the demo.
+- **`question`**: `where_it_fits` asks where in the person's process a review like this would sit. `where_it_sticks` asks where that process gets held up or goes wrong: what they meet, not where Tuuyi would go.
 
 ## 12. Output: search queries
 
@@ -200,7 +206,7 @@ Emit nothing outside the JSON object.
 
 ## 15. Output: the draft message
 
-Asked only for a candidate the qualification found `strong`. You are given the candidate record, the qualification, and the evidence files.
+Asked only for a candidate the qualification found `strong`. You are given the candidate record, the qualification, the evidence files, and the choices for this message (§11).
 
 | Field | Contents |
 |---|---|
@@ -354,4 +360,4 @@ A day's output is normally two to four prospects, and fewer when fewer meet the 
 
 <!-- audience: practice -->
 
-Track which kinds of prospect respond; which wording brings substantive replies; which uses are recognised; which objections recur; whether "review before diligence" works better than "claims review"; whether advisers, investors or acquirers show the strongest demand; whether the comparison with pointing AI at the data room is recognised; which evidence of fit predicts a useful conversation. Do not optimise for response rate. A useful response is one that improves understanding of the market, brings a credible referral, produces a test case, or shows a real buying use.
+Track which kinds of prospect respond; which wording brings substantive replies, including which value of each choice in §11; which uses are recognised; which objections recur; whether "review before diligence" works better than "claims review"; whether advisers, investors or acquirers show the strongest demand; whether the comparison with pointing AI at the data room is recognised; which evidence of fit predicts a useful conversation. Do not optimise for response rate. A useful response is one that improves understanding of the market, brings a credible referral, produces a test case, or shows a real buying use.
