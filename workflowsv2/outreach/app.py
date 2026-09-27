@@ -278,8 +278,8 @@ def _email_refusal(cid: str, local: Optional[Dict[str, Any]] = None) -> Optional
 
 
 def footer(address: str) -> str:
-    """The text every email ends with: who sent it, the postal address, and how to opt out."""
-    return (f"--\nBruce D'Ambrosio, Tuuyi · {os.environ.get('POSTAL_ADDRESS', '').strip()}\n"
+    """The text every email ends with: the practice's name and postal address, and how to opt out."""
+    return (f"--\nTuuyi · {os.environ.get('POSTAL_ADDRESS', '').strip()}\n"
             f"If you'd rather not hear from me again: {OPTOUT_URL}?e={address}")
 
 
