@@ -3,6 +3,52 @@
 Started 2026-08-23, on the workflow harness. Everything before it was
 discarded, deliberately — see "Why every earlier run was discarded".
 
+## Ember-1 qualification — 2026-09-27, doc9, effort medium
+
+Fireworks' Ember-1 (`accounts/fireworks/models/ember-1`, a retraining of Kimi
+K3 for shorter reasoning; route `measure/models/fw_ember1_medium.yaml`,
+temperature 1.0, top_p 0.95). Three runs, one at a time, harness `55cc34a6`,
+tree clean. Reviewer `glm-5p3-flash` (`measure/models/fw_glm53flash.yaml`) for
+all three. **Bruce's decision, 2026-09-27: Ember-1 is qualified.**
+
+| run | claims | exit, output check | P1 / P2 / P3 | review: findings that hold | cost | wall |
+|---|---|---|---|---|---|---|
+| `fx11_ember1med_doc9_1` | 16 | clean, ok | found / found / found | 15 of 16 | $0.98 | 8.4 min |
+| `fx11_ember1med_doc9_2` | 16 | clean, ok | found / found / found | 14 of 16 | $1.30 | 11.3 min |
+| `fx11_ember1med_doc9_3` | 21 | clean, ok | found / found / found | 20 of 21 | $1.09 | 10.7 min |
+
+- No run opened the answer key; all three share the harness revision. No
+  finding lacks a citation, and no cited document went unopened.
+- B1 (test coverage) and B2 (uptime monitoring) are found in all three. F2
+  (the last recoverable backup expiring) is missed in all three: the 30-day
+  retention claim comes back unsettled, not joined to the 21 days of failures.
+- **The one recurring exception.** In every run the reviewer rated the
+  backup-schedule finding (claim 4, "true, with something to know") as
+  overstated. A blind retest of that finding by Claude Opus 5.5 (not a
+  review stage; written to `review/retest_opus55_claim4.json` in each run)
+  agreed in all three. The leniency is Ember-1's: it credits a configured
+  schedule whose backups have failed for 21 days. Run 2 has the same
+  reviewer rating on DNS (claim 14).
+- Where the runs disagree: the in-operation backup claim is contradicted in
+  run 1 and partly true in runs 2 and 3; DNS is contradicted in runs 1 and 3.
+- Output tokens per run 22.0k / 28.3k / 27.1k, of which reasoning 9.1k /
+  13.5k / 11.8k. DeepSeek V4.1 Flash at low wrote 50–59k, 39–44k reasoning,
+  on this fixture on 2026-09-13.
+
+**The criteria in docs/model-qualification.md no longer match the review.**
+Q2 reads an ADMISSIBLE line from `review/summary.md`, and Q4 reads blocks,
+a Gap Map and a §9 recommendation; the workflowsv2 review writes
+`statistics.json`, `outcomes.json`, `review.json` and `retest.json`, and the
+runner produces none of those parts. REVIEW §9 retests only evidence
+observations, never `verdict_calibration`, so Q3's "an exception a second
+reviewer did not confirm does not stand" has no retest to read for an
+overstated verdict. This set was read on the current artifacts' equivalents;
+the criteria need re-deriving.
+
+Gate 3 before this set (same fixture, 2026-09-27): low `fx10_ember1low_doc9_1`
+and medium `fx10_ember1med_doc9_1`, both clean with the three planted findings,
+about $1 each.
+
 ## Campaign b4 — the amended METHOD and the block review, first exercise
 
 Two audits and two reviews on METHOD as amended 2026-08-27 (§4: every resolved
