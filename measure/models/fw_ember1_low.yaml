@@ -12,6 +12,11 @@
 # PRICE $3.00 in / $0.30 cached / $15.00 out per M tokens (model page,
 # 2026-09-27), well above the other routes here.
 #
+# DATA RETENTION: Fireworks confirmed to Bruce by email on 2026-09-27 that
+# Ember-1 is under its zero-data-retention policy (its docs state the default
+# only for open models). For paid work the production rule still needs the
+# client's and the seller's agreement to a ZDR cloud service.
+#
 # TEMPERATURE resolves through src/chat/model_params.py ("ember-1" -> 1.0;
 # no publisher value, Bruce chose it 2026-09-27).
 llm_config:
