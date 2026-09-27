@@ -503,8 +503,12 @@ def look_up_email(cid: str) -> Dict[str, Any]:
     person = contacts.get(cid)
     if person.get("email"):
         return {"email": person["email"], "sources": [], "confidence": "", "cost": 0, "run": ""}
+    # A contact found by scouting has no firm or title on record; what the
+    # qualification says the person does (from checked evidence) stands in.
+    q = _read_json(DATA / cid / "qualification.json") or {}
+    about = next((a["answer"] for a in q.get("answers") or [] if a.get("question") == 1), "")
     found = exa.find_email(person["name"], str(person.get("firm") or ""), str(person.get("title") or ""),
-                           str(person.get("linkedin") or ""))
+                           str(person.get("linkedin") or ""), about)
     logger.info("%s: email lookup gave %r (%s, $%s)", person["name"], found["email"], found["confidence"], found["cost"])
     if found["email"]:
         contacts.update_person(cid, {"email": found["email"]})

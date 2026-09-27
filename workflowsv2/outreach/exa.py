@@ -50,14 +50,16 @@ def _json(resp: requests.Response) -> Dict[str, Any]:
     return body
 
 
-def find_email(name: str, firm: str = "", title: str = "", linkedin: str = "") -> Dict[str, Any]:
+def find_email(name: str, firm: str = "", title: str = "", linkedin: str = "", about: str = "") -> Dict[str, Any]:
     """{"email": the work address found or "", "sources": the URLs Exa cites
     for it, "confidence": Exa's word for it, "cost": the run's total in
     dollars, "run": the run id}. Raises when the run fails or does not finish
-    within AGENT_WAIT. A cited source need not show the address itself: on the
+    within AGENT_WAIT. `about` is a sentence on what the person does, for
+    a contact whose firm and title are not recorded. A cited source need not show the address itself: on the
     first live run (2026-09-27) both sources only confirmed the person's role."""
     who = ", ".join(x for x in (name, title, f"at {firm}" if firm else "") if x)
-    body = {"query": f"Find the work email address of {who}." + (f" Their LinkedIn profile: {linkedin}" if linkedin else ""),
+    body = {"query": f"Find the work email address of {who}." + (f" Their LinkedIn profile: {linkedin}" if linkedin else "")
+                     + (f" What they do: {about}" if about else ""),
             "effort": "low",
             "input": {"data": [{"name": name, "company": firm, "linkedin_url": linkedin}]},
             "outputSchema": {"type": "object", "properties": {"email": {"type": "string", "format": "email"}}}}
