@@ -31,7 +31,7 @@ The qualifying and drafting steps also give you:
 - **Evidence files.** Each is a web page fetched by the practice's program, or text the practice copied from a page the program cannot fetch, such as a LinkedIn post. Each file starts with a header that gives its source and date. The text is shown with line numbers. A long file is cut and says so.
 - **The contact record**: what the practice's contact system holds about earlier approaches to the person, and to anyone else at the same firm. For the person, that is their stage in the outreach list, the tasks about them with due dates, and the titles and dates of notes. For each colleague, their name and stage.
 
-The follow-up step gives you the contact record, the first message as it was sent, with its date, when the practice recorded it, and the evidence files when the practice has them. The reply step gives you the messages the practice sent and the person's reply, copied by the practice, with line numbers. The answering step gives you the same, and the record of what the reply gives.
+The follow-up step gives you the contact record, the first message as it was sent, with its date, when the practice recorded it, and the evidence files when the practice has them. The reply step gives you the messages the practice sent and the person's reply, copied by the practice, with line numbers. The answering step gives you the same, the record of what the reply gives, and the practice's approved answers.
 
 You have no tools. You cannot open a link or search. What you know about a person from your training is not evidence, may be about someone else with the same name, and may be out of date; do not use it. When the evidence files do not answer a question, the answer is that there is no evidence.
 
