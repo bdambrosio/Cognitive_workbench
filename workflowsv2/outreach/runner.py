@@ -398,7 +398,7 @@ def draft(backend, c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]
         return None
     files = kept_files(_read_json(cand_dir / "research.json") or {"files": []})
     evidence = load_evidence(cand_dir, [f["file"] for f in files])
-    shown = {k: q[k] for k in ("prospect_type", "relationship", "problem_recognition", "category", "why_person", "why_now",
+    shown = {k: q.get(k) for k in ("prospect_type", "side", "relationship", "problem_recognition", "category", "why_person", "why_now",
                                "why_now_citations", "use_case", "concerns")}
     choices = {k: random.choice(v) for k, v in CHOICES.items()}
     user = (f"{candidate_text(c)}\n\nThe qualification:\n\n"
@@ -508,6 +508,8 @@ def push(c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]]:
         person = contacts.create_person(c["name"], str(c.get("title") or ""), linkedin,
                                         firm=str(c.get("firm") or ""), domain=firm_domain(c))
     rid = person["id"]
+    if q.get("email") and not person.get("email"):
+        contacts.update_person(rid, {"email": q["email"]})   # an address a checked quote shows; never overwrites
     entry = None if created else contacts.entry_of(rid)
     if entry is not None and contacts.stage_of(entry) not in OURS:
         logger.info("%s: the entry is at '%s', set by a person; left alone", c["name"], contacts.stage_of(entry))
@@ -713,7 +715,10 @@ def scout(backend, kind: str, data: Path, want: int) -> List[Dict[str, Any]]:
         return found[:want]
     log = data / SCOUT_LOG
     earlier = [r["query"] for r in read_jsonl(log) if r.get("kind") == kind]
-    user = (f"The kind of prospect: `{kind}`.\n\nSearches already made for this kind:\n\n"
+    side = random.choice(("sell", "buy")) if kind in SIDED_KINDS else ""
+    user = (f"The kind of prospect: `{kind}`."
+            + (f" The side: people who work for {'sellers' if side == 'sell' else 'buyers'}." if side else "")
+            + "\n\nSearches already made for this kind:\n\n"
             + ("\n".join(f"- {q}" for q in earlier) or "(none)")
             + "\n\nThis step proposes searches for new people. Emit the answer per PROSPECT.md §16.")
     out = _ask(backend, user, schemas.scout_schema(), 4096)
@@ -747,7 +752,7 @@ def scout(backend, kind: str, data: Path, want: int) -> List[Dict[str, Any]]:
             logger.info("scout: %s: fits=%s (%s)", name, rec["fits"], rec["reason"][:90])
             if rec["fits"] == "yes" and rec["prospect_type"] == kind:
                 found.append(c)                 # someone who fits another kind waits for a scout of that kind
-        append_jsonl(log, {"at": today(), "kind": kind, "query": q, "results": len(results), "new": new})
+        append_jsonl(log, {"at": today(), "kind": kind, "side": side, "query": q, "results": len(results), "new": new})
     return found[:want]
 
 
@@ -891,7 +896,11 @@ def load_candidates(path: Path) -> List[Dict[str, Any]]:
 #: The kinds the daily run scouts for, in turn, and those scouted by firm
 #: because the person to approach has to be chosen (PROSPECT.md §4).
 DAILY_KINDS = ("M&A adviser", "Repeat acquirer", "Searcher", "Small PE-family office",
-               "Technical feedback", "VC / Investor")
+               "Technical feedback", "VC / Investor", "Business broker",
+               "Exit or diligence consultant", "Founder preparing a sale", "Connector")
+#: Kinds that work for either side: their scouting searches name a side, drawn
+#: at random, so both sides are found over time (PROSPECT.md §16).
+SIDED_KINDS = ("M&A adviser", "Exit or diligence consultant")
 FIRM_KINDS = ("Repeat acquirer", "Small PE-family office")
 MODEL = REPO / "measure/models/local_qwen38flashnext.yaml"
 WRITER = REPO / "measure/models/anthropic_opus55_medium.yaml"

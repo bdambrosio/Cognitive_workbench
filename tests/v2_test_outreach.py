@@ -392,9 +392,23 @@ def test_not_pursuing_writes_the_note_then_removes_the_entry(store):
     assert "Ready to contact" in note["text"] and "Advises sellers." in note["text"]
 
 
+def test_an_email_is_kept_only_when_a_checked_quote_shows_it():
+    # PROSPECT.md §14: an address the evidence does not show would send a message to a guess.
+    ev = {"01_page.md": BODY + ["Write to Jane at jane@acme.example about a sale."]}
+    shown = {**_qualification(), "side": "sell", "side_citations": [],
+             "email": "jane@acme.example",
+             "email_citations": [_cite("Write to Jane at jane@acme.example about a sale.", (6, 6))]}
+    q, dropped = schemas.clean_qualification(shown, ev)
+    assert q["email"] == "jane@acme.example" and q["side"] == "sell" and not dropped
+    guessed = {**shown, "email": "jane.smith@acme.example"}
+    q, dropped = schemas.clean_qualification(guessed, ev)
+    assert q["email"] == "" and q["email_citations"] == [] and dropped[-1]["in"] == "email"
+
+
 def test_the_daily_kind_takes_turns_by_date():
     import datetime
-    kinds = [runner.next_kind(datetime.date(2026, 9, 21) + datetime.timedelta(days=i)) for i in range(6)]
+    kinds = [runner.next_kind(datetime.date(2026, 9, 21) + datetime.timedelta(days=i))
+             for i in range(len(runner.DAILY_KINDS))]
     assert sorted(kinds) == sorted(runner.DAILY_KINDS)
 
 

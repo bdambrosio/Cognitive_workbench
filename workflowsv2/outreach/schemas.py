@@ -12,7 +12,10 @@ from workflowsv2.claims_audit.schemas import quote_at
 #: of an entry in the outreach list (contacts.py), carried over from Attio.
 #: PROSPECT.md §4 and §14 define them; a new option needs a definition there.
 TYPES = ("M&A adviser", "Repeat acquirer", "Searcher", "Small PE-family office", "VC / Investor",
-         "Lawyer", "Contracted-software buyer", "licensee", "Connector", "Technical feedback", "none")
+         "Lawyer", "Contracted-software buyer", "licensee", "Business broker",
+         "Exit or diligence consultant", "Founder preparing a sale", "Connector", "Technical feedback", "none")
+#: Which side of a transaction the person works for (PROSPECT.md §4).
+SIDES = ("buy", "sell", "both", "unknown")
 RELATIONSHIPS = ("Warm", "Cold", "Referral")
 RECOGNITION = ("Unknown", "Weak", "Strong", "Immediate need")
 CATEGORIES = ("strong", "plausible", "weak", "reject")
@@ -94,12 +97,14 @@ def qualification_schema() -> Dict[str, Any]:
         "relationship": {"type": "string", "enum": list(RELATIONSHIPS)},
         "problem_recognition": {"type": "string", "enum": list(RECOGNITION)},
         "category": {"type": "string", "enum": list(CATEGORIES)},
+        "side": {"type": "string", "enum": list(SIDES)}, "side_citations": _CITATIONS,
+        "email": _STR, "email_citations": _CITATIONS,
         "why_person": _STR, "why_now": _STR,
         "why_now_citations": _CITATIONS,
         "use_case": _STR, "concerns": _STR, "reject_reason": _STR,
         "better_contact_name": _STR, "better_contact_role": _STR},
         "required": ["answers", "prospect_type", "relationship", "problem_recognition", "category",
-                     "why_person", "why_now", "why_now_citations", "use_case", "concerns",
+                     "side", "side_citations", "email", "email_citations", "why_person", "why_now", "why_now_citations", "use_case", "concerns",
                      "reject_reason", "better_contact_name", "better_contact_role"]}
 
 
@@ -190,6 +195,17 @@ def clean_qualification(obj: Any, evidence: Dict[str, List[str]]
         answers[n] = {"question": n, "answer": text, "citations": kept}
     kept_now, bad_now = check_citations(obj.get("why_now_citations"), evidence)
     dropped += [{**b, "in": "why_now"} for b in bad_now]
+    kept_side, bad_side = check_citations(obj.get("side_citations"), evidence)
+    dropped += [{**b, "in": "side"} for b in bad_side]
+    # An address is kept only when a checked quote contains it: an email the
+    # evidence does not show would send a message to a guess.
+    email = str(obj.get("email") or "").strip()
+    kept_email, bad_email = check_citations(obj.get("email_citations"), evidence)
+    dropped += [{**b, "in": "email"} for b in bad_email]
+    if email and not any(email.lower() in str(c.get("quote") or "").lower() for c in kept_email):
+        dropped.append({"file": "", "lines": [], "quote": email, "in": "email",
+                        "why": "no checked quote contains the address"})
+        email, kept_email = "", []
 
     def s(key: str) -> str:
         return str(obj.get(key) or "").strip()
@@ -201,6 +217,8 @@ def clean_qualification(obj: Any, evidence: Dict[str, List[str]]
             "problem_recognition": (obj.get("problem_recognition")
                                     if obj.get("problem_recognition") in RECOGNITION else None),
             "category": obj.get("category") if obj.get("category") in CATEGORIES else None,
+            "side": obj.get("side") if obj.get("side") in SIDES else "unknown",
+            "side_citations": kept_side, "email": email, "email_citations": kept_email,
             "why_person": s("why_person"), "why_now": s("why_now"),
             "why_now_citations": kept_now,
             "use_case": s("use_case"), "concerns": s("concerns"),
