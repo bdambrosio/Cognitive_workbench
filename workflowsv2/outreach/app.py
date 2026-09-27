@@ -393,7 +393,7 @@ def run(body: Run) -> Dict[str, Any]:
         first = [py, script, "replies", "--model", str(MODEL)]
         what = "reading replies and drafting answers"
     elif body.what == "daily":
-        first = [py, script, "daily", "--want", str(body.want), "--model", str(MODEL)]
+        first = [py, script, "daily", "--model", str(MODEL)]
         what = "today's work"
     else:
         raise HTTPException(422, "what must be daily, scout or replies")

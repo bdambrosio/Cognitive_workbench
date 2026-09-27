@@ -362,24 +362,39 @@ def test_contact_for_someone_unknown_reports_colleagues_at_the_firm(store):
     assert text == "A colleague at the same firm, Pat Head, is in the outreach list at stage 'Initial sent'."
 
 
-def test_daily_works_the_named_then_scouts_the_least_scouted_kind_when_the_pool_is_low(tmp_path, monkeypatch, store):
-    did = []
-    named = [{"name": "Ann Named"}]
-    monkeypatch.setattr(runner, "pickup", lambda data: named)
-    monkeypatch.setattr(runner, "work", lambda backend, writer, cands, stages, data, use_contacts, redo=False:
-                        did.append(("work", [c["name"] for c in cands], stages[-1], use_contacts)))
-    _person("Ann Ready", "Ready to contact")
-    _person("Bob Ready", "Ready to contact")
-    monkeypatch.setattr(runner, "scout", lambda b, kind, data, want: did.append(("scout", kind, want)) or [{"name": "Sue Scouted"}])
-    monkeypatch.setattr(runner, "scout_firms", lambda b, kind, data, want: did.append(("firms", kind, want)) or [])
-    monkeypatch.setattr(runner, "next_kind", lambda: "Repeat acquirer")
-    text = runner.daily(Backend(), Backend(), tmp_path, pool=5, want=2)
-    assert did == [("work", ["Ann Named"], "push", True), ("work", [], "push", True),
-                   ("firms", "Repeat acquirer", 2), ("work", [], "push", True)]
-    assert "Scouted for: Repeat acquirer, by firm." in text and "Ready to contact now: 2." in text
-    did.clear()
-    runner.daily(Backend(), Backend(), tmp_path, pool=2, want=2)                 # the pool is full: no scouting
-    assert [d[0] for d in did] == ["work", "work"]
+def _daily_with(tmp_path, monkeypatch, categories, strong, most):
+    """Run `daily` with scouting that finds one new person per call and a
+    qualification that gives them the next category in `categories`.
+    Returns the summary text and the names researched."""
+    researched, n = [], iter(range(1000))
+    monkeypatch.setattr(runner, "pickup", lambda data: [])
+    cats = iter(categories)
+
+    def work(backend, writer, cands, stages, data, use_contacts, redo=False):
+        if "research" not in stages:
+            return
+        for c in cands:
+            researched.append(c["name"])
+            d = data / runner.slug(c["name"])
+            d.mkdir(parents=True, exist_ok=True)
+            (d / "qualification.json").write_text(json.dumps({"category": next(cats)}))
+    monkeypatch.setattr(runner, "work", work)
+    found = lambda b, kind, data, want: [{"name": f"Person {next(n)}"}][:want]
+    monkeypatch.setattr(runner, "scout", found)
+    monkeypatch.setattr(runner, "scout_firms", found)
+    return runner.daily(Backend(), Backend(), tmp_path, strong=strong, most=most), researched
+
+
+def test_daily_scouts_until_the_day_has_the_strong_target(tmp_path, monkeypatch, store):
+    text, researched = _daily_with(tmp_path, monkeypatch, ["plausible", "strong", "weak", "strong"] + ["strong"] * 10,
+                                   strong=3, most=15)
+    assert len(researched) == 5 and "Strong today: 3 (target 3)" in text
+
+
+def test_daily_stops_at_the_research_limit_when_too_few_are_strong(tmp_path, monkeypatch, store):
+    # Research costs searches: a day with few strong people must not spend without limit.
+    text, researched = _daily_with(tmp_path, monkeypatch, ["plausible"] * 20, strong=5, most=4)
+    assert len(researched) == 4 and "Strong today: 0 (target 5); scouted people researched: 4 of at most 4." in text
 
 
 def test_not_pursuing_writes_the_note_then_removes_the_entry(store):

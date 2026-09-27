@@ -1,17 +1,17 @@
 """Research, qualify and draft a first message for people the practice names.
 
     workflowsv2/outreach/daily.sh                                  (the whole day's work, and the page)
-    python3 workflowsv2/outreach/runner.py daily [--pool 5] [--want 3]
+    python3 workflowsv2/outreach/runner.py daily [--strong 5] [--most 15]
     python3 workflowsv2/outreach/runner.py run --candidates <file.yaml> [--only <slug>]
     python3 workflowsv2/outreach/runner.py research|qualify|draft|brief ...   (one stage)
     python3 workflowsv2/outreach/runner.py followups|replies               (after a message is sent)
 
 `daily` works on the names waiting at Research in the contacts; reads the replies
-the practice has recorded and drafts the follow-ups that are due; then, when fewer than
-`--pool` people are Ready to contact, scouts for the day's kind (the kinds take turns by date; people
-an earlier scout found of that kind are taken before any new search)
-(`--want` of the people found go on to research); and pushes everything it
-qualified. The model is the local Qwen unless `--model` names another; the three calls
+the practice has recorded and drafts the follow-ups that are due; then scouts, one person
+at a time with the kinds in turn from the day's kind (the day's kind goes by date; people
+an earlier scout found of a kind are taken before any new search), until the day has
+`--strong` new strong candidates or `--most` scouted people have been researched; and
+pushes everything it qualified. The model is the local Qwen unless `--model` names another; the three calls
 that write a message to send (the first message, the follow-up, the answer to a reply)
 use the `--writer` model, Claude Opus 5.5 unless it names another.
 
@@ -744,7 +744,7 @@ def scout(backend, kind: str, data: Path, want: int) -> List[Dict[str, Any]]:
             shown, _ = schemas.numbered(text.splitlines(), PAGE_WORDS)
             look = _ask(backend, f"The person found: {name}.\n\nTheir professional profile, with line numbers:\n\n"
                                  f"{shown}\n\nThis step takes a first look. Emit the answer per PROSPECT.md §17.",
-                        schemas.first_look_schema(), 2048)
+                        schemas.first_look_schema(), 4096)
             lo = look.get("obj") if isinstance(look.get("obj"), dict) else {}
             rec = {"at": today(), "kind_sought": kind, "query": q, "fits": lo.get("fits"),
                    "prospect_type": lo.get("prospect_type"), "reason": str(lo.get("reason") or "").strip()}
@@ -795,7 +795,7 @@ def scout_firms(backend, kind: str, data: Path, want: int) -> List[Dict[str, Any
             shown, _ = schemas.numbered(text.splitlines(), PAGE_WORDS)
             look = _ask(backend, f"The firm found: {firm} ({url}).\n\nIts profile, with line numbers:\n\n{shown}\n\n"
                                  f"This step takes a first look at a firm. Emit the answer per PROSPECT.md §19.",
-                        schemas.first_look_schema(), 2048)
+                        schemas.first_look_schema(), 4096)
             lo = look.get("obj") if isinstance(look.get("obj"), dict) else {}
             rec: Dict[str, Any] = {"at": today(), "firm": firm, "url": url, "kind_sought": kind, "query": q,
                                    "fits": lo.get("fits"), "prospect_type": lo.get("prospect_type"),
@@ -974,30 +974,41 @@ def backup(data: Path) -> Path:
     return dest
 
 
-def daily(backend, writer, data: Path, pool: int, want: int) -> str:
+def _is_strong(c: Dict[str, Any], data: Path) -> bool:
+    return (_read_json(data / slug(c["name"]) / "qualification.json") or {}).get("category") == "strong"
+
+
+def daily(backend, writer, data: Path, strong: int, most: int) -> str:
     """The whole day's work, in order: a backup of the records; the names waiting at Research in the contacts;
     the replies recorded and not yet read, and the follow-ups that are due;
-    then, when fewer than `pool` people are Ready to contact, a scout for the
-    day's kind. Everything qualified is pushed. Returns what a
-    person needs to read."""
+    then scouting, one person at a time with the kinds in turn from the day's
+    kind, until the day has `strong` new strong candidates or `most` people
+    scouted have been researched. Everything qualified is pushed. Returns what
+    a person needs to read."""
     data.mkdir(parents=True, exist_ok=True)
     logger.info("backup: %s", backup(data))
     named = pickup(data)
     work(backend, writer, named, STAGES + ("push",), data, use_contacts=True)
     work(backend, writer, unpushed(data), ("push",), data, use_contacts=True)      # left by an earlier scout
     read, drafted = replies(backend, writer, data), followups(writer, data)
-    ready = sum(1 for e in contacts.entries() if contacts.stage_of(e) == "Ready to contact")
     lines = [f"Names you added, researched today: {len(named)}.",
              f"Replies read: {len(read)}{' (' + ', '.join(read) + ')' if read else ''}.",
-             f"Follow-ups drafted: {len(drafted)}{' (' + ', '.join(drafted) + ')' if drafted else ''}.",
-             f"Ready to contact before scouting: {ready} (scouting starts below {pool})."]
+             f"Follow-ups drafted: {len(drafted)}{' (' + ', '.join(drafted) + ')' if drafted else ''}."]
+    got = sum(_is_strong(c, data) for c in named)
+    start = DAILY_KINDS.index(next_kind())
+    kinds = list(DAILY_KINDS[start:] + DAILY_KINDS[:start])
     scouted: List[Dict[str, Any]] = []
-    if ready < pool:
-        kind = next_kind()
-        by_firm = kind in FIRM_KINDS
-        lines.append(f"Scouted for: {kind}{', by firm' if by_firm else ''}.")
-        scouted = (scout_firms if by_firm else scout)(backend, kind, data, want)
-        work(backend, writer, scouted, STAGES + ("push",), data, use_contacts=True)
+    while kinds and got < strong and len(scouted) < most:
+        kind = kinds.pop(0)
+        found = (scout_firms if kind in FIRM_KINDS else scout)(backend, kind, data, 1)
+        if not found:
+            logger.info("scout: nobody new for %s; it is left out for the rest of the day", kind)
+            continue
+        kinds.append(kind)
+        work(backend, writer, found, STAGES + ("push",), data, use_contacts=True)
+        scouted += found
+        got += _is_strong(found[0], data)
+    lines.append(f"Strong today: {got} (target {strong}); scouted people researched: {len(scouted)} of at most {most}.")
     ready = sum(1 for e in contacts.entries() if contacts.stage_of(e) == "Ready to contact")
     lines.append(f"Ready to contact now: {ready}.")
     return summary(named + scouted, data) + "\n" + "\n".join(lines) + "\n"
@@ -1017,10 +1028,12 @@ def main() -> int:
     ap.add_argument("--firms", action="store_true",
                     help="for `scout`: find firms of the kind, then the person to approach at each")
     ap.add_argument("--want", type=int, default=3,
-                    help="for `scout` and `daily`: how many of the people found go on to research now; "
+                    help="for `scout`: how many of the people found go on to research now; "
                          "the rest wait for the next scout (research costs searches)")
-    ap.add_argument("--pool", type=int, default=5,
-                    help="for `daily`: scout when fewer than this many people are Ready to contact")
+    ap.add_argument("--strong", type=int, default=5,
+                    help="for `daily`: scouting stops when the day has this many new strong candidates")
+    ap.add_argument("--most", type=int, default=15,
+                    help="for `daily`: scouting stops when this many people it found have been researched")
     ap.add_argument("--scouted", action="store_true",
                     help="the candidates are the people scouting found to fit who are qualified and not yet pushed")
     ap.add_argument("--only", default=None, help="one candidate, by slug (the name in lower case, _ for spaces)")
@@ -1035,7 +1048,7 @@ def main() -> int:
     writer = (backend_from_model(args.writer)
               if args.stage in ("daily", "followups", "replies") or "draft" in stages else None)
     if args.stage == "daily":
-        print(daily(backend, writer, args.data, args.pool, args.want))
+        print(daily(backend, writer, args.data, args.strong, args.most))
         return 0
     if args.stage in ("followups", "replies"):
         args.data.mkdir(parents=True, exist_ok=True)

@@ -2,7 +2,7 @@
 # The day's outreach work: start the page if it is not up, run `runner.py daily`,
 # and say where to look. Run it from anywhere:
 #
-#     workflowsv2/outreach/daily.sh [--pool 5] [--want 3]
+#     workflowsv2/outreach/daily.sh [--strong 5] [--most 15]
 #
 # The three API keys are read from the environment, and from ~/.bashrc for any
 # that are not set there (a shell that is not interactive does not load it).
