@@ -150,6 +150,17 @@ carried only the properties the action schema declares, `thought` and `tool`, an
 no tool arguments, so no tool call could run. Unqualified; recorded in
 `model_params.RETIRED`, Bruce's decision 2026-09-26.
 
+**Inadmissible on throughput — `MiMo-V2.6-Pro`, 2026-09-27.** Not on
+Fireworks. Served directly by DeepInfra as `XiaomiMiMo/MiMo-V2.6-Pro`; gate 1
+passed five of five, schema-valid, `finish_reason: stop`, and completion tokens
+were in range (120–2,048). It fails on speed: 10–21 tok/s on DeepInfra, one
+call 202 s for 2,048 tokens, and 7.5–8.3 tok/s on Xiaomi's own endpoint through
+OpenRouter, whose listed medians for all three providers are 17–26 tok/s.
+MiMo-V2.6-Flash was dropped from the chhoto comparison for 300 s read timeouts
+on DeepInfra, and this model is slower. Bruce ruled it inadmissible; no
+temperature was requested and none is configured. Re-screen if a faster host
+serves it.
+
 **Watch item, open.** `Qwen3.8-27B` is on record as unusable for this METHOD —
 two of three runs inadmissible, from citing claim ordinals rather than line
 numbers. `qwen/qwen3.8-flash` is a different model, so it does not transfer, but
