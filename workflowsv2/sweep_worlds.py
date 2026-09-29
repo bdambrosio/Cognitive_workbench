@@ -21,6 +21,8 @@ WHAT IS KEPT, by name, whatever its age:
   client_*          intake conversations, same (intake/session.py names the
                     world client_<engagement>)
   intake_*          intake worlds under an earlier name
+  consult_*         consultation co-pilot worlds (ayur_consult/session.py names
+                    the world consult_<case>); a consultation can be continued
   demo_*            the public demo's visitor worlds; src/demo/app.py sweeps
                     these on its own schedule (demo.yaml keep_days)
 
@@ -38,7 +40,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 SCENARIOS = REPO / "scenarios"
-KEEP_PREFIXES = ("jill_", "post_", "client_", "intake_", "demo_")
+KEEP_PREFIXES = ("jill_", "post_", "client_", "intake_", "demo_", "consult_")
 
 
 def candidates(days: int) -> list[tuple[Path, float]]:
