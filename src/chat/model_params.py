@@ -123,6 +123,14 @@ MODEL_TEMPERATURE: Dict[str, float] = {
     # (accounts/fireworks/models/glm-5p3-flash). Bruce confirmed 2026-09-02
     # that the Fireworks route inherits the GLM-5.3-Flash setting.
     "glm-5p3-flash": 1.0,
+    # The full GLM-5.3 (not Flash), through Fireworks' fast router
+    # (accounts/fireworks/routers/glm-5p3-fast). NO PUBLISHER RECOMMENDATION
+    # for agentic work: Fireworks' page gives Z.ai's defaults, 1.0 / top_p
+    # 0.95, and the card only per-benchmark configs (1.0/0.95 HLE with tools,
+    # 1.0/1.0 Terminal Bench and DeepSWE). Bruce chose 1.0 with the global
+    # top_p on 2026-09-27, as for Flash. The key names the router, not
+    # `glm-5p3`, which would also match `glm-5p3-flash`.
+    "glm-5p3-fast": 1.0,
     # Qwen3.8-Flash on OpenRouter (`qwen/qwen3.8-flash`). Bruce confirmed 1.0
     # on 2026-08-28, for BOTH the reasoning-on and reasoning-off arms.
     #

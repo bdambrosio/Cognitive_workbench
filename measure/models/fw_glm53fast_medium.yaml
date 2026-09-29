@@ -1,0 +1,26 @@
+# The full GLM-5.3 (not Flash) through Fireworks' fast router, added
+# 2026-09-27. The plain route, accounts/fireworks/models/glm-5p3, returned
+# HTTP 500 on 5 of 10 pre-screen calls the same day, so it is not used.
+#
+# Prescreened 2026-09-27 with the real payload (measure/prescreen.py, direct
+# URL): schema-valid 5/5, finish stop; low 87-129 completion tokens in
+# 0.7-1.2 s, medium 182-235 in 1.5-2.1 s; 102-119 tok/s.
+#
+# PRICE $2.10 in / $0.39 cached / $6.60 out per M tokens, from third-party
+# listings of this router (the plain route's Fireworks page gives $1.40 /
+# $0.26 / $4.40). GLM-5.3-Flash is $0.15 / $0.03 / $0.50.
+#
+# DATA RETENTION: open weights (huggingface.co/zai-org/GLM-5.3), so
+# Fireworks' documented default zero-data retention for open models applies.
+# Not separately confirmed for the router.
+#
+# TEMPERATURE resolves through src/chat/model_params.py ("glm-5p3-fast" ->
+# 1.0; no publisher agentic value, Bruce's choice 2026-09-27).
+llm_config:
+  server: local
+  model: "accounts/fireworks/routers/glm-5p3-fast"
+  vllm_url: https://api.fireworks.ai/inference/v1
+  # NAME of the env var holding the bearer token, not the token.
+  api_key: FIREWORKS_API_KEY
+  is_reasoning_model: true
+  reasoning_effort: medium
