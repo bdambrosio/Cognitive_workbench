@@ -674,3 +674,12 @@ def test_an_evidence_page_keeps_its_text_but_not_embedded_image_data(tmp_path):
     assert blob not in saved
     assert "Sailash Mani" in saved and "We buy practices." in saved
     assert len(saved) < 500
+
+
+def test_the_search_service_profile_link_is_not_the_firm_domain():
+    # Scouted people carry their Exa profile link; it was taken as their
+    # firm's domain, so two unrelated people read as colleagues and an email
+    # lookup went to exa.ai (2026-09-29).
+    exa_link = "https://exa.ai/library/person/5tfh9fzzwyq"
+    assert runner.firm_domain({"urls": [exa_link]}) == ""
+    assert runner.firm_domain({"urls": [exa_link, "https://stainless.example/team"]}) == "stainless.example"

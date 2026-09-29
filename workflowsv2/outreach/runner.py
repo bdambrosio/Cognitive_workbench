@@ -305,12 +305,17 @@ def research(backend, c: Dict[str, Any], cand_dir: Path) -> Dict[str, Any]:
     return rec
 
 
+#: Hosts whose links are profiles of a person on a service, never the person's firm.
+PROFILE_HOSTS = NOT_FETCHABLE + ("exa.ai",)
+
+
 def firm_domain(c: Dict[str, Any]) -> str:
     """The web domain of the candidate's firm: the host of the first link that
-    is not a profile on a site the program does not fetch."""
+    is not a profile on a service (LinkedIn, or the search service that found
+    the person)."""
     for u in c.get("urls") or []:
         host = urlparse(u).netloc.lower().removeprefix("www.")
-        if host and not any(host == h or host.endswith("." + h) for h in NOT_FETCHABLE):
+        if host and not any(host == h or host.endswith("." + h) for h in PROFILE_HOSTS):
             return host
     return ""
 
