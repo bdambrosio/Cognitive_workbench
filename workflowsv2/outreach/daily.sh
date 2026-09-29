@@ -4,8 +4,9 @@
 #
 #     workflowsv2/outreach/daily.sh [--strong 5] [--most 15]
 #
-# The three API keys are read from the environment, and from ~/.bashrc for any
-# that are not set there (a shell that is not interactive does not load it).
+# The three API keys are read from the environment, and from ~/.config/secrets.env
+# for any that are not set there. A shell that is not interactive does not load
+# ~/.bashrc, which is what loads that file.
 
 set -u
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -16,10 +17,10 @@ mkdir -p "$LOG"
 
 for k in EXA_API_KEY TAVILY_API_KEY CLAUDE_API_KEY; do
   if [ -z "${!k:-}" ]; then
-    v="$(grep -m1 "^export $k=" "$HOME/.bashrc" | sed -e "s/^export $k=//" -e 's/^["'"'"']//' -e 's/["'"'"']$//')"
+    v="$(grep -m1 "^export $k=" "$HOME/.config/secrets.env" | sed -e "s/^export $k=//" -e 's/^["'"'"']//' -e 's/["'"'"']$//')"
     [ -n "$v" ] && export "$k=$v"
   fi
-  [ -n "${!k:-}" ] || { echo "$k is not set, here or in ~/.bashrc"; exit 1; }
+  [ -n "${!k:-}" ] || { echo "$k is not set, here or in ~/.config/secrets.env"; exit 1; }
 done
 
 if ! curl -s -m 5 "http://127.0.0.1:5000/v1/models" > /dev/null; then
