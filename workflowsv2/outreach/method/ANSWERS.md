@@ -17,9 +17,10 @@ sent, and he edits or cancels each one before it is added.
 
 ## We already ask Claude or GPT about the data room. How is this different?
 
-Many teams already do. The difference is what you can check afterwards. Tuuyi
-writes down the seller's claims before testing any of them, tests each one that
-matters against the code, and every finding names the file and lines it rests
+Many teams already do. A model answers the questions you think to ask it.
+Tuuyi starts from the other end: it identifies every claim the seller's
+documents make and settles that list before testing any of them, then tests the
+material ones against the code. Every finding names the file and lines it rests
 on. What it could not settle, and what it did not examine, are listed too, so
 you can see where the answer stops. A second pass that did not do the review
 re-reads the evidence behind every finding, and a person reads the report
