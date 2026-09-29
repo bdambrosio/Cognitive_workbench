@@ -380,3 +380,16 @@ A day's output is normally five strong prospects, and fewer when fewer meet the 
 <!-- audience: practice -->
 
 Track which kinds of prospect respond; which wording brings substantive replies, including which value of each choice in §11; which uses are recognised; which objections recur; whether "review before diligence" works better than "claims review"; whether advisers, investors or acquirers show the strongest demand; whether the comparison with pointing AI at the data room is recognised; which evidence of fit predicts a useful conversation. Do not optimise for response rate. A useful response is one that improves understanding of the market, brings a credible referral, produces a test case, or shows a real buying use.
+
+## 29. Output: is this address where the person works now
+
+Asked before an email address for the person is recorded. You are given the candidate record, the address, where it came from, the organisation a service ties it to, and the evidence files.
+
+| Field | Contents |
+|---|---|
+| `current` | `yes` when the evidence shows the person works now at the organisation the address belongs to: a role marked current or with no end date. `no` when it shows they have left. `unsure` otherwise |
+| `organisation` | That organisation, as the evidence names it, or empty |
+| `citation` | One citation, in the form given in §14, to the lines that show the current role. Required for `yes` |
+| `reason` | One sentence a person can check against the citation |
+
+Emit nothing outside the JSON object.

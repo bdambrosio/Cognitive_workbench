@@ -40,7 +40,7 @@ from fastapi import FastAPI, HTTPException                              # noqa: 
 from fastapi.responses import FileResponse                              # noqa: E402
 from pydantic import BaseModel                                          # noqa: E402
 
-from workflowsv2.outreach import contacts, exa, runner, schemas           # noqa: E402
+from workflowsv2.outreach import contacts, runner, schemas                # noqa: E402
 from utils.file_utils import atomic_write_text                          # noqa: E402
 from client_ui import mail                                              # noqa: E402
 
@@ -375,13 +375,12 @@ def opted_out(body: Record) -> Dict[str, Any]:
 
 @app.post("/api/find_email")
 def find_email(body: Record) -> Dict[str, Any]:
-    """Look up the contact's work address with Exa (about $0.045 a lookup)."""
+    """Look up the contact's work address with the address-finding services;
+    an address is recorded only when the evidence shows they work there now."""
     if contacts.opted_out(body.record_id):
         raise HTTPException(409, "they asked not to be contacted again")
     try:
         return runner.look_up_email(body.record_id)
-    except exa.ExaError as e:
-        raise HTTPException(502, f"lookup failed: {e}")
     except contacts.ContactError as e:
         raise HTTPException(422, str(e))
 

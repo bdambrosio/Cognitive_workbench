@@ -344,9 +344,11 @@ async function optedOut(i) {
   await call("/api/opted_out", {record_id: cards[i].record_id}); note("Recorded."); load();
 }
 async function findEmail(i) {
-  note("Looking up the address; this takes about ten seconds.");
+  note("Looking up the address; this takes up to a minute.");
   const r = await call("/api/find_email", {record_id: cards[i].record_id});
-  if (r) { note(r.email ? `Found ${r.email} (${r.confidence || "no confidence given"}). Its sources are in a note.` : "No address found."); load(); }
+  if (r) { note(!r.email ? "No address found."
+      : r.current === "yes" ? `Recorded ${r.email} (from ${r.source}).`
+      : `${r.source} gave ${r.email}, not recorded: the evidence does not show they work there now. See the note.`); load(); }
 }
 async function answerSent(i, note_id) {
   const message = $("msg" + i).value.trim();

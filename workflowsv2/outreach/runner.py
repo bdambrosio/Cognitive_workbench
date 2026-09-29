@@ -113,7 +113,7 @@ for p in (str(REPO), str(REPO / "src")):
 from workflowsv2 import issues                                          # noqa: E402
 from workflowsv2.emit import emit                                       # noqa: E402
 from workflowsv2.claims_audit.decompose import backend_from_model       # noqa: E402
-from workflowsv2.outreach import contacts, exa, schemas                   # noqa: E402
+from workflowsv2.outreach import contacts, email_finder, exa, schemas     # noqa: E402
 from chat.workflow import load_workflow                                 # noqa: E402
 from utils import tavily_client                                         # noqa: E402
 from utils.doc_extract import html_to_markdown, pdf_to_markdown         # noqa: E402
@@ -513,27 +513,77 @@ def email_allowed(q: Dict[str, Any]) -> bool:
     return q.get("region") in EMAIL_REGIONS or bool(q.get("email"))
 
 
-def look_up_email(cid: str) -> Dict[str, Any]:
-    """Ask Exa for the work address of a contact who has none; write it to the
-    contact with a note saying where it came from. Returns what Exa gave.
-    Raises exa.ExaError when the lookup fails."""
+#: The address-finding services, asked in this order (email_finder.py).
+FINDERS = (("Findymail", email_finder.findymail), ("Prospeo", email_finder.prospeo))
+_checker = None
+
+
+def _check_backend():
+    """The model that checks an address (PROSPECT.md §29), made on first use:
+    the page asks for addresses without a run of its own."""
+    global _checker
+    if _checker is None:
+        _checker = backend_from_model(MODEL)
+    return _checker
+
+
+def address_current(c: Dict[str, Any], cand_dir: Path, email: str, organisation: str,
+                    source: str) -> Dict[str, Any]:
+    """Whether the evidence shows the person works now where `email` belongs
+    (PROSPECT.md §29): {"current", "organisation", "citation", "reason"}."""
+    files = kept_files(_read_json(cand_dir / "research.json") or {"files": []})
+    evidence = load_evidence(cand_dir, [f["file"] for f in files])
+    user = (f"{candidate_text(c)}\n\nThe address: {email}\nWhere it came from: {source}"
+            + (f"\nThe organisation the service ties it to: {organisation}" if organisation else "")
+            + f"\n\nToday is {today()}.\n\n{evidence_block(cand_dir, files)}\n\n"
+            "This step checks an email address before it is recorded. Emit the answer per PROSPECT.md §29.")
+    out = _ask(_check_backend(), user, schemas.address_schema(), 4096)
+    return schemas.clean_address(out.get("obj"), evidence)
+
+
+def record_address(cid: str, cand_dir: Path, email: str, organisation: str, source: str) -> Dict[str, Any]:
+    """Check one address against the evidence in `cand_dir` and write it to
+    the contact only when the evidence shows the person works there now. A
+    note records the address, where it came from and the check's answer
+    either way."""
+    c = (yaml.safe_load((cand_dir / "candidate.yaml").read_text(encoding="utf-8"))
+         if (cand_dir / "candidate.yaml").is_file() else {"name": contacts.get(cid)["name"]})
+    chk = address_current(c, cand_dir, email, organisation, source)
+    if chk["current"] == "yes":
+        contacts.update_person(cid, {"email": email})
+    cite = chk["citation"]
+    contacts.create_note(cid, f"{contacts.EMAIL_FOUND_NOTE} {today()}",
+                         f"{source} gave {email}" + (f" ({organisation})" if organisation else "") + ". "
+                         + ("Recorded. " if chk["current"] == "yes"
+                            else f"Not recorded: whether they work there now is {chk['current']}. ")
+                         + chk["reason"]
+                         + (f"\n- \"{cite['quote']}\" ({cite['file']} lines {cite['lines'][0]}-{cite['lines'][1]})"
+                            if cite else ""))
+    logger.info("%s: %s gave %s; current employer: %s", c["name"], source, email, chk["current"])
+    return {"email": email, "source": source, "organisation": organisation, **chk}
+
+
+def look_up_email(cid: str, cand_dir: Optional[Path] = None) -> Dict[str, Any]:
+    """Find a verified work address for a contact who has none: each service
+    in FINDERS in turn, each address checked by record_address, until one is
+    recorded. `cand_dir` holds the person's evidence; by default the runner's
+    directory for them. Returns the last address checked, or {"email": ""}
+    when no service found one."""
     person = contacts.get(cid)
     if person.get("email"):
-        return {"email": person["email"], "sources": [], "confidence": "", "cost": 0, "run": ""}
-    # A contact found by scouting has no firm or title on record; what the
-    # qualification says the person does (from checked evidence) stands in.
-    q = _read_json(DATA / cid / "qualification.json") or {}
-    about = next((a["answer"] for a in q.get("answers") or [] if a.get("question") == 1), "")
-    found = exa.find_email(person["name"], str(person.get("firm") or ""), str(person.get("title") or ""),
-                           str(person.get("linkedin") or ""), about)
-    logger.info("%s: email lookup gave %r (%s, $%s)", person["name"], found["email"], found["confidence"], found["cost"])
-    if found["email"]:
-        contacts.update_person(cid, {"email": found["email"]})
-        contacts.create_note(cid, f"{contacts.EMAIL_FOUND_NOTE} {today()}",
-                             f"Exa's lookup gave {found['email']} (confidence: {found['confidence'] or 'not given'}; "
-                             f"cost ${found['cost']}; run {found['run']}). The sources it cites, which need not show "
-                             "the address itself:\n" + "\n".join(found["sources"] or ["(none)"]))
-    return found
+        return {"email": person["email"], "current": "yes", "source": "the contact record"}
+    last: Dict[str, Any] = {"email": ""}
+    for name, find in FINDERS:
+        try:
+            got = find(person["name"], str(person.get("linkedin") or ""), str(person.get("domain") or ""))
+        except email_finder.FinderError as e:
+            logger.warning("%s: %s failed: %s", person["name"], name, e)
+            continue
+        if got["email"]:
+            last = record_address(cid, cand_dir or DATA / cid, got["email"], got["organisation"], name)
+            if last["current"] == "yes":
+                break
+    return last
 
 
 def push(c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]]:
@@ -563,13 +613,11 @@ def push(c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]]:
         logger.info("%s: asked not to be contacted again; nothing is pushed", c["name"])
         _write_json(cand_dir / "pushed.json", {"at": today(), "contact_id": rid, "opted_out": True})
         return None
-    if q.get("email") and not person.get("email"):
-        contacts.update_person(rid, {"email": q["email"]})   # an address a checked quote shows; never overwrites
-    elif category == "strong" and email_allowed(q) and not person.get("email"):
-        try:
-            look_up_email(rid)
-        except exa.ExaError as e:
-            logger.warning("%s: email lookup failed: %s", c["name"], e)
+    if not person.get("email"):                         # an address on record is never replaced
+        if q.get("email"):                              # a checked quote shows it; is it where they work now?
+            record_address(rid, cand_dir, q["email"], "", "a page in the evidence")
+        if category == "strong" and email_allowed(q) and not contacts.get(rid).get("email"):
+            look_up_email(rid, cand_dir)
     entry = None if created else contacts.entry_of(rid)
     if entry is not None and contacts.stage_of(entry) not in OURS:
         logger.info("%s: the entry is at '%s', set by a person; left alone", c["name"], contacts.stage_of(entry))

@@ -1,5 +1,5 @@
 """The output schemas of the outreach calls, and the checks that run after an
-answer is parsed. PROSPECT.md §12-§23 say what makes a field correct; the
+answer is parsed. PROSPECT.md §12-§23 and §29 say what makes a field correct; the
 field names here and there must agree.
 """
 from __future__ import annotations
@@ -22,6 +22,7 @@ RELATIONSHIPS = ("Warm", "Cold", "Referral")
 RECOGNITION = ("Unknown", "Weak", "Strong", "Immediate need")
 CATEGORIES = ("strong", "plausible", "weak", "reject")
 ABOUT = ("yes", "no", "unsure")
+CURRENT = ("yes", "no", "unsure")
 QUESTIONS = 9
 #: PROSPECT.md §11 asks for about 100 words and never more than 130; the flag allows a
 #: few words over the ceiling, which read no worse (Bruce, 2026-09-26).
@@ -86,6 +87,27 @@ def whom_schema() -> Dict[str, Any]:
         "first": _STR, "first_role": _STR, "first_citation": CITATION,
         "alternate": _STR, "reason": _STR},
         "required": ["first", "first_role", "alternate", "reason"]}
+
+
+def address_schema() -> Dict[str, Any]:
+    return {"type": "object", "properties": {
+        "current": {"type": "string", "enum": list(CURRENT)},
+        "organisation": _STR, "citation": CITATION, "reason": _STR},
+        "required": ["current", "organisation", "reason"]}
+
+
+def clean_address(obj: Any, evidence: Dict[str, List[str]]) -> Dict[str, Any]:
+    """The check of an address (PROSPECT.md §29). `yes` stands only on a
+    citation that the program finds in the evidence; without one it becomes
+    `unsure`, and the address is not recorded."""
+    obj = obj if isinstance(obj, dict) else {}
+    current = obj.get("current") if obj.get("current") in CURRENT else "unsure"
+    kept, dropped = check_citations([obj["citation"]] if isinstance(obj.get("citation"), dict) else [], evidence)
+    reason = str(obj.get("reason") or "").strip()
+    if current == "yes" and not kept:
+        current, reason = "unsure", f"{reason} (The citation for a current role was not found in the evidence.)".strip()
+    return {"current": current, "organisation": str(obj.get("organisation") or "").strip(),
+            "citation": kept[0] if kept else None, "reason": reason}
 
 
 def qualification_schema() -> Dict[str, Any]:

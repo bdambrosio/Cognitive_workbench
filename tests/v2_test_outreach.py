@@ -683,3 +683,51 @@ def test_the_search_service_profile_link_is_not_the_firm_domain():
     exa_link = "https://exa.ai/library/person/5tfh9fzzwyq"
     assert runner.firm_domain({"urls": [exa_link]}) == ""
     assert runner.firm_domain({"urls": [exa_link, "https://stainless.example/team"]}) == "stainless.example"
+
+
+def _with_address(tmp_path, monkeypatch, checks, found=()):
+    """A strong candidate in the US whose evidence shows `jane@old.example`;
+    `checks` are the answers of the address check (PROSPECT.md §29) in turn,
+    `found` what the address-finding services return in turn."""
+    _qualified(tmp_path, monkeypatch, "strong")
+    q = json.loads((tmp_path / "qualification.json").read_text())
+    q.update(email="jane@old.example", region="us")
+    (tmp_path / "qualification.json").write_text(json.dumps(q))
+    monkeypatch.setattr(runner, "emit", _fake(checks, []))
+    monkeypatch.setattr(runner, "_check_backend", lambda: Backend())
+    found = list(found)
+    monkeypatch.setattr(runner, "FINDERS", tuple(
+        (f"Finder{i}", lambda *a, _r=r: _r) for i, r in enumerate(found)))
+
+
+def test_an_address_where_the_person_no_longer_works_is_not_recorded(tmp_path, monkeypatch, store):
+    # Sean McSweeney's address came from a page about the job he left in
+    # April; it was written to his record as it stood (2026-09-29).
+    _with_address(tmp_path, monkeypatch,
+                  [{"current": "no", "organisation": "Old Co", "reason": "She left Old Co in 2025."}])
+    runner.push(CAND, tmp_path)
+    c = store.get("jane_smith")
+    assert c["email"] == ""
+    assert any("jane@old.example" in n["text"] and "Not recorded" in n["text"] for n in c["notes"])
+
+
+def test_the_next_service_is_asked_when_an_address_fails_the_check(tmp_path, monkeypatch, store):
+    cited = _cite("Several of our sellers are entering diligence at the same time.")
+    _with_address(tmp_path, monkeypatch,
+                  [{"current": "no", "organisation": "Old Co", "reason": "left"},
+                   {"current": "no", "organisation": "Past Co", "reason": "left"},
+                   {"current": "yes", "organisation": "Acme Advisers", "citation": cited, "reason": "current role"}],
+                  found=[{"email": "jane@past.example", "organisation": "Past Co"},
+                         {"email": "jane@acme.example", "organisation": "Acme Advisers"}])
+    runner.push(CAND, tmp_path)
+    c = store.get("jane_smith")
+    assert c["email"] == "jane@acme.example"
+    assert sum("Not recorded" in n["text"] for n in c["notes"]) == 2
+
+
+def test_a_current_employer_without_a_citation_in_the_evidence_is_not_enough(tmp_path, monkeypatch, store):
+    _with_address(tmp_path, monkeypatch,
+                  [{"current": "yes", "organisation": "Old Co", "citation": _cite("words that are not there"),
+                    "reason": "current"}])
+    runner.push(CAND, tmp_path)
+    assert store.get("jane_smith")["email"] == ""
