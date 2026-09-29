@@ -1,0 +1,22 @@
+# OpenAI gpt-6.1-sol, direct, added 2026-09-29 (released that day).
+#
+# Prescreened 2026-09-29 with the real payload, direct: schema-valid 10/10 at
+# efforts low and medium, 192-276 completion tokens, 4.8-6.3 s, 35-46 tok/s.
+# The API rejects `max_tokens` and `top_p`; the backend renames the first to
+# `max_completion_tokens` and drops the second on the first 400.
+#
+# EFFORT `medium`, the model's default, for gate 3.
+#
+# PRICE $2.00 in / $0.10 cached / $10.00 out per M tokens (model page,
+# 2026-09-29).
+#
+# TEMPERATURE resolves through src/chat/model_params.py ("gpt-6.1-sol" -> 1.0;
+# no publisher value, the only value the API accepts; Bruce, 2026-09-29).
+llm_config:
+  server: local
+  model: "gpt-6.1-sol"
+  vllm_url: https://api.openai.com/v1
+  # NAME of the env var holding the bearer token, not the token.
+  api_key: OPENAI_API_KEY
+  is_reasoning_model: true
+  reasoning_effort: medium
