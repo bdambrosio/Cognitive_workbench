@@ -661,3 +661,16 @@ def test_an_approved_answer_is_added_only_as_edited_and_cancel_writes_nothing(tm
     text = (tmp_path / "ANSWERS.md").read_text()
     assert text.startswith("# Approved answers\n\n## Does it run the code?\n\nNo, it reads it.\n")
     assert [r["faq"] for r in json.loads((tmp_path / "jane_smith" / "replies.json").read_text())] == ["cancelled", "added"]
+
+
+def test_an_evidence_page_keeps_its_text_but_not_embedded_image_data(tmp_path):
+    # A page saved with its photos inlined as base64 was 170k characters in
+    # ~1,000 words: the word cut let it through and it overflowed the model's
+    # context, stopping the day's run (2026-09-29).
+    blob = "iVBORw0KGgo" + "A" * 50000
+    text = f"Our team\n\n![Sailash Mani](data:image/jpeg;base64,{blob})\n\nWe buy practices."
+    name = runner.save_evidence(tmp_path, 1, "page", {"Source": "https://x.test"}, text)
+    saved = (tmp_path / name).read_text(encoding="utf-8")
+    assert blob not in saved
+    assert "Sailash Mani" in saved and "We buy practices." in saved
+    assert len(saved) < 500

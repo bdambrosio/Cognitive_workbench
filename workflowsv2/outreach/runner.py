@@ -94,6 +94,7 @@ import datetime
 import json
 import logging
 import random
+import re
 import sys
 import types
 import urllib.request
@@ -192,11 +193,19 @@ def page_text(url: str) -> Optional[str]:
         return None
 
 
+#: An image inlined in a page as base64 (`data:image/png;base64,...`). It is
+#: never evidence, and one photo can be 100k characters in a single "word",
+#: which the word limit on a page shown to the model does not catch.
+EMBEDDED_DATA = re.compile(r"data:[\w.+-]+/[\w.+-]+;base64,[A-Za-z0-9+/=]+")
+
+
 def save_evidence(ev_dir: Path, n: int, label: str, header: Dict[str, str], text: str) -> str:
     """Write one evidence file and return its name. The header lines are part
-    of the file, so the line numbers the model cites count from the top."""
+    of the file, so the line numbers the model cites count from the top.
+    Embedded image data is replaced by a short marker; the alt text stays."""
     name = f"{n:02d}_{slug(label)[:40] or 'page'}.md"
     head = "\n".join(f"{k}: {v}" for k, v in header.items() if v)
+    text = EMBEDDED_DATA.sub("data:(embedded image removed)", text)
     atomic_write_text(ev_dir / name, f"{head}\n---\n{text.strip()}\n")
     return name
 
