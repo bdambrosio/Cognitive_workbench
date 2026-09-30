@@ -58,10 +58,29 @@ RATING_WORDS = {
 }
 
 
+DISPOSITIONS = "dispositions.json"
+PRACTICE_REVIEW_WORDS = {"retained": "retained after review by the practice",
+                         "unresolved": "unresolved; the practice has not decided between the finding and the check"}
+
+
+def apply_dispositions(merged: Dict[str, Any], merged_dir: Path) -> None:
+    """Put the practice's decision on each finding the check did not uphold
+    into that finding as `disposition`. The decisions are written by hand,
+    after reading the finding and the check, in DISPOSITIONS beside
+    merged.json: {"<claim source>#<claim id>": {"disposition": "retained" |
+    "unresolved", "note": "..."}}."""
+    p = Path(merged_dir) / DISPOSITIONS
+    disp = json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {}
+    for f in merged.get("findings") or []:
+        if _key(f) in disp:
+            f["disposition"] = disp[_key(f)]
+
+
 def load(merged_dir: Path) -> Dict[str, Any]:
     merged_dir = Path(merged_dir)
     merged = json.loads((merged_dir / "merged.json").read_text(encoding="utf-8"))
     ratings = json.loads((merged_dir / "materiality.json").read_text(encoding="utf-8"))
+    apply_dispositions(merged, merged_dir)
     from workflowsv2.composition import scan as composition
     return {"merged": merged, "ratings": ratings, "dir": merged_dir,
             "covered": covered_by(merged_dir), "not_tested": not_tested(merged_dir),
@@ -355,6 +374,10 @@ def _finding(f: Dict[str, Any], rating: Optional[Dict[str, Any]],
         out += [f"**Question for the seller:** {_md_safe(q)}", ""]
     out += ["", "Evidence:", ""] + (_evidence(f.get("evidence")) or ["- (none)"])
     out += ["", f"Check: {_review_line(f)}.", ""]
+    d = f.get("disposition")
+    if d:
+        out += [f"Practice review: {PRACTICE_REVIEW_WORDS[d['disposition']]}."
+                + (f" {_md_safe(d['note'])}" if d.get("note") else ""), ""]
     return out
 
 
@@ -469,7 +492,9 @@ def _how_to_read() -> List[str]:
         "would change for this transaction. A *check* is an independent "
         "second pass over each finding's evidence, and a *retest* is a "
         "second check, blind to the first, on the findings the check "
-        "questioned. Each finding ends with the check's outcome. A finding "
+        "questioned. Each finding ends with the check's outcome; where the "
+        "check did not uphold a finding, a *practice review* line may follow, "
+        "saying whether the practice retained it or left it unresolved. A finding "
         "marked *covered by* names a wider claim of which this one is a "
         "part, with that claim's verdict beside it; the two were tested "
         "separately and each verdict is its own.", "",

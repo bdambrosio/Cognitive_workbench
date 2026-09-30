@@ -57,7 +57,9 @@ def deliverable_digest(merged: Dict[str, Any], merged_dir: Path,
                      + (f"; {'exposure' if 'exposure' in r else 'materiality'}: {rating}"
                         + (" (borderline)" if r.get("borderline") else "") if rating else "")
                      + (f"; check: {(f.get('review') or {}).get('outcome')}"
-                        if (f.get("review") or {}).get("outcome") else ""))
+                        if (f.get("review") or {}).get("outcome") else "")
+                     + (f"; practice review: {f['disposition']['disposition']}"
+                        if f.get("disposition") else ""))
         lines.append(f"quote: {_clip(f.get('quote'), 240)}")
         if adj.get("gap"):
             lines.append(f"gap: {_clip(adj.get('gap'), gap_chars)}")
@@ -96,6 +98,8 @@ class PostSession:
             raise SystemExit(f"{self.merged_dir}: no merged.json — not a "
                              f"merged output directory")
         self.merged = json.loads((self.merged_dir / "merged.json").read_text(encoding="utf-8"))
+        from workflowsv2.audit_report.render import apply_dispositions   # noqa: E402
+        apply_dispositions(self.merged, self.merged_dir)
         # THE TARGET IS A PATH, NOT A PIN: see continuation.py.
         self.target = (target or eng["target"]).resolve()
         self.eng_dir = eng["dir"]
@@ -197,6 +201,7 @@ class PostSession:
                 "gap": adj.get("gap"),
                 "unresolved_because": adj.get("unresolved_because"),
                 "review": (f.get("review") or {}).get("outcome"),
+                "practice_review": f.get("disposition"),
                 "evidence": ev}
         return out
 

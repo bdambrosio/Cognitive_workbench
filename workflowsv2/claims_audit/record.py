@@ -305,6 +305,10 @@ class ClaimRecord:
                        + (f" (observations: {', '.join(map(str, obs))})" if obs else ""))
         else:
             out.append("  check: none recorded")
+        if f.get("disposition"):
+            d = f["disposition"]
+            out.append(f"  practice review: {d.get('disposition')}"
+                       + (f" — {d['note']}" if d.get("note") else ""))
         if f.get("citation_problems"):
             out.append("  citation problems recorded at delivery:\n"
                        + _indent("\n".join(map(str, f["citation_problems"])), "    "))
