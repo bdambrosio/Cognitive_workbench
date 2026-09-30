@@ -17,7 +17,7 @@ TYPES = ("M&A adviser", "Repeat acquirer", "Searcher", "Small PE-family office",
 #: Which side of a transaction the person works for (PROSPECT.md §4).
 SIDES = ("buy", "sell", "both", "unknown")
 #: Where the person is based (PROSPECT.md §14); the channel follows from it.
-REGIONS = ("us", "uk_eu", "other", "unknown")
+REGIONS = ("us", "ca", "uk", "eu", "other", "unknown")
 RELATIONSHIPS = ("Warm", "Cold", "Referral")
 RECOGNITION = ("Unknown", "Weak", "Strong", "Immediate need")
 CATEGORIES = ("strong", "plausible", "weak", "reject")

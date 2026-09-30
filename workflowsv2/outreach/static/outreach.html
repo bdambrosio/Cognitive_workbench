@@ -228,10 +228,11 @@ function emailBox(c, i, which) {
     <button class="go" onclick="previewEmail(${i}, '${which}')">Send email…</button></div>
     <div class="meta">The email adds a footer with the postal address and an opt-out link.</div>`;
 }
+const REGION = {us: "US", ca: "Canada", uk: "UK", eu: "EU", other: "Other", unknown: "Region unknown"};
 function card(c, i) {
   const links = [c.linkedin ? `<a href="${esc(c.linkedin)}" target="_blank" rel="noopener">LinkedIn</a>` : "",
                  c.contact.email ? `<a href="mailto:${esc(c.contact.email)}">${esc(c.contact.email)}</a>` : ""].filter(Boolean).join(" · ");
-  const head = `<h3>${esc(c.name)}</h3><div class="meta">${esc([c.title, c.contact.firm, c.category].filter(Boolean).join(" · "))}${links ? " · " + links : ""}</div>`;
+  const head = `<h3>${esc(c.name)}</h3><div class="meta">${esc([c.title, c.contact.firm, c.category, REGION[c.region] || c.region].filter(Boolean).join(" · "))}${links ? " · " + links : ""}</div>`;
   const why = c.fit_rationale ? `<div class="why">${esc(c.fit_rationale)}</div>` : "";
   const flags = (c.flags || []).map(f => `<div class="flag">Check: ${esc(f)}</div>`).join("");
   const brief = (c.brief ? `<details><summary>Brief and evidence</summary><pre class="brief">${esc(c.brief)}</pre></details>` : "")

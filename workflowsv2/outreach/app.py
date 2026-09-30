@@ -137,6 +137,7 @@ def _card(e: Dict[str, Any], stage: str, group: str) -> Dict[str, Any]:
             "how_known": _text(e, "notes") or "",
             "title": e.get("title"), "linkedin": e.get("linkedin"),
             "category": _text(e, "category"),
+            "region": (local.get("qualification") or {}).get("region") or "unknown",
             "fit_rationale": _text(e, "fit_rationale"),
             "message": draft.get("edited_message") or draft.get("message"),
             "subject": draft.get("edited_subject") or draft.get("subject") or "",

@@ -515,7 +515,7 @@ OURS = (None, "Research")
 #: The regions (PROSPECT.md §14) where the practice sends a first message by
 #: email. Anyone else is approached on LinkedIn, unless the evidence shows
 #: their own address, which they published themselves.
-EMAIL_REGIONS = ("us", "uk_eu")
+EMAIL_REGIONS = ("us", "uk", "eu")
 
 
 def email_allowed(q: Dict[str, Any]) -> bool:
@@ -1015,9 +1015,12 @@ def load_candidates(path: Path) -> List[Dict[str, Any]]:
 
 #: The kinds the daily run scouts for, in turn, and those scouted by firm
 #: because the person to approach has to be chosen (PROSPECT.md §4).
+#: `Founder preparing a sale` is left out: to 2026-09-30 about 150 profiles
+#: gave 3 that fit and none strong. A founder rarely says on a profile that a
+#: sale is being prepared. It can still be scouted by hand.
 DAILY_KINDS = ("M&A adviser", "Repeat acquirer", "Searcher", "Small PE-family office",
                "Technical feedback", "VC / Investor", "Business broker",
-               "Exit or diligence consultant", "Founder preparing a sale", "Connector")
+               "Exit or diligence consultant", "Connector")
 #: Kinds that work for either side: their scouting searches name a side, drawn
 #: at random, so both sides are found over time (PROSPECT.md §16).
 SIDED_KINDS = ("M&A adviser", "Exit or diligence consultant")
