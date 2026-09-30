@@ -4,9 +4,9 @@
 #
 #     workflowsv2/outreach/daily.sh [--strong 5] [--most 15]
 #
-# The three API keys are read from the environment, and from ~/.config/secrets.env
-# for any that are not set there. A shell that is not interactive does not load
-# ~/.bashrc, which is what loads that file.
+# The API keys come from ~/.config/secrets.env, loaded whole; a value there
+# replaces one already in the environment. A shell that is not interactive does
+# not load ~/.bashrc, which is what loads that file for a terminal.
 
 set -u
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -15,12 +15,9 @@ PORT=8810
 LOG="$REPO/workflowsv2/outreach/prospects"
 mkdir -p "$LOG"
 
-for k in EXA_API_KEY TAVILY_API_KEY CLAUDE_API_KEY; do
-  if [ -z "${!k:-}" ]; then
-    v="$(grep -m1 "^export $k=" "$HOME/.config/secrets.env" | sed -e "s/^export $k=//" -e 's/^["'"'"']//' -e 's/["'"'"']$//')"
-    [ -n "$v" ] && export "$k=$v"
-  fi
-  [ -n "${!k:-}" ] || { echo "$k is not set, here or in ~/.config/secrets.env"; exit 1; }
+[ -f "$HOME/.config/secrets.env" ] && { set -a; . "$HOME/.config/secrets.env"; set +a; }
+for k in EXA_API_KEY TAVILY_API_KEY CLAUDE_API_KEY OPENAI_API_KEY FINDYMAIL_API_KEY PROSPEO_API_KEY; do
+  [ -n "${!k:-}" ] || { echo "$k is not set in ~/.config/secrets.env"; exit 1; }
 done
 
 if ! curl -s -m 5 "http://127.0.0.1:5000/v1/models" > /dev/null; then

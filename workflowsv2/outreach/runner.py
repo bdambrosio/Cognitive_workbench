@@ -11,8 +11,9 @@ the practice has recorded and drafts the follow-ups that are due; then scouts, o
 at a time with the kinds in turn from the day's kind (the day's kind goes by date; people
 an earlier scout found of a kind are taken before any new search), until the day has
 `--strong` new strong candidates or `--most` scouted people have been researched; and
-pushes everything it qualified. The model is the local Qwen unless `--model` names another; the three calls
-that write a message to send (the first message, the follow-up, the answer to a reply)
+pushes everything it qualified. The model is the local Qwen unless `--model` names another;
+qualification uses the `--qualifier` model, gpt-6.1-sol unless it names another; the three
+calls that write a message to send (the first message, the follow-up, the answer to a reply)
 use the `--writer` model, Claude Opus 5.5 unless it names another.
 
 THE CANDIDATES FILE is a YAML list. Each entry has `name`, and any of `firm`,
@@ -1023,6 +1024,20 @@ SIDED_KINDS = ("M&A adviser", "Exit or diligence consultant")
 FIRM_KINDS = ("Repeat acquirer", "Small PE-family office")
 MODEL = REPO / "measure/models/local_qwen38flashnext.yaml"
 WRITER = REPO / "measure/models/anthropic_opus55_medium.yaml"
+#: Qualification's model. In a comparison on ten people against gold labels
+#: (2026-09-29, three runs each) it was 1.7 steps from gold in total, never
+#: above it; the local Qwen 4.0 and GLM-5.3-Flash 5.3, the latter rating
+#: plausible people strong in every run.
+QUALIFIER = REPO / "measure/models/openai_gpt61sol_medium.yaml"
+_qualifier = None
+
+
+def qualifier_backend():
+    """The model that qualifies (QUALIFIER), made on first use."""
+    global _qualifier
+    if _qualifier is None:
+        _qualifier = backend_from_model(QUALIFIER)
+    return _qualifier
 RECORDS = {"research": "research.json", "qualify": "qualification.json", "draft": "draft.json"}
 
 
@@ -1046,7 +1061,7 @@ def work(backend, writer, cands: List[Dict[str, Any]], stages, data: Path, use_c
                 continue
             logger.info("%s: %s", c["name"], st)
             if st == "qualify":
-                q = qualify(backend, c, cand_dir,
+                q = qualify(qualifier_backend(), c, cand_dir,
                             contacts.contact_for(c["name"], str(c.get("firm") or ""), firm_domain(c)) if use_contacts else "")
                 better_contact(c, q, data, use_contacts)
                 continue
@@ -1134,6 +1149,7 @@ def daily(backend, writer, data: Path, strong: int, most: int) -> str:
 
 
 def main() -> int:
+    global QUALIFIER
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("stage", choices=STAGES + ("run", "push", "scout", "daily", "followups", "replies"))
@@ -1144,6 +1160,8 @@ def main() -> int:
     ap.add_argument("--model", type=Path, default=MODEL, help="default: the local Qwen model file")
     ap.add_argument("--writer", type=Path, default=WRITER,
                     help="the model for the calls that write a message to send; default: Claude Opus 5.5")
+    ap.add_argument("--qualifier", type=Path, default=QUALIFIER,
+                    help="the model for qualification; default: gpt-6.1-sol")
     ap.add_argument("--firms", action="store_true",
                     help="for `scout`: find firms of the kind, then the person to approach at each")
     ap.add_argument("--want", type=int, default=3,
@@ -1161,6 +1179,7 @@ def main() -> int:
                     help="read the person's history from the contacts for the qualification (reads only)")
     ap.add_argument("--data", type=Path, default=DATA)
     args = ap.parse_args()
+    QUALIFIER = args.qualifier
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     stages = STAGES if args.stage in ("run", "scout") else (args.stage,)
     backend = backend_from_model(args.model) if stages not in (("brief",), ("push",)) else None
