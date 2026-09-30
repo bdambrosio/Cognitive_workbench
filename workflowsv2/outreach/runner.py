@@ -411,12 +411,11 @@ def qualify(backend, c: Dict[str, Any], cand_dir: Path, contact: str = "") -> Di
     return rec
 
 
-#: The three things a first message varies on purpose (PROSPECT.md §11), each
+#: The two things a first message varies on purpose (PROSPECT.md §11), each
 #: with its values. One value of each is drawn at random per draft and recorded
 #: in draft.json, so replies can later be counted by choice.
 CHOICES = {"opening": ("purpose", "their_work"),
-           "showing": ("demo", "description"),
-           "question": ("where_it_fits", "where_it_sticks")}
+           "showing": ("demo", "description")}
 
 
 def draft(backend, c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]]:
