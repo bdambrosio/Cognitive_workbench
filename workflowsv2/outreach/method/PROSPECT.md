@@ -24,7 +24,7 @@ Many investors already give a general-purpose AI model the contents of a data ro
 
 ## 3. What you are given
 
-Every step about a candidate gives you the **candidate record**, written by the practice: the person's name and firm, links, and sometimes notes. It may include a **relationship note**, which says how the practice knows the person or how the person came to its attention. Treat the relationship note as fact.
+Every step about a candidate gives you the **candidate record**, written by the practice: the person's name and firm, links, and sometimes notes. It may include a **relationship note**, which says how the practice knows the person or how the person came to its attention. Treat the relationship note as fact. A line saying how the person was found gives the search's description of the kind of person wanted; it is not evidence about this person.
 
 The qualifying and drafting steps also give you:
 

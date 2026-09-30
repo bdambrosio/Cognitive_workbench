@@ -159,6 +159,12 @@ def _ask(backend, user: str, schema: Dict[str, Any], max_tokens: int) -> Dict[st
                 user, schema, max_tokens)
 
 
+#: How a scouted person's notes begin: the search that found them, written
+#: before anyone was found. It describes the search, not the person, and the
+#: local model cited it as fact about them (2026-09-29).
+SCOUT_NOTE, FIRM_SCOUT_NOTE = "Found by the scout search: ", "Found by the firm scout search: "
+
+
 def candidate_text(c: Dict[str, Any]) -> str:
     """The candidate record as every prompt states it. Pasted text is not
     repeated here; it reaches the model as evidence files."""
@@ -167,8 +173,11 @@ def candidate_text(c: Dict[str, Any]) -> str:
         rows.append(f"Firm: {c['firm']}")
     if c.get("urls"):
         rows.append("Links: " + ", ".join(c["urls"]))
-    if c.get("notes"):
-        rows.append(f"Notes: {str(c['notes']).strip()}")
+    notes = str(c.get("notes") or "").strip()
+    if notes.startswith((SCOUT_NOTE, FIRM_SCOUT_NOTE)):
+        rows.append(f"How the person was found (this describes the search, not the person): {notes}")
+    elif notes:
+        rows.append(f"Notes: {notes}")
     rows.append("Relationship note: " + (str(c.get("relationship") or "").strip() or "(none)"))
     return "The candidate record:\n\n" + "\n".join(rows)
 
@@ -846,7 +855,7 @@ def scout(backend, kind: str, data: Path, want: int) -> List[Dict[str, Any]]:
                 continue
             new += 1
             c = {"name": name, "urls": [url] if url else [],
-                 "notes": f"Found by the scout search: {q}",
+                 "notes": f"{SCOUT_NOTE}{q}",
                  "pasted": [{"source": f"Professional profile as the search service holds it, {url}",
                              "date": str(r.get("publishedDate") or "")[:10], "text": text}]}
             cand_dir.mkdir(parents=True)
@@ -969,7 +978,7 @@ def person_at(backend, firm: str, url: str, domain: str, rec: Dict[str, Any], fi
     rec["chosen"] = name
     c = {"name": name, "firm": firm, "title": str(obj.get("first_role") or "").strip(),
          "urls": [u for u in (url, str(r.get("url") or "")) if u],
-         "notes": (f"Found by the firm scout search: {rec['query']}. Chosen at {firm}: {rec['chosen_reason']}"
+         "notes": (f"{FIRM_SCOUT_NOTE}{rec['query']}. Chosen at {firm}: {rec['chosen_reason']}"
                    + (f" Alternate at the firm, not to be approached meanwhile: {rec['alternate']}."
                       if rec["alternate"] else "")),
          "pasted": [{"source": f"Professional profile as the search service holds it, {r.get('url') or ''}",
