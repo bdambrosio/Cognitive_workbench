@@ -698,7 +698,12 @@ class PromptsMixin:
     def _firing_concern_entity(self) -> str:
         """Counterpart of the concern currently firing, for autonomous
         turns. 'User' when there is no concern id, the note has gone, or
-        it names no entity — the value this replaced was that constant."""
+        it names no entity — the value this replaced was that constant.
+        A turn woken by a finished dispatch names its counterpart outright:
+        the one the dispatching turn was with (chat/background.py)."""
+        named = (getattr(self, '_current_turn', None) or {}).get('counterpart')
+        if named:
+            return named
         cid = (getattr(self, '_current_turn', None) or {}).get(
             'autonomous_concern_id')
         if not cid:

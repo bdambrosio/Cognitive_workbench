@@ -2,6 +2,7 @@
 Jill 2026-10-01: a dispatch returns at once; its result or failure reaches
 exactly one later turn, tagged; a scheduled item fires at its time, once
 per occurrence, and is listed in her prompt as Bruce's."""
+import queue
 import sys
 import threading
 from datetime import datetime, timedelta
@@ -15,11 +16,17 @@ from chat.background import BackgroundMixin, occurrence_due, next_occurrence  # 
 class _Host(BackgroundMixin):
     character_name = "TestJill"
 
-    def __init__(self, tmp: Path, tool=None):
+    def __init__(self, tmp: Path, tool=None, autonomy=True):
         self._mem = tmp
         self._tool = tool
         self.turns = []
+        self._inbox = queue.Queue()
+        self._autonomy_enabled = autonomy
+        self._current_turn = {'source': 'Claude'}
         self._init_background()
+
+    def _counterpart_for_turn(self, source):
+        return source
 
     def _memory_dir(self):
         return self._mem
@@ -112,3 +119,32 @@ def test_a_due_item_fires_once_says_it_is_late_and_is_listed_as_bruces(tmp_path)
     assert block.startswith("## Scheduled by Bruce")
     assert "Renewal reminder" in block and "every 168h" in block
     assert "Outreach figures" not in block                  # single item, past
+
+
+def test_a_finish_wakes_her_once_and_the_woken_turn_answers_the_dispatcher(tmp_path):
+    """Two finishes before the loop drains the queue make one wake-up; the
+    woken turn takes both results and is addressed to whoever the
+    dispatching turn was with."""
+    host = _Host(tmp_path, lambda t, q: f"OK: {q}")
+    host._run_dispatch("a", "inspect", "first")
+    host._run_dispatch("b", "inspect", "second")
+    _wait_for_results(host, n=2)
+    assert host._inbox.qsize() == 1 and host._inbox.get() == {'kind': 'background'}
+    host._handle_background_wake()
+    [turn] = host.turns
+    assert turn["autonomous"] is True and turn["counterpart"] == "Claude"
+    assert "has finished: a, b" in turn["text"] or "has finished: b, a" in turn["text"]
+
+
+def test_no_woken_turn_when_results_were_taken_or_autonomy_is_off(tmp_path):
+    host = _Host(tmp_path, lambda t, q: "OK: x")
+    host._run_dispatch("a", "inspect", "q")
+    _wait_for_results(host)
+    host._take_background_results()                 # another turn got there first
+    host._handle_background_wake()
+    assert host.turns == []
+    off = _Host(tmp_path, lambda t, q: "OK: x", autonomy=False)
+    off._run_dispatch("a", "inspect", "q")
+    _wait_for_results(off)
+    off._handle_background_wake()
+    assert off.turns == [] and len(off._bg_done) == 1   # waits for the next turn

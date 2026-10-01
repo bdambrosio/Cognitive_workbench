@@ -2044,7 +2044,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                            image_url: Optional[str] = None,
                            modality: Optional[str] = None,
                            fire_id: Optional[str] = None,
-                           hops: int = 0, xid: str = '') -> None:
+                           hops: int = 0, xid: str = '',
+                           counterpart: Optional[str] = None) -> None:
         """Drive one turn through the ReAct loop. The autonomous path
         (autonomous=True) reuses the same prompt construction so Jill's
         voice stays consistent and traces share format. Divergences are
@@ -2064,6 +2065,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             'text_preview': (text or '')[:120],
             'started_at': datetime.now(timezone.utc).isoformat(),
             'autonomous_concern_id': autonomous_concern_id,
+            # Set only on a turn woken by a finished dispatch: whom it answers.
+            'counterpart': counterpart,
         }
         self._affect.set_trigger('autonomous' if autonomous else 'user')
         self._affect.set_mode('thinking')
@@ -2815,6 +2818,14 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                     break
 
                 kind = msg.get('kind', 'user')
+                if kind == 'background':
+                    try:
+                        self._handle_background_wake()
+                    except Exception as e:
+                        logger.error(f"[{self.character_name}] background wake crashed: {e}")
+                        import traceback
+                        traceback.print_exc()
+                    continue
                 if kind == 'tick':
                     # Clear BEFORE handling: a tick arriving while this one
                     # runs must still be queued, or a long autonomy pass

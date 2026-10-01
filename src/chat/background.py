@@ -7,6 +7,12 @@ added to the input of her next turn of any kind (a user turn, a sensor turn,
 a peer message, a concern fire, a scheduled item), tagged with its label and
 what was asked, and delivered exactly once: it is taken out of the holding
 list when that turn starts, whether the turn then speaks or stays silent.
+A finish also wakes her (2026-10-01, Bruce's question, Jill agreed): it puts
+one `background` message in her inbox unless one is already waiting there,
+and when the loop reaches it, with autonomy on and results still held, she
+gets an autonomous turn on them, addressed to whoever the dispatching turn
+was with (for a concern fire, that fire's counterpart), free to stay silent.
+If another turn took the results first, the wake-up does nothing.
 A worker gets a backend of its own, so its calls never overwrite the main
 backend's per-call state (`last_finish_reason`) while a turn reads it.
 
@@ -91,6 +97,9 @@ class BackgroundMixin:
         self._bg_lock = threading.Lock()
         self._bg_running: Dict[str, Dict[str, Any]] = {}
         self._bg_done: List[Dict[str, Any]] = []
+        # A `background` message is in the inbox and not yet handled; no
+        # second one is queued until it is (state, not a time window).
+        self._bg_wake_pending = False
         # Results taken at the start of the current turn; rendered into its
         # input by _build_react_user_prefix.
         self._background_turn_results: List[Dict[str, Any]] = []
@@ -120,8 +129,12 @@ class BackgroundMixin:
             if len(self._bg_running) >= MAX_RUNNING:
                 return (f"ERROR: {MAX_RUNNING} dispatches are running "
                         f"({', '.join(self._bg_running)}); wait for one to finish")
+            turn = getattr(self, '_current_turn', None) or {}
             job = {'id': uuid.uuid4().hex[:8], 'label': label, 'tool': tool,
-                   'query': query, 'started_at': datetime.now().isoformat(timespec='seconds')}
+                   'query': query, 'started_at': datetime.now().isoformat(timespec='seconds'),
+                   # Whom the dispatching turn was with; the woken turn answers them.
+                   'counterpart': (self._counterpart_for_turn(turn['source'])
+                                   if turn.get('source') else 'User')}
             self._bg_running[label] = job
         threading.Thread(target=self._bg_worker, args=(job,), daemon=True,
                          name=f"dispatch-{label}").start()
@@ -173,6 +186,10 @@ class BackgroundMixin:
         with self._bg_lock:
             self._bg_running.pop(job['label'], None)
             self._bg_done.append(done)
+            wake = not self._bg_wake_pending
+            self._bg_wake_pending = True
+        if wake:
+            self._inbox.put({'kind': 'background'})
         self._bg_log({'event': 'finished', 'id': job['id'], 'label': job['label'],
                       'status': obs.split(':', 1)[0], 'chars': len(obs)})
 
@@ -185,11 +202,29 @@ class BackgroundMixin:
             self._bg_log({'event': 'delivered', 'id': r['id'], 'label': r['label']})
         return taken
 
+    def _handle_background_wake(self) -> None:
+        """The inbox reached a `background` message. Run a turn on the held
+        results unless autonomy is off or another turn already took them."""
+        with self._bg_lock:
+            self._bg_wake_pending = False
+            held = list(self._bg_done)
+        if not held or not getattr(self, '_autonomy_enabled', False):
+            return
+        labels = ", ".join(r['label'] for r in held)
+        counterpart = held[0].get('counterpart') or 'User'
+        text = (f"A task I dispatched has finished: {labels}\n"
+                f"Mode: autonomous\n\n"
+                f"Its result is under 'Background results' above. Act on it, tell "
+                f"{counterpart} if it is worth telling, or stay silent.")
+        self._process_user_turn(source=self.character_name, text=text, close=False,
+                                autonomous=True, counterpart=counterpart)
+
     def _render_background_results(self, results: List[Dict[str, Any]]) -> str:
         lines = ["## Background results (tasks I dispatched; each is shown to me once, here)"]
         for r in results:
             lines.append(f"### {r['label']} — {r['tool']}: {r['query']}")
-            lines.append(f"(dispatched {r['started_at']}, finished {r['finished_at']})")
+            lines.append(f"(dispatched {r['started_at']}, finished {r['finished_at']}, local "
+                         f"time; dispatched in a turn with {r.get('counterpart') or 'User'})")
             lines.append(r['result'])
             lines.append("")
         return "\n".join(lines)
