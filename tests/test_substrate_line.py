@@ -43,7 +43,8 @@ def repo(tmp_path):
 def loop(tmp_path):
     inst = object.__new__(ChatLoop)
     inst.character_name = "Tester"
-    inst.backend = SimpleNamespace(model="test-model-1")
+    inst.backend = SimpleNamespace(model="test-model-1",
+                                   resolved_model=lambda: "test-model-1")
     inst._memory_dir = lambda: tmp_path / "memory"
     return inst
 
@@ -98,3 +99,21 @@ def test_unreachable_prev_head_omits_delta(loop, repo, tmp_path):
     # prev..HEAD fails on the bogus sha — delta clause omitted, no crash.
     assert line.startswith("running commit ")
     assert "since my last session" not in line
+
+
+def test_a_blank_config_names_the_model_the_server_answers_with(loop, repo):
+    """A local model is configured as model:"" and takes whatever is served;
+    the line names the served model, so she is not left to guess it
+    (2026-10-01: she named a model she was not running)."""
+    loop.backend = SimpleNamespace(
+        model="", resolved_model=lambda: "primitive-ai/Qwen3.8-Flash-Next-NVFP4")
+    line = loop._compute_substrate_line(repo_root=repo)
+    assert "backend model primitive-ai/Qwen3.8-Flash-Next-NVFP4" in line
+
+
+def test_an_unidentified_model_leaves_the_clause_out_and_keeps_the_line(loop, repo):
+    def unreachable():
+        raise RuntimeError("/v1/models is unreachable")
+    loop.backend = SimpleNamespace(model="", resolved_model=unreachable)
+    line = loop._compute_substrate_line(repo_root=repo)
+    assert line.startswith("running commit ") and "backend model" not in line

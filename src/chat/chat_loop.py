@@ -1049,7 +1049,16 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                              f"session: {shown}{more}")
         elif prev_head == head:
             parts.append("no commits since my last session")
-        model = str(getattr(self.backend, 'model', '') or '').strip()
+        # The model actually answering, read off the server when the config
+        # leaves it blank (backend.resolved_model). Reading the config value
+        # alone left this clause out for a local model, and she then named a
+        # model she was not running (2026-10-01; Jill agreed this fix).
+        try:
+            model = str(self.backend.resolved_model() or '').strip()
+        except Exception as e:
+            logger.warning(
+                f"[{self.character_name}] substrate: model not identified: {e}")
+            model = ''
         if model:
             parts.append(f"backend model {model}")
         try:
