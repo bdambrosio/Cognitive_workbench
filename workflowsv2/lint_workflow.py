@@ -450,7 +450,7 @@ def check_report_fields(path: str, raw: str) -> List[str]:
 
 def check_intake_fields(path: str, raw: str) -> List[str]:
     """INTAKE §4's field table against `schemas.SLOTS`: every slot.field the
-    schema requires is specified, plus the two arrays, and nothing more."""
+    schema requires is specified, plus the three arrays, and nothing more."""
     from workflowsv2.intake import schemas as isch                    # noqa: E402
     bodies = {re.match(r"## (\d+[a-z]?)\.", b.splitlines()[0]).group(1): b
               for _, b in sections(raw)
@@ -460,7 +460,7 @@ def check_intake_fields(path: str, raw: str) -> List[str]:
         return ["INTAKE has no §4 to declare the fields in"]
     declared = set(re.findall(r"(?m)^\s*\|\s*`([a-z_.]+)(?:\[\])?`\s*\|", four))
     expected = {f"{slot}.{f}" for slot, fs in isch.SLOTS.items() for f in fs}
-    expected |= {"open_questions", "notes"}
+    expected |= {"buyer_questions", "open_questions", "notes"}
     bad = [f"schemas.py field {f!r} is not in §4's table"
            for f in sorted(expected - declared)]
     bad += [f"§4 declares {d!r}, which schemas.py does not define"

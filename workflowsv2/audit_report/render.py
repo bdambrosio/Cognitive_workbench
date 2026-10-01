@@ -22,7 +22,7 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from workflowsv2.audit_materiality import schemas as ms
 from workflowsv2.claims_audit.schemas import NOT_EXAMINED
@@ -137,13 +137,20 @@ def classify(merged: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
     """shown / unsettled / seller_unsettled / not_examined / holds, from the
     verdicts. `seller_unsettled` is the unsettled claims tagged `about:
     seller`; a seller-tagged claim the materials did settle stays with its
-    verdict, and one not examined stays with that class."""
+    verdict, and an unexamined one stays with that class.
+
+    `asked_buyer` and `asked_practice` are the findings on statements from a
+    question source (`asked_by`), whatever their verdict: the seller did not
+    make them, so none of the classes above, which are read as a record of
+    what the seller said, holds them."""
     out: Dict[str, List[Dict[str, Any]]] = {
         "shown": [], "unsettled": [], "seller_unsettled": [], "not_examined": [],
-        "holds": []}
+        "holds": [], "asked_buyer": [], "asked_practice": []}
     for f in merged.get("findings") or []:
         adj = f.get("adjudication") or {}
-        if ms.rateable(f):
+        if f.get("asked_by"):
+            out["asked_buyer" if f["asked_by"] == "buyer" else "asked_practice"].append(f)
+        elif ms.rateable(f):
             out["shown"].append(f)
         elif ms.exposable(f):
             if adj.get("unresolved_because") == NOT_EXAMINED:
@@ -165,6 +172,42 @@ SELLER_LINE = ("These claims are promises about what the seller does or offers �
                "against them. Each carries its exposure rating, what would change "
                "if the promise were not kept, and the question the review puts to "
                "the seller. Ordered by exposure.")
+
+
+#: The lines before the questions the buyer and the practice asked. Fixed
+#: text, not prose slots.
+ASKED_LINES = {
+    "asked_buyer": (
+        "Questions the buyer asked",
+        "The buyer asked these questions at intake. The practice wrote each one as "
+        "a statement of what the target is expected to have, and the review tested "
+        "it as it tests a claim. The seller did not make these statements, so a gap "
+        "here is a finding about the target, not about what the seller said. A gap "
+        "carries its materiality rating; a statement the materials cannot settle "
+        "carries its exposure rating. Gaps come first, then unsettled statements, "
+        "then those that hold."),
+    "asked_practice": (
+        "Questions the practice asked",
+        "The practice asks these of every engagement, or raised them from a claim "
+        "the seller made. Each is a statement of what the target is expected to "
+        "have, tested as a claim is tested. The seller did not make these "
+        "statements, so a gap here is a finding about the target, not about what "
+        "the seller said. A gap carries its materiality rating; a statement the "
+        "materials cannot settle carries its exposure rating. Gaps come first, then "
+        "unsettled statements, then those that hold."),
+}
+
+
+def _asked_ordered(findings: Sequence[Dict[str, Any]], by_m: Dict[str, Dict[str, Any]],
+                   by_e: Dict[str, Dict[str, Any]]) -> List[Tuple[Dict[str, Any], Optional[Dict[str, Any]], str]]:
+    """(finding, rating, rating field): gaps by materiality, then unsettled
+    statements by exposure, then those that hold."""
+    gaps = [f for f in findings if ms.rateable(f)]
+    open_ = [f for f in findings if not ms.rateable(f) and ms.exposable(f)]
+    held = [f for f in findings if not ms.rateable(f) and not ms.exposable(f)]
+    return ([(f, by_m.get(_key(f)), "materiality") for f in _ordered(gaps, by_m, "materiality")]
+            + [(f, by_e.get(_key(f)), "exposure") for f in _ordered(open_, by_e, "exposure")]
+            + [(f, None, "") for f in _ordered(held, {}, "")])
 
 
 def _ratings_by_key(ratings: Dict[str, Any], array: str
@@ -310,9 +353,14 @@ def _finding(f: Dict[str, Any], rating: Optional[Dict[str, Any]],
     head = f"### {f.get('claim_source')}, claim {f.get('claim_id')}"
     if rating:
         head += f" — {field}: {rating.get(field)}"
-    out = [head, "",
-           f"> \"{_md_safe(f.get('quote'))}\" "
-           f"({f.get('claim_source')}, {_lines(f.get('lines'))})"]
+    if f.get("asked_by"):
+        # The quote is the statement: a question source holds nothing else.
+        who = "buyer" if f["asked_by"] == "buyer" else "practice"
+        out = [head, "", f"**Asked by the {who}:** {_md_safe(f.get('statement'))}"]
+    else:
+        out = [head, "",
+               f"> \"{_md_safe(f.get('quote'))}\" "
+               f"({f.get('claim_source')}, {_lines(f.get('lines'))})"]
     for loc in f.get("locations") or []:
         out.append(f"> also, at {_lines(loc.get('lines'))}: "
                    f"\"{_md_safe(loc.get('quote'))}\"")
@@ -401,10 +449,10 @@ def coverage(merged: Dict[str, Any], ratings: Dict[str, Any],
             f"Shown, by materiality: "
             + (", ".join(f"{k} {n}" for k, n in sorted((rf.get('materiality') or {}).items()))
                or "none") + ".",
-            f"Unsettled and not examined, by exposure: "
+            f"Unsettled and unexamined, by exposure: "
             + (", ".join(f"{k} {n}" for k, n in sorted((rf.get('exposure') or {}).items()))
                or "none") + f"; of which {len(classes['seller_unsettled'])} about the seller.",
-            f"Not examined: {len(classes['not_examined'])} claim(s)."]
+            f"Unexamined: {len(classes['not_examined'])} claim(s)."]
     unopened = sorted({f for r in merged.get("runs") or []
                        for f in (r.get("unopened_candidates") or [])})
     if unopened:
@@ -429,7 +477,9 @@ def key_findings(classes: Dict[str, List[Dict[str, Any]]],
     summary lists what the ratings say and not what a writer chose to
     mention."""
     rows = []
-    for f in _ordered(classes["shown"], by_m, "materiality"):
+    asked = [f for k in ("asked_buyer", "asked_practice") for f in classes.get(k) or []
+             if ms.rateable(f)]
+    for f in _ordered(classes["shown"] + asked, by_m, "materiality"):
         r = by_m.get(_key(f))
         if not r or r.get("materiality") not in ("material", "decisive"):
             continue
@@ -503,14 +553,14 @@ def _how_to_read() -> List[str]:
         "| contradicted | " + VERDICT_WORDS["contradicted"] + " | shown |",
         "| partial | " + VERDICT_WORDS["partial"] + " | shown |",
         "| real_with_caveat | " + VERDICT_WORDS["real_with_caveat"] + " | shown |",
-        "| unverifiable | " + VERDICT_WORDS["unverifiable"] + " | unsettled, or not examined |",
+        "| unverifiable | " + VERDICT_WORDS["unverifiable"] + " | unsettled, or unexamined |",
         "| real | the materials bear the claim out | holds |", "",
         "**The three classes.** *Shown* findings are gaps the review "
         "demonstrated in the materials; they are the only findings that count "
         "against the seller, and each carries a *materiality* rating. "
         "*Unsettled* claims are ones the supplied materials cannot settle; "
         "nothing was found against them, and each carries an *exposure* "
-        "rating. *Not examined* claims are unsettled claims whose searches "
+        "rating. *Unexamined* claims are unsettled claims whose searches "
         "named files the engagement did not open; they are listed apart and "
         "are the first thing a further pass would settle. Unsettled claims "
         "about the seller's own conduct or services — a promise to maintain, "
@@ -588,7 +638,9 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
     out += ["## Executive summary", ""] + _slot("summary", prose)
     kf = key_findings(classes, by_m)
     out += ["**The material findings**, ordered by rating — each is set out in "
-            "full under *What the review showed*:", ""]
+            "full under *What the review showed*"
+            + (", or under the questions asked" if classes["asked_buyer"] or classes["asked_practice"]
+               else "") + ":", ""]
     out += kf + [""] if kf else ["No finding was rated material or decisive.", ""]
 
     # THE CONCLUSION IS OPT-IN AND CONDITIONAL. Present only when the
@@ -624,6 +676,12 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
                  "figures. " if untested else
                  "*Claims* are the seller's assertions as enumerated from the "
                  "claim source, one finding each. ")
+                + "".join(f"`{src}` holds statements the {who} asked, not assertions of the "
+                          "seller; its figures count those statements. "
+                          for src, who in sorted({(f.get("claim_source"),
+                                                   "buyer" if f["asked_by"] == "buyer" else "practice")
+                                                  for f in merged.get("findings") or []
+                                                  if f.get("asked_by")}))
                 + "*Files read* counts the "
                 "target's files the practice opened while gathering evidence, "
                 "over the number of *gathering legs* it took. *Checked* says "
@@ -654,9 +712,14 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
         for f in _ordered(classes["seller_unsettled"], by_e, "exposure"):
             out += _finding(f, by_e.get(_key(f)), "exposure", by_q.get(_key(f)), covered.get(_key(f)), verdicts)
     if classes["not_examined"]:
-        out += ["## Claims not examined", ""] + _slot("not_examined_note", prose)
+        out += ["## Unexamined claims", ""] + _slot("not_examined_note", prose)
         for f in _ordered(classes["not_examined"], by_e, "exposure"):
             out += _finding(f, by_e.get(_key(f)), "exposure", by_q.get(_key(f)), covered.get(_key(f)), verdicts)
+    for cls, (title, line) in ASKED_LINES.items():
+        if classes[cls]:
+            out += [f"## {title}", "", line, ""]
+            for f, r, field in _asked_ordered(classes[cls], by_m, by_e):
+                out += _finding(f, r, field, by_q.get(_key(f)), covered.get(_key(f)), verdicts)
     out += ["## Claims that hold", "",
             "| claim source | id | claim | evidence |", "|---|---|---|---|"]
     for f in sorted(classes["holds"], key=lambda x: (x.get("claim_source") or "",
@@ -705,15 +768,19 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
                or "none") + ". Unsettled claims by exposure: "
             + (", ".join(f"{k} {n}" for k, n in sorted((rf.get('exposure') or {}).items()))
                or "none") + f", of which {len(classes['seller_unsettled'])} about the seller. "
-            f"Not examined: {len(classes['not_examined'])}.", ""]
+            f"Unexamined: {len(classes['not_examined'])}."
+            + (f" Of all the findings, {len(classes['asked_buyer'])} are on statements the "
+               f"buyer asked and {len(classes['asked_practice'])} on statements the practice "
+               "asked; they are counted above by verdict and set out under the questions "
+               "asked." if classes["asked_buyer"] or classes["asked_practice"] else ""), ""]
     unopened = sorted({f for r in runs for f in (r.get("unopened_candidates") or [])})
     if unopened:
         out += [f"Files the searches named that were not opened ({len(unopened)}):", ""]
         out += [f"- `{f}`" for f in unopened] + [""]
 
     out += ["## Limitations", ""] + _slot("limitations", prose)
-    out += ["The party that made these claims was not consulted and has not "
-            "confirmed the review's interpretation of them. Every verdict and "
+    out += ["The seller was not consulted and has not confirmed the review's "
+            "interpretation of its claims. Every verdict and "
             "rating is defined by the practice's method at the version each "
             "run received, which is retained with the record; a later method "
             "may define a term differently.", ""]

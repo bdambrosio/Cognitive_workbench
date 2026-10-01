@@ -88,6 +88,20 @@ def test_merge_carries_review_outcome_problems_and_restatements(tmp_path):
     assert by_src["doc9.md"] == {"claim_source": "doc9.md", "question": "who?"}
 
 
+def test_merge_keeps_who_asked_a_question_source_statement(tmp_path):
+    """The report sets a statement the buyer asked apart from the seller's
+    claims by `asked_by`; the merge is what hands it on."""
+    cite = [{"form": "citation", "document": "d.md", "lines": [1, 1],
+             "quote": "x", "shows": "y"}]
+    q = _run(tmp_path, "q", "questions/buyer.md",
+             [{"id": 1, "quote": "Passwords are hashed", "lines": [2, 2],
+               "statement": "Passwords are hashed", "asked_by": "buyer"}],
+             [{"claim_id": 1, "adjudication": {"verdict": "contradicted", "gap": "g"},
+               "evidence": cite}])
+    m = mg.merge([q])
+    assert [f.get("asked_by") for f in m["findings"]] == ["buyer"]
+
+
 def test_merge_refuses_an_unfinished_run(tmp_path):
     d = tmp_path / "x"; d.mkdir()
     (d / "claims.json").write_text("{}")

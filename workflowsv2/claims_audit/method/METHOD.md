@@ -36,6 +36,8 @@ A claim is an assertion the seller makes to the buyer in the designated claim so
 
 **An assertion about the seller rather than the target is still a claim**, enumerated with `about` set to `seller`, per §5.
 
+**A question source is a claim source the practice wrote.** It states, one per line, what the target is expected to have: statements the buyer asked to have tested, or that the practice tests on every engagement. Each line is one claim, already enumerated and frozen, and is marked as asked by the buyer or the practice. Adjudicate it as a seller's claim about the target, under the same verdicts and evidence rules. The seller did not make it: write a gap as what the target lacks, not as something the seller said.
+
 Other supplied documents are not claim sources for this run, even when they assert something; §7 says which of them are evidence.
 
 Business claims are in scope as well as technical ones. Revenue, customer counts, contracts and external dependencies are evaluated the same way as backups, uptime, architecture or test coverage.
@@ -56,7 +58,7 @@ That is preferable to "no data exfiltration path", which claims more than the ev
 
 Four terms, and they nest:
 
-- **claim** — one seller assertion that can be evaluated as true or false, enumerated and frozen in §5.
+- **claim** — one seller assertion, or one statement of a question source (§2), that can be evaluated as true or false, enumerated and frozen in §5.
 - **verdict** — the classification assigned after comparing the claim with the evidence, from §6.
 - **adjudication** — the verdict, together with the `gap` or `unresolved_because` field that verdict requires, per §13.
 - **finding** — one output record: the `claim_id` of a frozen claim, its adjudication, and the evidence used.
@@ -106,7 +108,7 @@ The claim source is given to you one section at a time, in document order, with 
 
 **Enumerate before you adjudicate, and enumerate everything.** At this point you have not tested any claim, so you cannot know which will hold. A claim that looks obviously true, or obviously false, or impossible to check, is enumerated exactly like the rest.
 
-**Once the last section is enumerated the surface is frozen.** It is handed back to you for the adjudication phase and it does not change. An assertion you notice after the surface has closed is not added to it and is not adjudicated. Enumerate each section carefully the first time; that is what this phase is for.
+**Once the last section is enumerated the surface is frozen.** It is handed back to you for the adjudication phase and it does not change. An assertion you notice after the surface has closed is not added to it and is not adjudicated. Enumerate each section carefully the first time.
 
 ## 6. Verdicts
 
@@ -298,7 +300,7 @@ An evidence item's `form` decides its fields, per §7:
 | `derived` | `basis[]` (each `document`, `lines`, `quote`), `derivation`, `consequence`, and `from_knowledge` where §7 requires it |
 | `search` | `kind`, `performed`, `result`, `candidates` |
 
-The schema requires `form` and leaves the rest of each item open, because a form-by-form requirement is checked after the response is parsed rather than during decoding. An item missing a field its form requires fails that check, and the output is invalid.
+The schema requires `form` and leaves the rest of each item open. An item missing a field its form requires fails that check, and the output is invalid.
 
 Emit nothing outside the JSON object. There is no covering note and no summary.
 

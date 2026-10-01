@@ -135,6 +135,9 @@ def run(eng_name: str, model_yaml: Path, only: Optional[str] = None) -> Dict[str
     sources = [s for s in state.claim_sources(eng_dir) if only in (None, s)]
     if not sources:
         raise SystemExit(f"{only} is not a claim source of {eng_name}")
+    # Every statement of a question source is tested: the buyer asked it, or
+    # the practice tests it on every engagement. questions.py writes tier 1.
+    sources = [s for s in sources if not state.question_kind(eng_dir, s)]
     backend = backend_from_model(model_yaml)
     from workflowsv2.claims_audit import reliance
     statement = reliance.load(eng_dir)

@@ -135,7 +135,14 @@ def sort_steps(eng_dir: Path, model: str) -> List[Step]:
 
 def enumerate_steps(eng_dir: Path, model: str, ts: str) -> List[Step]:
     steps: List[Step] = []
+    # A question source is the practice's own statements, one per line: no
+    # model reads it; its draft surface is written straight from the file.
+    if any(state.question_kind(eng_dir, s) for s in state.claim_sources(eng_dir)):
+        steps.append(("list the question sources' statements", _py(
+            "workflowsv2/claims_audit/questions.py", "--engagement", eng_dir.name)))
     for src in state.claim_sources(eng_dir):
+        if state.question_kind(eng_dir, src):
+            continue
         world = f"enum_{eng_dir.name}_{slug(src)}_{ts}"
         steps.append((f"enumerate {src}", _py(
             "workflowsv2/claims_audit/runner.py", "--engagement", eng_dir.name,

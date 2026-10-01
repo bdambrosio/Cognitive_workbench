@@ -276,12 +276,14 @@ def locations(claim: Dict[str, Any]) -> List[Dict[str, Any]]:
             + list(claim.get("locations") or []))
 
 
-def check_surface(obj: Dict[str, Any], corpus: Path,
-                  claim_source: str) -> Dict[str, Any]:
-    """The frozen surface, against the document it was read from."""
+def check_surface(obj: Dict[str, Any], corpus: Path, claim_source: str,
+                  src_file: Optional[Path] = None) -> Dict[str, Any]:
+    """The frozen surface, against the document it was read from:
+    `src_file`, else the claim source under the corpus. A question source
+    is not under the corpus (engagement_state.claim_source_file)."""
     problems: List[str] = []
     body: List[str] = []
-    src = corpus / claim_source
+    src = src_file or corpus / claim_source
     if src.is_file():
         body = src.read_text(encoding="utf-8", errors="replace").splitlines()
     else:

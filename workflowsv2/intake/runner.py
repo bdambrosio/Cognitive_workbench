@@ -63,6 +63,9 @@ SCENARIO = HERE / "scenario.yaml"
 METHOD_PATH = "workflowsv2/intake/method/INTAKE.md"
 ENGAGEMENTS = REPO / "workflowsv2" / "claims_audit" / "engagements"
 STAGE = "intake"
+#: Where finishing the intake writes the buyer's questions: a question source
+#: in the engagement directory, not in the target the seller can read.
+BUYER_QUESTIONS = "questions/buyer.md"
 SOURCE = "User"
 NOTE_NAME = "engagement:intake"
 
@@ -171,6 +174,17 @@ def finish(eng_dir: Path, intake_dir: Path, form: Dict[str, Any],
         written.append("conclusion")
     if text:
         (intake_dir / state.BLOCKS_FILE).write_text(text, encoding="utf-8")
+    asked = [str(q).strip() for q in form.get("buyer_questions") or [] if str(q).strip()]
+    qfile = eng_dir / BUYER_QUESTIONS
+    if asked and not qfile.is_file():
+        # The buyer's words, as a note; the practice writes the statements
+        # the review tests beneath them, then names the file in
+        # engagement.yaml (claims_audit/questions.py says how).
+        qfile.parent.mkdir(exist_ok=True)
+        qfile.write_text("# Questions the buyer asked\n<!-- The buyer, at intake:\n"
+                         + "".join(f"     - {q.replace('-->', '- ->')}\n" for q in asked)
+                         + "-->\n", encoding="utf-8")
+        written.append(BUYER_QUESTIONS)
     brief = eng_dir / "brief.md"
     if not brief.is_file():
         b = form.get("background") or {}

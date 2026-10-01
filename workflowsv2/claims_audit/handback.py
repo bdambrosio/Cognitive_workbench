@@ -110,7 +110,8 @@ def main() -> int:
     shutil.copytree(run, out, ignore=shutil.ignore_patterns("review", "findings.partial.json"))
     target = Path(meta["external_repo"])
     claim_source = obj.get("claim_source") or (meta.get("surface") or {}).get("claim_source")
-    src_doc = target / claim_source
+    src_doc = (Path(meta["claim_source_file"]) if meta.get("claim_source_file")
+               else target / claim_source)
     traces_dir = out / "working_record" / "inspect_traces"
     excludes = list(meta.get("evidence_excludes") or [])
     budget = int(meta.get("evidence_budget") or audit.EVIDENCE_BUDGET)

@@ -172,7 +172,7 @@ def main() -> int:
                                      encoding="utf-8")
     classes = render.classify(record["merged"])
     logger.info("assembled: shown %d, unsettled %d (about the seller %d), "
-                "not examined %d, hold %d",
+                "unexamined %d, hold %d",
                 *(len(classes[k]) for k in ("shown", "unsettled", "seller_unsettled",
                                            "not_examined", "holds")))
     if args.no_prose:

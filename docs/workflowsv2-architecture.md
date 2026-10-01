@@ -258,7 +258,7 @@ uphold is recorded as issue `rated_but_not_upheld`.
 transaction, executive summary, scope and approach (a table of tested and
 not-tested counts per claim source, including a source with no run), what the
 review showed by materiality, unsettled claims by exposure, unsettled claims
-about the seller, claims not examined, claims that hold, questions for the
+about the seller, unexamined claims, claims that hold, questions for the
 seller, observations the seller did not claim, coverage, limitations, an
 appendix of every tested claim with its verdict, and a second appendix of
 claims listed and not tested. `not_tested` reads the engagement's frozen

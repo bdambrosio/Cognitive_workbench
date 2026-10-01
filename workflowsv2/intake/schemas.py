@@ -27,6 +27,7 @@ SLOTS: Dict[str, Tuple[str, ...]] = {
 def empty_form() -> Dict[str, Any]:
     out: Dict[str, Any] = {slot: {f: "" for f in fields}
                            for slot, fields in SLOTS.items()}
+    out["buyer_questions"] = []
     out["open_questions"] = []
     out["notes"] = []
     return out
@@ -40,10 +41,11 @@ def intake_schema() -> Dict[str, Any]:
         props[slot] = {"type": "object",
                        "properties": {f: {"type": "string"} for f in fields},
                        "required": list(fields)}
+    props["buyer_questions"] = {"type": "array", "items": {"type": "string"}}
     props["open_questions"] = {"type": "array", "items": {"type": "string"}}
     props["notes"] = {"type": "array", "items": {"type": "string"}}
     return {"type": "object", "properties": props,
-            "required": list(SLOTS) + ["open_questions", "notes"]}
+            "required": list(SLOTS) + ["buyer_questions", "open_questions", "notes"]}
 
 
 def check_intake(obj: Dict[str, Any]) -> Dict[str, Any]:

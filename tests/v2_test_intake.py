@@ -94,6 +94,24 @@ def test_finish_writes_the_intake_blocks_and_a_brief_once(tmp_path):
     assert (eng / "brief.md").read_text() == "edited by hand"
 
 
+def test_finish_puts_the_buyers_questions_where_the_seller_cannot_read_them(tmp_path):
+    """The buyer's questions become the start of a question source in the
+    engagement directory, not in the target, and are kept as the buyer said
+    them; no statement is written for the practice."""
+    from workflowsv2.claims_audit import questions
+    eng = tmp_path / "e"; eng.mkdir()
+    (eng / "engagement.yaml").write_text("target: target\nclaim_sources: [a.md]\n")
+    idir = eng / "intakes" / "2026-10-01T00-00-00Z"; idir.mkdir(parents=True)
+    f = sch.empty_form()
+    f["buyer_questions"] = ["Is the admin login safe?", "Will an upgrade lose our links?"]
+    res = rn.finish(eng, idir, f)
+    assert rn.BUYER_QUESTIONS in res["written"]
+    text = (eng / rn.BUYER_QUESTIONS).read_text()
+    assert "Is the admin login safe?" in text and "Will an upgrade lose our links?" in text
+    assert not (eng / "target").exists()
+    assert questions.statements(text) == []
+
+
 def test_intake_session_refuses_a_missing_engagement(tmp_path, monkeypatch):
     import pytest
     from workflowsv2.intake.session import IntakeSession

@@ -243,6 +243,36 @@ def claim_sources(eng_dir: Path) -> List[str]:
     return [str(c) for c in (_engagement_yaml(eng_dir).get("claim_sources") or [])]
 
 
+#: Who writes a question source: the buyer at intake, the practice's standard
+#: list, or the practice reading a seller claim.
+QUESTION_KINDS = ("buyer", "standard", "practice")
+
+
+def question_kind(eng_dir: Path, source: str) -> Optional[str]:
+    """The kind of a question source, from engagement.yaml `questions:` (a
+    map from claim source to kind), or None for a source the seller wrote.
+
+    A question source is a file of statements the review tests, written by
+    the practice, one statement per line. It lives in the engagement
+    directory, not in the target: the seller can read every file under the
+    target, and the buyer's questions are not the seller's to read."""
+    kind = (_engagement_yaml(eng_dir).get("questions") or {}).get(source)
+    if kind is None:
+        return None
+    if kind not in QUESTION_KINDS:
+        raise SystemExit(f"{eng_dir.name}: question source {source} has kind {kind!r}, "
+                         f"not one of {', '.join(QUESTION_KINDS)}")
+    return kind
+
+
+def claim_source_file(eng_dir: Path, source: str) -> Path:
+    """Where a claim source's text is: under the engagement directory for a
+    question source, else under the target."""
+    if question_kind(eng_dir, source):
+        return eng_dir / source
+    return target_dir(eng_dir) / source
+
+
 def evidence_excludes(eng_dir: Path) -> List[str]:
     """Paths under the target that are documentation, not evidence: the
     engagement's `evidence_excludes` when the key is present, else every

@@ -125,11 +125,15 @@ def statistics(run: Path, corpus: Path, claim_source: str) -> Dict[str, Any]:
     claims = json.loads((run / "claims.json").read_text())
     findings = json.loads((run / "findings.json").read_text())
     frozen = claims.get("claims") or []
-    surface = audit_schemas.check_surface(claims, corpus, claim_source)
     # The documents the audit ran with excluded from evidence, from its own
     # record; an older run recorded none and excluded nothing.
     meta0 = json.loads((run / "run_meta.json").read_text()) \
         if (run / "run_meta.json").is_file() else {}
+    # Where the claim source's text was; a run made before question sources
+    # recorded none, and its claim source is under the corpus.
+    src_file = (Path(meta0["claim_source_file"]) if meta0.get("claim_source_file")
+                else corpus / claim_source)
+    surface = audit_schemas.check_surface(claims, corpus, claim_source, src_file=src_file)
     excludes = list(meta0.get("evidence_excludes") or [])
     output = audit_schemas.check_output(findings, corpus, claim_source, frozen,
                                         excludes=excludes)
@@ -213,7 +217,7 @@ def statistics(run: Path, corpus: Path, claim_source: str) -> Dict[str, Any]:
         "documents_opened": opened,
         "documents_cited_but_never_opened": never_opened,
         # For a person, per REVIEW.md §7.
-        "unclaimed_spans": unclaimed_spans(frozen, corpus / claim_source),
+        "unclaimed_spans": unclaimed_spans(frozen, src_file),
     }
 
 
@@ -271,6 +275,10 @@ def _finding_text(f: Dict[str, Any], claims: Dict[int, Dict[str, Any]]) -> str:
     elif c.get("about") == "document":
         out.append("    about     : a document itself (METHOD \u00a75) — the document "
                    "settles it, and a citation into it is evidence for this claim")
+    if c.get("asked_by"):
+        out.append(f"    asked by  : the {'buyer' if c['asked_by'] == 'buyer' else 'practice'}, "
+                   f"not claimed by the seller — a property the target is expected to "
+                   f"have, tested like any claim")
     if c.get("implied_by") is not None:
         out.append(f"    implied by: claim {c['implied_by']} — the practice's reading, "
                    f"recorded before the freeze; the statement is what was tested")

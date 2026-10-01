@@ -1128,6 +1128,10 @@ def _claim_line(c: Dict[str, Any]) -> str:
         line += "  (about the seller, per METHOD \u00a75)"
     elif c.get("about") == "document":
         line += "  (about a document itself, per METHOD \u00a75: the document settles it)"
+    if c.get("asked_by"):
+        line += (f"\n      asked by the {'buyer' if c['asked_by'] == 'buyer' else 'practice'}, "
+                 f"not claimed by the seller: a property the target is expected to "
+                 f"have, tested like any claim")
     if c.get("implied_by") is not None:
         line += (f"\n      implied by claim {c['implied_by']}: the quote is that claim's; "
                  f"the statement is the practice's reading of what it asserts, and is "
@@ -1379,7 +1383,8 @@ def main() -> int:
     if claim_source not in eng["claim_sources"]:
         raise SystemExit(f"'{claim_source}' is not one of the engagement's "
                          f"claim_sources: {', '.join(eng['claim_sources'])}")
-    src_doc = eng["target"] / claim_source
+    from workflowsv2 import engagement_state as state           # noqa: E402
+    src_doc = state.claim_source_file(eng["dir"], claim_source)
     method_text = load_workflow(REPO / METHOD_PATH)
     emit_tokens = int((cfg.get("chat") or {}).get("react_max_tokens", 32768))
     try:
@@ -1479,7 +1484,7 @@ def main() -> int:
         if not error:
             frozen = assembled.get("claims") or []
             surface_check = schemas.check_surface(
-                assembled, eng["target"], claim_source)
+                assembled, eng["target"], claim_source, src_file=src_doc)
             for problem in surface_check["problems"]:
                 issues.note(out, stage="claims_audit", code="surface_check",
                             text=problem, severity="blocking")
@@ -2104,6 +2109,9 @@ def main() -> int:
         "llm_config": cfg.get("llm_config"),
         "served_model_check": served_check,
         "external_repo": cfg.get("external_repo"),
+        # Where the claim source's text is: under the target, or under the
+        # engagement for a question source (engagement_state.question_kind).
+        "claim_source_file": str(src_doc),
         # A PATH IS NOT A PIN. run_meta used to record where the target was and
         # not what it contained, so a citation could later resolve against a
         # tree the report never saw, silently. The commit says the tree moved;

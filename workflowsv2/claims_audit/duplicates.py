@@ -247,7 +247,9 @@ def _touched(eng_dir: Path, source: str) -> bool:
 
 def run(eng_dir: Path, model_yaml: Path) -> Dict[str, Any]:
     from client_ui import jobs
-    order = state.claim_sources(eng_dir)
+    # A question source states what the target is expected to have; it is
+    # never the same claim as the seller's, and has no enumeration run.
+    order = [s for s in state.claim_sources(eng_dir) if not state.question_kind(eng_dir, s)]
     backend = backend_from_model(model_yaml)
     runs: Dict[str, Path] = {}
     claims: Dict[Key, Dict[str, Any]] = {}

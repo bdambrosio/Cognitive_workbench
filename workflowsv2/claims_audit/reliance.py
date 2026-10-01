@@ -80,10 +80,14 @@ def buyer_said(eng: Dict[str, Any]) -> str:
 
 def inventory(eng_dir: Path) -> str:
     """Every claim's statement, by claim source; repeats of an earlier claim
-    left out, as the tier stage leaves them out."""
+    left out, as the tier stage leaves them out. Question sources are left
+    out: they are what the target is expected to have, not what the seller
+    said."""
     from workflowsv2.claims_audit.tiers import claims_file
     parts: List[str] = []
     for src in state.claim_sources(eng_dir):
+        if state.question_kind(eng_dir, src):
+            continue
         f = claims_file(eng_dir, src)
         if f is None:
             raise SystemExit(f"{src} has not been enumerated")

@@ -87,13 +87,13 @@ def test_assemble_without_prose_leaves_markers_and_orders_by_rating():
     order = ["## The transaction", "## Executive summary", "## Scope and approach",
              "## How to read a finding", "## What the review showed", "## Unsettled claims",
              "## Unsettled claims about the seller",
-             "## Claims not examined", "## Claims that hold", "## Questions for the seller",
+             "## Unexamined claims", "## Claims that hold", "## Questions for the seller",
              "## Coverage", "## Limitations", "## Appendix"]
     idx = [doc.index(h) for h in order]
     assert idx == sorted(idx)
     scope = doc[doc.index("## Scope and approach"):doc.index("## How to read a finding")]
     assert "| README.md | 5 | 5 | yes | 12 | 3 | m |" in scope and "[[scope_note]]" in scope
-    assert "| unsettled, or not examined |" in doc                    # the crosswalk
+    assert "| unsettled, or unexamined |" in doc                    # the crosswalk
     # decisive before material within the shown section
     shown = doc[doc.index("## What the review showed"):doc.index("## Unsettled claims")]
     assert shown.index("claim 5 — materiality: decisive") < shown.index("claim 1 — materiality: material")
@@ -103,18 +103,18 @@ def test_assemble_without_prose_leaves_markers_and_orders_by_rating():
     assert "material of the right kind was supplied" in unsettled
     assert "**Question for the seller:** where?" in unsettled           # a question rides with its finding
     assert "claim 6" not in unsettled
-    seller = doc[doc.index("## Unsettled claims about the seller"):doc.index("## Claims not examined")]
+    seller = doc[doc.index("## Unsettled claims about the seller"):doc.index("## Unexamined claims")]
     assert seller.startswith("## Unsettled claims about the seller\n\n" + render.SELLER_LINE)
     assert "claim 6 — exposure: material" in seller
     assert "**Question for the seller:** for how long?" in seller
     assert "claim 7" not in seller and "claim 3" not in seller
-    ne = doc[doc.index("## Claims not examined"):doc.index("## Claims that hold")]
+    ne = doc[doc.index("## Unexamined claims"):doc.index("## Claims that hold")]
     assert "claim 4 — exposure: decisive" in ne and "Files named: `app/h.py`" in ne
     assert "| README.md | 2 | claim 2 text | `app/x.py` lines 3–4 |" in doc
     assert "| README.md | 7 | claim 7 text | `app/x.py` lines 3–4 |" in doc
     cov = doc[doc.index("## Coverage"):doc.index("## Limitations")]
     assert "| contradicted | shown | 1 |" in cov and "| unverifiable | unsettled | 3 |" in cov
-    assert "of which 1 about the seller. Not examined: 1." in cov and "- `app/h.py`" in cov
+    assert "of which 1 about the seller. Unexamined: 1." in cov and "- `app/h.py`" in cov
     assert "- (README.md, claim 6) for how long?" in doc                # the checklist stays complete
     lim = doc[doc.index("## Limitations"):doc.index("## Appendix")]
     assert "[[limitations]]" in lim and "has not confirmed the review's interpretation" in lim
@@ -128,10 +128,10 @@ def test_assemble_places_prose_and_drops_the_not_examined_section_when_empty():
     assert "[[" not in doc and "<summary>" in doc and "<limitations>" in doc
     assert "The engagement states nothing about the transaction" in doc
     assert "**The buyer's thresholds.**  \nNone recorded." in doc
-    assert "## Claims not examined" in doc
+    assert "## Unexamined claims" in doc
     rec["merged"]["findings"] = [f for f in rec["merged"]["findings"] if f["claim_id"] not in (4, 6)]
     doc = render.assemble(rec, None, None, "eng")
-    assert "## Claims not examined" not in doc and "[[not_examined_note]]" not in doc
+    assert "## Unexamined claims" not in doc and "[[not_examined_note]]" not in doc
     assert "## Unsettled claims about the seller" not in doc and render.SELLER_LINE not in doc
 
 
@@ -320,3 +320,28 @@ def test_a_verdict_resting_on_dependency_knowledge_is_marked_and_no_other_is():
     assert "Rests in part on knowledge of a dependency." in marked
     assert "from knowledge of the dependency, not from the supplied materials" in marked
     assert "knowledge of" not in plain and "- derived from `backend/src/main.rs`" in plain
+
+
+def test_a_statement_the_buyer_asked_is_reported_apart_from_the_sellers_claims():
+    """A gap in a statement the buyer asked is not a mark against the seller:
+    it has its own section, and is still listed among the material findings."""
+    rec = _record()
+    rec["merged"]["findings"].append({
+        "claim_source": "questions/buyer.md", "claim_id": 1,
+        "quote": "Passwords are hashed.", "lines": [2, 2],
+        "statement": "Passwords are hashed.", "about": "target", "asked_by": "buyer",
+        "adjudication": {"verdict": "contradicted", "gap": "stored in plain text"},
+        "evidence": [{"form": "citation", "document": "app/u.py", "lines": [9, 9],
+                      "quote": "x", "shows": "y"}],
+        "review": {"outcome": "holds", "adverse_observations": []},
+        "citation_problems": []})
+    rec["ratings"]["ratings"].append({"claim_source": "questions/buyer.md", "claim_id": 1,
+                                      "materiality": "material", "basis": "b"})
+    doc = render.assemble(rec, None, "t", "eng", None, False)
+    head = "### questions/buyer.md, claim 1"
+    shown = doc[doc.index("## What the review showed"):doc.index("## Unsettled claims")]
+    assert head not in shown
+    asked = doc[doc.index("## Questions the buyer asked"):doc.index("## Claims that hold")]
+    assert head in asked and "**Asked by the buyer:** Passwords are hashed." in asked
+    summary = doc[doc.index("## Executive summary"):doc.index("## Scope and approach")]
+    assert "questions/buyer.md, claim 1" in summary
