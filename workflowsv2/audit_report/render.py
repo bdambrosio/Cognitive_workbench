@@ -752,6 +752,7 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
     if record.get("composition"):
         from workflowsv2.composition import appendix
         out += [""] + appendix.render(record["composition"])
+        out += [""] + appendix.render_secrets(record["composition"])
     return "\n".join(out).rstrip() + "\n"
 
 

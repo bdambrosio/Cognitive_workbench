@@ -74,3 +74,48 @@ def test_the_flag_is_settable_and_read_as_a_boolean(tmp_path):
     assert "composition: true" in (eng / "engagement.yaml").read_text()
     assert scan.enabled(eng) is True
     assert scan.latest(eng) is None              # enabled, not yet scanned
+
+
+SECRET = "Zx8vQ2mN4pL7rT1wK9sB3dF6hJ0cY5aE"
+
+
+def _git(repo, *a):
+    import subprocess
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t",
+                    *a], check=True, capture_output=True)
+
+
+def test_secrets_the_seller_exempts_or_removed_are_still_reported_without_values(tmp_path):
+    """The target is the seller's: its own gitleaks settings and allow
+    comments must not hide a match, a credential deleted in a later commit is
+    still reported, and no value reaches the record."""
+    import shutil
+    import pytest
+    if not (shutil.which("gitleaks") and shutil.which("syft") and shutil.which("grype")
+            and scan.GITLEAKS_RULES.is_file()):
+        pytest.skip("gitleaks, syft, grype or the pinned rules are not installed")
+    target = tmp_path / "target"
+    target.mkdir()
+    _git(target, "init", "-q")
+    (target / "old.py").write_text(f'api_key = "{SECRET}"\n')
+    _git(target, "add", "."); _git(target, "commit", "-qm", "one")
+    (target / "old.py").unlink()
+    (target / "settings.py").write_text(f'auth_token = "{SECRET[::-1]}"  # gitleaks:allow\n')
+    (target / ".gitleaks.toml").write_text(
+        '[extend]\nuseDefault = true\n[[allowlists]]\npaths = [".*"]\n')
+    import subprocess
+    first = subprocess.run(["git", "-C", str(target), "rev-parse", "HEAD"],
+                           capture_output=True, text=True).stdout.strip()
+    (target / ".gitleaksignore").write_text(f"{first}:old.py:generic-api-key:1\n")
+    _git(target, "add", "-A"); _git(target, "commit", "-qm", "two")
+    eng = tmp_path / "e"
+    eng.mkdir()
+    (eng / "engagement.yaml").write_text(f"target: {target}\ncomposition: true\n")
+
+    out = scan.run(eng)
+    rows = scan.latest(eng)["secrets"]
+    assert ("files", "settings.py") in {(r["where"], r["file"]) for r in rows}
+    assert ("history", "old.py") in {(r["where"], r["file"]) for r in rows}
+    for f in out.iterdir():
+        text = f.read_text(encoding="utf-8")
+        assert SECRET not in text and SECRET[::-1] not in text, f.name

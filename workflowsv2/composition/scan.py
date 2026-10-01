@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Scan an engagement's target for the third-party components its dependency
-files declare, and match them against a pinned vulnerability database.
+files declare, match them against a pinned vulnerability database, and look
+for credentials written into its files and its git history.
 
     python3 workflowsv2/composition/scan.py --engagement <name>
 
@@ -8,7 +9,7 @@ Runs only when the engagement enables it (`composition: true` in
 engagement.yaml). The chain job calls it first when it is enabled; it can
 also be run on its own.
 
-WHAT RUNS. Two programs, both run locally, and no model:
+WHAT RUNS. Three programs, all run locally, and no model:
 
   syft    reads the dependency files under the target (lockfiles, manifests,
           CI workflow files) and lists every component they declare, with the
@@ -18,6 +19,16 @@ WHAT RUNS. Two programs, both run locally, and no model:
   grype   matches the listed components against a vulnerability database by
           name and version. The database is a pinned offline copy (GRYPE_DB),
           never updated during a scan, and its build date is recorded.
+  gitleaks reads every file under the target, and every commit when the
+          target is a git checkout, for text that matches a credential
+          pattern (API keys, tokens, private keys). Values are redacted. The
+          rules are a pinned copy (GITLEAKS_RULES); the target's own
+          .gitleaks.toml, .gitleaksignore and gitleaks:allow comments are not
+          honoured, because the seller writes them.
+
+WHAT A SECRET MATCH IS. Text that fits a credential pattern. Nobody checked
+whether it is a real credential, or whether it still works; examples and test
+values match too.
 
 WHAT A MATCH IS. A component whose recorded version falls in a range some
 advisory names. It is level 1 of the Linux Foundation guide's ladder at most:
@@ -32,6 +43,10 @@ target because the seller sees the target:
   components.json  one row per component, with a stable id
   matches.json     one row per match, with a stable id; the practice's record,
                    not shown to the client
+  gitleaks_files.json, gitleaks_history.json
+                   gitleaks's own output, kept whole (values redacted)
+  secrets.json     one row per secret match, without its value; the
+                   practice's record, not shown to the client
   scan_meta.json   tool versions, database build, target commit, the files
                    the scan read, and the counts
 
@@ -46,6 +61,7 @@ import logging
 import os
 import subprocess
 import sys
+import tempfile
 from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -66,6 +82,10 @@ GRYPE_DB = Path(os.environ.get("TUUYI_GRYPE_DB_DIR",
 #: Paths under the target the scan leaves out: files the practice extracted
 #: there (materials sorting writes claim sources to claim_sources/).
 EXCLUDE = ("./claim_sources/**",)
+#: gitleaks's default rules for the installed version, pinned so a scan does not
+#: depend on the target. Override with TUUYI_GITLEAKS_RULES.
+GITLEAKS_RULES = Path(os.environ.get("TUUYI_GITLEAKS_RULES",
+                                     Path.home() / ".local/share/tuuyi/gitleaks/gitleaks-8.30.1.toml"))
 SCANS = "composition"
 
 
@@ -145,6 +165,68 @@ def matches(grype_doc: Dict[str, Any], comps: List[Dict[str, Any]]) -> List[Dict
     return sorted(rows, key=lambda r: (r["name"] or "", r["vulnerability"] or ""))
 
 
+def _gitleaks(mode: str, target: Path, report: Path) -> List[Dict[str, Any]]:
+    """gitleaks in `dir` or `git` mode. Exit code 0 whether or not it finds
+    anything; a failure to run raises.
+
+    gitleaks also reads a .gitleaksignore from the path it scans, whatever
+    --gitleaks-ignore-path says. In `git` mode an entry names commit, file,
+    rule and line, which the seller knows, so history is scanned in a bare
+    mirror clone, which has no working tree and so no such file. In `dir`
+    mode an entry names the absolute path of the file on the practice's
+    machine, which the seller does not know."""
+    if mode == "git":
+        with tempfile.TemporaryDirectory() as tmp:
+            mirror = Path(tmp) / "mirror.git"
+            r = subprocess.run(["git", "clone", "-q", "--mirror", str(target), str(mirror)],
+                               capture_output=True, text=True)
+            if r.returncode != 0:
+                raise SystemExit(f"git clone --mirror failed: {r.stderr.strip()[-600:]}")
+            return _gitleaks("mirror", mirror, report)
+    mode = "git" if mode == "mirror" else mode
+    env = {k: v for k, v in _env().items() if not k.startswith("GITLEAKS_")}
+    r = subprocess.run(["gitleaks", mode, str(target), "--config", str(GITLEAKS_RULES),
+                        "--gitleaks-ignore-path", str(report.parent),
+                        "--ignore-gitleaks-allow", "--redact", "--no-banner",
+                        "--log-level", "error", "--exit-code", "0",
+                        "-f", "json", "-r", str(report)],
+                       cwd=report.parent, env=env, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise SystemExit(f"gitleaks {mode} failed ({r.returncode}): {r.stderr.strip()[-600:]}")
+    return json.loads(report.read_text(encoding="utf-8"))
+
+
+def secrets(files_doc: List[Dict[str, Any]], history_doc: List[Dict[str, Any]],
+            target: Path) -> List[Dict[str, Any]]:
+    """One row per secret match, without its value: `match` is the matched
+    text with the value replaced by REDACTED, and `id` is gitleaks's
+    fingerprint with the path made relative to the target, so a row read by
+    someone else shows nothing of the practice's machine. `where` is `files` for a
+    match in the files as delivered, `history` for a match found only in a
+    commit, by file and rule: a credential committed and later removed stays
+    readable to anyone with the repository."""
+    def rel(f: str) -> str:
+        p = Path(f)
+        return str(p.relative_to(target)) if p.is_absolute() and p.is_relative_to(target) else f
+    rows, seen = [], set()
+    for where, doc in (("files", files_doc), ("history", history_doc)):
+        for x in doc:
+            f = rel(x.get("File") or "")
+            if f.startswith("claim_sources/"):
+                continue
+            key = (f, x.get("RuleID"))
+            if where == "history" and key in seen:
+                continue
+            seen.add(key)
+            commit = x.get("Commit") or None
+            rows.append({"id": ":".join(str(v) for v in (commit, f, x.get("RuleID"),
+                                                         x.get("StartLine")) if v),
+                         "where": where, "rule": x.get("RuleID"), "file": f,
+                         "line": x.get("StartLine"), "match": x.get("Match"),
+                         "commit": commit, "date": x.get("Date") or None})
+    return rows
+
+
 def _target_rev(target: Path) -> Optional[str]:
     """The target's commit, only when the target is itself the top of a git
     checkout. A plain directory inside some other repository (a fixture's
@@ -180,6 +262,12 @@ def run(eng_dir: Path) -> Path:
     comps = components(syft_doc)
     found = matches(grype_doc, comps)
     rev = _target_rev(target)
+    if not GITLEAKS_RULES.is_file():
+        raise SystemExit(f"no gitleaks rules at {GITLEAKS_RULES}")
+    files_doc = _gitleaks("dir", target, out / "gitleaks_files.json")
+    history_doc = _gitleaks("git", target, out / "gitleaks_history.json") if rev else []
+    found_secrets = secrets(files_doc, history_doc, target)
+    gl = subprocess.run(["gitleaks", "version"], capture_output=True, text=True).stdout.strip()
     meta = {
         "engagement": eng_dir.name,
         "scanned_at": ts,
@@ -189,16 +277,21 @@ def run(eng_dir: Path) -> Path:
         "grype": (grype_doc.get("descriptor") or {}).get("version"),
         "db": {"built": db.get("built"), "schema": db.get("schemaVersion"),
                "from": db.get("from")},
+        "gitleaks": gl,
+        "gitleaks_rules": GITLEAKS_RULES.name,
+        "history_scanned": bool(rev),
         "files": dict(sorted(Counter(f for c in comps for f in c["files"]).items())),
         "counts": {"components": len(comps),
                    "by_type": dict(Counter(c["type"] for c in comps)),
                    "version_range": sum(1 for c in comps if c["version_range"]),
                    "no_licence": sum(1 for c in comps if not c["licences"]),
                    "matches": len(found),
-                   "matched_components": len({m["component"] for m in found})},
+                   "matched_components": len({m["component"] for m in found}),
+                   "secrets_files": sum(1 for x in found_secrets if x["where"] == "files"),
+                   "secrets_history": sum(1 for x in found_secrets if x["where"] == "history")},
     }
     for name, doc in (("components.json", comps), ("matches.json", found),
-                      ("scan_meta.json", meta)):
+                      ("secrets.json", found_secrets), ("scan_meta.json", meta)):
         (out / name).write_text(json.dumps(doc, indent=1, ensure_ascii=False) + "\n",
                                 encoding="utf-8")
     logger.info("%s: %d components, %d matches in %d components -> %s",
@@ -209,7 +302,8 @@ def run(eng_dir: Path) -> Path:
 
 def latest(eng_dir: Path) -> Optional[Dict[str, Any]]:
     """The newest scan of an engagement that enables composition analysis, as
-    {"dir", "meta", "components", "matches"}, or None."""
+    {"dir", "meta", "components", "matches", "secrets"}, or None. `secrets` is
+    None for a scan made before the secrets scan was added."""
     if not enabled(eng_dir):
         return None
     d = eng_dir / SCANS
@@ -219,7 +313,8 @@ def latest(eng_dir: Path) -> Optional[Dict[str, Any]]:
     s = scans[-1]
     load = lambda n: json.loads((s / n).read_text(encoding="utf-8"))   # noqa: E731
     return {"dir": str(s), "meta": load("scan_meta.json"),
-            "components": load("components.json"), "matches": load("matches.json")}
+            "components": load("components.json"), "matches": load("matches.json"),
+            "secrets": load("secrets.json") if (s / "secrets.json").is_file() else None}
 
 
 def main() -> int:
