@@ -75,3 +75,22 @@ def test_the_standard_list_is_copied_under_its_version_and_a_practice_edit_survi
     copy.write_text("# edited\nOne statement.\n")
     assert questions.add_standard(eng) == src
     assert copy.read_text() == "# edited\nOne statement.\n"
+
+
+def test_a_question_source_batch_is_not_shown_the_statements_of_other_batches(tmp_path, monkeypatch):
+    """A question source's text is its statements; shown whole to a batch,
+    the model adjudicated claims of the next batch too, and those claims got
+    two findings each (chhoto-questions, 2026-10-01)."""
+    from workflowsv2.claims_audit import runner
+    src = tmp_path / "standard.md"
+    src.write_text("# Q\nFirst statement.\nSecond statement.\nThird statement.\n")
+    batch = questions.claims(src.read_text(), "standard")[:2]
+    seen = {}
+
+    def fake_emit(loop, method, user, schema, max_tokens, salvage=None):
+        seen["user"] = user
+        return {"obj": {"findings": []}, "parse": "parsed"}
+    monkeypatch.setattr(runner, "emit", fake_emit)
+    monkeypatch.setattr(runner, "gathered_evidence", lambda t, b: {"text": ""})
+    runner.emit_findings(None, "METHOD", src, batch, [], 1000)
+    assert "First statement." in seen["user"] and "Third statement." not in seen["user"]

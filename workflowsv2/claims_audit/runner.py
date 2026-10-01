@@ -1079,10 +1079,20 @@ def emit_findings(loop, method_text: str, claim_source: Path,
     generation. This call is built to sit on the safe side of that.
     """
     ev = gathered_evidence(traces, evidence_budget)
-    user = (
+    # A question source's text is its statements and nothing else, so shown
+    # whole it lists every claim of the run, and a batch adjudicated claims
+    # outside it (chhoto-questions, 2026-10-01: 18 findings for 14 claims).
+    # Each frozen claim already carries its whole line.
+    source_text = (
+        f"The claim source for this run is `{claim_source.name}`, a question "
+        f"source the practice wrote (METHOD \u00a72). Its statements are the "
+        f"claims below.\n\n"
+        if any(c.get("asked_by") for c in frozen) else
         f"The claim source for this run is `{claim_source.name}`. Its text, "
         f"with the line numbers your citations refer to:\n\n"
-        f"{numbered(claim_source)}\n\n"
+        f"{numbered(claim_source)}\n\n")
+    user = (
+        source_text +
         # A cited line of the claim source is the assertion restated, not
         # evidence about it. Two runs on 2026-09-04, once the subagent could
         # cite verbatim, cited README badge lines and rated the badge claims
