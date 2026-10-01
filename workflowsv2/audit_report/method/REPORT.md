@@ -42,7 +42,7 @@ Some claims may have been listed and not tested: before testing, the practice ju
 
 **Do not write the figures.** The counts, the list of the material findings, and the table of what was examined are computed by the client's process and placed in the document. Do not restate them, recalculate them, or describe them as approximate.
 
-**Do not draw on the composition appendix.** Where the document carries one, it is a scan's output and nobody reviewed it. A vulnerability matched by version does not show that the target is affected. Do not mention its counts or its components, and do not treat anything in it as a gap.
+**Do not draw on the scan appendices.** Where the document carries them, they are the output of programs and nobody reviewed them. A vulnerability matched by version does not show that the target is affected. Text that matches a credential pattern does not show that a credential is real or still works. Do not mention their counts, components or matches, and do not treat anything in them as a gap.
 
 **Do not soften or sharpen.** If a finding says a feature does not exist, say that. Do not write "appears to be incomplete", and do not write "seriously misrepresented".
 
@@ -72,7 +72,7 @@ Seven, each one field of the output. The document is assembled in this order, an
 8. **`not_examined_note`** — one to three sentences before the unexamined claims: that the searches named files nobody opened, that these claims are the first thing a further pass would settle, and that they are ordered by exposure. Empty when the document has no such claims.
 9. The claims that hold, the questions for the seller, the unclaimed observations, and the coverage figures, copied or computed.
 10. **`limitations`** — one paragraph. What this document is not: not a penetration test, not a code-quality review, not legal advice, not a judgement on claims it did not resolve. The facts about scope come from the document itself; add nothing it does not state. The client's process adds the inherent limitations it states in every report.
-11. The appendix of every tested claim and its verdict, and the appendix of claims listed and not tested, computed. When the engagement included composition analysis, a third appendix follows: the components the target's dependency files declare, with their declared licences and a count of known vulnerabilities matched by version, computed from a scan and not reviewed.
+11. The appendix of every tested claim and its verdict, and the appendix of claims listed and not tested, computed. When the engagement included composition analysis, two more appendices follow, computed from scans and not reviewed: the components the target's dependency files declare, with their declared licences and a count of known vulnerabilities matched by version; and counts, by kind, of text in the target's files and git history that matches a credential pattern.
 
 ## 7. The output
 

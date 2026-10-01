@@ -20,7 +20,9 @@ from markdown_it import MarkdownIt
 
 #: Sections that start a new page in print.
 PAGE_BREAK_BEFORE = ("Executive summary", "What the review showed",
-                     "Appendix — every claim and its verdict")
+                     "Appendix — every claim and its verdict",
+                     "Appendix — components and licences",
+                     "Appendix — credentials in the files and history")
 
 CSS = """
 :root { --ink: #1a1a1a; --muted: #555; --rule: #cfcfcf; --box: #f6f6f6; }
