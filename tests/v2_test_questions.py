@@ -61,3 +61,17 @@ def test_an_item_that_does_not_apply_is_listed_untested_with_its_reason():
     assert [(c["statement"], c["tier_basis"]) for c in untested] == [
         ("User passwords are hashed.",
          "Not applicable to this target: The software has no user accounts.")]
+
+
+def test_the_standard_list_is_copied_under_its_version_and_a_practice_edit_survives(tmp_path):
+    """The copy's name carries the list's version, which is how the report
+    names it; adding it again keeps the practice's edits to the copy."""
+    eng = tmp_path / "e"
+    eng.mkdir()
+    src = questions.add_standard(eng)
+    assert src == "questions/standard-v1.md"
+    copy = eng / src
+    assert questions.statements(copy.read_text())
+    copy.write_text("# edited\nOne statement.\n")
+    assert questions.add_standard(eng) == src
+    assert copy.read_text() == "# edited\nOne statement.\n"

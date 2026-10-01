@@ -2,6 +2,7 @@
 """Turn a question source into the draft surface of its statements. No model.
 
     python3 workflowsv2/claims_audit/questions.py --engagement <name>
+    python3 workflowsv2/claims_audit/questions.py --engagement <name> --add-standard
 
 A QUESTION SOURCE is a file the practice writes in the engagement directory
 (not in the target, which the seller can read), named in engagement.yaml
@@ -24,6 +25,11 @@ an item that does not apply to the target moves under a heading reading
 exactly `# Not applicable`, written `statement | reason`. It becomes a claim
 of tier 3 with the reason as its basis, so the report lists it, with the
 reason, among the claims not tested, and the list stays whole in the record.
+
+STANDARD. `--add-standard` copies method/STANDARD_QUESTIONS.md into the
+engagement as questions/standard-v<N>.md, N its version, so the report names
+the version, and prints the two lines engagement.yaml needs; the practice
+adds them and moves what does not apply under `# Not applicable`.
 
 The surface is written as the draft, which the practice reads and freezes on
 the surface page like any other. A draft or frozen surface already there is
@@ -50,6 +56,8 @@ logger = logging.getLogger("claims_audit.questions")
 #: Written on each claim as `tier_by`, so the tier stage's `mark` leaves the
 #: tier alone, and so a reader of the surface sees where the tier came from.
 TIER_BY = "question source"
+#: The practice's standard list; its first line names its version.
+STANDARD = Path(__file__).resolve().parent / "method" / "STANDARD_QUESTIONS.md"
 
 
 #: The heading above the items that do not apply to this engagement.
@@ -125,15 +133,40 @@ def build(eng_dir: Path) -> Dict[str, int]:
     return done
 
 
+def add_standard(eng_dir: Path) -> str:
+    """Copy the standard list into the engagement; returns the claim source.
+    An existing copy is left alone: the practice may have edited it."""
+    import re
+    first = STANDARD.read_text(encoding="utf-8").splitlines()[0]
+    m = re.search(r"version (\d+)", first)
+    if not m:
+        raise SystemExit(f"{STANDARD.name} does not name its version on its first line")
+    src = f"questions/standard-v{m.group(1)}.md"
+    dst = eng_dir / src
+    if dst.is_file():
+        logger.info("%s is already in the engagement; left as it is", src)
+    else:
+        dst.parent.mkdir(exist_ok=True)
+        dst.write_text(STANDARD.read_text(encoding="utf-8"), encoding="utf-8")
+    return src
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--engagement", required=True)
+    ap.add_argument("--add-standard", action="store_true",
+                    help="copy the standard list into the engagement instead of building surfaces")
     args = ap.parse_args()
     eng = state.ENGAGEMENTS / args.engagement
     if not eng.is_dir():
         raise SystemExit(f"no engagement {args.engagement}")
+    if args.add_standard:
+        src = add_standard(eng)
+        print(f"Copied to {eng / src}. Add to engagement.yaml:\n"
+              f"  claim_sources:  - {src}\n  questions:      {src}: standard")
+        return 0
     build(eng)
     return 0
 
