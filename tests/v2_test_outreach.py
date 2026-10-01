@@ -105,10 +105,10 @@ def test_strong_without_a_checked_citation_is_asked_again_then_flagged(tmp_path,
     assert "CHECK:" in runner.brief(CAND, tmp_path)
 
 
-def test_draft_only_for_strong_and_flags(tmp_path, monkeypatch):
+def test_no_draft_for_weak_and_flags(tmp_path, monkeypatch):
     _prepare(tmp_path)
     seen = []
-    monkeypatch.setattr(runner, "emit", _fake([_qualification("plausible")], seen))
+    monkeypatch.setattr(runner, "emit", _fake([_qualification("weak")], seen))
     runner.qualify(Backend(), CAND, tmp_path)
     assert runner.draft(Backend(), CAND, tmp_path) is None and len(seen) == 1
 
@@ -221,7 +221,8 @@ def _qualified(tmp_path, monkeypatch, category, with_draft=True):
                "rests_on": [_cite("Several of our sellers are entering diligence")]}
     monkeypatch.setattr(runner, "emit", _fake([_qualification(category), drafted, drafted], []))   # an empty draft is asked for twice
     runner.qualify(Backend(), CAND, tmp_path)
-    runner.draft(Backend(), CAND, tmp_path)
+    if category == "strong":            # a plausible one gets a draft only through work, with a checked address
+        runner.draft(Backend(), CAND, tmp_path)
 
 
 def test_push_writes_a_strong_candidate_once(tmp_path, monkeypatch, store):
@@ -370,7 +371,7 @@ def _daily_with(tmp_path, monkeypatch, categories, strong, most):
     monkeypatch.setattr(runner, "pickup", lambda data: [])
     cats = iter(categories)
 
-    def work(backend, writer, cands, stages, data, use_contacts, redo=False):
+    def work(backend, writer, cands, stages, data, use_contacts, redo=False, plausible=0):
         if "research" not in stages:
             return
         for c in cands:
@@ -731,3 +732,43 @@ def test_a_current_employer_without_a_citation_in_the_evidence_is_not_enough(tmp
                     "reason": "current"}])
     runner.push(CAND, tmp_path)
     assert store.get("jane_smith")["email"] == ""
+
+
+def test_a_plausible_person_gets_a_draft_only_in_the_us_with_a_checked_address_and_within_the_day_s_limit(
+        tmp_path, monkeypatch, store):
+    # Bruce, 2026-09-30: plausible people are drafted too, by email, at most a
+    # few a day, so their replies can be compared with those of strong people.
+    data = tmp_path / "data"
+    cited = _cite("Several of our sellers are entering diligence at the same time.")
+    current = {"current": "yes", "organisation": "Acme Advisers", "citation": cited, "reason": "current role"}
+    message = {"angle": "a", "subject": "s", "message": "Jane, a short message.", "assumes": "", "rests_on": []}
+    monkeypatch.setattr(runner, "_check_backend", lambda: Backend())
+    monkeypatch.setattr(runner, "FINDERS", (("Finder", lambda *a: {"email": "jane@acme.example",
+                                                                     "organisation": "Acme Advisers"}),))
+
+    def run(name, region, answers):
+        cand = {**CAND, "name": name}
+        d = data / runner.slug(name)
+        d.mkdir(parents=True)
+        _prepare(d)
+        (d / "qualification.json").write_text(json.dumps({**_qualification("plausible"), "region": region}))
+        seen = []
+        monkeypatch.setattr(runner, "emit", _fake(answers, seen))
+        runner.work(Backend(), Backend(), [cand], ("draft", "push"), data, use_contacts=False, plausible=1)
+        return d, seen
+
+    d, seen = run("Jane Canada", "ca", [])
+    assert not seen and not (d / "draft.json").exists() and not store.known("Jane Canada")
+
+    d, seen = run("Jane Left", "us", [{"current": "no", "organisation": "Acme Advisers", "reason": "left"}])
+    assert len(seen) == 1 and not (d / "draft.json").exists() and not store.known("Jane Left")
+
+    d, seen = run("Jane Smith", "us", [current, message])
+    c = store.get("jane_smith")
+    assert json.loads((d / "draft.json").read_text())["category"] == "plausible"
+    assert c["email"] == "jane@acme.example" and c["entry"]["stage"] == "Ready to contact"
+    assert c["entry"]["next_action"].endswith("by email")
+    assert "Suggested message" in next(n["text"] for n in c["notes"] if n["title"].startswith("Outreach brief"))
+
+    d, seen = run("Jane Later", "us", [])                     # the day's one plausible draft is made
+    assert not seen and not (d / "draft.json").exists() and not store.known("Jane Later")

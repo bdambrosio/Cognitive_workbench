@@ -1,7 +1,7 @@
 """Research, qualify and draft a first message for people the practice names.
 
     workflowsv2/outreach/daily.sh                                  (the whole day's work, and the page)
-    python3 workflowsv2/outreach/runner.py daily [--strong 5] [--most 15]
+    python3 workflowsv2/outreach/runner.py daily [--strong 5] [--most 15] [--plausible 3]
     python3 workflowsv2/outreach/runner.py run --candidates <file.yaml> [--only <slug>]
     python3 workflowsv2/outreach/runner.py research|qualify|draft|brief ...   (one stage)
     python3 workflowsv2/outreach/runner.py followups|replies               (after a message is sent)
@@ -11,7 +11,9 @@ the practice has recorded and drafts the follow-ups that are due; then scouts, o
 at a time with the kinds in turn from the day's kind (the day's kind goes by date; people
 an earlier scout found of a kind are taken before any new search), until the day has
 `--strong` new strong candidates or `--most` scouted people have been researched; and
-pushes everything it qualified. The model is the local Qwen unless `--model` names another;
+pushes everything it qualified. Up to `--plausible` plausible candidates a day in the US
+also get a first message, when a work address for them is on record or is found and
+checked first (look under `draft`). The model is the local Qwen unless `--model` names another;
 qualification uses the `--qualifier` model, gpt-6.1-sol unless it names another; the three
 calls that write a message to send (the first message, the follow-up, the answer to a reply)
 use the `--writer` model, Claude Opus 5.5 unless it names another.
@@ -32,11 +34,17 @@ no tools; everything that touches the network is code.
     qualify    one emission per candidate over the evidence kept (§14). Every
                citation is checked against its evidence file by program; one
                whose quote is not in the file is dropped and recorded.
-    draft      for a `strong` candidate only, the message (§15), checked the
-               same way.
+    draft      for a `strong` candidate, the message (§15), checked the
+               same way. Also for a `plausible` candidate in the US while fewer
+               than `--plausible` plausible candidates have a draft dated
+               today, and only when the person has a work address on record,
+               or one is found (FINDERS) and the evidence shows they work
+               there now (§29); the checks are recorded in address.json, and
+               the draft records the category it was written for, so that
+               replies can be compared by category (§28).
     brief      brief.md per candidate and summary.md for the file, written
                from the records. No model.
-    push       not part of `run`. For a `strong` candidate with a draft: the
+    push       not part of `run`. For a candidate with a draft: the
                person's contact (contacts.py) is found by name or created, the person
                is put in the outreach list at "Ready to contact" with the
                rationale and the three selects, and the brief is attached as a
@@ -420,7 +428,7 @@ CHOICES = {"opening": ("purpose", "their_work"),
 
 def draft(backend, c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]]:
     q = _read_json(cand_dir / "qualification.json")
-    if not q or q.get("category") != "strong":
+    if not q or q.get("category") not in ("strong", "plausible"):
         return None
     files = kept_files(_read_json(cand_dir / "research.json") or {"files": []})
     evidence = load_evidence(cand_dir, [f["file"] for f in files])
@@ -436,13 +444,14 @@ def draft(backend, c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]
     for _ in range(2):
         # Asked again once when nothing usable comes back: a strong candidate
         # with no message is not pushed, and would wait for a person to notice.
+        # A plausible one may rightly get none (§15); it goes to Qualified.
         out = _ask(backend, user, schemas.draft_schema(), 16000)
         d, dropped, flags = schemas.clean_draft(out.get("obj"), evidence)
-        if out.get("parse") in ("parsed", "repaired") and d["message"]:
+        if out.get("parse") in ("parsed", "repaired") and (d["message"] or q["category"] != "strong"):
             break
     else:
         flags.append("the draft returned nothing usable")
-    rec = {**d, "choices": choices, "at": today(), "model": backend.resolved_model(),
+    rec = {**d, "category": q["category"], "choices": choices, "at": today(), "model": backend.resolved_model(),
            "citations_dropped": dropped, "flags": flags}
     _write_json(cand_dir / "draft.json", rec)
     return rec
@@ -460,11 +469,18 @@ def _cite_lines(cand_dir: Path, cites: List[Dict[str, Any]], sources: Dict[str, 
     return out
 
 
+def _drafted(cand_dir: Path, q: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The draft with a message written for the category the qualification
+    now gives, or None. A draft left by an earlier qualification with another
+    category does not count; drafts from before 2026-09-30 were all for `strong`."""
+    d = _read_json(cand_dir / "draft.json")
+    return d if d and d.get("message") and d.get("category", "strong") == q.get("category") else None
+
+
 def brief(c: Dict[str, Any], cand_dir: Path) -> str:
     r = _read_json(cand_dir / "research.json") or {"files": []}
     q = _read_json(cand_dir / "qualification.json") or {}
-    # A draft left by an earlier qualification that was `strong` is not shown.
-    d = _read_json(cand_dir / "draft.json") if q.get("category") == "strong" else None
+    d = _drafted(cand_dir, q)
     sources = {f["file"]: f["source"] for f in r["files"]}
     head = c["name"] + (f", {c['firm']}" if c.get("firm") else "")
     rows = [f"# {head}", "",
@@ -550,14 +566,10 @@ def address_current(c: Dict[str, Any], cand_dir: Path, email: str, organisation:
     return schemas.clean_address(out.get("obj"), evidence)
 
 
-def record_address(cid: str, cand_dir: Path, email: str, organisation: str, source: str) -> Dict[str, Any]:
-    """Check one address against the evidence in `cand_dir` and write it to
-    the contact only when the evidence shows the person works there now. A
-    note records the address, where it came from and the check's answer
-    either way."""
-    c = (yaml.safe_load((cand_dir / "candidate.yaml").read_text(encoding="utf-8"))
-         if (cand_dir / "candidate.yaml").is_file() else {"name": contacts.get(cid)["name"]})
-    chk = address_current(c, cand_dir, email, organisation, source)
+def write_address(cid: str, chk: Dict[str, Any]) -> None:
+    """Write a checked address (check_address) to the contact when the check
+    says the person works there now, and a note of the check either way."""
+    email, organisation, source = chk["email"], chk["organisation_given"], chk["source"]
     if chk["current"] == "yes":
         contacts.update_person(cid, {"email": email})
     cite = chk["citation"]
@@ -568,8 +580,69 @@ def record_address(cid: str, cand_dir: Path, email: str, organisation: str, sour
                          + chk["reason"]
                          + (f"\n- \"{cite['quote']}\" ({cite['file']} lines {cite['lines'][0]}-{cite['lines'][1]})"
                             if cite else ""))
+
+
+def check_address(c: Dict[str, Any], cand_dir: Path, email: str, organisation: str, source: str) -> Dict[str, Any]:
+    """address_current, with the address and where it came from. Writes nothing."""
+    chk = address_current(c, cand_dir, email, organisation, source)
     logger.info("%s: %s gave %s; current employer: %s", c["name"], source, email, chk["current"])
-    return {"email": email, "source": source, "organisation": organisation, **chk}
+    return {"email": email, "source": source, "organisation_given": organisation, **chk}
+
+
+def record_address(cid: str, cand_dir: Path, email: str, organisation: str, source: str) -> Dict[str, Any]:
+    """Check one address against the evidence in `cand_dir` and write it to
+    the contact only when the evidence shows the person works there now. A
+    note records the address, where it came from and the check's answer
+    either way."""
+    c = (yaml.safe_load((cand_dir / "candidate.yaml").read_text(encoding="utf-8"))
+         if (cand_dir / "candidate.yaml").is_file() else {"name": contacts.get(cid)["name"]})
+    chk = check_address(c, cand_dir, email, organisation, source)
+    write_address(cid, chk)
+    return chk
+
+
+def find_address(c: Dict[str, Any], cand_dir: Path, q: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """For someone not yet in the contacts: the address the evidence shows,
+    then each service in FINDERS, each checked by check_address, until one
+    passes. Writes nothing to the contacts; the checks go to address.json,
+    for `push` to write."""
+    checks: List[Dict[str, Any]] = []
+    if q.get("email"):
+        checks.append(check_address(c, cand_dir, q["email"], "", "a page in the evidence"))
+    for name, find in FINDERS:
+        if checks and checks[-1]["current"] == "yes":
+            break
+        try:
+            got = find(c["name"], _linkedin(c), firm_domain(c))
+        except email_finder.FinderError as e:
+            logger.warning("%s: %s failed: %s", c["name"], name, e)
+            continue
+        if got["email"]:
+            checks.append(check_address(c, cand_dir, got["email"], got["organisation"], name))
+    _write_json(cand_dir / "address.json", {"at": today(), "checks": checks})
+    return checks
+
+
+#: Where a plausible candidate may get a first message: by email only, and
+#: so far only in the US (Bruce, 2026-09-30).
+PLAUSIBLE_REGIONS = ("us",)
+
+
+def plausible_drafted_today(data: Path) -> int:
+    return sum(1 for f in data.glob("*/draft.json")
+               if (d := _read_json(f)) and d.get("at") == today() and d.get("category") == "plausible")
+
+
+def plausible_gets_draft(c: Dict[str, Any], cand_dir: Path, q: Dict[str, Any], data: Path, most: int) -> bool:
+    """Whether a plausible candidate gets a first message: in PLAUSIBLE_REGIONS,
+    fewer than `most` plausible drafts today, and a work address on record
+    or found and checked now."""
+    if q.get("region") not in PLAUSIBLE_REGIONS or plausible_drafted_today(data) >= most:
+        return False
+    person = contacts.find_person(c["name"])
+    if person and person.get("email"):
+        return True
+    return any(chk["current"] == "yes" for chk in find_address(c, cand_dir, q))
 
 
 def look_up_email(cid: str, cand_dir: Optional[Path] = None) -> Dict[str, Any]:
@@ -595,15 +668,19 @@ def look_up_email(cid: str, cand_dir: Optional[Path] = None) -> Dict[str, Any]:
     return last
 
 
+def _linkedin(c: Dict[str, Any]) -> str:
+    return next((u for u in c.get("urls") or [] if "linkedin.com" in urlparse(u).netloc.lower()), "")
+
+
 def push(c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]]:
     """Write one qualified candidate into the contacts: the list stage for its
     category, the rationale and the three selects, and for a strong or
     plausible candidate the brief as a note. A strong candidate with no
     usable draft is not written. Returns the record of what was written."""
     q = _read_json(cand_dir / "qualification.json") or {}
-    d = _read_json(cand_dir / "draft.json")
     category = q.get("category")
-    if category not in CATEGORIES_PUSHED or (category == "strong" and not (d and d.get("message"))):
+    drafted = _drafted(cand_dir, q) is not None
+    if category not in CATEGORIES_PUSHED or (category == "strong" and not drafted):
         logger.info("%s: no category, or strong with no draft; nothing is pushed", c["name"])
         return None
     if (cand_dir / "pushed.json").is_file():
@@ -611,18 +688,21 @@ def push(c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]]:
         return None
     person = contacts.find_person(c["name"])
     created = person is None
-    if created and category != "strong":
+    if created and not drafted:
         return None                     # a name nobody put in the contacts, and not worth putting there
     if created:
-        linkedin = next((u for u in c.get("urls") or [] if "linkedin.com" in urlparse(u).netloc.lower()), "")
-        person = contacts.create_person(c["name"], str(c.get("title") or ""), linkedin,
+        person = contacts.create_person(c["name"], str(c.get("title") or ""), _linkedin(c),
                                         firm=str(c.get("firm") or ""), domain=firm_domain(c))
     rid = person["id"]
     if contacts.opted_out(rid):
         logger.info("%s: asked not to be contacted again; nothing is pushed", c["name"])
         _write_json(cand_dir / "pushed.json", {"at": today(), "contact_id": rid, "opted_out": True})
         return None
-    if not person.get("email"):                         # an address on record is never replaced
+    found = _read_json(cand_dir / "address.json")
+    if not person.get("email") and found:               # checked before the draft (a plausible candidate)
+        for chk in found["checks"]:
+            write_address(rid, chk)
+    elif not person.get("email"):                       # an address on record is never replaced
         if q.get("email"):                              # a checked quote shows it; is it where they work now?
             record_address(rid, cand_dir, q["email"], "", "a page in the evidence")
         if category == "strong" and email_allowed(q) and not contacts.get(rid).get("email"):
@@ -637,10 +717,11 @@ def push(c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]]:
         rec = {"at": today(), "contact_id": rid, "person_created": False, "not_pursuing": True, "reason": why}
         _write_json(cand_dir / "pushed.json", rec)
         return rec
-    stage = STAGE_OF[category]
+    stage = "Ready to contact" if drafted else STAGE_OF[category]
     values: Dict[str, Any] = {"stage": stage, "fit_rationale": why}
-    if category == "strong":
-        values.update(next_action="Review the draft and send on LinkedIn", next_action_date=today())
+    if drafted:
+        values.update(next_action="Review the draft and send" + (" on LinkedIn" if category == "strong" else " by email"),
+                      next_action_date=today())
     for field, key in (("category", "prospect_type"), ("relationship", "relationship"),
                        ("problem_recognition", "problem_recognition")):
         if q.get(key) and q[key] != "none":
@@ -1044,9 +1125,10 @@ RECORDS = {"research": "research.json", "qualify": "qualification.json", "draft"
 
 
 def work(backend, writer, cands: List[Dict[str, Any]], stages, data: Path, use_contacts: bool,
-         redo: bool = False) -> None:
+         redo: bool = False, plausible: int = 0) -> None:
     """Run the named stages for each candidate. A stage whose record exists
-    is not run again unless `redo`."""
+    is not run again unless `redo`. At most `plausible` plausible candidates
+    a day get a draft (plausible_gets_draft)."""
     for c in cands:
         cand_dir = data / slug(c["name"])
         cand_dir.mkdir(parents=True, exist_ok=True)
@@ -1068,7 +1150,9 @@ def work(backend, writer, cands: List[Dict[str, Any]], stages, data: Path, use_c
                 better_contact(c, q, data, use_contacts)
                 continue
             if st == "draft":
-                draft(writer, c, cand_dir)
+                q = _read_json(cand_dir / "qualification.json") or {}
+                if q.get("category") != "plausible" or plausible_gets_draft(c, cand_dir, q, data, plausible):
+                    draft(writer, c, cand_dir)
                 continue
             research(backend, c, cand_dir)
 
@@ -1114,17 +1198,18 @@ def _is_strong(c: Dict[str, Any], data: Path) -> bool:
     return (_read_json(data / slug(c["name"]) / "qualification.json") or {}).get("category") == "strong"
 
 
-def daily(backend, writer, data: Path, strong: int, most: int) -> str:
+def daily(backend, writer, data: Path, strong: int, most: int, plausible: int = 0) -> str:
     """The whole day's work, in order: a backup of the records; the names waiting at Research in the contacts;
     the replies recorded and not yet read, and the follow-ups that are due;
     then scouting, one person at a time with the kinds in turn from the day's
     kind, until the day has `strong` new strong candidates or `most` people
-    scouted have been researched. Everything qualified is pushed. Returns what
+    scouted have been researched. Up to `plausible` plausible people get a
+    draft (work). Everything qualified is pushed. Returns what
     a person needs to read."""
     data.mkdir(parents=True, exist_ok=True)
     logger.info("backup: %s", backup(data))
     named = pickup(data)
-    work(backend, writer, named, STAGES + ("push",), data, use_contacts=True)
+    work(backend, writer, named, STAGES + ("push",), data, use_contacts=True, plausible=plausible)
     work(backend, writer, unpushed(data), ("push",), data, use_contacts=True)      # left by an earlier scout
     read, drafted = replies(backend, writer, data), followups(writer, data)
     lines = [f"Names you added, researched today: {len(named)}.",
@@ -1141,10 +1226,11 @@ def daily(backend, writer, data: Path, strong: int, most: int) -> str:
             logger.info("scout: nobody new for %s; it is left out for the rest of the day", kind)
             continue
         kinds.append(kind)
-        work(backend, writer, found, STAGES + ("push",), data, use_contacts=True)
+        work(backend, writer, found, STAGES + ("push",), data, use_contacts=True, plausible=plausible)
         scouted += found
         got += _is_strong(found[0], data)
     lines.append(f"Strong today: {got} (target {strong}); scouted people researched: {len(scouted)} of at most {most}.")
+    lines.append(f"Plausible people drafted today: {plausible_drafted_today(data)} of at most {plausible}.")
     ready = sum(1 for e in contacts.entries() if contacts.stage_of(e) == "Ready to contact")
     lines.append(f"Ready to contact now: {ready}.")
     return summary(named + scouted, data) + "\n" + "\n".join(lines) + "\n"
@@ -1173,6 +1259,9 @@ def main() -> int:
                     help="for `daily`: scouting stops when the day has this many new strong candidates")
     ap.add_argument("--most", type=int, default=15,
                     help="for `daily`: scouting stops when this many people it found have been researched")
+    ap.add_argument("--plausible", type=int, default=3,
+                    help="for `daily` and the draft stage: at most this many plausible people in the US "
+                         "get a first message a day, each only with a work address found and checked")
     ap.add_argument("--scouted", action="store_true",
                     help="the candidates are the people scouting found to fit who are qualified and not yet pushed")
     ap.add_argument("--only", default=None, help="one candidate, by slug (the name in lower case, _ for spaces)")
@@ -1188,7 +1277,7 @@ def main() -> int:
     writer = (backend_from_model(args.writer)
               if args.stage in ("daily", "followups", "replies") or "draft" in stages else None)
     if args.stage == "daily":
-        print(daily(backend, writer, args.data, args.strong, args.most))
+        print(daily(backend, writer, args.data, args.strong, args.most, args.plausible))
         return 0
     if args.stage in ("followups", "replies"):
         args.data.mkdir(parents=True, exist_ok=True)
@@ -1208,7 +1297,7 @@ def main() -> int:
     todo = [c for c in cands if args.only in (None, slug(c["name"]))]
     if not todo and args.only:
         raise SystemExit(f"no candidate with the slug {args.only}")
-    work(backend, writer, todo, stages, args.data, args.contacts, args.redo)
+    work(backend, writer, todo, stages, args.data, args.contacts, args.redo, args.plausible)
     print(summary(cands, args.data))
     return 0
 

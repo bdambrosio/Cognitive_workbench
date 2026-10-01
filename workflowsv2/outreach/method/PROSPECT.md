@@ -220,7 +220,7 @@ Emit nothing outside the JSON object.
 
 ## 15. Output: the draft message
 
-Asked only for a candidate the qualification found `strong`. You are given the candidate record, the qualification, the evidence files, and the choices for this message (§11).
+Asked for a candidate the qualification found `strong`, and sometimes for one found `plausible`. You are given the candidate record, the qualification, the evidence files, and the choices for this message (§11). For a `plausible` candidate, part 2 of §11 names the most specific thing of theirs the evidence shows from the past year; when it shows nothing specific enough, leave `message` empty and say why in `assumes`.
 
 | Field | Contents |
 |---|---|
@@ -370,13 +370,13 @@ Record each response by what it gives, under the names in §22. The answer is dr
 
 For every prospect surfaced, the contact system holds: name, role, organisation, kind of prospect, links, why this person, why now, the use proposed, concerns, relationship context, the channel, the date, the exact message sent, the response, the follow-up date, and any introduction or next action. Another person should be able to see why the approach was made without repeating the research.
 
-A day's output is normally five strong prospects, and fewer when fewer meet the standard in §1.
+A day's output is normally five strong prospects, and fewer when fewer meet the standard in §1. Up to three plausible prospects a day in the United States also get a first message, by email only, to a work address found and checked under §29, so that their replies can be compared with those of strong prospects (§28).
 
 ## 28. What to learn from the responses
 
 <!-- audience: practice -->
 
-Track which kinds of prospect respond; which wording brings substantive replies, including which value of each choice in §11; which uses are recognised; which objections recur; whether "review before diligence" works better than "claims review"; whether advisers, investors or acquirers show the strongest demand; whether the comparison with pointing AI at the data room is recognised; which evidence of fit predicts a useful conversation. Do not optimise for response rate. A useful response is one that improves understanding of the market, brings a credible referral, produces a test case, or shows a real buying use.
+Track which kinds of prospect respond; whether prospects qualified `plausible` reply as usefully as those qualified `strong`; which wording brings substantive replies, including which value of each choice in §11; which uses are recognised; which objections recur; whether "review before diligence" works better than "claims review"; whether advisers, investors or acquirers show the strongest demand; whether the comparison with pointing AI at the data room is recognised; which evidence of fit predicts a useful conversation. Do not optimise for response rate. A useful response is one that improves understanding of the market, brings a credible referral, produces a test case, or shows a real buying use.
 
 ## 29. Output: is this address where the person works now
 
