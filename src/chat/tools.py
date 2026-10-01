@@ -426,6 +426,18 @@ class ToolsMixin:
             "Every argument is optional; the default is the active agent concerns, highest "
             "activation first. Read-only: it changes nothing. Non-terminal — the loop "
             "continues."))
+        # Background work (2026-10-01, agreed with Jill): an existing tool run
+        # on a thread, its result delivered into the next turn.
+        tools.append(("dispatch",
+            "`{\"thought\": \"<one terse sentence>\", \"tool\": \"dispatch\", "
+            "\"label\": <short name>, \"run\": \"inspect\"|\"search-web\", \"query\": <string>}` — "
+            "run `inspect` or `search-web` in the background and carry on with this turn. "
+            "It returns at once. When the work finishes, its result, or its failure, is put "
+            "in the input of your next turn of any kind under 'Background results', tagged "
+            "with the label and the query, and is shown there once only. Give each dispatch "
+            "a label you will recognise later; a label still running cannot be reused. At "
+            "most three run at once. The result is a tool's output, not your own reasoning: "
+            "check it as you would any other observation. Non-terminal — the loop continues."))
         tools.append(("display",
             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"display\", "
             "\"content\": <string|$stepN>, \"format\": \"markdown\"|\"html\"}` — "

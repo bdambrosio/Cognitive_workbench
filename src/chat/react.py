@@ -94,7 +94,7 @@ REACT_ACTION_SCHEMA: Dict[str, Any] = {
 
 # Tools the model can emit. Validated structurally in _parse_react_action;
 # the dispatcher in _run_react_loop knows how to run each.
-_REACT_TOOLS = ('process_text', 'recall', 'inspect', 'inspect_external', 'security', 'justify', 'agent-say', 'mint', 'concern-state', 'display', 'respond', 'yield')
+_REACT_TOOLS = ('process_text', 'recall', 'inspect', 'inspect_external', 'security', 'justify', 'agent-say', 'mint', 'concern-state', 'dispatch', 'display', 'respond', 'yield')
 
 # Per-iteration auto-binding: $step1, $step2, ... names the result of each
 # action so subsequent actions can reference it. Scoped to the current turn
@@ -755,6 +755,10 @@ class ReactMixin:
                     action.get('collection'), action.get('by_id'), action.get('status'),
                     action.get('has_instruction'), action.get('min_activation'),
                     action.get('seed'))
+            elif tool == 'dispatch':
+                obs = self._run_dispatch(
+                    action.get('label'), action.get('run'),
+                    self._resolve_react_value(action.get('query', ''), log))
             elif tool == 'display':
                 content = self._resolve_react_value(action.get('content', ''), log)
                 fmt = (action.get('format') or 'markdown').strip().lower()
@@ -809,7 +813,7 @@ class ReactMixin:
                 # Tool list shown to the model on bad emission. Built-ins
                 # are stable; the discovered set comes from the registry.
                 builtin = ["process_text", "recall", "inspect", "security",
-                           "justify", "concern-state", "display", "respond"]
+                           "justify", "concern-state", "dispatch", "display", "respond"]
                 if self._get_external_repo() is not None:
                     builtin.insert(builtin.index("inspect") + 1, "inspect_external")
                 if getattr(self, '_peers', None):

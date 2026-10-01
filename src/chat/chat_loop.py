@@ -81,6 +81,7 @@ from chat.prompts import (  # noqa: E402,F401
     _REASONING_HISTORY_FULL, _REASONING_HISTORY_OBS_CAP,
     _ATTRIBUTION_OBS_CAP)
 from chat.disposition import DispositionMixin  # noqa: E402
+from chat.background import BackgroundMixin  # noqa: E402
 from chat.zenoh_io import ZenohMixin, AGENT_HOP_BUDGET  # noqa: E402
 
 
@@ -260,7 +261,7 @@ def is_sensor_source(source: str) -> bool:
 
 class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                ReactMixin, ConcernsMixin, DispositionMixin, ToolsMixin,
-               PromptsMixin, ZenohMixin):
+               PromptsMixin, ZenohMixin, BackgroundMixin):
     def __init__(
         self,
         character_name: str,
@@ -273,16 +274,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         self.shutdown_requested = False
 
         # ---- LLM backend ----
-        llm_cfg = (character_config.get('llm_config') or {})
-        self.backend = _ChatBackend(
-            server=llm_cfg.get('server', 'local'),
-            model=llm_cfg.get('model', ''),
-            base_url=llm_cfg.get('vllm_url') or llm_cfg.get('base_url') or 'http://127.0.0.1:5000',
-            is_reasoning=llm_cfg.get('is_reasoning_model'),
-            api_key=llm_cfg.get('api_key'),
-            reasoning_effort=llm_cfg.get('reasoning_effort'),
-            extra_body=llm_cfg.get('extra_body'),
-        )
+        self.backend = self._make_backend()
 
         # ---- Persona ----
         self.persona = str(character_config.get('character', '')).strip()
@@ -659,6 +651,9 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         self._turn_seq: int = 0
         self._last_inject_trace_seqs: List[int] = []
 
+        # `dispatch` results and Bruce's schedule (chat/background.py).
+        self._init_background()
+
         # ---- Zenoh wiring ----
         self._inbox: "queue.Queue[dict]" = queue.Queue()
         # A tick already queued and not yet handled. Ticks are a heartbeat,
@@ -866,6 +861,22 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         if source == self.character_name:
             return self._firing_concern_entity()
         return source
+
+    def _make_backend(self) -> _ChatBackend:
+        """A chat backend from the character's llm_config. The turn loop has
+        one; each `dispatch` worker gets its own, so a worker's calls never
+        overwrite per-call state such as `last_finish_reason` that the loop
+        reads after its own call."""
+        llm_cfg = (self.config.get('llm_config') or {})
+        return _ChatBackend(
+            server=llm_cfg.get('server', 'local'),
+            model=llm_cfg.get('model', ''),
+            base_url=llm_cfg.get('vllm_url') or llm_cfg.get('base_url') or 'http://127.0.0.1:5000',
+            is_reasoning=llm_cfg.get('is_reasoning_model'),
+            api_key=llm_cfg.get('api_key'),
+            reasoning_effort=llm_cfg.get('reasoning_effort'),
+            extra_body=llm_cfg.get('extra_body'),
+        )
 
     def _reply_recipient(self, source: str, silent: bool) -> str:
         """Whose dialogue this reply belongs in.
@@ -2057,6 +2068,9 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         self._affect.set_trigger('autonomous' if autonomous else 'user')
         self._affect.set_mode('thinking')
         self._minted_this_turn = False          # the `mint` action: one per turn
+        # Background results finished since the last turn, delivered in this
+        # one and no other (chat/background.py).
+        self._background_turn_results = self._take_background_results()
         self._current_turn_hops = max(0, int(hops or 0))
         self._current_turn_xid = str(xid or '')
         # Fresh slot per turn. Reset here rather than at the end of the
@@ -2476,6 +2490,10 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # housekeeping, not behaviour; only firing is behaviour.
         self._sweep_stale_agent_concerns()
         if not self._autonomy_enabled:
+            return
+        # An item Bruce scheduled fires at its time, ahead of the concerns;
+        # they get the next tick.
+        if self._fire_due_schedule():
             return
         # Grow first, then check — ensures activations reflect elapsed
         # time before the fire decision. The sweep above already ran, so a

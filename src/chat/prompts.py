@@ -489,6 +489,11 @@ class PromptsMixin:
         block = self._render_agent_concerns_block(agent_concerns or [])
         if block:
             parts.append(block)
+        # Bruce's schedule: his items, listed apart from her concerns
+        # (chat/background.py). Absent when there are none.
+        schedule = self._render_schedule_block()
+        if schedule:
+            parts.append(schedule)
         # Fire digest: pending autonomous fires being surfaced this turn
         # (set at user-turn entry in _process_user_turn; empty on
         # autonomous turns). Absent when empty — prompt stability.
@@ -739,6 +744,12 @@ class PromptsMixin:
         reasoning_block = self._get_reasoning_history_block(history_entity)
         if reasoning_block:
             parts.append(reasoning_block)
+            parts.append("")
+        # Results of earlier `dispatch` calls, taken at this turn's start and
+        # shown in this turn only (chat/background.py).
+        bg = getattr(self, '_background_turn_results', None)
+        if bg:
+            parts.append(self._render_background_results(bg))
             parts.append("")
         # Name the source. With co-resident agents "user input" was a
         # false label on every peer turn — the one field naming who is
