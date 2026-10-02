@@ -43,6 +43,9 @@
 <h2>Does it only check what the seller claims?</h2>
 <p>No. At intake the buyer can raise questions of their own and say what a "no" to each would do to the deal, and the review adds a standard list of questions a buyer of a small software company expects answered. Each is tested against the code like a claim, and a gap is reported as a finding about the software, not about what the seller said. In the demo, the buyer asked whether each customer's links could be kept separate; the code has no way to do that.</p>
 
+<h2>Is this a PCI DSS, SOC 2 or GDPR compliance assessment?</h2>
+<p>No. Those are formal assessments by accredited assessors, and they cover the organisation as well as the code. The review adds questions drawn from published requirements for the kind of software it is (OWASP ASVS, the OWASP Top 10 for LLM applications, GDPR and PCI DSS among them) where the software has that kind of data or feature and a "no" would matter to the buyer. Each is tested against the code. A gap is a red flag to raise with the seller, or to send a full assessment to look at, before you commit. The review does not certify compliance with any standard.</p>
+
 <h2>Can I see an example?</h2>
 <p>Yes. The public demo at <a href="https://demo.tuuyi.com">demo.tuuyi.com</a> is a finished review of a small open-source project, and you can put questions to it. For example, the project's README promises the software will never use cookies, and the review found the code that sets one when the administrator logs in.</p>
 

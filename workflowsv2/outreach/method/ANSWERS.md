@@ -56,6 +56,21 @@ customer's links could be kept separate; the code has no way to do that.
 Source: PROSPECT.md §2; site /how-it-works ("Your questions, and the standard
 ones"); the demo review of 2026-10-02. Checked 2026-10-02.
 
+## Is this a PCI DSS, SOC 2 or GDPR compliance assessment?
+
+No. Those are formal assessments by accredited assessors, and they cover the
+organisation as well as the code. The review adds questions drawn from
+published requirements for the kind of software it is (OWASP ASVS, the OWASP
+Top 10 for LLM applications, GDPR and PCI DSS among them) where the software
+has that kind of data or feature and a "no" would matter to the buyer. Each is
+tested against the code. A gap is a red flag to raise with the seller, or to
+send a full assessment to look at, before you commit. The review does not
+certify compliance with any standard.
+
+Source: claims_audit method/PROPERTY_QUESTIONS.md and PROPERTY_SELECTION.md;
+site /how-it-works ("Your questions, and the standard ones"). Checked
+2026-10-02.
+
 ## Can I see an example?
 
 Yes. The public demo at demo.tuuyi.com is a finished review of a small
