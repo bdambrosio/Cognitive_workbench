@@ -34,11 +34,25 @@ Every claim in the seller's documents is listed and rated, before any testing,
 by what it would change for the buyer if it were false. The claims that could
 change the price, the terms or the decision to close are tested against the
 code. The rest are listed with the reason they were not tested, and the buyer
-can ask for any of them to be tested. In the public demo, 312 claims were
-listed and 38 were tested; each of the 38 has a finding with its evidence.
+can ask for any of them to be tested. In the public demo, 312 of the seller's
+claims were listed and 38 were tested; each of the 38 has a finding with its
+evidence. The buyer's 5 questions and 14 of the 15 standard questions were
+tested too.
 
-Source: the demo review of 2026-09-25 (report coverage table and second
-appendix), served at demo.tuuyi.com. Checked 2026-09-27.
+Source: the demo review of 2026-10-02 (report scope table and second
+appendix), served at demo.tuuyi.com. Checked 2026-10-02.
+
+## Does it only check what the seller claims?
+
+No. At intake the buyer can raise questions of their own and say what a "no"
+to each would do to the deal, and the review adds a standard list of questions
+a buyer of a small software company expects answered. Each is tested against
+the code like a claim, and a gap is reported as a finding about the software,
+not about what the seller said. In the demo, the buyer asked whether each
+customer's links could be kept separate; the code has no way to do that.
+
+Source: PROSPECT.md §2; site /how-it-works ("Your questions, and the standard
+ones"); the demo review of 2026-10-02. Checked 2026-10-02.
 
 ## Can I see an example?
 

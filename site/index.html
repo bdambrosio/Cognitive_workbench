@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Technical due diligence for software acquisitions — Tuuyi</title>
-<meta name="description" content="Technical due diligence for software acquisitions: the seller's claims checked against the code, every finding cited to file and line. From a free demo to a signed opinion.">
+<meta name="description" content="Technical due diligence for software acquisitions: the seller's claims and the questions a buyer should ask, checked against the code, every finding cited to file and line. From a free demo to a signed opinion.">
 <link rel="canonical" href="https://tuuyi.com/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon.ico" sizes="32x32">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Tuuyi">
 <meta property="og:title" content="Technical due diligence for software acquisitions — Tuuyi">
-<meta property="og:description" content="Technical due diligence for software acquisitions: the seller's claims checked against the code, every finding cited to file and line. From a free demo to a signed opinion.">
+<meta property="og:description" content="Technical due diligence for software acquisitions: the seller's claims and the questions a buyer should ask, checked against the code, every finding cited to file and line. From a free demo to a signed opinion.">
 <meta property="og:url" content="https://tuuyi.com/">
 <meta property="og:image" content="https://tuuyi.com/og.png">
 <meta property="og:image:width" content="1200">
@@ -33,19 +33,19 @@
 <p class="eyebrow accent">Independent software claims review</p>
 <h1>The seller says<br>the software<br>does&nbsp;X.<br><em>Does it?</em></h1>
 <p class="note">Selling software, not buying it? <a href="/sellers">Check your own claims first →</a></p>
-<p class="lede">We check what the software says about itself against what its code actually does.</p>
-<p>For buyers and advisers of small software companies, at the point where the seller's description of the product is most of what you have. Every finding names the file and the lines it rests on, so you can look for yourself.</p>
+<p class="lede">What the seller says, what a buyer should ask, and what the code shows, with the file and line for each.</p>
+<p>For buyers and advisers of small software companies, at the point where the seller's description of the product is most of what you have. Alongside the seller's claims, the review tests the questions you raise and a standard list a buyer of a small software company expects answered; it can also scan the dependencies and look for credentials left in the code. Every finding names the file and the lines it rests on, so you can look for yourself.</p>
 <div class="buttons"><a class="btn primary" href="/demo">Read a finished review ↗</a> <a class="btn" href="/introduction">Watch the introduction (9 min)</a> <a class="btn" href="/contact?reason=beta">Ask for a beta review</a></div>
 </div>
 <aside class="panel" aria-label="One finding, from the demo">
-<div class="panelhead"><span><span class="dot"></span>One finding / from the demo</span><span>README 98–100</span></div>
-<p class="tag">The claim</p>
-<p class="quote">Under “Bloat that will not be implemented”: “Cookies, newsletters, ‘we value your privacy’ popups…”</p>
+<div class="panelhead"><span><span class="dot"></span>One finding / from the demo</span><span>A buyer's question</span></div>
+<p class="tag">The buyer asked</p>
+<p class="quote">“Can each of our customers have their own links, kept separate from the others?”</p>
 <p class="tag">What the code shows</p>
-<div class="evidence"><code>backend/src/main.rs:104–112</code><p>Every request passes through a cookie-based session layer; the session cookie lasts seven days.</p></div>
-<div class="evidence"><code>backend/src/services/post.rs:221–223</code><p>Logging in to the admin page writes the session cookie.</p></div>
-<div class="chips"><span class="chip amber">Verdict · contradicted</span><span class="chip amber">Rating · material</span></div>
-<p class="small">Material to a buyer paying for the stated privacy posture. The price or terms would change; the deal would not end.</p>
+<div class="evidence"><code>backend/src/database/queries.rs:37–45</code><p>The links table has no owner, user or customer column.</p></div>
+<div class="evidence"><code>backend/src/auth.rs:150–155</code><p>A request carries the one shared API key, the one shared password session, or nothing: no customer identity.</p></div>
+<div class="chips"><span class="chip amber">Verdict · contradicted</span><span class="chip amber">Rating · material, the buyer's</span></div>
+<p class="small">The seller's documents say nothing about this; the gap turned up because the buyer asked. Material to a buyer who plans to host the software for its own customers.</p>
 <span class="chip tint">Independent check · upheld</span>
 <p class="small" style="margin-top:16px"><a href="/demo">Read the whole review and ask it questions ↗</a></p>
 </aside>
@@ -60,10 +60,11 @@
 <tr><th>Part</th><th>What it holds</th></tr>
 <tr><td>Executive summary</td><td>What was examined, and the findings rated material, one line each.</td></tr>
 <tr><td>What the review showed</td><td>Each gap: the claim as written, the verdict, the evidence quoted with its file and lines, the independent check's outcome, and what the gap would change for you.</td></tr>
+<tr><td>Questions asked</td><td>The questions you raise and the standard questions, each tested like a claim. A gap here is a finding about the software, not about what the seller said.</td></tr>
 <tr><td>Unsettled claims</td><td>Claims the materials cannot settle, why, and how much rests on each. Promises about the seller's own conduct are listed apart, with a question for each.</td></tr>
 <tr><td>Claims that hold</td><td>Listed with their evidence, so the good news is checkable too.</td></tr>
 <tr><td>Questions for the seller</td><td>What to ask to close the gaps the materials left.</td></tr>
-<tr><td>Appendices</td><td>Every claim in document order with its verdict, then the claims not tested, each with the reason.</td></tr>
+<tr><td>Appendices</td><td>Every claim in document order with its verdict, then the claims not tested, each with the reason. With the optional scans, the dependencies with their declared licences, and credentials found in the files and their history.</td></tr>
 </table>
 <p>The report also sets out the transaction and the thresholds its ratings are made against, anything the review noticed that the seller did not claim, and what the review covered and did not. <a href="/demo">See one, on a real project</a>.</p>
 <p>The seller uploads the repository and documents to a page only the seller and the practice can open; you name the documents that carry the seller's claims and never see the code. A small target comes back within days of receiving the materials; a typical deal in about a week.</p>
@@ -80,8 +81,8 @@
 <p>It is not a penetration test, not a review of code quality or architecture, and not legal advice. It reads the code and does not run it. It reports the state of each claim and what a gap would change for you.</p>
 
 <h2 class="eyebrow">How it works</h2>
-<div class="step"><div class="n">01</div><div><strong>Intake.</strong><p>A short conversation about what you are evaluating and why: what you already know, what would change your mind, and, for a deal, what would move the price or end it.</p></div></div>
-<div class="step"><div class="n">02</div><div><strong>Review.</strong><p>The claims are listed and frozen before any evidence is read, and then each claim your decision rests on is tested against the code and the documents supplied. The others are listed as not tested, with the reason.</p></div></div>
+<div class="step"><div class="n">01</div><div><strong>Intake.</strong><p>A short conversation about what you are evaluating and why: what you already know, what would change your mind, for a deal what would move the price or end it, and the questions you want answered about the software.</p></div></div>
+<div class="step"><div class="n">02</div><div><strong>Review.</strong><p>The claims are listed and frozen before any evidence is read, together with your questions and the standard questions, each written as a statement to test. Then each one your decision rests on is tested against the code and the documents supplied. The others are listed as not tested, with the reason.</p></div></div>
 <div class="step"><div class="n">03</div><div><strong>Check and rate.</strong><p>A second, independent pass re-reads the evidence behind every finding. Each gap is rated against your thresholds, twice, and looked at again when the two readings differ. A README that promises no cookies while the admin login sets one is material to a buyer paying for that privacy posture, and not material to one who is not.</p></div></div>
 <div class="step"><div class="n">04</div><div><strong>Report and questions.</strong><p>You receive the report and a private page where you can ask about any finding in your own time, with the working record behind every answer.</p></div></div>
 
