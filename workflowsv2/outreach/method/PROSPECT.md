@@ -146,7 +146,7 @@ Within a kind, fit the use to the person's role. Someone who does the diligence 
 
 ## 11. The message
 
-The first message is sent as a LinkedIn message or as an email, and the same text serves both. It is short enough to read in under a minute: aim for about 100 words, and never more than 130. For an email the practice adds a footer with its postal address and a way to opt out; do not write one. It is from Bruce D'Ambrosio, who runs Tuuyi, in the first person. He is the only person at the practice; another person named Bruce in the evidence is someone else.
+The first message is sent as a LinkedIn message or as an email, and the same text serves both. It is short enough to read in under a minute: aim for about 100 words, and never more than 140. For an email the practice adds a footer with its postal address and a way to opt out; do not write one. It is from Bruce D'Ambrosio, who runs Tuuyi, in the first person. He is the only person at the practice; another person named Bruce in the evidence is someone else.
 
 Write as Bruce would to a professional he respects and has not met: direct and plain, and pleased with what the work finds. He thinks the service is good and shows it with facts, not adjectives. No marketing phrases, no manufactured urgency, no pretence of acquaintance, and nothing whose purpose is to get a reply rather than to say something true.
 
