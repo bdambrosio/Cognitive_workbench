@@ -1,0 +1,80 @@
+{
+ "claim_source": "questions/buyer.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "The AI agent can answer customers using a self-hosted model, with no customer conversation sent to an outside AI provider.",
+   "lines": [
+    8,
+    8
+   ],
+   "statement": "The AI agent can answer customers using a self-hosted model, with no customer conversation sent to an outside AI provider.",
+   "about": "target",
+   "asked_by": "buyer",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source",
+   "buyer_rating": "material"
+  },
+  {
+   "id": 2,
+   "quote": "Customer conversation data is encrypted at rest in the database.",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "Customer conversation data is encrypted at rest in the database.",
+   "about": "target",
+   "asked_by": "buyer",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source",
+   "buyer_rating": "material"
+  },
+  {
+   "id": 3,
+   "quote": "A customer's conversations and personal data can be deleted on request by a function in the software.",
+   "lines": [
+    10,
+    10
+   ],
+   "statement": "A customer's conversations and personal data can be deleted on request by a function in the software.",
+   "about": "target",
+   "asked_by": "buyer",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source",
+   "buyer_rating": "material"
+  },
+  {
+   "id": 4,
+   "quote": "The backend can run as more than one instance behind a load balancer.",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "The backend can run as more than one instance behind a load balancer.",
+   "about": "target",
+   "asked_by": "buyer",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source",
+   "buyer_rating": "material"
+  },
+  {
+   "id": 5,
+   "quote": "The Shopify integration requests only read access to store data.",
+   "lines": [
+    12,
+    12
+   ],
+   "statement": "The Shopify integration requests only read access to store data.",
+   "about": "target",
+   "asked_by": "buyer",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source",
+   "buyer_rating": "material"
+  }
+ ]
+}

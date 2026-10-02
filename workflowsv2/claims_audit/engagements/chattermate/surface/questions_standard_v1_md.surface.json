@@ -1,0 +1,215 @@
+{
+ "claim_source": "questions/standard-v1.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "No credential, API key or private key is written into the source files or the git history.",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "No credential, API key or private key is written into the source files or the git history.",
+   "about": "target",
+   "asked_by": "standard",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source"
+  },
+  {
+   "id": 2,
+   "quote": "Passwords of the software's users are stored only as salted hashes made with a password-hashing function.",
+   "lines": [
+    12,
+    12
+   ],
+   "statement": "Passwords of the software's users are stored only as salted hashes made with a password-hashing function.",
+   "about": "target",
+   "asked_by": "standard",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source"
+  },
+  {
+   "id": 3,
+   "quote": "Every request handler that changes stored data requires an authenticated caller.",
+   "lines": [
+    13,
+    13
+   ],
+   "statement": "Every request handler that changes stored data requires an authenticated caller.",
+   "about": "target",
+   "asked_by": "standard",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source"
+  },
+  {
+   "id": 4,
+   "quote": "Database queries built from user input pass it as parameters, not by joining it into the query text.",
+   "lines": [
+    16,
+    16
+   ],
+   "statement": "Database queries built from user input pass it as parameters, not by joining it into the query text.",
+   "about": "target",
+   "asked_by": "standard",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source"
+  },
+  {
+   "id": 5,
+   "quote": "Text a user supplies is escaped by default when the software shows it in a web page.",
+   "lines": [
+    17,
+    17
+   ],
+   "statement": "Text a user supplies is escaped by default when the software shows it in a web page.",
+   "about": "target",
+   "asked_by": "standard",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source"
+  },
+  {
+   "id": 6,
+   "quote": "No password, token, email address or IP address is written to the software's logs.",
+   "lines": [
+    20,
+    20
+   ],
+   "statement": "No password, token, email address or IP address is written to the software's logs.",
+   "about": "target",
+   "asked_by": "standard",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source"
+  },
+  {
+   "id": 7,
+   "quote": "The software sends no data to a third party (analytics, telemetry, error reporting) unless the shipped configuration enables it.",
+   "lines": [
+    21,
+    21
+   ],
+   "statement": "The software sends no data to a third party (analytics, telemetry, error reporting) unless the shipped configuration enables it.",
+   "about": "target",
+   "asked_by": "standard",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source"
+  },
+  {
+   "id": 8,
+   "quote": "Every dependency's version is fixed by a lockfile in the repository.",
+   "lines": [
+    24,
+    24
+   ],
+   "statement": "Every dependency's version is fixed by a lockfile in the repository.",
+   "about": "target",
+   "asked_by": "standard",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source"
+  },
+  {
+   "id": 9,
+   "quote": "No dependency declares a licence from the GPL, AGPL or SSPL families.",
+   "lines": [
+    25,
+    25
+   ],
+   "statement": "No dependency declares a licence from the GPL, AGPL or SSPL families.",
+   "about": "target",
+   "asked_by": "standard",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source"
+  },
+  {
+   "id": 10,
+   "quote": "The repository carries a licence file that covers its code.",
+   "lines": [
+    26,
+    26
+   ],
+   "statement": "The repository carries a licence file that covers its code.",
+   "about": "target",
+   "asked_by": "standard",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source"
+  },
+  {
+   "id": 11,
+   "quote": "Code copied into the repository from another project names its origin and licence.",
+   "lines": [
+    27,
+    27
+   ],
+   "statement": "Code copied into the repository from another project names its origin and licence.",
+   "about": "target",
+   "asked_by": "standard",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source"
+  },
+  {
+   "id": 12,
+   "quote": "The software can be built from the repository without a private registry or any file the repository does not contain.",
+   "lines": [
+    30,
+    30
+   ],
+   "statement": "The software can be built from the repository without a private registry or any file the repository does not contain.",
+   "about": "target",
+   "asked_by": "standard",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source"
+  },
+  {
+   "id": 13,
+   "quote": "Automated tests exist for the software's core function and run in a continuous-integration workflow in the repository.",
+   "lines": [
+    31,
+    31
+   ],
+   "statement": "Automated tests exist for the software's core function and run in a continuous-integration workflow in the repository.",
+   "about": "target",
+   "asked_by": "standard",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source"
+  },
+  {
+   "id": 14,
+   "quote": "Changes to the database schema are made by versioned migrations kept in the repository.",
+   "lines": [
+    32,
+    32
+   ],
+   "statement": "Changes to the database schema are made by versioned migrations kept in the repository.",
+   "about": "target",
+   "asked_by": "standard",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source"
+  },
+  {
+   "id": 15,
+   "quote": "The stored data can be exported or backed up by a mechanism in the code or the deployment files.",
+   "lines": [
+    33,
+    33
+   ],
+   "statement": "The stored data can be exported or backed up by a mechanism in the code or the deployment files.",
+   "about": "target",
+   "asked_by": "standard",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source"
+  }
+ ]
+}

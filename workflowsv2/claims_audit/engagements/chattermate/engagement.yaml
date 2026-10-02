@@ -41,6 +41,14 @@ claim_sources:
   - llms.txt
   - HELP_CENTER_INFRA.md
   - backend/app/knowledge/README.md
+  - questions/buyer.md
+  - questions/standard-v1.md
+
+questions:
+  questions/buyer.md: buyer
+  questions/standard-v1.md: standard
+
+composition: true
 
 # Runs land in runs/ beside this file. Retention is an engagement fact, not a
 # harness default: a real client's run holds verbatim client material and
