@@ -19,14 +19,16 @@ sent, and he edits or cancels each one before it is added.
 
 Many teams already do. A model answers the questions you think to ask it.
 Tuuyi starts from the other end: it identifies every claim the seller's
-documents make and settles that list before testing any of them, then tests the
-material ones against the code. Every finding names the file and lines it rests
+documents make and settles that list before testing any of them, adds the
+buyer's own questions and a standard list of questions a buyer of a small
+software company should ask, then tests the material ones against the code.
+Every finding names the file and lines it rests
 on. What it could not settle, and what it did not examine, are listed too, so
 you can see where the answer stops. A second pass that did not do the review
 re-reads the evidence behind every finding, and a person reads the report
 before it is released.
 
-Source: PROSPECT.md §2; site /how-it-works. Checked 2026-09-27.
+Source: PROSPECT.md §2; site /how-it-works. Checked 2026-10-02.
 
 ## Why are only some of the claims tested?
 
