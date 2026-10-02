@@ -345,3 +345,12 @@ def test_a_statement_the_buyer_asked_is_reported_apart_from_the_sellers_claims()
     assert head in asked and "**Asked by the buyer:** Passwords are hashed." in asked
     summary = doc[doc.index("## Executive summary"):doc.index("## Scope and approach")]
     assert "questions/buyer.md, claim 1" in summary
+    # The front matter names the buyer's questions apart from the seller's
+    # claim sources, and says the seller did not make them.
+    front = doc[:doc.index("## The transaction")]
+    claim_line = next(l for l in front.splitlines() if l.startswith("Materials as of"))
+    assert "Questions tested: `questions/buyer.md` (the buyer's questions)" in claim_line
+    assert "questions/buyer.md" not in claim_line.split("Questions tested:")[0]
+    assert "statements the seller did not make" in front
+    plain = render.assemble(_record(), None, "t", "eng", None, False)
+    assert "Questions tested" not in plain and "statements the seller did not make" not in plain

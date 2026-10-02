@@ -494,17 +494,31 @@ def key_findings(classes: Dict[str, List[Dict[str, Any]]],
     return rows
 
 
+#: Whose questions a question source holds, by its kind (asked_by).
+ASKED_BY_WORDS = {"buyer": "the buyer's questions", "standard": "the practice's standard questions",
+                  "practice": "the practice's questions"}
+
+
 def _front_matter(engagement: str, dates: List[str], revs: List[str],
-                  sources: List[str], tiered: bool = False) -> List[str]:
+                  sources: List[str], tiered: bool = False,
+                  asked: Optional[Dict[str, str]] = None) -> List[str]:
     """Title, the materials' date and version, the assurance given, and who
     is responsible for what. Fixed text from the record; defines the terms it
-    uses at first use. `tiered`: some claims were listed and not tested."""
+    uses at first use. `tiered`: some claims were listed and not tested.
+    `asked`: question sources by claim source, with their kind; they are
+    named apart from the seller's claim sources, as statements the seller
+    did not make."""
+    asked = asked or {}
     when = ", ".join(dates) if dates else "an undated run"
     rev = (" at commit " + ", ".join(r[:12] for r in revs)) if revs else ""
-    src = ", ".join(f"`{s}`" for s in sources) or "the claim sources named by the engagement"
+    src = (", ".join(f"`{s}`" for s in sources if s not in asked)
+           or "the claim sources named by the engagement")
+    questions = ", ".join(f"`{s}` ({ASKED_BY_WORDS.get(k, 'questions')})"
+                          for s, k in asked.items())
     return [
         f"# Claims review — {engagement}", "",
-        f"Materials as of {when}{rev}. Claim sources: {src}.", "",
+        f"Materials as of {when}{rev}. Claim sources: {src}."
+        + (f" Questions tested: {questions}." if questions else ""), "",
         "**What this document is.** A claims review: "
         + ("every assertion the seller makes in the claim sources is listed, "
            "and each is rated by what it would change for the buyer if it were "
@@ -519,7 +533,12 @@ def _front_matter(engagement: str, dates: List[str], revs: List[str],
         "the seller asserts things about the target; the *materials* are "
         "everything supplied, including the claim sources, source code and "
         "configuration. The review examined what was supplied and nothing "
-        "else.", "",
+        "else."
+        + (" The review also tested statements the seller did not make: "
+           "questions the buyer raised and questions the practice asks, each "
+           "written as a statement about the target and tested like a claim. A "
+           "gap in one is a finding about the target, not about what the seller "
+           "said." if asked else ""), "",
         "**The assurance given is limited.** The review reports what the "
         f"materials show about each{' tested' if tiered else ''} claim. It did not perform procedures "
         "beyond examining the materials, so a claim the materials cannot "
@@ -529,7 +548,9 @@ def _front_matter(engagement: str, dates: List[str], revs: List[str],
         "stated; where this document carries none, none was recorded.", "",
         "**Responsibilities.** The seller made the claims and was not "
         "consulted; the seller has not confirmed the review's reading of any "
-        "claim. The practice performed the review under its written method, "
+        "claim. "
+        + ("The buyer and the practice wrote the questions tested. " if asked else "")
+        + "The practice performed the review under its written method, "
         "at the version each run received, retained with the record, and is "
         "responsible for the findings and their ratings. The buyer is "
         "responsible for decisions taken on them.", ""]
@@ -626,8 +647,10 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
     # A claim source whose every claim was listed and not tested has no run.
     unrun = sorted({c.get("claim_source") for c in untested} - set(sources) - {None})
     sources = sources + unrun
+    asked = {f["claim_source"]: f["asked_by"] for f in merged.get("findings") or []
+             if f.get("asked_by")}
     out = _front_matter(engagement or merged.get("engagement") or "engagement",
-                        dates, revs, sources, tiered=bool(untested))
+                        dates, revs, sources, tiered=bool(untested), asked=asked)
 
     out += ["## The transaction", ""]
     out += ["  \n".join(transaction.strip().splitlines()), ""] if transaction else [

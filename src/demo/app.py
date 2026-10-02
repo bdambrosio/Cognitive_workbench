@@ -290,13 +290,15 @@ def main(argv: Optional[List[str]] = None) -> int:
                         roots=[REPO, eng_dir, base.target])
     merged = base.merged
     fig = merged.get("figures") or {}
+    asked = {f["claim_source"] for f in merged.get("findings") or [] if f.get("asked_by")}
+    seller_runs = [r for r in merged.get("runs") or [] if r.get("claim_source") not in asked]
     document = redactor.deep({
         "kind": "report", "engagement": cfg["display_name"], "intake": None,
         "run": "demo", "html": base.document()["html"],
         "findings": base.findings(),
         "banner": banner(cfg["display_name"], fig.get("claims", 0),
-                         fig.get("findings", 0), len(merged.get("runs") or []),
-                         cfg["model_label"])})
+                         fig.get("findings", 0), len(seller_runs),
+                         cfg["model_label"], question_lists=len(asked))})
     leaks = redactor.leaks(json.dumps(document))
     if leaks:
         raise SystemExit(f"the redacted document still carries: {leaks}")

@@ -63,12 +63,16 @@ class Redactor:
 
 
 def banner(display_name: str, claims: int, findings: int, sources: int,
-           model_label: str) -> str:
+           model_label: str, question_lists: int = 0) -> str:
     """The demo's own banner: what the visitor is looking at, with nothing
-    that identifies the target."""
+    that identifies the target. `sources` counts the seller's claim
+    documents; `question_lists` the buyer's and the practice's questions."""
+    lists = (f" and {question_lists} question list{'s' if question_lists != 1 else ''}"
+             if question_lists else "")
     return "\n".join([
         f"  target       {display_name} — a real public repository, identity withheld",
-        f"  reviewed     {sources} claim document{'s' if sources != 1 else ''}, "
-        f"{claims} claims, {findings} findings, reviewed and rated",
+        f"  reviewed     {sources} claim document{'s' if sources != 1 else ''}{lists}, "
+        f"{claims} {'claims and questions' if question_lists else 'claims'}, "
+        f"{findings} findings, reviewed and rated",
         f"  model        {model_label}, on a hosted inference service",
         "  this page    your conversation is tied to this browser, kept on our server for a few days, then deleted"])
