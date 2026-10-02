@@ -719,10 +719,17 @@ def push(c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]]:
         rec = {"at": today(), "contact_id": rid, "person_created": False, "not_pursuing": True, "reason": why}
         _write_json(cand_dir / "pushed.json", rec)
         return rec
-    stage = "Ready to contact" if drafted else STAGE_OF[category]
+    # A draft with no way to send it is not ready: the person needs an email
+    # address or a LinkedIn profile on record (Bruce, 2026-10-02).
+    now = contacts.get(rid)
+    reachable = bool(now.get("email") or now.get("linkedin"))
+    stage = "Ready to contact" if drafted and reachable else STAGE_OF[category]
     values: Dict[str, Any] = {"stage": stage, "fit_rationale": why}
-    if drafted:
+    if drafted and reachable:
         values.update(next_action="Review the draft and send" + (" on LinkedIn" if category == "strong" else " by email"),
+                      next_action_date=today())
+    elif drafted:
+        values.update(next_action="No email address or LinkedIn found; find a way to reach them, then send the draft",
                       next_action_date=today())
     for field, key in (("category", "prospect_type"), ("relationship", "relationship"),
                        ("problem_recognition", "problem_recognition")):
