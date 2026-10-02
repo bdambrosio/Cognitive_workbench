@@ -420,10 +420,12 @@ def qualify(backend, c: Dict[str, Any], cand_dir: Path, contact: str = "") -> Di
 
 
 #: The two things a first message varies on purpose (PROSPECT.md §11), each
-#: with its values. One value of each is drawn at random per draft and recorded
-#: in draft.json, so replies can later be counted by choice.
-CHOICES = {"opening": ("purpose", "their_work"),
-           "showing": ("demo", "description")}
+#: with its values and their weights. One value of each is drawn at random per
+#: draft and recorded in draft.json, so replies can later be counted by choice.
+#: The `question` opening is drawn about one time in five (Bruce, 2026-10-02:
+#: permitted, not the usual opening).
+CHOICES = {"opening": {"purpose": 2, "their_work": 2, "question": 1},
+           "showing": {"demo": 1, "description": 1}}
 
 
 def draft(backend, c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]]:
@@ -434,7 +436,7 @@ def draft(backend, c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]
     evidence = load_evidence(cand_dir, [f["file"] for f in files])
     shown = {k: q.get(k) for k in ("prospect_type", "side", "relationship", "problem_recognition", "category", "why_person", "why_now",
                                "why_now_citations", "use_case", "concerns")}
-    choices = {k: random.choice(v) for k, v in CHOICES.items()}
+    choices = {k: random.choices(list(v), weights=list(v.values()))[0] for k, v in CHOICES.items()}
     user = (f"{candidate_text(c)}\n\nThe qualification:\n\n"
             f"{json.dumps(shown, indent=1, ensure_ascii=False)}\n\n"
             f"{evidence_block(cand_dir, files)}\n\n"
