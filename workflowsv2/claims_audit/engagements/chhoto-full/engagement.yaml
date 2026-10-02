@@ -14,6 +14,14 @@ claim_sources:
   - docs/SECURITY.md
   - docs/TOOLS.md
   - claim_sources/site_index_html.md
+  - questions/buyer.md
+  - questions/standard-v1.md
+
+questions:
+  questions/buyer.md: buyer
+  questions/standard-v1.md: standard
+
+composition: true
 
 # Who may open this engagement's pages on the client site, by email. The
 # client is the buyer: letter, intake, claim surface, report. The seller

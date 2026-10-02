@@ -1,0 +1,80 @@
+{
+ "claim_source": "questions/buyer.md",
+ "claims": [
+  {
+   "id": 1,
+   "quote": "The API is described in a machine-readable specification, such as an OpenAPI document, kept in the repository.",
+   "lines": [
+    7,
+    7
+   ],
+   "statement": "The API is described in a machine-readable specification, such as an OpenAPI document, kept in the repository.",
+   "about": "target",
+   "asked_by": "buyer",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source",
+   "buyer_rating": "material"
+  },
+  {
+   "id": 2,
+   "quote": "The server sends CORS headers that let a web application on another origin call the API.",
+   "lines": [
+    8,
+    8
+   ],
+   "statement": "The server sends CORS headers that let a web application on another origin call the API.",
+   "about": "target",
+   "asked_by": "buyer",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source",
+   "buyer_rating": "material"
+  },
+  {
+   "id": 3,
+   "quote": "Links can be kept per customer, with each customer's access limited to its own links.",
+   "lines": [
+    9,
+    9
+   ],
+   "statement": "Links can be kept per customer, with each customer's access limited to its own links.",
+   "about": "target",
+   "asked_by": "buyer",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source",
+   "buyer_rating": "material"
+  },
+  {
+   "id": 4,
+   "quote": "The service can run as more than one instance sharing the same stored links.",
+   "lines": [
+    10,
+    10
+   ],
+   "statement": "The service can run as more than one instance sharing the same stored links.",
+   "about": "target",
+   "asked_by": "buyer",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source",
+   "buyer_rating": "material"
+  },
+  {
+   "id": 5,
+   "quote": "Requests that create links are rate-limited.",
+   "lines": [
+    11,
+    11
+   ],
+   "statement": "Requests that create links are rate-limited.",
+   "about": "target",
+   "asked_by": "buyer",
+   "tier": 1,
+   "tier_basis": "Every statement of a question source is tested.",
+   "tier_by": "question source",
+   "buyer_rating": "material"
+  }
+ ]
+}
