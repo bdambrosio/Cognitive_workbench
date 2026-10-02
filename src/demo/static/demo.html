@@ -6,14 +6,20 @@
 <title>Demo — a claims review, read and questioned</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="stylesheet" href="/static/client.css?v=20260906">
-<link rel="stylesheet" href="/demo-static/theme-light.css?v=20260926">
+<link rel="stylesheet" href="/demo-static/theme-light.css?v=20261002">
 </head>
 <body>
 <header>
   <div class="title"><a class="brand" href="https://tuuyi.com/">Tuuyi</a><span id="engagement">a project</span> <span class="mode" id="mode"></span></div>
   <div class="state"><span id="thinking" class="thinking" hidden>thinking…</span><span id="conn">connecting</span></div>
 </header>
-<div class="strip"><b>What this is.</b> A finished claims review of a real public repository, as a client would receive it except that names identifying the project are replaced, in quoted code too, with a page beside it for asking about any finding. <b>What is different from paid work.</b> The demo runs on a hosted open-weight model and replies take a minute or two; a paid claims review runs on isolated, single-tenant hardware the practice controls, or on a zero-data-retention cloud service when the client and the seller agree. <b>What is made up.</b> The buyer and the deal the ratings are read against are illustrative, written by the practice for this demo. <b>Privacy.</b> Your conversation is tied to this browser, so no other visitor sees it. It is kept on our server for a few days so you can return to it, then deleted, and each question is sent to the hosted inference service to produce its reply. Do not paste confidential material.</div>
+<details class="strip" id="about" open>
+<summary>About this demo</summary>
+<p><b>What this is.</b> A finished claims review of a real public repository, as a client would receive it except that names identifying the project are replaced, in quoted code too, with a page beside it for asking about any finding.</p>
+<p><b>What is different from paid work.</b> The demo runs on a hosted open-weight model and replies take a minute or two; a paid claims review runs on isolated, single-tenant hardware the practice controls, or on a zero-data-retention cloud service when the client and the seller agree.</p>
+<p><b>What is made up.</b> The buyer and the deal the ratings are read against are illustrative, written by the practice for this demo.</p>
+<p><b>Privacy.</b> Your conversation is tied to this browser, so no other visitor sees it. It is kept on our server for a few days so you can return to it, then deleted, and each question is sent to the hosted inference service to produce its reply. Do not paste confidential material.</p>
+</details>
 <main>
   <section id="chat">
     <div id="messages"></div>
@@ -26,6 +32,7 @@
       <div class="hint" id="uploadsHint" hidden></div>
     </form>
   </section>
+  <div id="splitter" role="separator" aria-orientation="vertical" aria-label="Resize the panes; double-click to reset" tabindex="0"></div>
   <section id="document">
     <div id="doc"></div>
     <div id="evidence" hidden></div>
@@ -33,5 +40,6 @@
 </main>
 <script src="/static/md.js"></script>
 <script src="/static/client.js?v=20261002"></script>
+<script src="/demo-static/demo.js?v=20261002"></script>
 </body>
 </html>
