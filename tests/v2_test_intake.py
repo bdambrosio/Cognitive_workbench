@@ -103,13 +103,18 @@ def test_finish_puts_the_buyers_questions_where_the_seller_cannot_read_them(tmp_
     (eng / "engagement.yaml").write_text("target: target\nclaim_sources: [a.md]\n")
     idir = eng / "intakes" / "2026-10-01T00-00-00Z"; idir.mkdir(parents=True)
     f = sch.empty_form()
-    f["buyer_questions"] = ["Is the admin login safe?", "Will an upgrade lose our links?"]
+    f["buyer_questions"] = [{"question": "Is the admin login safe?", "rating": "decisive"},
+                            {"question": "Will an upgrade lose our links?", "rating": ""}]
     res = rn.finish(eng, idir, f)
     assert rn.BUYER_QUESTIONS in res["written"]
     text = (eng / rn.BUYER_QUESTIONS).read_text()
     assert "Is the admin login safe?" in text and "Will an upgrade lose our links?" in text
     assert not (eng / "target").exists()
     assert questions.statements(text) == []
+    # Each question sits under the heading of the rating the buyer gave it,
+    # so the statements the practice writes beneath it carry that rating.
+    assert text.index("# Rated by the buyer: decisive") < text.index("Is the admin login safe?")
+    assert text.index("# Not rated by the buyer") < text.index("Will an upgrade lose our links?")
 
 
 def test_intake_session_refuses_a_missing_engagement(tmp_path, monkeypatch):

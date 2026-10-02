@@ -24,6 +24,26 @@ SLOTS: Dict[str, Tuple[str, ...]] = {
 }
 
 
+#: What a "no" to a buyer question would do to the deal, as the buyer says
+#: it at intake (INTAKE.md §3); the rating stage takes it as the finding's
+#: rating instead of asking the model.
+BUYER_RATINGS = ("material", "decisive", "not_material")
+
+
+def buyer_questions(form: Dict[str, Any]) -> List[Dict[str, str]]:
+    """The buyer's questions as {question, rating}. A form written before
+    ratings were asked holds plain strings; each reads as unrated."""
+    out = []
+    for q in form.get("buyer_questions") or []:
+        if isinstance(q, dict):
+            text, rating = str(q.get("question") or "").strip(), str(q.get("rating") or "").strip()
+        else:
+            text, rating = str(q).strip(), ""
+        if text:
+            out.append({"question": text, "rating": rating if rating in BUYER_RATINGS else ""})
+    return out
+
+
 def empty_form() -> Dict[str, Any]:
     out: Dict[str, Any] = {slot: {f: "" for f in fields}
                            for slot, fields in SLOTS.items()}
@@ -41,7 +61,11 @@ def intake_schema() -> Dict[str, Any]:
         props[slot] = {"type": "object",
                        "properties": {f: {"type": "string"} for f in fields},
                        "required": list(fields)}
-    props["buyer_questions"] = {"type": "array", "items": {"type": "string"}}
+    props["buyer_questions"] = {"type": "array", "items": {
+        "type": "object",
+        "properties": {"question": {"type": "string"},
+                       "rating": {"type": "string", "enum": list(BUYER_RATINGS) + [""]}},
+        "required": ["question", "rating"]}}
     props["open_questions"] = {"type": "array", "items": {"type": "string"}}
     props["notes"] = {"type": "array", "items": {"type": "string"}}
     return {"type": "object", "properties": props,

@@ -20,6 +20,11 @@ whose quote and statement are the line itself, `about: target`, `asked_by`
 the source's kind, and tier 1: every statement is tested, so the tier stage
 skips question sources.
 
+THE BUYER'S RATING. In a buyer source, a heading reading `# Rated by the
+buyer: material` (or `decisive`, or `not_material`) gives each statement
+under it that rating as `buyer_rating`, up to the next heading. The rating
+stage takes it as the finding's rating instead of asking the model.
+
 NOT APPLICABLE. The standard list is copied whole into each engagement, and
 an item that does not apply to the target moves under a heading reading
 exactly `# Not applicable`, written `statement | reason`. It becomes a claim
@@ -62,6 +67,9 @@ STANDARD = Path(__file__).resolve().parent / "method" / "STANDARD_QUESTIONS.md"
 
 #: The heading above the items that do not apply to this engagement.
 NOT_APPLICABLE = "not applicable"
+#: The heading that carries the buyer's rating of the statements below it.
+RATED_BY_BUYER = "rated by the buyer:"
+BUYER_RATINGS = ("material", "decisive", "not_material")
 
 
 def statements(text: str) -> List[Dict[str, Any]]:
@@ -70,13 +78,21 @@ def statements(text: str) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     in_comment = False
     not_applicable = False
+    rating = None
     for n, raw in enumerate(text.splitlines(), 1):
         line = raw.strip()
         if in_comment or line.startswith("<!--"):
             in_comment = "-->" not in line
             continue
         if line.startswith("#"):
-            not_applicable = line.lstrip("#").strip().lower() == NOT_APPLICABLE
+            heading = line.lstrip("#").strip().lower()
+            not_applicable = heading == NOT_APPLICABLE
+            rating = None
+            if heading.startswith(RATED_BY_BUYER):
+                rating = heading[len(RATED_BY_BUYER):].strip().replace(" ", "_")
+                if rating not in BUYER_RATINGS:
+                    raise SystemExit(f"line {n}: the buyer's rating is one of "
+                                     f"{', '.join(BUYER_RATINGS)}, not {rating!r}")
             continue
         if not line:
             continue
@@ -88,7 +104,8 @@ def statements(text: str) -> List[Dict[str, Any]]:
             out.append({"line": n, "text": line, "statement": statement.strip(),
                         "not_applicable": reason.strip()})
         else:
-            out.append({"line": n, "text": line, "statement": line})
+            out.append({"line": n, "text": line, "statement": line,
+                        "buyer_rating": rating})
     return out
 
 
@@ -101,7 +118,8 @@ def claims(text: str, kind: str) -> List[Dict[str, Any]]:
                     "tier": 3 if na else 1,
                     "tier_basis": (f"Not applicable to this target: {na}" if na else
                                    "Every statement of a question source is tested."),
-                    "tier_by": TIER_BY})
+                    "tier_by": TIER_BY,
+                    **({"buyer_rating": s["buyer_rating"]} if s.get("buyer_rating") else {})})
     return out
 
 

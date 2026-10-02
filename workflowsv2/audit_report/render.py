@@ -184,8 +184,9 @@ ASKED_LINES = {
         "it as it tests a claim. The seller did not make these statements, so a gap "
         "here is a finding about the target, not about what the seller said. A gap "
         "carries its materiality rating; a statement the materials cannot settle "
-        "carries its exposure rating. Gaps come first, then unsettled statements, "
-        "then those that hold."),
+        "carries its exposure rating. Where the buyer said at intake what a \"no\" "
+        "would do to the deal, that is the rating, and it is marked as the buyer's. "
+        "Gaps come first, then unsettled statements, then those that hold."),
     "asked_practice": (
         "Questions the practice asked",
         "The practice asks these of every engagement, or raised them from a claim "
@@ -405,7 +406,9 @@ def _finding(f: Dict[str, Any], rating: Optional[Dict[str, Any]],
     if rating:
         agree = rating.get("agreement")
         tag = ""
-        if agree:
+        if rating.get("by") == "buyer":
+            tag = " (the buyer's own rating, given at intake)"
+        elif agree:
             tag = (f" (rated {agree.split(' of ')[1]} times, {agree.split(' of ')[0]} agree"
                    + ("; **borderline**" if rating.get("borderline") else "") + ")")
         out += [f"**{field.capitalize()} — {rating.get(field)}{tag}:** "

@@ -320,6 +320,29 @@ def replicate(loop, method_text: str, eng: Dict[str, Any],
     return {"obj": obj, "calls": calls}
 
 
+def to_rate(merged: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """(rateable, exposable) findings for the model. A statement the buyer
+    rated at intake keeps the buyer's rating and is left out (INTAKE.md §3)."""
+    fs = [f for f in merged["findings"] if not f.get("buyer_rating")]
+    return ([f for f in fs if schemas.rateable(f)], [f for f in fs if schemas.exposable(f)])
+
+
+def add_buyer_ratings(ratings: Dict[str, Any], merged: Dict[str, Any]) -> None:
+    """Record the buyer's own rating for each finding it covers: as its
+    materiality when the finding shows a gap, its exposure when unsettled."""
+    for f in merged["findings"]:
+        if not f.get("buyer_rating"):
+            continue
+        field, array = (("materiality", "ratings") if schemas.rateable(f) else
+                        ("exposure", "exposures") if schemas.exposable(f) else (None, None))
+        if field:
+            ratings.setdefault(array, []).append({
+                "claim_source": f["claim_source"], "claim_id": f["claim_id"],
+                field: f["buyer_rating"], "by": "buyer",
+                "basis": f"The buyer rated this question {f['buyer_rating'].replace('_', ' ')} "
+                         f"at intake; the buyer's own rating stands."})
+
+
 def _sha(text: Optional[str]) -> Optional[str]:
     import hashlib
     return hashlib.sha256(text.encode("utf-8")).hexdigest() if text else None
@@ -400,8 +423,7 @@ def main() -> int:
                     severity="check")
 
     # ---- part two: rate -----------------------------------------------------
-    rateable = [f for f in merged["findings"] if schemas.rateable(f)]
-    exposable = [f for f in merged["findings"] if schemas.exposable(f)]
+    rateable, exposable = to_rate(merged)
     from chat.chat_loop import ChatLoop                        # noqa: E402
     world = f"materiality_{ts}_{label}"[:60]
     name, cfg = build_config(out, world, args.model)
@@ -438,6 +460,7 @@ def main() -> int:
             logger.warning("executor shutdown failed: %s", e)
 
     ratings = result["obj"]
+    add_buyer_ratings(ratings, merged)
     check = schemas.check_ratings(ratings, merged)
     for p in check["problems"]:
         issues.note(out, stage=STAGE, code="ratings_check", text=p,

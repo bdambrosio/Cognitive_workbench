@@ -136,6 +136,7 @@ def merge(run_dirs: Sequence[Path]) -> Dict[str, Any]:
                    "implied_by": c.get("implied_by"),
                    "approved_by": c.get("approved_by"),
                    "asked_by": c.get("asked_by"),
+                   "buyer_rating": c.get("buyer_rating"),
                    "locations": list(c.get("locations") or []),
                    "adjudication": adj, "evidence": f.get("evidence") or [],
                    "review": review,
