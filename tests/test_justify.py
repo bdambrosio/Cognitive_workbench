@@ -927,6 +927,7 @@ def test_post_turn_stages_are_isolated_and_claims_run_first():
 
     class _Fake:
         character_name = "TestJill"
+        attribution_enabled = True    # set by ChatLoop.__init__ (fea3cb24)
 
         def _extract_and_log_claims(self, seq, spawn_verification=False):
             order.append("claims")
@@ -960,6 +961,7 @@ def test_post_turn_survives_a_failing_claims_stage():
 
     class _Fake:
         character_name = "TestJill"
+        attribution_enabled = True    # set by ChatLoop.__init__ (fea3cb24)
 
         def _extract_and_log_claims(self, seq, spawn_verification=False):
             order.append("claims")

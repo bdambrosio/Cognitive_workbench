@@ -408,6 +408,7 @@ def test_embodiment_probe_reports_down_surfaces(monkeypatch):
 
     class Fake:
         _EMBODIMENT_SURFACES = ChatLoop._EMBODIMENT_SURFACES
+        _head_enabled = False         # set by ChatLoop.__init__ (2b4933da)
 
     def refuse(*a, **k):
         raise requests.ConnectionError("refused")

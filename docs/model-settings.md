@@ -77,7 +77,7 @@ Named explicitly so a stale config fails with a reason instead of a bare
 | `claude-opus-4-7` | dropped 2026-08-24; revisit at Sonnet 5 |
 | `claude-sonnet-4-6` | dropped 2026-08-24; revisit at Sonnet 5 |
 | `mimo-v2.5` | dropped 2026-08-24 |
-| `gemini-3.8-flash` | failed pre-screen gate 3, 2026-09-24; unqualified. The model emits only the properties the action schema declares (`thought`, `tool`), so its actions carry no tool arguments. Gates 1-2 passed only at effort low. Route kept as a record: `measure/models/or_gemini38flash_low.yaml` |
+| `gemini-3.8-flash` | failed pre-screen gate 3, 2026-09-24; unqualified. The model emits only the properties the action schema declares (`thought`, `tool`), so its actions carry no tool arguments. Gates 1-2 passed only at effort low. Route kept as a record: `measure/retired_models/or_gemini38flash_low.yaml`, out of `measure/models/` so no run picks it up |
 
 ## Adding a model
 
