@@ -129,7 +129,8 @@
   // rows becomes a link to that finding: the executive summary's list of
   // material findings and the appendix table are the finding-level outline.
   function linkReferences() {
-    const re = /([\w.\-]+\.\w+), claim (\d+)/g;
+    // A source may sit in a folder (claim_sources/site.md, questions/buyer.md).
+    const re = /([\w.\-\/]+\.\w+), claim (\d+)/g;
     for (const el of doc.querySelectorAll(".report p, .report li, .report td")) {
       if (el.closest("h3")) continue;
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
@@ -239,7 +240,7 @@
   // A reply that names a finding — "README.md, claim 20", "claim 20" — opens it.
   function findingsNamed(replyText) {
     const keys = [];
-    const re = /(?:([\w.\-]+\.\w+),?\s+)?claim(?:_id)?\s+#?(\d+)/gi;
+    const re = /(?:([\w.\-\/]+\.\w+),?\s+)?claim(?:_id)?\s+#?(\d+)/gi;
     let m;
     while ((m = re.exec(replyText)) !== null) {
       const src = m[1] || (sources.length === 1 ? sources[0] : null);
