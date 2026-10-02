@@ -71,6 +71,21 @@ Source: claims_audit method/PROPERTY_QUESTIONS.md and PROPERTY_SELECTION.md;
 site /how-it-works ("Your questions, and the standard ones"). Checked
 2026-10-02.
 
+## How is this different from a code scanner or a code-analysis platform?
+
+Scanners and code-analysis platforms start from the code: they check it
+against their rules, score its quality and security, and some compare it with
+other codebases. Tuuyi starts from what the buyer is being told and asked to
+rely on. It identifies the claims in the seller's documents, adds the buyer's
+questions and the questions published standards ask of that kind of software,
+rates each by what a "no" would change for this buyer, and tests the material
+ones against the code. Each answer is a verdict on one statement, with the
+file and lines it rests on, and a person reads the report before it is
+released. The two can sit side by side: the review can also include a scan of
+the dependencies and their licences.
+
+Source: PROSPECT.md §2; site /how-it-works. Checked 2026-10-02.
+
 ## Can I see an example?
 
 Yes. The public demo at demo.tuuyi.com is a finished review of a small

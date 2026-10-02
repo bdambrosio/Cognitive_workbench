@@ -46,6 +46,9 @@
 <h2>Is this a PCI DSS, SOC 2 or GDPR compliance assessment?</h2>
 <p>No. Those are formal assessments by accredited assessors, and they cover the organisation as well as the code. The review adds questions drawn from published requirements for the kind of software it is (OWASP ASVS, the OWASP Top 10 for LLM applications, GDPR and PCI DSS among them) where the software has that kind of data or feature and a "no" would matter to the buyer. Each is tested against the code. A gap is a red flag to raise with the seller, or to send a full assessment to look at, before you commit. The review does not certify compliance with any standard.</p>
 
+<h2>How is this different from a code scanner or a code-analysis platform?</h2>
+<p>Scanners and code-analysis platforms start from the code: they check it against their rules, score its quality and security, and some compare it with other codebases. Tuuyi starts from what the buyer is being told and asked to rely on. It identifies the claims in the seller's documents, adds the buyer's questions and the questions published standards ask of that kind of software, rates each by what a "no" would change for this buyer, and tests the material ones against the code. Each answer is a verdict on one statement, with the file and lines it rests on, and a person reads the report before it is released. The two can sit side by side: the review can also include a scan of the dependencies and their licences.</p>
+
 <h2>Can I see an example?</h2>
 <p>Yes. The public demo at <a href="https://demo.tuuyi.com">demo.tuuyi.com</a> is a finished review of a small open-source project, and you can put questions to it. For example, the project's README promises the software will never use cookies, and the review found the code that sets one when the administrator logs in.</p>
 
