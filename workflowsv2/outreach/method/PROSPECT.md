@@ -140,7 +140,7 @@ The message offers one use, or both when the side is unknown, chosen by what the
 - **Connector:** the use that fits the part of the market they know; the question asks for their opinion of it, not for a purchase.
 - **Technical feedback:** no use is offered and part 4 is left out; the question asks for their criticism of the method in part 3, not for a purchase.
 
-For a buyer, or someone who works for buyers, the use may be put in terms of timing: the review finds the risks before the letter of intent, so the diligence paid for later goes where they are.
+For a buyer, or someone who works for buyers, the use may be put in terms of timing: the review finds the risks before the letter of intent, so the diligence paid for later goes where they are. Before the letter of intent a seller usually does not share code, so the buyer asks the seller to have the seller's check done and to admit the buyer to it; the buyer then reads the report, not the repository.
 
 Within a kind, fit the use to the person's role. Someone who does the diligence meets the problem directly. Someone who runs M&A or holds the budget decides whether a review like this has a place in how their firm buys or invests.
 

@@ -139,11 +139,15 @@ Source: PROSPECT.md §2; site /pricing ("What it does not include"). Checked
 
 A seller can have the claims in their own README, documentation or deck checked
 against their code privately, before a buyer, investor or large customer does,
-so they can correct the words or the code first. The report is theirs alone and
-is not an independent assessment for anyone else to rely on. It is described at
-tuuyi.com/sellers.
+so they can correct the words or the code first. Only the people the seller
+admits to the engagement can open the report, and each of them can read and
+download it. A seller can admit a buyer, so a buyer can ask a seller for one
+before the letter of intent, while the seller is not yet sharing code: the
+buyer sees the report, not the repository. It is not an independent
+assessment for anyone else to rely on. It is described at tuuyi.com/sellers.
 
-Source: PROSPECT.md §2; site /sellers. Checked 2026-09-27.
+Source: PROSPECT.md §2 and §10; site /sellers; client_ui/access.py (who may open
+an engagement). Checked 2026-10-02.
 
 ## Where does the code go? Who sees it?
 
