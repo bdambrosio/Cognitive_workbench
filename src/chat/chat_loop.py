@@ -868,6 +868,10 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         overwrite per-call state such as `last_finish_reason` that the loop
         reads after its own call."""
         llm_cfg = (self.config.get('llm_config') or {})
+        # One prompt-cache session per world and character: the audit and
+        # review scenarios also name their character Jill, and must not share
+        # her bucket.
+        world = (self.config.get('world_config') or {}).get('world_name') or 'chat'
         return _ChatBackend(
             server=llm_cfg.get('server', 'local'),
             model=llm_cfg.get('model', ''),
@@ -876,6 +880,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             api_key=llm_cfg.get('api_key'),
             reasoning_effort=llm_cfg.get('reasoning_effort'),
             extra_body=llm_cfg.get('extra_body'),
+            session_affinity=f"{world}/{self.character_name}",
         )
 
     def _reply_recipient(self, source: str, silent: bool) -> str:

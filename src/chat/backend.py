@@ -97,7 +97,15 @@ class _ChatBackend:
                  is_reasoning: Optional[bool] = None,
                  api_key: Optional[str] = None,
                  reasoning_effort: Optional[str] = None,
-                 extra_body: Optional[Dict[str, Any]] = None):
+                 extra_body: Optional[Dict[str, Any]] = None,
+                 session_affinity: Optional[str] = None):
+        # Sent as `x-session-affinity` on the OpenAI-compatible route. Fireworks
+        # keeps its prompt cache per replica and routes a session to one
+        # replica only when the request names it; without it, a ReAct turn's
+        # iterations over a byte-identical 25-40k-token prefix all reported
+        # cached=0 (Jill on glm-5p3-flash, 2026-10-02). Servers that do not
+        # know the header ignore it. Agreed with Jill, 2026-10-02.
+        self.session_affinity = (session_affinity or '').strip() or None
         # Verbatim passthrough into the OpenAI-compat request body. Exists
         # for gateway-level fields this class should not have to know about —
         # OpenRouter's `provider` routing being the case that forced it. Four
@@ -778,6 +786,8 @@ class _ChatBackend:
         headers: Dict[str, str] = {'Content-Type': 'application/json'}
         if self._api_key_value:
             headers['Authorization'] = f'Bearer {self._api_key_value}'
+        if self.session_affinity:
+            headers['x-session-affinity'] = self.session_affinity
         # Apply whatever this endpoint taught us on an earlier call.
         for old, new in self._param_renames.items():
             if old in body:
