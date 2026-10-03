@@ -2,7 +2,7 @@
 
 <!-- Statements for each property in PROPERTIES.md. An engagement
      uses the sections for the properties it identified, together with the
-     baseline list (draft baseline v2, logs/BASELINE_QUESTIONS.v2.draft.md), which applies to every engagement.
+     baseline list (method/STANDARD_QUESTIONS.md, version 2), which applies to every engagement.
      Each statement is testable by reading the code and the files supplied
      with it; questions only the seller can answer are not in this file. One
      statement per line; its source is on the comment line above it.

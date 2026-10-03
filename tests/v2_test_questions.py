@@ -1,6 +1,7 @@
 """Question sources: statements the buyer or the practice wrote, kept out of
 the seller's materials, become a surface the audit can test."""
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -69,7 +70,8 @@ def test_the_standard_list_is_copied_under_its_version_and_a_practice_edit_survi
     eng = tmp_path / "e"
     eng.mkdir()
     src = questions.add_standard(eng)
-    assert src == "questions/standard-v1.md"
+    version = re.search(r"version (\d+)", questions.STANDARD.read_text().splitlines()[0]).group(1)
+    assert src == f"questions/standard-v{version}.md"
     copy = eng / src
     assert questions.statements(copy.read_text())
     copy.write_text("# edited\nOne statement.\n")

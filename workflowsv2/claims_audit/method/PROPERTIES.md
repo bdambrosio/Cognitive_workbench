@@ -8,7 +8,7 @@ like the baseline list's: one testable statement per line, each citing a
 requirement of a published standard or marked "practice". This file lists
 the properties only. Statements are drafted after this list is approved.
 
-The baseline list (draft baseline v2, logs/BASELINE_QUESTIONS.v2.draft.md) applies to every engagement and is
+The baseline list (method/STANDARD_QUESTIONS.md, version 2) applies to every engagement and is
 not a property.
 
 Two things are deliberately not properties:
