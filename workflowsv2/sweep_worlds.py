@@ -21,8 +21,9 @@ WHAT IS KEPT, by name, whatever its age:
   client_*          intake conversations, same (intake/session.py names the
                     world client_<engagement>)
   intake_*          intake worlds under an earlier name
-  consult_*         consultation co-pilot worlds (ayur_consult/session.py names
-                    the world consult_<case>); a consultation can be continued
+  consult_*         consultation co-pilot worlds (the madhava-nidana repository's
+                    ayur_consult/session.py names the world consult_<case>); a
+                    consultation can be continued
   demo_*            the public demo's visitor worlds; src/demo/app.py sweeps
                     these on its own schedule (demo.yaml keep_days)
 

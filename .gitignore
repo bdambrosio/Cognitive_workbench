@@ -167,7 +167,3 @@ workflowsv2/outreach/prospects/
 workflowsv2/claims_audit/engagements/cmp-*/
 workflowsv2/claims_audit/engagements/tiercross-*/
 workflowsv2/claims_audit/engagements/*/.logs/
-# Madhava Nidana knowledge base and translations are data, kept outside the repo
-# (/data/Sree/...). data/ayurveda/ is the knowledge base's default location
-# (workflowsv2/nidana_kb/kb.py) when $AYUR_KB is unset.
-data/ayurveda/
