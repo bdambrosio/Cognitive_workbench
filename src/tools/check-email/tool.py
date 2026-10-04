@@ -12,13 +12,11 @@ Zero pip dependencies — stdlib only (imaplib, email, ssl).
 """
 
 import email
-import email.header
 import email.utils
 import imaplib
 import logging
 import os
 import re
-import ssl
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -30,13 +28,14 @@ try:
 except ImportError:
     InfospaceExecutor = Any  # type: ignore[assignment,misc]
 
+from utils.imap_utils import (IMAPConnection as _IMAPConnection,  # noqa: E402
+                              decode_header as _decode_header)
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-IMAP_HOST = "imap.gmail.com"
-IMAP_PORT = 993
 MAX_BODY_CHARS = 50_000
 ABSOLUTE_MAX_LIMIT = 50
 
@@ -100,38 +99,6 @@ def _create_collection(note_ids: List[str], agent_name: str,
         return collection_id
     logger.error(f"Failed to create Collection: {error_msg}")
     return None
-
-
-# ---------------------------------------------------------------------------
-# IMAP connection context manager
-# ---------------------------------------------------------------------------
-
-class _IMAPConnection:
-    """Context manager: connects to Gmail IMAP, logs in, auto-disconnects."""
-
-    def __init__(self, address: str, app_password: str):
-        self._address = address
-        self._app_password = app_password
-        self._conn: Optional[imaplib.IMAP4_SSL] = None
-
-    def __enter__(self) -> imaplib.IMAP4_SSL:
-        ctx = ssl.create_default_context()
-        self._conn = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT, ssl_context=ctx)
-        self._conn.login(self._address, self._app_password)
-        logger.info(f"IMAP login successful for {self._address}")
-        return self._conn
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if self._conn:
-            try:
-                self._conn.close()
-            except Exception:
-                pass
-            try:
-                self._conn.logout()
-            except Exception:
-                pass
-        return False
 
 
 # ---------------------------------------------------------------------------
@@ -205,20 +172,6 @@ def _fetch_emails(conn: imaplib.IMAP4_SSL, folder: str,
 # ---------------------------------------------------------------------------
 # Parse a single email
 # ---------------------------------------------------------------------------
-
-def _decode_header(raw: str) -> str:
-    """Decode RFC 2047 encoded header value."""
-    if not raw:
-        return ''
-    parts = email.header.decode_header(raw)
-    decoded: List[str] = []
-    for fragment, charset in parts:
-        if isinstance(fragment, bytes):
-            decoded.append(fragment.decode(charset or 'utf-8', errors='replace'))
-        else:
-            decoded.append(fragment)
-    return ' '.join(decoded)
-
 
 def _strip_html(html: str) -> str:
     """Rough tag strip for HTML fallback — not a full parser."""

@@ -13,6 +13,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from chat.background import BackgroundMixin, occurrence_due, next_occurrence  # noqa: E402
 
 
+class _Store:
+    """Stored turns by source, as the conversation store returns them."""
+
+    def __init__(self):
+        self.by_source = {}
+
+    def get_recent_turns(self, entity, limit=20, scope='all'):
+        return self.by_source.get(entity, [])[-limit:]
+
+
 class _Host(BackgroundMixin):
     character_name = "TestJill"
 
@@ -23,6 +33,7 @@ class _Host(BackgroundMixin):
         self._inbox = queue.Queue()
         self._autonomy_enabled = autonomy
         self._current_turn = {'source': 'Claude'}
+        self.store = _Store()
         self._init_background()
 
     def _counterpart_for_turn(self, source):
@@ -148,3 +159,20 @@ def test_no_woken_turn_when_results_were_taken_or_autonomy_is_off(tmp_path):
     _wait_for_results(off)
     off._handle_background_wake()
     assert off.turns == [] and len(off._bg_done) == 1   # waits for the next turn
+
+
+def test_a_scheduled_turn_is_told_when_a_person_last_spoke(tmp_path):
+    host = _Host(tmp_path)
+    now = datetime(2026, 10, 3, 16, 30)
+    assert host._last_human_turn_line(now).endswith("none on record.")
+    host.store.by_source['User'] = [
+        {'direction': 'in', 'timestamp': '2026-10-02T18:42:00'},
+        # Her own later message to him is not him speaking.
+        {'direction': 'out', 'timestamp': '2026-10-03T09:00:00'}]
+    assert host._last_human_turn_line(now).endswith("2026-10-02 18:42; none today.")
+    host.store.by_source['Voice'] = [{'direction': 'in', 'timestamp': '2026-10-03T11:05:00'}]
+    assert host._last_human_turn_line(now).endswith("2026-10-03 11:05.")
+    (tmp_path / "schedule.yaml").write_text(
+        "- text: Check in\n  at: 2020-01-01 16:30\n  every_hours: 24\n", encoding="utf-8")
+    assert host._fire_due_schedule()
+    assert "Last human turn (User or Voice): 2026-10-03 11:05" in host.turns[0]['text']

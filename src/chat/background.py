@@ -52,6 +52,12 @@ SCHEDULE_FIRED_FILE = 'schedule_fired.json'
 DISPATCH_LOG = 'background_dispatch.jsonl'
 #: How many upcoming schedule items the prompt lists.
 SCHEDULE_PROMPT_ITEMS = 5
+#: The turn sources that are a person talking to her. A scheduled item is told
+#: when one of them last spoke (Jill's request, 2026-10-03).
+HUMAN_SOURCES = ('User', 'Voice')
+#: How many stored turns per source are searched for the last one from a
+#: person. Her own messages to that person are stored in the same list.
+HUMAN_TURN_LOOKBACK = 200
 
 
 def _now() -> datetime:
@@ -293,6 +299,25 @@ class BackgroundMixin:
         occ, it = min(due, key=lambda x: x[0])
         return it, occ
 
+    def _last_human_turn_line(self, now: datetime) -> str:
+        """One line for a scheduled turn: when a person last spoke to her.
+        Her prompt's conversation history carries no dates, so without this
+        she cannot tell whether Bruce has spoken today."""
+        latest: Optional[datetime] = None
+        for source in HUMAN_SOURCES:
+            for t in self.store.get_recent_turns(source, limit=HUMAN_TURN_LOOKBACK,
+                                                 scope='all'):
+                if t.get('direction') != 'in' or not t.get('timestamp'):
+                    continue
+                at = datetime.fromisoformat(t['timestamp'])
+                if latest is None or at > latest:
+                    latest = at
+        head = "Last human turn (User or Voice): "
+        if latest is None:
+            return head + "none on record."
+        return (head + f"{latest:%Y-%m-%d %H:%M}"
+                + ("." if latest.date() == now.date() else "; none today."))
+
     def _fire_due_schedule(self) -> bool:
         """Fire one due scheduled item as an autonomous turn. Returns True
         when one fired. The occurrence is recorded before the turn runs, so a
@@ -311,7 +336,7 @@ class BackgroundMixin:
                 + (f"; it is now {now:%Y-%m-%d %H:%M}, so this runs late"
                    if late > timedelta(minutes=10) else ""))
         text = (f"An item Bruce scheduled has come due: {item['text']}\n"
-                f"{when}\nMode: autonomous\n\n"
+                f"{when}\n{self._last_human_turn_line(now)}\nMode: autonomous\n\n"
                 f"Execute the following procedure now and produce the appropriate "
                 f"output. If the procedure specifies silence under some condition, "
                 f"stay silent.\n\n{item['instruction'] or item['text']}")
