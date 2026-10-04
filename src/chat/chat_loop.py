@@ -2281,6 +2281,9 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             (autonomous or from_sensor or source in self._peers) and not reply)
         if not reply:
             reply = "(no reply)"
+        # Read by a quiet-period schedule item, which gives no further turns
+        # once she has spoken in one (chat/background.py).
+        self._turn_spoke = not intentionally_silent
 
         # Assign this turn's seq now, before publish, so the reply can
         # carry the number the user needs to ask for its provenance

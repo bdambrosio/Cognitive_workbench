@@ -30,6 +30,21 @@ down fires late, once, and says so. Each fired occurrence is recorded in
 `<memory>/schedule_fired.json` before its turn runs. Her prompt lists the
 upcoming items under a heading saying Bruce wrote them, apart from the
 concerns she or reflection create.
+
+A QUIET-PERIOD ITEM (Bruce's design, agreed with Jill, 2026-10-04) has
+`after_quiet_hours` in place of `at` and `every_hours`:
+
+    - text: Check-in
+      after_quiet_hours: 1
+      instruction: ...
+
+Its turn comes due when no person (HUMAN_SOURCES) has spoken to her for that
+long and its last turn was at least that long ago; this holds from startup.
+A turn in which she stays silent changes nothing else, so the next comes one
+quiet period later. Once she speaks in one of its turns, the item gives no
+further turns until a person speaks to her. "Spoken to her" is a turn from a
+person; activity elsewhere on the machine is not seen. The time of its last
+turn and of her last remark in one are kept in `schedule_fired.json`.
 """
 from __future__ import annotations
 
@@ -262,12 +277,28 @@ class BackgroundMixin:
                 every = float(every) if every not in (None, '') else None
             except (TypeError, ValueError):
                 every = -1
+            quiet = (it or {}).get('after_quiet_hours') if isinstance(it, dict) else None
+            if quiet not in (None, ''):
+                try:
+                    quiet = float(quiet)
+                except (TypeError, ValueError):
+                    quiet = -1
+                if not text or quiet <= 0 or at is not None or every is not None:
+                    logger.warning(f"[{self.character_name}] {SCHEDULE_FILE} item {n} left out: "
+                                   f"a quiet-period item needs `text` and a positive "
+                                   f"`after_quiet_hours`, and no `at` or `every_hours`")
+                    continue
+                items.append({'text': text, 'at': None, 'every_hours': None,
+                              'after_quiet_hours': quiet,
+                              'instruction': str(it.get('instruction') or '').strip()})
+                continue
             if at is None or not text or (every is not None and every <= 0):
                 logger.warning(f"[{self.character_name}] {SCHEDULE_FILE} item {n} left out: "
                                f"it needs `text`, an `at` time, and a positive "
                                f"`every_hours` if any")
                 continue
             items.append({'text': text, 'at': at, 'every_hours': every,
+                          'after_quiet_hours': None,
                           'instruction': str(it.get('instruction') or '').strip()})
         return items
 
@@ -292,6 +323,8 @@ class BackgroundMixin:
         fired = self._schedule_fired()
         due = []
         for it in self._schedule_items():
+            if it['after_quiet_hours']:
+                continue
             occ = occurrence_due(it['at'], it['every_hours'], now)
             if occ is not None and self._schedule_key(it, occ) not in fired:
                 due.append((occ, it))
@@ -300,10 +333,35 @@ class BackgroundMixin:
         occ, it = min(due, key=lambda x: x[0])
         return it, occ
 
-    def _last_human_turn_line(self, now: datetime) -> str:
-        """One line for a scheduled turn: when a person last spoke to her.
-        Her prompt's conversation history carries no dates, so without this
-        she cannot tell whether Bruce has spoken today."""
+    def _due_quiet_item(self, now: datetime) -> Optional[Dict[str, Any]]:
+        """The first quiet-period item whose turn is due, or None. See the
+        module docstring for the rule."""
+        items = [it for it in self._schedule_items() if it['after_quiet_hours']]
+        if not items:
+            return None
+        last_human = self._last_human_turn()
+        fired = self._schedule_fired()
+        for it in items:
+            quiet = timedelta(hours=it['after_quiet_hours'])
+            if last_human is not None and now - last_human < quiet:
+                continue
+            spoke = _parse_at(fired.get(self._quiet_key(it, 'spoke'), ''))
+            if spoke is not None and (last_human is None or spoke > last_human):
+                continue
+            last_turn = _parse_at(fired.get(self._quiet_key(it, 'turn'), ''))
+            if last_turn is not None and now - last_turn < quiet:
+                continue
+            return it
+        return None
+
+    @staticmethod
+    def _quiet_key(item: Dict[str, Any], what: str) -> str:
+        """Key in schedule_fired.json for a quiet-period item's last turn
+        (`turn`) or her last remark in one (`spoke`)."""
+        return f"{item['text']}|quiet|{what}"
+
+    def _last_human_turn(self) -> Optional[datetime]:
+        """When a person last spoke to her, or None with none on record."""
         latest: Optional[datetime] = None
         for source in HUMAN_SOURCES:
             for t in self.store.get_recent_turns(source, limit=HUMAN_TURN_LOOKBACK,
@@ -313,6 +371,13 @@ class BackgroundMixin:
                 at = datetime.fromisoformat(t['timestamp'])
                 if latest is None or at > latest:
                     latest = at
+        return latest
+
+    def _last_human_turn_line(self, now: datetime) -> str:
+        """One line for a scheduled turn: when a person last spoke to her.
+        Her prompt's conversation history carries no dates, so without this
+        she cannot tell whether Bruce has spoken today."""
+        latest = self._last_human_turn()
         head = "Last human turn (User or Voice): "
         if latest is None:
             return head + "none on record."
@@ -325,7 +390,7 @@ class BackgroundMixin:
         crash inside the turn cannot make it fire again."""
         hit = self._due_schedule_item()
         if hit is None:
-            return False
+            return self._fire_due_quiet_item()
         item, occ = hit
         now = _now()
         fired = self._schedule_fired()
@@ -347,20 +412,59 @@ class BackgroundMixin:
                                 trigger=f"schedule: {item['text']}")
         return True
 
+    def _fire_due_quiet_item(self) -> bool:
+        """Fire one due quiet-period item as an autonomous turn. Returns True
+        when one fired. The turn's time is recorded before it runs, and her
+        remark, if she makes one, after."""
+        now = _now()
+        item = self._due_quiet_item(now)
+        if item is None:
+            return False
+        from utils.file_utils import atomic_write_json
+        fired = self._schedule_fired()
+        fired[self._quiet_key(item, 'turn')] = now.isoformat(timespec='seconds')
+        atomic_write_json(self._memory_dir() / SCHEDULE_FIRED_FILE, fired)
+        text = (f"An item Bruce scheduled has come due: {item['text']}\n"
+                f"Due because no person has spoken to you for "
+                f"{item['after_quiet_hours']:g} hour(s). "
+                f"It is now {now:%A %Y-%m-%d %H:%M}.\n"
+                f"{self._last_human_turn_line(now)}\nMode: autonomous\n\n"
+                f"Execute the following procedure now and produce the appropriate "
+                f"output. If the procedure specifies silence under some condition, "
+                f"stay silent.\n\n{item['instruction'] or item['text']}")
+        logger.info(f"[{self.character_name}] quiet-period item fired: {item['text']!r}")
+        self._turn_spoke = False
+        self._process_user_turn(source=self.character_name, text=text, close=False,
+                                autonomous=True,
+                                trigger=f"schedule: {item['text']}")
+        if self._turn_spoke:
+            fired = self._schedule_fired()
+            fired[self._quiet_key(item, 'spoke')] = _now().isoformat(timespec='seconds')
+            atomic_write_json(self._memory_dir() / SCHEDULE_FIRED_FILE, fired)
+        return True
+
     def _render_schedule_block(self, now: Optional[datetime] = None) -> str:
         """Bruce's upcoming items for the prompt; empty when there are none."""
         now = now or _now()
         rows = []
+        quiet_items = []
         for it in self._schedule_items():
+            if it['after_quiet_hours']:
+                quiet_items.append(it)
+                continue
             nxt = next_occurrence(it['at'], it['every_hours'], now)
             if nxt is not None:
                 rows.append((nxt, it))
-        if not rows:
+        if not rows and not quiet_items:
             return ''
         rows.sort(key=lambda x: x[0])
         lines = ["## Scheduled by Bruce (he wrote these; each fires at its time, "
-                 "apart from my concerns)"]
+                 "or when its row says, apart from my concerns)"]
         for nxt, it in rows[:SCHEDULE_PROMPT_ITEMS]:
             rep = (f", then every {it['every_hours']:g}h" if it['every_hours'] else "")
             lines.append(f"- next {nxt:%a %Y-%m-%d %H:%M}{rep}: {it['text']}")
+        for it in quiet_items:
+            lines.append(f"- when no person has spoken to me for "
+                         f"{it['after_quiet_hours']:g}h, and not again after I speak "
+                         f"in it until a person speaks: {it['text']}")
         return "\n".join(lines)

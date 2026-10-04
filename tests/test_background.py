@@ -176,3 +176,40 @@ def test_a_scheduled_turn_is_told_when_a_person_last_spoke(tmp_path):
         "- text: Check in\n  at: 2020-01-01 16:30\n  every_hours: 24\n", encoding="utf-8")
     assert host._fire_due_schedule()
     assert "Last human turn (User or Voice): 2026-10-03 11:05" in host.turns[0]['text']
+
+
+def test_a_quiet_period_item_waits_for_quiet_and_stops_once_she_has_spoken(tmp_path, monkeypatch):
+    import chat.background as bg
+    clock = {'now': datetime(2026, 10, 4, 10, 30)}
+    monkeypatch.setattr(bg, '_now', lambda: clock['now'])
+    host = _Host(tmp_path)
+    speaks = {'next': False}
+
+    def turn(**kw):
+        host.turns.append(kw)
+        host._turn_spoke = speaks['next']
+    host._process_user_turn = turn
+    (tmp_path / "schedule.yaml").write_text(
+        "- text: Check-in\n  after_quiet_hours: 1\n  instruction: Say one thing.\n",
+        encoding="utf-8")
+    host.store.by_source['User'] = [{'direction': 'in', 'timestamp': '2026-10-04T10:00:00'}]
+
+    assert host._fire_due_schedule() is False               # he spoke 30 minutes ago
+    clock['now'] = datetime(2026, 10, 4, 11, 0)
+    assert host._fire_due_schedule() is True                # an hour of quiet
+    assert "It is now Sunday 2026-10-04 11:00." in host.turns[0]['text']
+    assert host.turns[0]['text'].endswith("Say one thing.")
+    clock['now'] = datetime(2026, 10, 4, 11, 30)
+    assert host._fire_due_schedule() is False               # she stayed silent: wait an hour
+    clock['now'] = datetime(2026, 10, 4, 12, 0)
+    speaks['next'] = True
+    assert host._fire_due_schedule() is True                # and this time she speaks
+    clock['now'] = datetime(2026, 10, 4, 18, 0)
+    assert host._fire_due_schedule() is False               # no more until he speaks
+    host.store.by_source['User'].append({'direction': 'in', 'timestamp': '2026-10-04T18:10:00'})
+    clock['now'] = datetime(2026, 10, 4, 18, 40)
+    assert host._fire_due_schedule() is False
+    clock['now'] = datetime(2026, 10, 4, 19, 10)
+    assert host._fire_due_schedule() is True                # he spoke, then an hour of quiet
+    assert len(host.turns) == 3
+    assert "when no person has spoken to me for 1h" in host._render_schedule_block()
