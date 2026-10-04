@@ -81,7 +81,7 @@ from chat.prompts import (  # noqa: E402,F401
     _REASONING_HISTORY_FULL, _REASONING_HISTORY_OBS_CAP,
     _ATTRIBUTION_OBS_CAP)
 from chat.disposition import DispositionMixin  # noqa: E402
-from chat.background import BackgroundMixin  # noqa: E402
+from chat.background import BackgroundMixin, HUMAN_SOURCES  # noqa: E402
 from chat.zenoh_io import ZenohMixin, AGENT_HOP_BUDGET  # noqa: E402
 
 
@@ -245,6 +245,15 @@ def cap_discourse_state(text: str,
                    f"under {limit} characters; they are not lost from memory, "
                    f"only from this summary.]")
     return "\n".join(out)
+
+
+#: Recorded in the conversation after a message whose turn the person stopped
+#: with Esc. Jill's wording (2026-10-04), with "the message above" because
+#: the mark is its own entry: a stored turn cannot be edited.
+INTERRUPTED_MARK = (
+    "[user interrupted the message above before any response; treat it as a "
+    "draft — if the user's next message completes or restates it, read them "
+    "as one utterance]")
 
 
 def is_sensor_source(source: str) -> bool:
@@ -705,6 +714,11 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
     # at class level so it exists however the object was constructed —
     # several tests build a ChatLoop without running __init__.
     _pending_turn_seq: Optional[int] = None
+    # One line about a turn a person stopped with Esc: how many steps it
+    # completed and which tools they ran. Shown in the prompt of each later
+    # turn until a turn from a person runs to its end (Jill's request,
+    # 2026-10-04: she does not otherwise know what the stopped turn did).
+    _interrupted_note: Optional[str] = None
 
     _EMBODIMENT_SURFACES = (
         ('shared world', 'utils.world_link', '/health',
@@ -882,6 +896,46 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             extra_body=llm_cfg.get('extra_body'),
             session_affinity=f"{world}/{self.character_name}",
         )
+
+    def _finish_interrupted_turn(self, source: str, text: str,
+                                 log: List[Tuple[str, str]],
+                                 iters: List[Dict[str, Any]], *,
+                                 orientation: str, recall: Any,
+                                 agent_concerns: Any, user_concerns: Any,
+                                 image_ref: Optional[str]) -> None:
+        """End a turn the person stopped with Esc (agreed with Jill,
+        2026-10-04). Nothing is published and no post-turn reflection runs:
+        it would record conclusions about a message the person withdrew.
+        What the turn already did stays done, and three records are kept:
+        a mark after the person's message in the conversation, the turn's
+        trace, and a one-line note for the turns that follow."""
+        self.store.record_outgoing(source, INTERRUPTED_MARK,
+                                   act_type='interrupted')
+        self._append_conversation_entry(
+            'out', source, INTERRUPTED_MARK, meta='act=interrupted')
+        done = [str((it.get('tool_meta') or {}).get('tool'))
+                for it in iters if (it.get('tool_meta') or {}).get('tool')]
+        self._interrupted_note = (
+            f"Previous turn from {source} was interrupted by them after "
+            f"{len(done)} completed step(s)"
+            + (f"; completed: {', '.join(done)}." if done
+               else "; nothing was completed."))
+        if iters:
+            self._write_react_trace(
+                source, text, log, iters, '(interrupted)', 'interrupted',
+                recall=recall, image_ref=image_ref)
+            self._write_reasoning_history(
+                source, text, iters, '(interrupted)', 'interrupted',
+                orientation=orientation, recall=recall,
+                agent_concerns=agent_concerns, user_concerns=user_concerns,
+                autonomous=False, image_ref=image_ref, fire_id=None)
+        try:
+            self._persist_to_disk()
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] persist after an "
+                           f"interrupted turn failed: {e}")
+        logger.info(f"[{self.character_name}] turn from {source} interrupted "
+                    f"after {len(done)} completed step(s)")
 
     def _reply_recipient(self, source: str, silent: bool) -> str:
         """Whose dialogue this reply belongs in.
@@ -2072,6 +2126,10 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # Mark the turn in flight for /status. Cleared immediately after
         # _publish_say so a fresh user input isn't blocked-on-status by
         # the trace-write / post-turn reflection that follows. Use a
+        # Cleared before _current_turn is set: the interrupt query accepts
+        # only while _current_turn is a person's turn, so an Esc for this
+        # turn cannot arrive before this line and be lost.
+        self._interrupt_requested = False
         # try/finally so a crash mid-turn doesn't leave _current_turn
         # set forever.
         self._current_turn = {
@@ -2260,6 +2318,15 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             import traceback
             traceback.print_exc()
             reply = f"[{self.character_name}] I had trouble generating a reply: {e}"
+
+        if exit_reason == 'interrupted':
+            self._finish_interrupted_turn(
+                source, text, log, iters, orientation=orientation,
+                recall=recall, agent_concerns=agent_concerns,
+                user_concerns=user_concerns, image_ref=image_ref)
+            return
+        if not autonomous and source in HUMAN_SOURCES:
+            self._interrupted_note = None
 
         reply = (reply or '').strip()
         # Autonomous silence is a first-class outcome: a fired concern with a

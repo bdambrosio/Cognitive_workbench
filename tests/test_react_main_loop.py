@@ -17,7 +17,7 @@ against exercising live resource-manager state in tests.
 
 What is pinned here above all is the RETURN CONTRACT:
 `(reply, log, iters, exit_reason)` with exit_reason in
-{respond, yield, llm_error, max_iters} — because `concerns.py` and
+{respond, yield, llm_error, max_iters, interrupted} — because `concerns.py` and
 `chat_loop.py` branch on those exact strings to decide concern servicing,
 successor spawning, and activation decrement.
 """
@@ -167,6 +167,32 @@ def test_respond_exits_with_reply_and_respond_reason():
     assert reply == 'the reply'
     assert exit_reason == 'respond'
     assert len(iters) == 1
+
+
+def test_an_interrupt_during_the_model_call_drops_the_reply():
+    host = Host([act(thought='t', tool='respond', text='the reply')])
+    answer = host.backend.chat
+
+    def chat(messages, **kwargs):
+        host._interrupt_requested = True        # Esc arrives while the model works
+        return answer(messages, **kwargs)
+    host.backend.chat = chat
+    reply, log, iters, exit_reason = run(host)
+    assert (reply, exit_reason) == ('', 'interrupted')
+    assert 'exit_loop' in host._affect.calls
+
+
+def test_an_interrupt_during_a_tool_stops_before_the_next_model_call():
+    host = Host([act(thought='t', tool='recall', query='q'),
+                 act(thought='t', tool='respond', text='the reply')])
+
+    def remember(q):
+        host._interrupt_requested = True        # Esc arrives while the tool runs
+        return 'OK: found'
+    host._run_remember = remember
+    reply, log, iters, exit_reason = run(host)
+    assert (reply, exit_reason) == ('', 'interrupted')
+    assert len(host.backend.calls) == 1         # the tool finished; no second call
 
 
 def test_yield_exits_with_yield_reason_and_records_next_slice():

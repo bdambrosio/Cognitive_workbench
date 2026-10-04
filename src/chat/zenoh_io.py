@@ -23,6 +23,7 @@ if _SRC_DIR not in sys.path:
     sys.path.insert(0, _SRC_DIR)
 
 from chat.concerns import _snap_rhythm_hours  # noqa: E402
+from chat.background import HUMAN_SOURCES  # noqa: E402
 
 logger = logging.getLogger('chat_loop')
 
@@ -115,6 +116,12 @@ class ZenohMixin:
         self._external_repo_q = self._zenoh_session.declare_queryable(
             f"cognitive/{self.character_name}/control/external_repo",
             self._handle_external_repo_query,
+        )
+        # Interrupt (Esc in the CLI): stop the turn a person's message
+        # started, at the next step boundary.
+        self._interrupt_q = self._zenoh_session.declare_queryable(
+            f"cognitive/{self.character_name}/control/interrupt",
+            self._handle_interrupt_query,
         )
         # Status (/status): is Jill ready for new input, currently
         # processing a turn, or running autonomous work?
@@ -457,6 +464,21 @@ class ZenohMixin:
         except Exception as e:
             logger.error(f"[{self.character_name}] remember query failed: {e}")
             self._reply(query, {'success': False, 'error': str(e)})
+
+    def _handle_interrupt_query(self, query) -> None:
+        """Ask the turn in process to stop. Accepted only while a turn that
+        a person's message started is in process; during a sensor turn, an
+        agent's message, a concern fire or a scheduled item, and when no
+        turn is running, it does nothing. Response: {success, accepted}.
+        The ReAct loop acts on it between steps (chat/react.py)."""
+        ct = self._current_turn  # snapshot the dict reference
+        accepted = bool(ct and ct.get('kind') == 'user'
+                        and ct.get('source') in HUMAN_SOURCES)
+        if accepted:
+            self._interrupt_requested = True
+            logger.info(f"[{self.character_name}] interrupt accepted for the "
+                        f"turn from {ct.get('source')}")
+        self._reply(query, {'success': True, 'accepted': accepted})
 
     def _handle_status_query(self, query) -> None:
         """Report whether Jill is ready for new input. Payload is empty

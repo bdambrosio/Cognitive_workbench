@@ -727,6 +727,7 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
         'agent_state': {},
         'active_character': active_character,
         'awaiting_ask': False,  # True while agent is blocking on an ask
+        'last_sent': None,      # the last plain message sent; Esc restores it
     }
     state_lock = threading.Lock()
 
@@ -837,6 +838,37 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
     @kb.add(Keys.Escape, Keys.Enter)
     def _(event):
         event.current_buffer.insert_text('\n')
+
+    # Esc alone: for a message sent too early. If the agent is still on the
+    # turn that message started, it stops at its next step and the sent text
+    # comes back to the input line. Otherwise nothing happens. The key takes
+    # effect after prompt_toolkit's escape timeout, because Esc also begins
+    # Alt+key sequences such as the newline binding above.
+    @kb.add(Keys.Escape)
+    def _(event):
+        with state_lock:
+            sent = state.get('last_sent')
+        if not sent:
+            return
+        app = event.app
+        buf = event.current_buffer
+
+        def _ask():
+            result = _zenoh_get(
+                zenoh_session, f"cognitive/{active_character}/control/interrupt")
+            if not (result and result.get('accepted')):
+                return
+            with state_lock:
+                state['last_sent'] = None
+
+            def _restore():
+                typed = buf.text
+                buf.text = sent + (' ' + typed if typed else '')
+                buf.cursor_position = len(buf.text)
+            app.loop.call_soon_threadsafe(_restore)
+            _print_info(f"(interrupted {active_character}; your message is "
+                        f"back in the input line)")
+        threading.Thread(target=_ask, daemon=True).start()
 
     session = PromptSession(
         history=FileHistory(str(history_path)),
@@ -1076,6 +1108,8 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
                 })
             }
             sense_publisher.put(json.dumps(sense_data))
+            with state_lock:
+                state['last_sent'] = line
             _print_info(f"→ sent to {active_character}")
 
     except KeyboardInterrupt:

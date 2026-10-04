@@ -756,6 +756,12 @@ class PromptsMixin:
         if bg:
             parts.append(self._render_background_results(bg))
             parts.append("")
+        # Set when a person stopped the previous turn with Esc; shown until
+        # a turn from a person runs to its end (chat_loop.py).
+        interrupted = getattr(self, '_interrupted_note', None)
+        if interrupted:
+            parts.append(interrupted)
+            parts.append("")
         # Name the source. With co-resident agents "user input" was a
         # false label on every peer turn — the one field naming who is
         # actually speaking.

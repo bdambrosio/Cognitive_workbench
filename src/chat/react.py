@@ -109,6 +109,20 @@ _REFERENCE_PROBE_MAX_CHARS = 200
 class ReactMixin:
     """Mixin for ChatLoop — moved verbatim from chat_loop.py."""
 
+    # Set by the interrupt query (chat/zenoh_io.py) when a person presses
+    # Esc during the turn their message started; cleared at each turn's
+    # start. The loop reads it between steps: a model call or a tool that
+    # is running finishes first.
+    _interrupt_requested: bool = False
+
+    def _interrupted_exit(self, i: int, log: List[Tuple[str, str]],
+                          iters: List[Dict[str, Any]]
+                          ) -> Tuple[str, List[Tuple[str, str]], List[Dict[str, Any]], str]:
+        logger.info(f"[{self.character_name}] ReAct iter {i+1}: interrupted by the user")
+        self._clear_status()
+        self._affect.exit_loop()
+        return '', log, iters, 'interrupted'
+
     # ------------------------------------------------------------------
     # ReAct loop — single-action-per-iteration tool use for chat.
     #
@@ -497,6 +511,8 @@ class ReactMixin:
 
         self._affect.enter_loop()
         for i in range(REACT_MAX_ITERS):
+            if self._interrupt_requested:
+                return self._interrupted_exit(i, log, iters)
             self._affect.set_react_iter(i + 1)
             # Budget nudge: yield-adherence is decided at the moment the
             # budget runs short, not when the catalog was read ~2k tokens
@@ -620,6 +636,12 @@ class ReactMixin:
                     f"[{self.character_name}] ReAct iter {i+1}: no parseable action after "
                     f"{REACT_MAX_FORMAT_RETRIES + 1} attempts; bailing to fallback synthesis")
                 break
+
+            # The model call above may have taken a while; an interrupt that
+            # arrived during it stops the turn before the action runs, and
+            # that includes a `respond`.
+            if self._interrupt_requested:
+                return self._interrupted_exit(i, log, iters)
 
             tool = action.get('tool')
             if tool == 'respond':
