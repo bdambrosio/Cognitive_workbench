@@ -924,7 +924,8 @@ def scout(backend, kind: str, data: Path, want: int) -> List[Dict[str, Any]]:
         return found[:want]
     log = data / SCOUT_LOG
     earlier = [r["query"] for r in read_jsonl(log) if r.get("kind") == kind]
-    side = random.choice(("sell", "buy")) if kind in SIDED_KINDS else ""
+    side = (random.choices(list(SIDE_WEIGHTS), weights=list(SIDE_WEIGHTS.values()))[0]
+            if kind in SIDED_KINDS else "")
     user = (f"The kind of prospect: `{kind}`."
             + (f" The side: people who work for {'sellers' if side == 'sell' else 'buyers'}." if side else "")
             + "\n\nSearches already made for this kind:\n\n"
@@ -1113,6 +1114,11 @@ DAILY_KINDS = ("M&A adviser", "Repeat acquirer", "Searcher", "Small PE-family of
 #: Kinds that work for either side: their scouting searches name a side, drawn
 #: at random, so both sides are found over time (PROSPECT.md §16).
 SIDED_KINDS = ("M&A adviser", "Exit or diligence consultant")
+#: How often each side is drawn. Sell is drawn three times in four since
+#: 2026-10-03: a seller can supply the code before a letter of intent and a
+#: buyer cannot, and to that date 8 first messages had gone to the sell side
+#: against 14 to the buy side. Even weights restore the earlier behaviour.
+SIDE_WEIGHTS = {"sell": 3, "buy": 1}
 FIRM_KINDS = ("Repeat acquirer", "Small PE-family office")
 MODEL = REPO / "measure/models/local_qwen38flashnext.yaml"
 WRITER = REPO / "measure/models/anthropic_opus55_medium.yaml"
