@@ -143,11 +143,12 @@ _CANDIDATES_FILE = 'concern_candidates.jsonl'
 # interests mint is for arise while she works in fires), rhythm within
 # [_MINT_RHYTHM_MIN_HOURS, _MINT_RHYTHM_MAX_HOURS] (she asked for a floor
 # of 6; 8 is the smallest allowed bucket above it), surface text is the
-# sentence itself with no prefix. Shadow first: every mint is recorded
-# to <memory>/self_mints.jsonl, and until _MINT_LIVE no concern is
-# created. The shadow period ends when the rows say enough, not on a
-# date.
-_MINT_LIVE = False
+# sentence itself with no prefix. Every mint is recorded to
+# <memory>/self_mints.jsonl; with _MINT_LIVE False it creates no concern.
+# Live since 2026-10-04 (Bruce's decision): in 24 days of shadow she never
+# minted, and the tool description told her a shadow mint creates nothing,
+# so the rows the shadow period was waiting for were never going to come.
+_MINT_LIVE = True
 _MINTS_FILE = 'self_mints.jsonl'
 _MINT_RHYTHM_MIN_HOURS = 8
 _MINT_RHYTHM_MAX_HOURS = 168

@@ -394,7 +394,7 @@ class ToolsMixin:
                 "conversations get cut off: make each message complete and "
                 "self-contained rather than chatty."))
         # Self-minted concerns (2026-09-10, agreed with Jill). Offered in every
-        # turn since 2026-09-22: in fires too, still in shadow.
+        # turn since 2026-09-22, fires included; live since 2026-10-04.
         from chat.concerns import _MINT_RHYTHM_MIN_HOURS, _MINT_RHYTHM_MAX_HOURS
         tools.append(("mint",
             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"mint\", "
@@ -408,9 +408,7 @@ class ToolsMixin:
             "'check whether X still holds' rather than 'keep an eye on X'. `rhythm_hours` is "
             f"how often it fires, {_MINT_RHYTHM_MIN_HOURS} to {_MINT_RHYTHM_MAX_HOURS}. "
             "A concern too near an existing one revives that one instead; the population "
-            "cap can refuse. One mint per turn. Non-terminal — the loop continues. "
-            "While minting is in shadow the mint is recorded and no concern is created; "
-            "you will be told when it goes live."))
+            "cap can refuse. One mint per turn. Non-terminal — the loop continues."))
         # Read-only view of the live concern collections (2026-09-15, Jill's
         # proposal). Every turn, autonomous fires included: that is where the
         # agent reasons about its own queue.
