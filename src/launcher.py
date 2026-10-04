@@ -377,10 +377,13 @@ def _launch_widget_window(
         return None
 
 
-def launch_affect_display(size: str, pos: str, browser: Optional[str]
-                          ) -> List[subprocess.Popen]:
+def launch_affect_display(size: str, pos: str, browser: Optional[str],
+                          window: bool = True) -> List[subprocess.Popen]:
     """Spawn the affect-display bridge + chromium widget window.
-    Returns the list of subprocesses to track for cleanup."""
+    Returns the list of subprocesses to track for cleanup.
+
+    window=False starts the bridge alone, for the outputs window, which
+    shows the affect page in its own corner."""
     procs: List[subprocess.Popen] = []
     try:
         bridge = subprocess.Popen(
@@ -390,6 +393,8 @@ def launch_affect_display(size: str, pos: str, browser: Optional[str]
         logger.info("affect bridge launched (ws://127.0.0.1:8787)")
     except Exception as e:
         logger.error(f"affect: failed to launch bridge: {e}")
+        return procs
+    if not window:
         return procs
     # Brief pause so the WS server is listening when chromium connects.
     # The JS shim reconnects on failure, so this is just an optimization.
@@ -738,7 +743,8 @@ def main():
                         help='Canvas window position X,Y (default: 540,60).')
     parser.add_argument('--outputs', action='store_true',
                         help='Launch the outputs window: one line per reply '
-                             'the first launched character sends.')
+                             'the first launched character sends, with the '
+                             'affect display in its corner.')
     parser.add_argument('--outputs-size', default='560x320',
                         help='Outputs window size WxH or W,H (default: 560x320).')
     parser.add_argument('--outputs-pos', default='60,420',
@@ -874,10 +880,11 @@ def main():
     # Affect (processing-state) and canvas (rich-display) widget windows.
     # Each spawns a Python bridge + a chromium app-mode window. Both are
     # tracked in service_procs so they get terminated on shutdown.
-    if args.affect:
+    if args.affect or args.outputs:
         affect_size = _parse_size(args.affect_size, '320,320')
         service_procs.extend(launch_affect_display(
-            size=affect_size, pos=args.affect_pos, browser=args.browser))
+            size=affect_size, pos=args.affect_pos, browser=args.browser,
+            window=args.affect))
     if args.canvas:
         primary_character = characters[0][0] if characters else ""
         if not primary_character:

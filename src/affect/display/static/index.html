@@ -26,6 +26,11 @@
 
 // ── WebSocket: receive ProcState from src/affect/display/__main__.py ──
 const WS_URL = 'ws://127.0.0.1:8787';
+// ?quiet in the URL (the outputs window sets it when it shows this page in
+// its corner): once the state has been idle for a few seconds the sketch
+// stops drawing, and it starts again on the next state message.
+const QUIET = new URLSearchParams(location.search).has('quiet');
+const QUIET_AFTER_IDLE_S = 3;
 let state = {
   mode: 'idle',
   mode_entered_at: Date.now() / 1000,
@@ -67,6 +72,7 @@ function connect() {
       }
       lastMemOp = next.memory_op || 'none';
       state = next;
+      if (QUIET) loop();
     } catch (e) { console.warn('parse', e); }
   };
 }
@@ -257,10 +263,13 @@ function windowResized() {
 
 function draw() {
   const nowSec = millis() / 1000;
+  // The state's timestamps are wall-clock seconds (time.time() in the
+  // publisher), so ages are taken against the wall clock, not millis().
+  const wallSec = Date.now() / 1000;
   const palette = getPalette(state);
   const trouble = troubleScore(state);
-  const energy = transitionEnergy(state, nowSec);
-  const wear = loopWear(state, nowSec);
+  const energy = transitionEnergy(state, wallSec);
+  const wear = loopWear(state, wallSec);
 
   // Trigger tint
   let colorA = palette[0].slice();
@@ -311,14 +320,21 @@ function draw() {
   image(nebulaBuf, 0, 0, W, H);
 
   // ── Foreground in 2D. Origin top-left, +y down. Face is at (W/2, H/2). ──
-  drawFace(nowSec, palette, energy, trouble);
+  drawFace(nowSec, wallSec, palette, energy, trouble);
   drawMemoryTransient(nowSec, palette);
 
   updateDebug(colorA, colorB, trouble, energy, wear, flowSpeed);
+
+  // Stop on a frame with the eyes open and no memory ring part-drawn.
+  if (QUIET && state.mode === 'idle'
+      && wallSec - (state.mode_entered_at || 0) > QUIET_AFTER_IDLE_S
+      && nowSec - lastBlinkAt > 0.2 && nowSec - memOpFlashAt > 1.5) {
+    noLoop();
+  }
 }
 
-function drawFace(nowSec, palette, energy, trouble) {
-  const boost = completionBoost(state, nowSec);
+function drawFace(nowSec, wallSec, palette, energy, trouble) {
+  const boost = completionBoost(state, wallSec);
   // Head position in 2D screen coords. Origin = top-left.
   const floatY = Math.sin(nowSec * 0.6) * 5 - energy * 6 - boost * 12;
   const cx = W / 2;

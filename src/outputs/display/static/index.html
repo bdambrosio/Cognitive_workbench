@@ -6,13 +6,39 @@
 <style>
   html, body { margin: 0; padding: 0; background: #111; color: #ddd;
                font: 13px/1.35 -apple-system, system-ui, sans-serif; }
+
+  /* Top band: the affect display, and beside it the newest reply. */
+  #top { display: flex; border-bottom: 1px solid #333; }
+  #corner { position: relative; flex: none; width: 112px; height: 112px;
+            overflow: hidden; background: #000; }
+  /* The affect page draws its face and mouth for a window of about 320px,
+     so it is laid out at that size and scaled down, not laid out small. */
+  #corner iframe { width: 336px; height: 336px; border: 0;
+                   transform: scale(0.3334); transform-origin: 0 0;
+                   pointer-events: none; }
+  #unread { position: absolute; top: 4px; right: 4px; min-width: 16px;
+            padding: 0 4px; border-radius: 9px; background: #d9534f;
+            color: #fff; font-size: 11px; font-weight: 600; line-height: 18px;
+            text-align: center; display: none; }
+  #newest { flex: 1; min-width: 0; padding: 4px 8px; cursor: pointer; }
+  #newest .body { white-space: pre-wrap; overflow-wrap: anywhere;
+                  display: -webkit-box; -webkit-box-orient: vertical;
+                  -webkit-line-clamp: 5; overflow: hidden; }
+  #newest.open .body { display: block; cursor: text; }
+
   #rows { padding-bottom: 18px; }
-  .row { border-bottom: 1px solid #262626; padding: 3px 8px; cursor: pointer; }
+  /* The newest reply is in the top band, so its row is not shown again. */
+  #rows .row:first-child { display: none; }
+  .row { border-bottom: 1px solid #262626; padding: 3px 8px; cursor: pointer;
+         border-left: 3px solid transparent; }
   .row:hover { background: #1b1b1b; }
+  .unread { border-left-color: #d9534f; }
+  #newest.unread { border-left: 3px solid #d9534f; }
   .line { display: flex; gap: 8px; white-space: nowrap; }
   .time, .seq { color: #777; font-variant-numeric: tabular-nums; flex: none; }
   .trigger { color: #7fb4e6; flex: none; max-width: 40%;
              overflow: hidden; text-overflow: ellipsis; }
+  #newest .trigger { max-width: none; flex: 1; min-width: 0; }
   .text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .full { display: none; white-space: pre-wrap; overflow-wrap: anywhere;
           padding: 6px 0 6px 12px; color: #ccc; cursor: text; }
@@ -24,6 +50,13 @@
 </style>
 </head>
 <body>
+<div id="top">
+  <div id="corner">
+    <iframe src="../../../affect/display/static/index.html?quiet"></iframe>
+    <div id="unread"></div>
+  </div>
+  <div id="newest"></div>
+</div>
 <div id="rows"></div>
 <div id="status">connecting…</div>
 <script>
@@ -34,14 +67,16 @@
 // the shown one, so the rows resent after a reconnect do not appear twice.
 const WS_URL = 'ws://127.0.0.1:8792';
 const list = document.getElementById('rows');
+const newest = document.getElementById('newest');
+const badge = document.getElementById('unread');
+
+// A reply is unread if it arrived while this window did not have focus. The
+// count and the marks clear when the window is clicked or given focus.
+let unread = 0;
 
 function pad(n) { return String(n).padStart(2, '0'); }
 
-function render(row) {
-  const el = document.createElement('div');
-  el.className = 'row';
-  el.dataset.id = row.id;
-
+function headLine(row) {
   const line = document.createElement('div');
   line.className = 'line';
   const d = new Date(row.ts * 1000);
@@ -54,7 +89,19 @@ function render(row) {
   add('time', pad(d.getHours()) + ':' + pad(d.getMinutes()));
   if (row.turn_seq != null) add('seq', '#' + row.turn_seq);
   if (row.trigger) add('trigger', row.trigger);
-  add('text', row.text.replace(/\s+/g, ' '));
+  return line;
+}
+
+function render(row) {
+  const el = document.createElement('div');
+  el.className = 'row';
+  el.dataset.id = row.id;
+
+  const line = headLine(row);
+  const text = document.createElement('span');
+  text.className = 'text';
+  text.textContent = row.text.replace(/\s+/g, ' ');
+  line.appendChild(text);
   el.appendChild(line);
 
   const full = document.createElement('div');
@@ -67,16 +114,47 @@ function render(row) {
   return el;
 }
 
+function showNewest(row, isUnread) {
+  newest.className = isUnread ? 'unread' : '';
+  newest.replaceChildren(headLine(row));
+  const body = document.createElement('div');
+  body.className = 'body';
+  body.textContent = row.text;
+  newest.appendChild(body);
+}
+newest.addEventListener('click', () => {
+  // A click that ends a text selection in the open reply must not close it.
+  if (newest.classList.contains('open') && String(getSelection())) return;
+  newest.classList.toggle('open');
+});
+
 function show(row) {
   const el = render(row);
   const shown = list.querySelector('.row[data-id="' + row.id + '"]');
   if (shown) {
-    if (shown.classList.contains('open')) el.classList.add('open');
+    el.className = shown.className;
     shown.replaceWith(el);
-  } else {
-    list.prepend(el);   // newest on top
+    return;
   }
+  const isUnread = !document.hasFocus();
+  if (isUnread) {
+    el.classList.add('unread');
+    unread += 1;
+    badge.textContent = unread;
+    badge.style.display = 'block';
+  }
+  list.prepend(el);   // newest on top
+  showNewest(row, isUnread);
 }
+
+function markRead() {
+  unread = 0;
+  badge.style.display = 'none';
+  document.querySelectorAll('.unread').forEach(
+      (el) => el.classList.remove('unread'));
+}
+window.addEventListener('focus', markRead);
+window.addEventListener('click', markRead);
 
 function connect() {
   const status = document.getElementById('status');
