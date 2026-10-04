@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Jill — outputs</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #111; color: #ddd;
+               font: 13px/1.35 -apple-system, system-ui, sans-serif; }
+  #rows { padding-bottom: 18px; }
+  .row { border-bottom: 1px solid #262626; padding: 3px 8px; cursor: pointer; }
+  .row:hover { background: #1b1b1b; }
+  .line { display: flex; gap: 8px; white-space: nowrap; }
+  .time, .seq { color: #777; font-variant-numeric: tabular-nums; flex: none; }
+  .trigger { color: #7fb4e6; flex: none; max-width: 40%;
+             overflow: hidden; text-overflow: ellipsis; }
+  .text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .full { display: none; white-space: pre-wrap; overflow-wrap: anywhere;
+          padding: 6px 0 6px 12px; color: #ccc; cursor: text; }
+  .row.open .full { display: block; }
+  .row.open .line .text { color: #777; }
+  #status { position: fixed; left: 8px; bottom: 4px;
+            color: rgba(255,255,255,0.45); font-size: 10px;
+            pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="rows"></div>
+<div id="status">connecting…</div>
+<script>
+'use strict';
+
+// Rows from src/outputs/display/__main__.py. Each message is a JSON list of
+// {id, ts, turn_seq, trigger, text}. A row whose id is already shown replaces
+// the shown one, so the rows resent after a reconnect do not appear twice.
+const WS_URL = 'ws://127.0.0.1:8792';
+const list = document.getElementById('rows');
+
+function pad(n) { return String(n).padStart(2, '0'); }
+
+function render(row) {
+  const el = document.createElement('div');
+  el.className = 'row';
+  el.dataset.id = row.id;
+
+  const line = document.createElement('div');
+  line.className = 'line';
+  const d = new Date(row.ts * 1000);
+  const add = (cls, text) => {
+    const s = document.createElement('span');
+    s.className = cls;
+    s.textContent = text;
+    line.appendChild(s);
+  };
+  add('time', pad(d.getHours()) + ':' + pad(d.getMinutes()));
+  if (row.turn_seq != null) add('seq', '#' + row.turn_seq);
+  if (row.trigger) add('trigger', row.trigger);
+  add('text', row.text.replace(/\s+/g, ' '));
+  el.appendChild(line);
+
+  const full = document.createElement('div');
+  full.className = 'full';
+  full.textContent = row.text;
+  // Selecting text in the open reply must not close it.
+  full.addEventListener('click', (ev) => ev.stopPropagation());
+  el.appendChild(full);
+  el.addEventListener('click', () => el.classList.toggle('open'));
+  return el;
+}
+
+function show(row) {
+  const el = render(row);
+  const shown = list.querySelector('.row[data-id="' + row.id + '"]');
+  if (shown) {
+    if (shown.classList.contains('open')) el.classList.add('open');
+    shown.replaceWith(el);
+  } else {
+    list.prepend(el);   // newest on top
+  }
+}
+
+function connect() {
+  const status = document.getElementById('status');
+  status.textContent = 'connecting…';
+  const ws = new WebSocket(WS_URL);
+  ws.onopen = () => { status.textContent = ''; };
+  ws.onclose = () => {
+    status.textContent = 'disconnected';
+    setTimeout(connect, 1500);
+  };
+  ws.onerror = () => { status.textContent = 'ws error'; };
+  ws.onmessage = (ev) => {
+    try {
+      JSON.parse(ev.data).forEach(show);
+    } catch (e) { console.warn('parse', e); }
+  };
+}
+connect();
+</script>
+</body>
+</html>

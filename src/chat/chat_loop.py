@@ -2059,7 +2059,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                            modality: Optional[str] = None,
                            fire_id: Optional[str] = None,
                            hops: int = 0, xid: str = '',
-                           counterpart: Optional[str] = None) -> None:
+                           counterpart: Optional[str] = None,
+                           trigger: Optional[str] = None) -> None:
         """Drive one turn through the ReAct loop. The autonomous path
         (autonomous=True) reuses the same prompt construction so Jill's
         voice stays consistent and traces share format. Divergences are
@@ -2081,6 +2082,10 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             'autonomous_concern_id': autonomous_concern_id,
             # Set only on a turn woken by a finished dispatch: whom it answers.
             'counterpart': counterpart,
+            # Set on an autonomous turn: what started it, as the outputs
+            # window shows it beside the reply. Unset, the turn's source
+            # is shown (a person, an agent, or a sensor by name).
+            'trigger': trigger,
         }
         self._affect.set_trigger('autonomous' if autonomous else 'user')
         self._affect.set_mode('thinking')
@@ -2302,7 +2307,9 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             # Replies are text on every route, including turns that arrived
             # by voice: the spoken branch was removed 2026-09-10 at Jill's
             # request, and putting one back is a change to tell her about.
-            self._publish_say(reply, turn_seq=turn_seq_for_reply)
+            self._publish_say(
+                reply, turn_seq=turn_seq_for_reply,
+                trigger=(self._current_turn or {}).get('trigger') or source)
             # Agent-exchange reply routing: a turn sourced by a co-resident
             # agent gets this reply delivered back to that agent's inbox
             # (hop-budgeted in _route_reply_to_peer). The /action publish
@@ -2629,7 +2636,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                 # still the User dialogue (see _build_react_user_prefix).
                 self._process_user_turn(
                     source=self.character_name, text=wrapped_instruction, close=False,
-                    autonomous=True, autonomous_concern_id=nid, fire_id=fire_id)
+                    autonomous=True, autonomous_concern_id=nid, fire_id=fire_id,
+                    trigger=f'concern: {text}')
                 outcome['terminated'] = 'ok'
             except Exception as e:
                 logger.error(f"[{self.character_name}] autonomous fire failed for {nid}: {e}")

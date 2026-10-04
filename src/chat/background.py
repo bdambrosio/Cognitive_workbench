@@ -223,7 +223,8 @@ class BackgroundMixin:
                 f"Its result is under 'Background results' above. Act on it, tell "
                 f"{counterpart} if it is worth telling, or stay silent.")
         self._process_user_turn(source=self.character_name, text=text, close=False,
-                                autonomous=True, counterpart=counterpart)
+                                autonomous=True, counterpart=counterpart,
+                                trigger=f'dispatch: {labels}')
 
     def _render_background_results(self, results: List[Dict[str, Any]]) -> str:
         lines = ["## Background results (tasks I dispatched; each is shown to me once, here)"]
@@ -342,7 +343,8 @@ class BackgroundMixin:
                 f"stay silent.\n\n{item['instruction'] or item['text']}")
         logger.info(f"[{self.character_name}] scheduled item fired: {item['text']!r} ({when})")
         self._process_user_turn(source=self.character_name, text=text, close=False,
-                                autonomous=True)
+                                autonomous=True,
+                                trigger=f"schedule: {item['text']}")
         return True
 
     def _render_schedule_block(self, now: Optional[datetime] = None) -> str:

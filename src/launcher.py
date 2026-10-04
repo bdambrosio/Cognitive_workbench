@@ -428,6 +428,32 @@ def launch_canvas_display(character: str, size: str, pos: str,
     return procs
 
 
+def launch_outputs_display(character: str, size: str, pos: str,
+                           browser: Optional[str]) -> List[subprocess.Popen]:
+    """Spawn the outputs-display bridge + chromium widget window for
+    the given character. Returns subprocesses to track."""
+    procs: List[subprocess.Popen] = []
+    env = os.environ.copy()
+    env['OUTPUTS_CHARACTER'] = character
+    try:
+        bridge = subprocess.Popen(
+            [sys.executable, '-m', 'outputs.display'],
+            env=env,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        procs.append(bridge)
+        logger.info(f"outputs bridge launched (character={character}, ws://127.0.0.1:8792)")
+    except Exception as e:
+        logger.error(f"outputs: failed to launch bridge: {e}")
+        return procs
+    time.sleep(0.4)
+    html = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        'outputs', 'display', 'static', 'index.html')
+    win = _launch_widget_window('outputs', f'file://{html}', size, pos, browser)
+    if win is not None:
+        procs.append(win)
+    return procs
+
+
 def _tool_names_with_prefix(prefix: str) -> List[str]:
     """Skill.md `name:` values for one tool family.
 
@@ -710,6 +736,13 @@ def main():
                         help='Canvas window size WxH or W,H (default: 820x640).')
     parser.add_argument('--canvas-pos', default='540,60',
                         help='Canvas window position X,Y (default: 540,60).')
+    parser.add_argument('--outputs', action='store_true',
+                        help='Launch the outputs window: one line per reply '
+                             'the first launched character sends.')
+    parser.add_argument('--outputs-size', default='560x320',
+                        help='Outputs window size WxH or W,H (default: 560x320).')
+    parser.add_argument('--outputs-pos', default='60,420',
+                        help='Outputs window position X,Y (default: 60,420).')
     # One embodiment at a time. Advertising both tool families at once is
     # what sent "come to me at -18, 25" to fac-status: fifteen fac-* tools
     # against two world-* ones, and the factory wins the semantic match.
@@ -854,6 +887,15 @@ def main():
             service_procs.extend(launch_canvas_display(
                 character=primary_character,
                 size=canvas_size, pos=args.canvas_pos, browser=args.browser))
+    if args.outputs:
+        primary_character = characters[0][0] if characters else ""
+        if not primary_character:
+            logger.warning("--outputs requested but no characters; window not opened.")
+        else:
+            outputs_size = _parse_size(args.outputs_size, '560,320')
+            service_procs.extend(launch_outputs_display(
+                character=primary_character,
+                size=outputs_size, pos=args.outputs_pos, browser=args.browser))
     if args.world:
         # Occupants are config, not code: the human plus whichever
         # characters are given bodies. Adding Sentinel is a name here.

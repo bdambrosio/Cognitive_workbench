@@ -234,7 +234,8 @@ class ZenohMixin:
         return ex
 
     def _publish_say(self, text: str, *,
-                     turn_seq: Optional[int] = None) -> None:
+                     turn_seq: Optional[int] = None,
+                     trigger: Optional[str] = None) -> None:
         if not self._action_pub:
             return
         payload = {
@@ -251,6 +252,10 @@ class ZenohMixin:
         # out of its prompt.
         if turn_seq is not None:
             payload['turn_seq'] = int(turn_seq)
+        # Display-layer only, like turn_seq: what the turn answered, for
+        # the outputs window (src/outputs/display).
+        if trigger:
+            payload['trigger'] = trigger
         try:
             self._action_pub.put(json.dumps(payload).encode('utf-8'))
         except Exception as e:
