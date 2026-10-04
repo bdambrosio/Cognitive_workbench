@@ -1,0 +1,10 @@
+[Unit]
+Description=Tuuyi outreach daily run (workflowsv2/outreach/daily.sh); leaves a report in Jill's inbox
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/bruce/Downloads/Cognitive_workbench
+ExecStart=/home/bruce/Downloads/Cognitive_workbench/workflowsv2/outreach/daily.sh
+# daily.sh starts the outreach page when it is not up. Without this, systemd
+# stops the page when the run ends.
+KillMode=process

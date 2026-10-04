@@ -1,0 +1,10 @@
+[Unit]
+Description=Start the Tuuyi outreach daily run at 08:30
+
+[Timer]
+OnCalendar=*-*-* 08:30:00
+# A run missed because the machine was off or asleep starts at the next login.
+Persistent=true
+
+[Install]
+WantedBy=timers.target
