@@ -652,22 +652,25 @@ def look_up_email(cid: str, cand_dir: Optional[Path] = None) -> Dict[str, Any]:
     in FINDERS in turn, each address checked by record_address, until one is
     recorded. `cand_dir` holds the person's evidence; by default the runner's
     directory for them. Returns the last address checked, or {"email": ""}
-    when no service found one."""
+    when no service found one; `failed` lists each service that could not be
+    asked, with its reason."""
     person = contacts.get(cid)
     if person.get("email"):
         return {"email": person["email"], "current": "yes", "source": "the contact record"}
     last: Dict[str, Any] = {"email": ""}
+    failed: List[str] = []
     for name, find in FINDERS:
         try:
             got = find(person["name"], str(person.get("linkedin") or ""), str(person.get("domain") or ""))
         except email_finder.FinderError as e:
             logger.warning("%s: %s failed: %s", person["name"], name, e)
+            failed.append(f"{name}: {e}")
             continue
         if got["email"]:
             last = record_address(cid, cand_dir or DATA / cid, got["email"], got["organisation"], name)
             if last["current"] == "yes":
                 break
-    return last
+    return {**last, "failed": failed}
 
 
 def _linkedin(c: Dict[str, Any]) -> str:

@@ -349,7 +349,10 @@ async function findEmail(i) {
   const r = await call("/api/find_email", {record_id: cards[i].record_id});
   if (r) { note(!r.email ? "No address found."
       : r.current === "yes" ? `Recorded ${r.email} (from ${r.source}).`
-      : `${r.source} gave ${r.email}, not recorded: the evidence does not show they work there now. See the note.`); load(); }
+      : `${r.source} gave ${r.email}, not recorded: the evidence does not show they work there now. See the note.`);
+    // A service that could not be asked is not "no address found": the note goes after 4 s, so this stays until dismissed.
+    if ((r.failed || []).length) alert("A service could not be asked:\n\n" + r.failed.join("\n\n"));
+    load(); }
 }
 async function answerSent(i, note_id) {
   const message = $("msg" + i).value.trim();

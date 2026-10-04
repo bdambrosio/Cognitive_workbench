@@ -772,3 +772,28 @@ def test_a_plausible_person_gets_a_draft_only_in_the_us_with_a_checked_address_a
 
     d, seen = run("Jane Later", "us", [])                     # the day's one plausible draft is made
     assert not seen and not (d / "draft.json").exists() and not store.known("Jane Later")
+
+
+class _Answer:
+    def __init__(self, status, body):
+        self.status_code, self._body = status, body
+
+    def json(self):
+        return self._body
+
+
+@pytest.mark.parametrize("finder, key, refused, not_found", [
+    ("findymail", "FINDYMAIL_API_KEY", (401, {"message": "Unauthenticated."}), (200, {"contact": {"email": None}})),
+    ("prospeo", "PROSPEO_API_KEY", (400, {"error": True, "error_code": "INVALID_API_KEY"}),
+     (400, {"error": True, "error_code": "NO_MATCH"})),
+])
+def test_a_refused_request_is_an_error_and_a_person_not_found_is_not(monkeypatch, finder, key, refused, not_found):
+    """The answers are the ones each service gave on 2026-10-04."""
+    from workflowsv2.outreach import email_finder
+    monkeypatch.setenv(key, "k")
+    find = getattr(email_finder, finder)
+    monkeypatch.setattr(email_finder.requests, "post", lambda *a, **k: _Answer(*refused))
+    with pytest.raises(email_finder.FinderError):
+        find("Jane Smith", "", "acme.example")
+    monkeypatch.setattr(email_finder.requests, "post", lambda *a, **k: _Answer(*not_found))
+    assert find("Jane Smith", "", "acme.example") == {"email": "", "organisation": ""}
