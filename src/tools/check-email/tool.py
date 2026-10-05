@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 MAX_BODY_CHARS = 50_000
+SHOWN_BODY_CHARS = 4_000  # per email, in the chat observation
 ABSOLUTE_MAX_LIMIT = 50
 
 # ---------------------------------------------------------------------------
@@ -275,8 +276,34 @@ def react_invoke(args, *, character_name=None, backend=None, logger=None):
         character_name=character_name, backend=backend, manager=mgr,
         **extra,
     ))
-    return translate_result(result, manager=mgr,
-                            empty_text="no matching emails")
+    out = translate_result(result, manager=mgr,
+                           empty_text="no matching emails")
+    # The legacy value is a count and a list of note ids. In chat the
+    # observation is the mail itself: headers, then the body, newest first.
+    note_ids = (result.get("extra") or {}).get("note_ids") or []
+    if out.get("status") == "ok" and note_ids:
+        out["text"] = "\n\n---\n\n".join(
+            _format_email(entry.get("tool_metadata") or {}, mgr.get_note_text(nid))
+            for nid, entry in zip(note_ids, mgr.tool_meta()))
+    return out
+
+
+def _format_email(headers: Dict[str, Any], body: str) -> str:
+    """One email as the chat agent reads it. The body is cut at
+    SHOWN_BODY_CHARS, with a line giving the full length."""
+    lines = [f"From: {headers.get('from', '')}",
+             f"To: {headers.get('to', '')}",
+             f"Date: {headers.get('date', '')}",
+             f"Subject: {headers.get('subject', '')}",
+             ""]
+    body = body.strip()
+    if len(body) > SHOWN_BODY_CHARS:
+        lines.append(body[:SHOWN_BODY_CHARS])
+        lines.append(f"[body cut at {SHOWN_BODY_CHARS} characters; "
+                     f"the full body is {len(body)} characters]")
+    else:
+        lines.append(body or "[no text body]")
+    return "\n".join(lines)
 
 
 def tool(input_value, runtime=None, **kwargs):

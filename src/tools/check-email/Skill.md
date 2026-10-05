@@ -50,5 +50,5 @@ Without both, the tool returns an error and no data.
 
 ## Notes
 
-- Email body is capped at 50,000 characters per message.
+- Each email shows From, To, Date and Subject, then the body. The body shown is cut at 4,000 characters per message; a line after it gives the full length.
 - Body prefers plain text; HTML is tag-stripped as fallback.
