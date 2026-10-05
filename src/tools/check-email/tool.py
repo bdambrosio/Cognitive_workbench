@@ -143,13 +143,25 @@ def _build_search_criteria(*, from_addr: str = '', subject: str = '',
 # Fetch emails
 # ---------------------------------------------------------------------------
 
+class _FolderRefused(Exception):
+    """The server would not open the folder; carries the server's message."""
+
+
 def _fetch_emails(conn: imaplib.IMAP4_SSL, folder: str,
                   search_criteria: str, limit: int) -> List[bytes]:
-    """Select folder (readonly), search, return raw MIME bytes for newest N."""
-    status, _ = conn.select(folder, readonly=True)
+    """Select folder (readonly), search, return raw MIME bytes for newest N.
+    Raises _FolderRefused when the server will not open the folder."""
+    # Quoted, so a name with a space ("[Gmail]/All Mail") is one argument.
+    quoted = '"' + folder.replace('\\', '\\\\').replace('"', '\\"') + '"'
+    try:
+        status, data = conn.select(quoted, readonly=True)
+    except imaplib.IMAP4.error as e:
+        raise _FolderRefused(str(e))
     if status != 'OK':
-        logger.error(f"Failed to select folder '{folder}'")
-        return []
+        detail = data[0] if data else b''
+        if isinstance(detail, bytes):
+            detail = detail.decode('utf-8', errors='replace')
+        raise _FolderRefused(str(detail))
 
     status, data = conn.search(None, search_criteria)
     if status != 'OK' or not data or not data[0]:
@@ -360,6 +372,9 @@ def tool(input_value, runtime=None, **kwargs):
     try:
         with _IMAPConnection(gmail_address, gmail_password) as conn:
             raw_messages = _fetch_emails(conn, folder, search_criteria, limit)
+    except _FolderRefused as e:
+        logger.error(f"IMAP server refused folder '{folder}': {e}")
+        return _fail(executor, f"could not open folder {folder}: {e}")
     except imaplib.IMAP4.error:
         logger.error(f"IMAP authentication failed for {gmail_address}")
         return _fail(executor, 'authentication_failed',
