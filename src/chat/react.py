@@ -491,6 +491,9 @@ class ReactMixin:
         # it. Single slot (most-recent-wins) and reset each turn: a fresh frame
         # replaces the old one, and stale frames don't leak across turns.
         self._pending_tool_image = None
+        # Set by the dispatcher when a tool put its own output on the canvas
+        # (generate-image); read and cleared after the dispatch below.
+        self._tool_displayed = False
 
         # Structured provenance from the most recent discovered-tool call
         # (source URLs, query, paths). Consumed right after dispatch into
@@ -810,6 +813,11 @@ class ReactMixin:
                        "run.")
             elif (canon := self._canonical_tool_name(tool)) is not None:
                 obs = self._dispatch_discovered_tool(canon, action, log)
+                if self._tool_displayed:
+                    # Same as a `display` call: the final reply is not
+                    # mirrored over what the tool put on the canvas.
+                    did_display = True
+                    self._tool_displayed = False
                 if self._pending_tool_meta is not None:
                     iters[-1]['tool_meta'] = self._pending_tool_meta
                     # _step_sources drives process_text's citation

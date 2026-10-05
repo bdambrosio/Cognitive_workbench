@@ -233,6 +233,17 @@ class ToolsMixin:
         if isinstance(meta, list) and meta:
             self._pending_tool_meta = {"tool": name, "meta": meta}
         if status == "ok":
+            # A tool may optionally return HTML for the USER to see
+            # (generate-image). It goes to the canvas here, so showing it is
+            # not a second step the model can leave out.
+            html = result.get("display")
+            if isinstance(html, str) and html.strip():
+                shown = self._run_display(html, "html")
+                if shown.startswith("OK"):
+                    self._tool_displayed = True
+                    text = (text + " [shown on the user's canvas]").strip()
+                else:
+                    text = (text + f" [not shown on the user's canvas: {shown}]").strip()
             # A tool may optionally return an image for the model to SEE
             # (e.g. camera-capture). The image bytes never enter the text log:
             # we stash a data-URI in the single most-recent slot and the ReAct

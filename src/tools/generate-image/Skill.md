@@ -1,11 +1,12 @@
 ---
 name: generate-image
-description: Generate an original image from a text description, locally (Bonsai-Image 4B, ternary-quantized, on a long-lived studio server). The generated image is attached to your own visual input, so you can SEE what came back, not only what you asked for. Use when the user wants a picture, illustration, avatar, or face created from a description that does not already exist on the web. For existing photos of real things, prefer image search instead; for simple diagrams or line drawings, prefer authoring inline SVG.
+description: Generate an original image from a text description, locally (Bonsai-Image 4B, ternary-quantized, on a long-lived studio server). The generated image is put on the user's canvas and attached to your own visual input, so the user sees it and you can SEE what came back, not only what you asked for. Use when the user wants a picture, illustration, avatar, or face created from a description that does not already exist on the web. For existing photos of real things, prefer image search instead; for simple diagrams or line drawings, prefer authoring inline SVG.
 args:
   prompt: required string — what to depict, e.g. "a friendly cartoon robot face, soft smile, flat vector style". State qualities you want directly; the model follows prompts literally.
   steps: optional int (default 4) — denoising steps; Bonsai is distilled for 4, more buys little
   size: optional int (default 512) — square side length in pixels. 512 is the fast preset; 1024 is the quality preset (slower).
   seed: optional int — fix for reproducible output; omit for variety
+  show: optional bool (default true) — put the image on the user's canvas. Pass false for an image the user should not see yet.
   attach: optional bool (default true) — attach the image to your visual input. Pass false when generating several images in one turn and you do not need to look at this one.
 ---
 
@@ -48,8 +49,18 @@ separate "describe" step), labelled "generated image". Three limits:
 - It adds its tokens to every remaining iteration of the turn, and a 1024
   image costs more of them than a 512 one.
 
-The observation also gives an `<img>` tag with a `/local` URL. That is for the
-user: pass it to the `display` tool (`format=html`) to show the image on screen.
+## Showing the result
+
+The image is put on the user's canvas by this tool; you do not call `display`
+for it. The observation says "[shown on the user's canvas]" when that
+happened. At the end of such a turn the canvas holds the picture, and your
+reply is not mirrored over it.
+
+Each image shown replaces the one before it on the canvas, so of several
+generated in one turn the user sees the last. To show several together, or an
+image with text, compose a page yourself: the observation gives an `<img>` tag
+with a `/local` URL to pass to the `display` tool (`format=html`), and that
+replaces what this tool showed.
 
 ## Examples
 

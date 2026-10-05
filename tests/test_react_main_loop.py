@@ -53,8 +53,8 @@ class _Canvas:
     def new_turn(self):
         self.turns += 1
 
-    def set_content(self, *a, **k):
-        pass
+    def set_content(self, content, *a, **k):
+        self.shown = getattr(self, 'shown', []) + [content]
 
 
 class _Backend:
@@ -359,3 +359,21 @@ def test_canvas_episode_opens_once_per_turn():
     host = Host([act(thought='t', tool='respond', text='x')])
     run(host)
     assert host._canvas.turns == 1
+
+
+def test_the_reply_is_not_put_over_what_a_tool_showed_on_the_canvas():
+    """generate-image puts its picture on the canvas; the turn ends with the
+    picture there, not the reply. Without a tool's picture the reply is shown."""
+    host = Host([act(thought='t', tool='painter'), act(thought='t', tool='respond', text='the reply')])
+    host._discovered_tools = {'painter': {}}
+
+    def dispatch(name, action, *a, **k):
+        host._tool_displayed = True       # what the dispatcher sets after showing
+        return 'OK: painted'
+    host._dispatch_discovered_tool = dispatch
+    run(host)
+    assert 'the reply' not in getattr(host._canvas, 'shown', [])
+
+    plain = Host([act(thought='t', tool='respond', text='the reply')])
+    run(plain)
+    assert plain._canvas.shown == ['the reply']
