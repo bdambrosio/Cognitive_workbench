@@ -29,7 +29,7 @@ Every step about a candidate gives you the **candidate record**, written by the 
 The qualifying and drafting steps also give you:
 
 - **Evidence files.** Each is a web page fetched by the practice's program, or text the practice copied from a page the program cannot fetch, such as a LinkedIn post. Each file starts with a header that gives its source and date. The text is shown with line numbers. A long file is cut and says so.
-- **The contact record**: what the practice's contact system holds about earlier approaches to the person, and to anyone else at the same firm. For the person, that is their stage in the outreach list, the tasks about them with due dates, and the titles and dates of notes. For each colleague, their name and stage.
+- **The contact record**: what the practice's contact system holds about earlier approaches to the person: their stage in the outreach list, the date of the last contact, the tasks about them with due dates, and the titles and dates of notes.
 
 The follow-up step gives you the contact record, the first message as it was sent, with its date, when the practice recorded it, and the evidence files when the practice has them. The reply step gives you the messages the practice sent and the person's reply, copied by the practice, with line numbers. The answering step gives you the same, the record of what the reply gives, and the practice's approved answers.
 
@@ -54,9 +54,9 @@ Prefer people close to a decision to buy, sell, invest in, or accept software. T
 - **`Technical feedback`**: a person with the standing to criticise how the review is done, for example someone who has done technical diligence, program analysis or software assurance. The practice wants their judgement of the method; they need not be a possible client.
 - **`none`**: none of the above.
 
-At a firm of more than a few people, the person to approach is the one who does the work Tuuyi bears on, who is often not the head of the firm or its most visible member. At a repeat acquirer or a holding company: whoever runs M&A or corporate development, or whoever examines the technology of the companies being bought. At a private-equity firm or family office: the partner or operating partner who evaluates software investments. At an advisory firm of a few people, the partner who runs the engagements is the person, and a junior member of the team is not, whatever part of the work the firm's site says they cover. A searcher, a lawyer or a solo adviser is their own firm.
+When a person fits more than one kind, choose the kind closest to a decision to buy, sell, invest in or accept software. `Connector` and `Technical feedback` are chosen only when no other kind fits.
 
-The practice approaches one person at a firm at a time.
+At a firm of more than a few people, the person to approach is the one who does the work Tuuyi bears on, who is often not the head of the firm or its most visible member. At a repeat acquirer or a holding company: whoever runs M&A or corporate development, or whoever examines the technology of the companies being bought. At a private-equity firm or family office: the partner or operating partner who evaluates software investments. At an advisory firm of a few people, the partner who runs the engagements is the person, and a junior member of the team is not, whatever part of the work the firm's site says they cover. A searcher, a lawyer or a solo adviser is their own firm.
 
 **Side.** Tuuyi has an offer for each side of a transaction. A buyer, or someone who works for buyers, is offered the claims review. A seller, or someone who works for sellers, is offered the seller's check: a private review of the claims in the company's own materials, done before a buyer looks, described at tuuyi.com/sellers. The side is fixed by the kind for a `Repeat acquirer`, `Searcher`, `Small PE-family office`, `VC / Investor`, `Contracted-software buyer` and `licensee` (buy), and for a `Business broker` and `Founder preparing a sale` (sell). For every other kind the evidence decides it: an M&A adviser may act for sellers, for buyers or for both.
 
@@ -72,17 +72,18 @@ A candidate is more worth contacting when several of these are shown in the evid
 
 These do not show fit on their own: working in venture capital, working at a well-known firm, investing in technology generally, a large following, frequent mention of AI, or the letters "M&A" in a biography. The connection to evaluating or transacting in software must be specific and shown.
 
-## 6. Reasons to reject or defer
+## 6. Reasons to reject
+
+**No fit.**
 
 - The person's work fits none of the kinds in §4.
 - Their usual deals are so large that none of the uses in §2 applies.
 - Their part in transactions is financial only, with no part in evaluating the product or the technology.
-- Nothing in the evidence gives a reason to contact them.
-- The evidence is too thin to write an honest individual message.
-- A message would have to pretend familiarity with the person or their work.
-- The relationship note shows personal history that makes an unrequested approach unwelcome, or says not to approach. This applies however well the person otherwise fits.
-- The contact record shows the person was contacted recently.
-- The contact record shows that someone else at the same firm was contacted recently or is waiting to be contacted.
+- The evidence shows no connection between the person's work and buying, selling, investing in, accepting or examining software.
+
+**Not to be approached, however well the person fits.** Say in `reject_reason` that the person fits, when they do.
+
+- The relationship note shows personal history that makes an unrequested approach unwelcome, or says not to approach.
 - The evidence shows another person at the same firm is the better one to contact. Name them.
 
 ## 7. The research questions
@@ -102,9 +103,9 @@ Qualification answers these from the evidence files.
 ## 8. Categories
 
 - **`strong`**: the evidence shows the person is one of the kinds in §4 and shows a plausible use for Tuuyi (for a `Connector` or `Technical feedback`, a reason to expect a useful opinion), a recent or specific fact that gives a reason to contact the person now, and enough detail to write an individual message. Nothing in §6 applies.
-- **`plausible`**: the role and the market both fit, and the reason to contact them now is weak or missing, or the evidence leaves an important question in §7 open.
+- **`plausible`**: the role and the market both fit and nothing in §6 applies, but the conditions for `strong` are not all met: the reason to contact them now is weak or missing, the evidence is too thin to write an individual message without pretending familiarity, or it leaves an important question in §7 open.
 - **`weak`**: the evidence shows only a general overlap of subject.
-- **`reject`**: no real fit, or a reason in §6 applies.
+- **`reject`**: a reason in §6 applies.
 
 Do not give a numeric score.
 
@@ -124,7 +125,7 @@ If a rationale would fit hundreds of other people equally well, it is not a rati
 
 ## 10. The angle, by kind of prospect
 
-The message offers one use, or both when the side is unknown, chosen by what the person does and by their side (§4). When the person works for both sides, offer the one the evidence shows them doing more. When the side is unknown, do not guess: part 4 names both uses in one sentence, and the offer in part 5 covers both.
+The message offers one use, or both when the side is unknown, chosen by what the person does and by their side (§4). When the person works for both sides, offer the one the evidence shows them doing more; when the evidence shows neither more, treat the side as unknown. When the side is unknown, do not guess: part 4 names both uses in one sentence, and the offer in part 5 covers both.
 
 - **M&A adviser:** on the sell side, preparing a seller before buyer diligence with the seller's check. On the buy side, a lower-cost review for smaller transactions, or showing where a buyer's diligence should concentrate.
 - **Repeat acquirer:** the same review on every target; checking claims before paying for full diligence; finding product or technical uncertainty early.
@@ -155,7 +156,7 @@ Write for the time it takes to understand the message, not for its word count. S
 A message says these things, in whatever order reads naturally for this person. Give each part its own short paragraph of one to three sentences; parts 4 and 5 may share one, or be one sentence. Whether part 3 uses the demo finding is set by the choices below:
 
 1. **Who is writing.** Bruce recently started Tuuyi and it is in beta. Say only that; part 5 gives the reason for writing. Do not add that he wants their judgement, whom else he is talking with, or where the service fits in their work. Do not say or suggest that he is unsure whether the service is useful. For example: "I recently started Tuuyi, and it's in beta."
-2. **Why this person.** Do not tell the person what their own job is. Name one specific thing of theirs that bears on what Tuuyi does (a transaction, an article, a post, a concern they stated) in one plain sentence, without comment on what it shows. Never use one more than about a year old by the dates in the evidence file headers. Refer to it accurately, and claim no more acquaintance with it than reading it. How firmly to state a fact about the person depends on where it comes from, as the evidence file header shows. In the person's own current words (their profile, their firm's page about them, a post of theirs): state it plainly. From someone else: name the source instead of stating it as fact, for example "Your firm's site describes…". Inferred rather than shown: leave it out. Never soften a fact with "I believe" or "I understand". If the relationship note names someone who introduced the practice to the person, open with the introduction and keep the rest shorter.
+2. **Why this person.** Do not tell the person what their own job is. Name one specific thing of theirs that bears on what Tuuyi does (a transaction, an article, a post, a concern they stated) in one plain sentence, without comment on what it shows. Never use one more than about a year old by the dates in the evidence file headers. Refer to it accurately, and claim no more acquaintance with it than reading it. How firmly to state a fact about the person depends on where it comes from, as the evidence file header shows. In the person's own current words (their profile, a post of theirs): state it plainly. From someone else, including their firm's site: name the source instead of stating it as fact, for example "Your firm's site describes…". Inferred rather than shown: leave it out. Never soften a fact with "I believe" or "I understand". If the relationship note names someone who introduced the practice to the person, open with the introduction, whatever the `opening` choice says, and keep the rest shorter.
 3. **What Tuuyi is**, in these three sentences, which are Bruce's wording: "Tuuyi reviews a software company's claims. We identify the claims it makes, settle that list, and then test the material ones, the questions a buyer should ask, and what published standards ask of software like it, against the code and materials supplied. Each finding gives the file and lines it rests on." Use them as written. Change a word only where the person's side (§4) requires it, and then use the plainest word that does. Do not add where the claims come from, and do not replace "identify" or "material" with a longer phrase. The demo is a finished review anyone can read, at demo.tuuyi.com. In it, the project's README says the software will never use cookies, and the review found that the code sets one when the administrator logs in. When the choice is `demo`, follow these three sentences with one sentence of about twenty words, with the link, that names the source, what the README claims and what the code does, as an example of what a review finds. For example: "Our demo review (demo.tuuyi.com) found a README that promises no cookies, and code that sets one."
 4. **One use for this person's work**, from §10, for their side (both, when the side is unknown).
 5. **The close.** What it is depends on the kind of prospect.
@@ -168,7 +169,7 @@ A message says these things, in whatever order reads naturally for this person. 
 
 The first reviews are free while the service is in beta. A message may say so, and part 5 does where it makes the offer. Otherwise do not state a price or a turnaround time, and do not state where the work runs or how the practice stores or deletes materials.
 
-Do not state anything about the person that the evidence files do not show. Do not flatter. Do not say general-purpose AI review is unreliable.
+Do not state anything about the person that the evidence files or the relationship note do not show. Listing something in `assumes` does not permit stating it. Do not flatter. Do not say general-purpose AI review is unreliable.
 
 **The choices for this message.** The practice varies two things between messages on purpose, so that it can learn from the replies which ways of writing work. The request names one value of each, chosen at random, and the message follows them. Each value is still written under everything above.
 
@@ -218,7 +219,7 @@ A **citation** has `file` (the evidence file's name as given), `lines` (the firs
 | `why_person` | One or two sentences, per §9 |
 | `why_now` | One or two sentences naming the recent or specific fact, per §9. `Nothing found.` when there is none, and then the category is not `strong` |
 | `why_now_citations[]` | The citations `why_now` rests on. At least one when the category is `strong`, unless `why_now` rests on the relationship note, which you then say in `why_now` |
-| `use_case` | One sentence: the use of Tuuyi that fits this person, from §10. Empty when the category is `weak` or `reject` |
+| `use_case` | One sentence: the use of Tuuyi that fits this person, from §10. For `Technical feedback`, the reason to expect useful criticism of the method. Empty when the category is `weak` or `reject` |
 | `concerns` | What the practice should know before acting: a doubt whether a page is about this person, evidence that is old, a question in §7 left open. Empty when there is nothing |
 | `reject_reason` | The reason from §6, in one sentence, when the category is `reject`. Otherwise empty |
 | `better_contact_name` | When the evidence shows another person at the same firm is the better one to approach (§4, §6): their name as the evidence gives it. Otherwise empty |
@@ -228,11 +229,11 @@ Emit nothing outside the JSON object.
 
 ## 15. Output: the draft message
 
-Asked for a candidate the qualification found `strong`, and sometimes for one found `plausible`. You are given the candidate record, the qualification, the evidence files, and the choices for this message (§11). For a `plausible` candidate, part 2 of §11 names the most specific thing of theirs the evidence shows from the past year; when it shows nothing specific enough, leave `message` empty and say why in `assumes`.
+Asked for a candidate the qualification found `strong`, and sometimes for one found `plausible`. You are given the candidate record, the qualification, the evidence files, and the choices for this message (§11). For any candidate, part 2 of §11 names the most specific thing of theirs the evidence shows from the past year, or the introduction when the relationship note gives one. When the evidence shows nothing specific enough, leave `message` empty and say why in `assumes`.
 
 | Field | Contents |
 |---|---|
-| `angle` | One sentence: the use from §10 the message offers, and why that one; both uses when the side is unknown |
+| `angle` | One sentence: the use from §10 the message offers, and why that one; both uses when the side is unknown; for `Technical feedback`, what the message asks them to criticise |
 | `subject` | The subject line, used when the message is sent by email: a few plain words that say what the message is about. Nothing the message does not support, and no question written to get an answer |
 | `message` | The message, per §11. Plain text, no greeting line beyond the person's first name, no signature block beyond "Bruce" |
 | `rests_on[]` | The citations, in the form given in §14, for each thing the message states about the person or their work beyond their role. Empty when the message states nothing beyond their role, or rests on the relationship note alone |
@@ -287,7 +288,7 @@ Asked once for each firm that fits. You are given the firm's name, kind and prof
 | `first` | The file name of the person to approach first under §4, or empty when no profile shows a suitable person who works at this firm now |
 | `first_role` | That person's role at the firm, in a few words from their profile |
 | `first_citation` | One citation, in the form given in §14, to the lines of their profile that show they work at this firm now and in that role |
-| `alternate` | The file name of a second suitable person at the firm, or empty. The practice does not approach them while the first approach is open |
+| `alternate` | The file name of a second suitable person at the firm, or empty |
 | `reason` | One or two sentences: why the first person and not the others |
 
 ## 21. Output: the follow-up message
@@ -311,11 +312,11 @@ Asked when the person has replied. You are given the candidate record, the messa
 - **`opinion`**: an opinion on whether the need is real. The practice keeps their words.
 - **`objection`**: a reason Tuuyi would not be used. For example: existing diligence covers this; AI already does this; buyers would not pay separately; evidence supplied by the seller is not enough; full diligence is needed anyway. An objection is research data: the practice's next message does not argue with it.
 - **`new_use`**: a use the practice had not proposed. For example: preparing a seller, reviewing a portfolio company, an internal software review, sorting acquisition targets.
-- **`introduction`**: the person names someone to talk to, or offers to introduce someone. The practice approaches that person as a referral, in a message that names the introducer.
+- **`introduction`**: the person names someone to talk to, or offers to introduce someone. The practice approaches that person as a referral, in a message that names the introducer, once they have agreed to that.
 - **`test_case`**: the person takes up the offer of a review, offers a real codebase, or offers a case where the truth is known. The practice runs a review with a fixed scope, free while the service is in beta.
 - **`meeting`**: the person asks for a call or a meeting, or agrees to one. The practice accepts when the person has relevant experience and there is a clear question to explore.
 - **`question`**: the person asks something about Tuuyi that the practice has to answer.
-- **`declined`**: the person says they are not interested, or asks not to be contacted. The practice stops.
+- **`declined`**: the person says they are not interested, or asks not to be contacted. When they ask not to be contacted, the practice stops. Otherwise it answers whatever else the reply gives, and makes no further offer.
 - **`other`**: anything else, such as a bare acknowledgement.
 
 | Field | Contents |
@@ -341,9 +342,9 @@ The answer is usually 60 to 90 words, from Bruce in the first person, in the voi
 - `introduction`: thank the person, and ask whether the practice may use their name when it writes to the person they named.
 - `test_case`: say the practice will run the review, and ask the one thing needed to start that the reply does not already say: what is to be reviewed, or who can supply its code and materials. Do not mention payment, beyond that the review is free.
 - `meeting`: when the next step recorded for the reply is to accept, accept and ask the person to name a time that suits them. Otherwise leave the meeting for the practice to decide, and say so in `assumes`.
-- `declined`: one line of thanks, and nothing else.
+- `declined`: when the person asks not to be contacted, one line of thanks and nothing else, whatever else the reply gives. Otherwise acknowledge it in a few words, answer what else the reply gives, and do not repeat the offer.
 
-Ask at most one question, which the person can answer in a line, and none when the reply gives `declined`. Offer no use of Tuuyi that neither the person nor an earlier message raised. State nothing about what Tuuyi does beyond §2 and the approved answers: when the person credits Tuuyi with something neither says, do not confirm it. The voice of §11 applies, and so do its two paragraphs, the ones that begin "The first reviews are free" and "Do not state anything about the person", except that an answer may say where the work runs and how materials are handled when an approved answer says it.
+Ask at most one question, which the person can answer in a line. When more than one line calls for a question, ask the one for `test_case`; failing that, `meeting`; failing that, `introduction`. Offer no use of Tuuyi that neither the person nor an earlier message raised. State nothing about what Tuuyi does beyond §2 and the approved answers: when the person credits Tuuyi with something neither says, do not confirm it. In an answer, the reply and the messages the practice sent also count as showing things about the person. The voice of §11 applies, and so do its two paragraphs, the ones that begin "The first reviews are free" and "Do not state anything about the person", except that an answer may say where the work runs and how materials are handled when an approved answer says it.
 
 | Field | Contents |
 |---|---|

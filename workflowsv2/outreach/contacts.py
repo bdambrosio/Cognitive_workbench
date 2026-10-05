@@ -150,19 +150,6 @@ def firm_known(firm: str = "", domain: str = "") -> bool:
     return any(_same_firm(c, firm, domain) for c in everyone())
 
 
-def colleagues(firm: str, domain: str, but: str = "") -> str:
-    """The other contacts at this firm, each with their stage in the outreach
-    list: what "one approach per firm" is judged from. Empty when there is
-    nobody else."""
-    rows = []
-    for c in everyone():
-        if c["id"] == but or not _same_firm(c, firm, domain):
-            continue
-        where = f"in the outreach list at stage '{stage_of(c)}'" if c.get("entry") else "not in the outreach list"
-        rows.append(f"A colleague at the same firm, {c['name']}, is {where}.")
-    return "\n".join(rows)
-
-
 def contact_record(c: Dict[str, Any]) -> str:
     """What is recorded about approaches to this person, as the text the
     qualification reads: the list stage and last contact, each task, and the
@@ -180,16 +167,11 @@ def contact_record(c: Dict[str, Any]) -> str:
     return "\n".join(rows)
 
 
-def contact_for(name: str, firm: str = "", domain: str = "") -> str:
-    """Everything the qualification is told about earlier approaches: the
-    person's own record when there is one, and their colleagues at the firm."""
+def contact_for(name: str) -> str:
+    """What the qualification is told about earlier approaches to the person:
+    their own record, or nothing when the practice has none."""
     c = find_person(name)
-    rows: List[str] = []
-    if c is not None:
-        rows.append(contact_record(c))
-        firm, domain = c.get("firm") or firm, c.get("domain") or domain
-    rows.append(colleagues(firm, domain, but=c["id"] if c else ""))
-    return "\n".join(r for r in rows if r)
+    return contact_record(c) if c is not None else ""
 
 
 def notes(cid: str) -> List[Dict[str, Any]]:

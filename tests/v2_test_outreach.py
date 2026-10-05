@@ -356,13 +356,6 @@ def test_a_better_contact_named_in_qualification_waits_for_research(tmp_path, mo
     assert runner.better_contact(cand, {"better_contact_name": ""}, tmp_path, use_contacts=False) is None
 
 
-def test_contact_for_someone_unknown_reports_colleagues_at_the_firm(store):
-    _person("Pat Head", "Initial sent", domain="acme.example")
-    _person("Lee Elsewhere", "Initial sent", firm="Other Group")
-    text = store.contact_for("Ravi Diligence", "Acme Software Group", "acme.example")
-    assert text == "A colleague at the same firm, Pat Head, is in the outreach list at stage 'Initial sent'."
-
-
 def _daily_with(tmp_path, monkeypatch, categories, strong, most):
     """Run `daily` with scouting that finds one new person per call and a
     qualification that gives them the next category in `categories`.

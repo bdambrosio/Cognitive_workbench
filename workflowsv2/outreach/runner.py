@@ -1071,7 +1071,7 @@ def person_at(backend, firm: str, url: str, domain: str, rec: Dict[str, Any], fi
     c = {"name": name, "firm": firm, "title": str(obj.get("first_role") or "").strip(),
          "urls": [u for u in (url, str(r.get("url") or "")) if u],
          "notes": (f"{FIRM_SCOUT_NOTE}{rec['query']}. Chosen at {firm}: {rec['chosen_reason']}"
-                   + (f" Alternate at the firm, not to be approached meanwhile: {rec['alternate']}."
+                   + (f" Alternate at the firm: {rec['alternate']}."
                       if rec["alternate"] else "")),
          "pasted": [{"source": f"Professional profile as the search service holds it, {r.get('url') or ''}",
                      "date": str(r.get("publishedDate") or "")[:10], "text": str(r.get("text") or "")}]}
@@ -1162,7 +1162,7 @@ def work(backend, writer, cands: List[Dict[str, Any]], stages, data: Path, use_c
             logger.info("%s: %s", c["name"], st)
             if st == "qualify":
                 q = qualify(qualifier_backend(), c, cand_dir,
-                            contacts.contact_for(c["name"], str(c.get("firm") or ""), firm_domain(c)) if use_contacts else "")
+                            contacts.contact_for(c["name"]) if use_contacts else "")
                 better_contact(c, q, data, use_contacts)
                 continue
             if st == "draft":
