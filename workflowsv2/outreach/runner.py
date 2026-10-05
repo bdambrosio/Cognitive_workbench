@@ -422,9 +422,7 @@ def qualify(backend, c: Dict[str, Any], cand_dir: Path, contact: str = "") -> Di
 #: The two things a first message varies on purpose (PROSPECT.md §11), each
 #: with its values and their weights. One value of each is drawn at random per
 #: draft and recorded in draft.json, so replies can later be counted by choice.
-#: The `question` opening is drawn about one time in five (Bruce, 2026-10-02:
-#: permitted, not the usual opening).
-CHOICES = {"opening": {"purpose": 2, "their_work": 2, "question": 1},
+CHOICES = {"opening": {"purpose": 1, "their_work": 1},
            "showing": {"demo": 1, "description": 1}}
 
 
