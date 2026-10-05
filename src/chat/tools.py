@@ -241,9 +241,14 @@ class ToolsMixin:
             img = result.get("image")
             if isinstance(img, dict) and img.get("data_uri"):
                 label = str(img.get("label") or "image").strip()
-                self._pending_tool_image = {"data_uri": img["data_uri"],
-                                            "label": label}
-                text = (text + f" [{label} attached as an image below]").strip()
+                if self.backend.supports_image_input:
+                    self._pending_tool_image = {"data_uri": img["data_uri"],
+                                                "label": label}
+                    text = (text + f" [{label} attached as an image below]").strip()
+                else:
+                    # Sending it would fail the next model call; say so instead.
+                    text = (text + f" [{label} not attached: this model route "
+                                   f"does not accept images]").strip()
             return "OK: " + text
         if status == "empty":
             return "EMPTY: " + (text or f"{name} produced no result")

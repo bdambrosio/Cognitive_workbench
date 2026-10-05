@@ -3,7 +3,10 @@
 ReAct entry-point. POSTs the prompt directly to the long-lived Bonsai FastAPI
 backend (scripts.local_backend, which strips the bearer gate on Linux), saves
 the returned PNG under the canvas server's allowlisted local root, and returns a
-ready-to-display URL. The image bytes never travel through the ReAct text log.
+ready-to-display URL. Unless `attach` is false the PNG is also returned as an
+`image` entry, which the loop attaches to the model's visual input the way it
+does a camera-capture frame. The image bytes never travel through the ReAct
+text log.
 
 The backend is expected at http://localhost:4001 by default and exposes
 /generate and /healthz (the /api/generate path belongs to the Next.js studio
@@ -11,6 +14,7 @@ frontend, which we bypass). If the backend isn't running, the tool launches it
 via the Bonsai-Image-Demo serve.sh and waits for /healthz to come up. Override
 the base URL with GENERATE_IMAGE_URL and the launcher with GENERATE_IMAGE_SERVE_SH.
 """
+import base64
 import logging
 import os
 import subprocess
@@ -175,7 +179,8 @@ def _ensure_server():
 
 
 def react_invoke(args, *, character_name=None, backend=None, logger=None):
-    """See Skill.md for the args contract. Returns {status, text}."""
+    """See Skill.md for the args contract. Returns {status, text} and, unless
+    `attach` is false, `image` for the model to see."""
     prompt = args.get("prompt", "")
     if not isinstance(prompt, str) or not prompt.strip():
         return {"status": "error", "text": "generate-image requires a non-empty `prompt`"}
@@ -233,6 +238,13 @@ def react_invoke(args, *, character_name=None, backend=None, logger=None):
 
     url = (f"http://127.0.0.1:{_CANVAS_PORT}/local?path="
            + urllib.parse.quote(str(out_path)))
-    return {"status": "ok",
-            "text": (f"image generated{gen_info}. Show it with the display tool, "
-                     f"format=html: <img src=\"{url}\" style=\"max-width:100%\">")}
+    result = {"status": "ok",
+              "text": (f"image generated{gen_info}. Show it with the display tool, "
+                       f"format=html: <img src=\"{url}\" style=\"max-width:100%\">")}
+    # The URL above is for the canvas; a model server cannot fetch a 127.0.0.1
+    # URL, so the model's own view goes as an inline data-URI.
+    if str(args.get("attach", True)).strip().lower() != "false":
+        result["image"] = {"data_uri": ("data:image/png;base64,"
+                                        + base64.b64encode(resp.content).decode("ascii")),
+                           "label": "generated image"}
+    return result

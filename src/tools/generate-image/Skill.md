@@ -1,11 +1,12 @@
 ---
 name: generate-image
-description: Generate an original image from a text description, locally (Bonsai-Image 4B, ternary-quantized, on a long-lived studio server). Use when the user wants a picture, illustration, avatar, or face created from a description that does not already exist on the web. For existing photos of real things, prefer image search instead; for simple diagrams or line drawings, prefer authoring inline SVG.
+description: Generate an original image from a text description, locally (Bonsai-Image 4B, ternary-quantized, on a long-lived studio server). The generated image is attached to your own visual input, so you can SEE what came back, not only what you asked for. Use when the user wants a picture, illustration, avatar, or face created from a description that does not already exist on the web. For existing photos of real things, prefer image search instead; for simple diagrams or line drawings, prefer authoring inline SVG.
 args:
   prompt: required string — what to depict, e.g. "a friendly cartoon robot face, soft smile, flat vector style". State qualities you want directly; the model follows prompts literally.
   steps: optional int (default 4) — denoising steps; Bonsai is distilled for 4, more buys little
   size: optional int (default 512) — square side length in pixels. 512 is the fast preset; 1024 is the quality preset (slower).
   seed: optional int — fix for reproducible output; omit for variety
+  attach: optional bool (default true) — attach the image to your visual input. Pass false when generating several images in one turn and you do not need to look at this one.
 ---
 
 # generate-image
@@ -35,6 +36,20 @@ graphics. It is a *generator*, not a search: it cannot reproduce a specific
 real photograph or a named existing image. There is no separate negative
 prompt; describe exactly what you want (including what to leave out) in the
 `prompt`.
+
+## Seeing the result
+
+The image is attached to your visual input for the rest of this turn (no
+separate "describe" step), labelled "generated image". Three limits:
+
+- Only the most recent image from any tool is in view. A second generation, or
+  a camera capture, replaces this one.
+- It is not carried to your next turn; only what you wrote about it is.
+- It adds its tokens to every remaining iteration of the turn, and a 1024
+  image costs more of them than a 512 one.
+
+The observation also gives an `<img>` tag with a `/local` URL. That is for the
+user: pass it to the `display` tool (`format=html`) to show the image on screen.
 
 ## Examples
 
