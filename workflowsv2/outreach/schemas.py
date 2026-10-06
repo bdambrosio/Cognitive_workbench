@@ -27,8 +27,8 @@ QUESTIONS = 9
 #: PROSPECT.md §11 asks for about 100 words and never more than 140; the flag allows a
 #: few words over the ceiling, which read no worse (Bruce, 2026-09-26).
 MESSAGE_WORDS = 145
-#: PROSPECT.md §21 asks for 40 to 60 words.
-FOLLOWUP_WORDS = 75
+#: PROSPECT.md §21 asks for 60 to 80 words.
+FOLLOWUP_WORDS = 95
 #: PROSPECT.md §23 asks for 60 to 90 words.
 ANSWER_WORDS = 110
 #: What a reply gives, PROSPECT.md §22.

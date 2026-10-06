@@ -474,10 +474,10 @@ def test_followup_prompt_record_and_flags(tmp_path, monkeypatch):
     assert "Jane, I read your post." in seen[0]["user"] and "stage 'Initial sent'" in seen[0]["user"]
     assert rec["first_message_recorded"] and not rec["flags"]
     assert json.loads((tmp_path / "followup.json").read_text())["message"].startswith("Jane, one more")
-    monkeypatch.setattr(runner, "emit", _fake([{**good, "message": "word " * 80}], seen))
+    monkeypatch.setattr(runner, "emit", _fake([{**good, "message": "word " * 100}], seen))
     rec = runner.followup(Backend(), CAND, tmp_path, "", "")
     assert "its text was not recorded" in seen[-1]["user"] and not rec["first_message_recorded"]
-    assert rec["flags"] == ["the follow-up is 80 words"]
+    assert rec["flags"] == ["the follow-up is 100 words"]
 
 
 def test_followups_are_drafted_once_for_those_whose_date_has_come(tmp_path, monkeypatch, store):
