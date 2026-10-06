@@ -248,6 +248,9 @@ class _ChatBackend:
     # generation prompt, a thinking-channel opener) which the character
     # count above does not see.
     _CLAMP_MARGIN_TOKENS = 512
+    # What one attached image is taken to cost when a prompt is sized. A
+    # 1024px image cost about 1,000 tokens on 2026-10-05, one observation.
+    _IMAGE_TOKENS = 1500
 
     def _server_window(self) -> int:
         """Context window of the served model, or 0 if unknown.
@@ -340,8 +343,22 @@ class _ChatBackend:
             # Cloud providers meter reasoning separately and max_tokens
             # caps visible output only, so this arithmetic does not apply.
             return max_tokens
-        chars = sum(len(str(m.get('content', '') or '')) for m in messages)
-        est_prompt = int(chars / self._CHARS_PER_TOKEN) + self._CLAMP_MARGIN_TOKENS
+        # An attached image is counted as _IMAGE_TOKENS, not by the length
+        # of its base64 text: the server turns it into image tokens by its
+        # resolution. Counted as text, a 1.5 MB picture read as 730,000
+        # tokens and left the turn a 256-token output (2026-10-05).
+        chars = images = 0
+        for m in messages:
+            content = m.get('content', '') or ''
+            for part in content if isinstance(content, list) else [content]:
+                if isinstance(part, dict) and part.get('type') == 'image_url':
+                    images += 1
+                elif isinstance(part, dict):
+                    chars += len(str(part.get('text', '') or ''))
+                else:
+                    chars += len(str(part))
+        est_prompt = (int(chars / self._CHARS_PER_TOKEN) + images * self._IMAGE_TOKENS
+                      + self._CLAMP_MARGIN_TOKENS)
         room = window - est_prompt
         if room >= max_tokens:
             return max_tokens

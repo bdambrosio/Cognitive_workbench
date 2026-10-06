@@ -119,7 +119,6 @@ def test_a_turn_with_no_tools_flags_nothing():
 
 def test_the_truncation_preamble_forbids_claiming_completeness():
     p = ConcernsMixin._TRUNCATED_PARENT_PREAMBLE.lower()
-    assert "iteration cap" in p
     assert "partly done" in p
     for word in ("complete", "verified", "grounded"):
         assert word in p, f"the preamble must name {word!r} as a claim to avoid"
@@ -137,6 +136,20 @@ def test_a_truncated_parent_leads_its_successor_with_the_caveat(loop):
     instr = props(loop, new_id)["instruction"]
     assert instr.startswith("NOTE —"), "the caveat must come first"
     assert "Synthesize the verified bug reports" in instr
+
+
+def test_the_caveat_names_the_iteration_cap_only_when_the_cap_was_reached(loop):
+    """A turn that ended because no parseable action came back ran two
+    iterations on 2026-10-05; its successor was told it hit the cap, and
+    Jill reported a cap to Bruce."""
+    capped = loop._create_successor_concern(make_parent(loop), "Finish.", truncated=True)
+    assert "hit its iteration cap" in props(loop, capped)["instruction"]
+
+    loop._react_no_action = True
+    bailed = loop._create_successor_concern(make_parent(loop), "Finish.", truncated=True)
+    instr = props(loop, bailed)["instruction"]
+    assert "no parseable action" in instr and "hit its iteration cap" not in instr
+    assert "PARTLY done" in instr
 
 
 def test_a_chosen_yield_carries_no_caveat(loop):

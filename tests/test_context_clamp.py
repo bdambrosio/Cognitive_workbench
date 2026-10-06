@@ -38,6 +38,17 @@ def _msgs(chars):
     return [{'role': 'user', 'content': 'x' * chars}]
 
 
+def test_an_attached_image_is_not_sized_by_its_base64_text():
+    """A 1.5 MB picture is about two million characters of base64 and about
+    a thousand tokens to the server. Sized as text it read as 730,000 tokens
+    and the turn was left a 256-token output (2026-10-05)."""
+    b = _backend(128768)
+    picture = {'type': 'image_url',
+               'image_url': {'url': 'data:image/png;base64,' + 'A' * 2_000_000}}
+    msgs = [{'role': 'user', 'content': [{'type': 'text', 'text': 'x' * 120_000}, picture]}]
+    assert b._clamp_max_tokens(msgs, 12288) == 12288
+
+
 def test_no_clamp_when_there_is_room():
     b = _backend(65336)
     assert b._clamp_max_tokens(_msgs(200), 8192) == 8192

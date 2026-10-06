@@ -2949,9 +2949,18 @@ class ConcernsMixin:
     # does: on 2026-08-17 one read 3 of 9 sources, handed on "provide the
     # final justification", and reported "everything is now grounded in
     # primary source documentation".
-    _TRUNCATED_PARENT_PREAMBLE = (
+    # The cause is stated as it was. A turn that ended because the model
+    # returned no parseable action was told it "hit its iteration cap" after
+    # two iterations, and Jill reported a cap to Bruce (2026-10-05).
+    _CUT_OFF_BY_CAP = (
         "NOTE — the turn before this one hit its iteration cap and was cut "
-        "off mid-work; it did not choose to stop. Whatever set it was "
+        "off mid-work; it did not choose to stop. ")
+    _CUT_OFF_BY_NO_ACTION = (
+        "NOTE — the turn before this one ended because the model returned "
+        "no parseable action after its retries, and was cut off mid-work; "
+        "it did not choose to stop and did not reach its iteration cap. ")
+    _TRUNCATED_PARENT_PREAMBLE = (
+        "Whatever set it was "
         "working through, assume it is PARTLY done and that neither it nor "
         "you know how much. Do not describe the work as complete, "
         "finished, fully verified or fully grounded, and do not let a "
@@ -2972,7 +2981,9 @@ class ConcernsMixin:
         if not next_slice:
             return None
         if truncated:
-            next_slice = self._TRUNCATED_PARENT_PREAMBLE + next_slice
+            cause = (self._CUT_OFF_BY_NO_ACTION if getattr(self, '_react_no_action', False)
+                     else self._CUT_OFF_BY_CAP)
+            next_slice = cause + self._TRUNCATED_PARENT_PREAMBLE + next_slice
         parent = self.resource_manager.get_resource(parent_id)
         if not parent:
             return None

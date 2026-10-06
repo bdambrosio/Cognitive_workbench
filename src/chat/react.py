@@ -491,6 +491,9 @@ class ReactMixin:
         # it. Single slot (most-recent-wins) and reset each turn: a fresh frame
         # replaces the old one, and stale frames don't leak across turns.
         self._pending_tool_image = None
+        # True when the turn ends because no parseable action came back,
+        # so the successor's note does not call that an iteration cap.
+        self._react_no_action = False
         # Set by the dispatcher when a tool put its own output on the canvas
         # (generate-image); read and cleared after the dispatch below.
         self._tool_displayed = False
@@ -638,6 +641,7 @@ class ReactMixin:
                 logger.warning(
                     f"[{self.character_name}] ReAct iter {i+1}: no parseable action after "
                     f"{REACT_MAX_FORMAT_RETRIES + 1} attempts; bailing to fallback synthesis")
+                self._react_no_action = True
                 break
 
             # The model call above may have taken a while; an interrupt that
@@ -881,7 +885,8 @@ class ReactMixin:
             self._affect.set_tool(None)
             logger.info(f"[{self.character_name}] ReAct iter {i+1}: {tool} → {binding} ({len(obs)} chars)")
 
-        logger.warning(f"[{self.character_name}] ReAct hit max iters ({REACT_MAX_ITERS})")
+        if not self._react_no_action:
+            logger.warning(f"[{self.character_name}] ReAct hit max iters ({REACT_MAX_ITERS})")
         reply = self._react_fallback_synthesis(log)
         self._clear_status()
         self._affect.exit_loop()
