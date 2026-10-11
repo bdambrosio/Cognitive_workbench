@@ -356,39 +356,46 @@ def test_a_better_contact_named_in_qualification_waits_for_research(tmp_path, mo
     assert runner.better_contact(cand, {"better_contact_name": ""}, tmp_path, use_contacts=False) is None
 
 
-def _daily_with(tmp_path, monkeypatch, categories, strong, most):
-    """Run `daily` with scouting that finds one new person per call and a
-    qualification that gives them the next category in `categories`.
-    Returns the summary text and the names researched."""
+def _daily_with(tmp_path, monkeypatch, outcomes, emails, most):
+    """Run `daily` with scouting that finds one new person per call. Each
+    gets the next of `outcomes`: "email" (a first message and an address),
+    "draft" (a first message and no address) or "none". Returns the summary
+    text and the names researched."""
     researched, n = [], iter(range(1000))
     monkeypatch.setattr(runner, "pickup", lambda data: [])
-    cats = iter(categories)
+    outcome = iter(outcomes)
 
-    def work(backend, writer, cands, stages, data, use_contacts, redo=False, plausible=0):
+    def work(backend, writer, cands, stages, data, use_contacts, redo=False, emails=0):
         if "research" not in stages:
             return
         for c in cands:
             researched.append(c["name"])
             d = data / runner.slug(c["name"])
             d.mkdir(parents=True, exist_ok=True)
-            (d / "qualification.json").write_text(json.dumps({"category": next(cats)}))
+            got = next(outcome)
+            (d / "qualification.json").write_text(json.dumps({"category": "strong", "region": "us"}))
+            if got != "none":
+                (d / "draft.json").write_text(json.dumps({"message": "m", "at": runner.today()}))
+                contacts.update_person(contacts.create_person(c["name"])["id"],
+                                       {"email": "p@acme.example" if got == "email" else ""})
     monkeypatch.setattr(runner, "work", work)
     found = lambda b, kind, data, want: [{"name": f"Person {next(n)}"}][:want]
     monkeypatch.setattr(runner, "scout", found)
     monkeypatch.setattr(runner, "scout_firms", found)
-    return runner.daily(Backend(), Backend(), tmp_path, strong=strong, most=most), researched
+    return runner.daily(Backend(), Backend(), tmp_path, emails=emails, most=most), researched
 
 
-def test_daily_scouts_until_the_day_has_the_strong_target(tmp_path, monkeypatch, store):
-    text, researched = _daily_with(tmp_path, monkeypatch, ["plausible", "strong", "weak", "strong"] + ["strong"] * 10,
-                                   strong=3, most=15)
-    assert len(researched) == 5 and "Strong today: 3 (target 3)" in text
+def test_daily_scouts_until_the_day_has_its_goal_of_messages_that_can_go_by_email(tmp_path, monkeypatch, store):
+    # Bruce, 2026-10-11: a person with no address does not count toward the day's goal.
+    text, researched = _daily_with(tmp_path, monkeypatch, ["draft", "email", "none", "email"] + ["email"] * 10,
+                                   emails=3, most=15)
+    assert len(researched) == 5 and "drafted today: 3 (goal 3)" in text
 
 
-def test_daily_stops_at_the_research_limit_when_too_few_are_strong(tmp_path, monkeypatch, store):
-    # Research costs searches: a day with few strong people must not spend without limit.
-    text, researched = _daily_with(tmp_path, monkeypatch, ["plausible"] * 20, strong=5, most=4)
-    assert len(researched) == 4 and "Strong today: 0 (target 5); scouted people researched: 4 of at most 4." in text
+def test_daily_stops_at_the_research_limit_when_too_few_can_be_emailed(tmp_path, monkeypatch, store):
+    # Research costs searches: a day with few addresses found must not spend without limit.
+    text, researched = _daily_with(tmp_path, monkeypatch, ["draft"] * 20, emails=5, most=4)
+    assert len(researched) == 4 and "drafted today: 0 (goal 5); scouted people researched: 4 of at most 4." in text
 
 
 def test_not_pursuing_writes_the_note_then_removes_the_entry(store):
@@ -589,7 +596,7 @@ def test_the_page_records_an_answer_and_keeps_an_edit(tmp_path, monkeypatch, sto
 
 def _emailable(tmp_path, monkeypatch, region="us"):
     """Jane Smith, Ready to contact, with an address and a qualification in `region`."""
-    from workflowsv2.outreach import app
+    from workflowsv2.outreach import app, sending
     monkeypatch.setattr(app.runner, "DATA", tmp_path)
     monkeypatch.setenv("POSTAL_ADDRESS", "PO Box 1, Town")
     cid = _person("Jane Smith", "Ready to contact")
@@ -597,8 +604,8 @@ def _emailable(tmp_path, monkeypatch, region="us"):
     (tmp_path / cid).mkdir()
     (tmp_path / cid / "qualification.json").write_text(json.dumps({"category": "strong", "region": region}))
     sent = []
-    monkeypatch.setattr(app.mail, "send", lambda *a, **k: sent.append(a) or {"error": None, "dry_run": False,
-                                                                                "message_id": "<m1@tuuyi.com>"})
+    monkeypatch.setattr(sending.mail, "send", lambda *a, **k: sent.append(a) or {"error": None, "dry_run": False,
+                                                                                    "message_id": "<m1@tuuyi.com>"})
     return app, cid, sent
 
 
@@ -624,6 +631,102 @@ def test_no_email_goes_to_someone_who_opted_out_or_is_outside_the_email_regions(
     with pytest.raises(app.HTTPException):
         app.send_email(app.Email(**ask))
     assert sent == []
+
+
+# ---- after_daily.py: what is sent and recorded with nobody present ---------------
+
+def _ready(tmp_path, name, email="", region="us", flags=(), stage="Ready to contact"):
+    """A contact at `stage` with a first message drafted. Returns the id."""
+    cid = _person(name, stage)
+    contacts.update_person(cid, {"email": email})
+    (tmp_path / cid).mkdir()
+    (tmp_path / cid / "qualification.json").write_text(json.dumps({"category": "strong", "region": region}))
+    (tmp_path / cid / "draft.json").write_text(json.dumps({"subject": "Tuuyi", "message": f"{name}, a line.",
+                                                           "flags": list(flags)}))
+    return cid
+
+
+def _unattended(tmp_path, monkeypatch, answer=None):
+    """after_daily with the mail server replaced; returns it and the list of emails sent."""
+    from workflowsv2.outreach import after_daily, sending
+    monkeypatch.setattr(runner, "DATA", tmp_path)
+    monkeypatch.setenv("POSTAL_ADDRESS", "PO Box 1, Town")
+    went = []
+    monkeypatch.setattr(sending.mail, "send", lambda to, *a, **k: went.append(to[0]) or (
+        answer or {"error": None, "dry_run": False, "message_id": f"<m{len(went)}@tuuyi.com>"}))
+    return after_daily, went
+
+
+def test_after_the_daily_run_a_first_message_goes_only_to_someone_ready_who_can_be_emailed_with_an_unflagged_draft(
+        tmp_path, monkeypatch, store):
+    after_daily, went = _unattended(tmp_path, monkeypatch)
+    jane = _ready(tmp_path, "Jane Smith", "jane@acme.example")
+    others = [_ready(tmp_path, "No Address"),
+              _ready(tmp_path, "Far Away", "far@acme.example", region="other"),
+              _ready(tmp_path, "Too Long", "long@acme.example", flags=["the message is 163 words"]),
+              _ready(tmp_path, "Not Ready", "notyet@acme.example", stage="Qualified")]
+    out = after_daily.send_ready(dry=False)
+    assert went == ["jane@acme.example"] and out["sent"] == ["Jane Smith <jane@acme.example>"]
+    assert out["held"] == ["Too Long <long@acme.example>: the message is 163 words"]
+    assert out["failed"] == []          # someone who is reached on LinkedIn is not a failure to report
+    note = store.get(jane)["notes"][-1]
+    assert (note["text"], note["channel"]) == ("Jane Smith, a line.", "email")
+    assert store.stage_of(store.get(jane)) == "Initial sent"
+    assert [store.stage_of(store.get(c)) for c in others] == ["Ready to contact"] * 3 + ["Qualified"]
+    assert after_daily.send_ready(dry=False)["sent"] == [] and len(went) == 1        # not sent twice
+
+
+@pytest.mark.parametrize("answer", [{"error": None, "dry_run": True, "message_id": "<m@tuuyi.com>"},
+                                    {"error": "SMTPAuthenticationError: refused", "dry_run": False, "message_id": ""}])
+def test_an_email_the_mail_server_did_not_take_is_not_recorded_as_sent(tmp_path, monkeypatch, store, answer):
+    # Nobody is present to notice: a contact marked sent who was not would never be written to.
+    after_daily, went = _unattended(tmp_path, monkeypatch, answer)
+    jane = _ready(tmp_path, "Jane Smith", "jane@acme.example")
+    out = after_daily.send_ready(dry=False)
+    assert out["sent"] == [] and len(out["failed"]) == 1
+    assert store.stage_of(store.get(jane)) == "Ready to contact" and store.get(jane)["notes"] == []
+
+
+def _mail(sender, subject, body="", to="bruce@tuuyi.com", **headers):
+    from email.message import EmailMessage
+    msg = EmailMessage()
+    msg["From"], msg["To"], msg["Subject"] = sender, to, subject
+    for k, v in headers.items():
+        msg[k.replace("_", "-")] = v
+    msg.set_content(body or "text")
+    return msg
+
+
+def test_mail_that_arrived_is_recorded_by_what_its_headers_show(tmp_path, monkeypatch, store):
+    after_daily, went = _unattended(tmp_path, monkeypatch)
+    monkeypatch.setenv("MAIL_FROM", "bruce@tuuyi.com")
+    jane = _ready(tmp_path, "Jane Smith", "jane@acme.example")
+    bob = _ready(tmp_path, "Bob Jones", "bob@acme.example", stage="Initial sent")
+    store.create_note(bob, "Message sent 2026-10-01", "Bob, a line.", channel="email", message_id="<first@tuuyi.com>")
+    form = "Tuuyi contact form <contact@tuuyi.com>"
+    messages = [
+        _mail(form, "[tuuyi.com] opt-out: Jane@acme.example", "Opt-out request", to="info@tuuyi.com"),
+        # from an address that is not on his contact: the thread shows whose reply it is
+        _mail("Bob <bob@gmail.example>", "Re: Tuuyi", "Yes, let us talk.\n\n> Bob, a line.\n> --\n",
+              In_Reply_To="<first@tuuyi.com>"),
+        _mail(form, "[tuuyi.com] Contact from Ann Lee", "Reason: Contact", to="info@tuuyi.com",
+              Reply_To="ann@other.example"),
+        _mail("bob@acme.example", "Out of office", "Back Monday.", In_Reply_To="<first@tuuyi.com>",
+              Auto_Submitted="auto-replied"),
+        _mail("news@list.example", "This week"),
+        # the folder read also holds what the practice sent: its own follow-up is not Bob's reply
+        _mail("Bruce <bruce@tuuyi.com>", "Re: Tuuyi", "Bob, following up.", to="bob@acme.example",
+              In_Reply_To="<first@tuuyi.com>"),
+    ]
+    found = after_daily.read_mailbox(messages, dry=False)
+    assert found["optouts"] == ["Jane Smith <jane@acme.example>"] and store.opted_out(jane)
+    assert after_daily.send_ready(dry=False)["sent"] == [] and went == []          # no email after the opt-out
+    assert found["replies"] == ["Bob Jones"] and store.stage_of(store.get(bob)) == "Replied"
+    assert [n["text"] for n in store.note_texts(bob, store.REPLY_NOTE)] == ["Yes, let us talk."]
+    assert found["forms"] == ["Contact from Ann Lee <ann@other.example>"]
+    assert found["automatic"] == ["bob@acme.example: Out of office"]
+    assert after_daily.read_mailbox(messages, dry=False)["replies"] == []          # the same mail read again
+    assert len(store.note_texts(bob, store.REPLY_NOTE)) == 1
 
 
 def test_someone_who_opted_out_is_not_pushed_again_nor_added_again(tmp_path, monkeypatch, store):
@@ -727,10 +830,11 @@ def test_a_current_employer_without_a_citation_in_the_evidence_is_not_enough(tmp
     assert store.get("jane_smith")["email"] == ""
 
 
-def test_a_plausible_person_gets_a_draft_only_in_the_us_with_a_checked_address_and_within_the_day_s_limit(
+def test_a_plausible_person_gets_a_draft_only_in_an_email_region_with_a_checked_address_and_within_the_day_s_goal(
         tmp_path, monkeypatch, store):
-    # Bruce, 2026-09-30: plausible people are drafted too, by email, at most a
-    # few a day, so their replies can be compared with those of strong people.
+    # Bruce, 2026-09-30: plausible people are drafted too, by email, so their
+    # replies can be compared with those of strong people. 2026-10-11: in the
+    # US, the UK and Canada, while the day is short of its goal of emails.
     data = tmp_path / "data"
     cited = _cite("Several of our sellers are entering diligence at the same time.")
     current = {"current": "yes", "organisation": "Acme Advisers", "citation": cited, "reason": "current role"}
@@ -747,23 +851,23 @@ def test_a_plausible_person_gets_a_draft_only_in_the_us_with_a_checked_address_a
         (d / "qualification.json").write_text(json.dumps({**_qualification("plausible"), "region": region}))
         seen = []
         monkeypatch.setattr(runner, "emit", _fake(answers, seen))
-        runner.work(Backend(), Backend(), [cand], ("draft", "push"), data, use_contacts=False, plausible=1)
+        runner.work(Backend(), Backend(), [cand], ("draft", "push"), data, use_contacts=False, emails=1)
         return d, seen
 
-    d, seen = run("Jane Canada", "ca", [])
-    assert not seen and not (d / "draft.json").exists() and not store.known("Jane Canada")
+    d, seen = run("Jane Elsewhere", "eu", [])
+    assert not seen and not (d / "draft.json").exists() and not store.known("Jane Elsewhere")
 
     d, seen = run("Jane Left", "us", [{"current": "no", "organisation": "Acme Advisers", "reason": "left"}])
     assert len(seen) == 1 and not (d / "draft.json").exists() and not store.known("Jane Left")
 
-    d, seen = run("Jane Smith", "us", [current, message])
+    d, seen = run("Jane Smith", "ca", [current, message])
     c = store.get("jane_smith")
     assert json.loads((d / "draft.json").read_text())["category"] == "plausible"
     assert c["email"] == "jane@acme.example" and c["entry"]["stage"] == "Ready to contact"
     assert c["entry"]["next_action"].endswith("by email")
     assert "Suggested message" in next(n["text"] for n in c["notes"] if n["title"].startswith("Outreach brief"))
 
-    d, seen = run("Jane Later", "us", [])                     # the day's one plausible draft is made
+    d, seen = run("Jane Later", "us", [])                     # the day has its one email
     assert not seen and not (d / "draft.json").exists() and not store.known("Jane Later")
 
 

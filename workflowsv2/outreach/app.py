@@ -9,7 +9,9 @@ it writes goes to the same two places, and only when a person presses a
 button. A LinkedIn message is copied by the person into LinkedIn, who then
 presses Sent. An email is sent only by /api/send_email with `confirm` set,
 which the page calls when the person presses Confirm send after reading the
-whole email as it will go; nothing else here sends mail.
+whole email as it will go; nothing else here sends mail. (after_daily.py,
+which daily.sh runs after the daily run, sends first messages with nobody
+present; it and this page share sending.py.)
 
 Email needs SMTP_USER, SMTP_PASS and MAIL_FROM (bruce@tuuyi.com) and
 POSTAL_ADDRESS in the environment; daily.sh reads them from
@@ -24,7 +26,6 @@ import argparse
 import datetime
 import json
 import logging
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -40,9 +41,8 @@ from fastapi import FastAPI, HTTPException                              # noqa: 
 from fastapi.responses import FileResponse                              # noqa: E402
 from pydantic import BaseModel                                          # noqa: E402
 
-from workflowsv2.outreach import contacts, runner, schemas                # noqa: E402
+from workflowsv2.outreach import contacts, runner, schemas, sending       # noqa: E402
 from utils.file_utils import atomic_write_text                          # noqa: E402
-from client_ui import mail                                              # noqa: E402
 
 logger = logging.getLogger("outreach.app")
 
@@ -55,10 +55,7 @@ GROUPS = ("replies", "followup", "ready", "noresponse", "waiting", "qualified", 
 GROUP_OF = {"Ready to contact": "ready", "Qualified": "qualified", "Research": "research",
             "Initial sent": "followup", "Follow-up sent": "noresponse",
             "Replied": "replies", "Conversation": "replies"}
-FOLLOWUP_AFTER_DAYS = 6
-CLOSE_AFTER_DAYS = 7
-OPTOUT_URL = "https://tuuyi.com/optout"
-OPTOUT_API = "https://tuuyi.com/api/optout"
+FOLLOWUP_AFTER_DAYS, CLOSE_AFTER_DAYS = sending.FOLLOWUP_AFTER_DAYS, sending.CLOSE_AFTER_DAYS
 
 app = FastAPI()
 _run: Dict[str, Any] = {"proc": None, "what": None, "started": None}
@@ -200,16 +197,8 @@ def replied(body: Replied) -> Dict[str, Any]:
     if not body.reply.strip():
         raise HTTPException(422, "paste the reply")
     try:
-        # compared without regard to spacing: notes carried over from Attio were re-spaced
-        if any(n["text"].split() == body.reply.split() for n in contacts.note_texts(body.record_id, contacts.REPLY_NOTE)):
+        if not sending.record_reply(body.record_id, body.reply, today()):
             raise HTTPException(409, "this reply is already recorded for this person")
-        entry = contacts.entry_of(body.record_id)
-        contacts.create_note(body.record_id, f"{contacts.REPLY_NOTE} {today()}", body.reply.strip())
-        values: Dict[str, Any] = {"last_contact": today(), "next_action": "Read the reply",
-                                  "next_action_date": today()}
-        if entry is None or contacts.stage_of(entry) != "Conversation":
-            values["stage"] = "Replied"
-        contacts.upsert_entry(body.record_id, values)
     except contacts.ContactError as e:
         raise HTTPException(422, str(e))
     reading = not _running()
@@ -291,22 +280,7 @@ def conversation(body: Record) -> Dict[str, Any]:
 
 def _email_refusal(cid: str, local: Optional[Dict[str, Any]] = None) -> Optional[str]:
     """Why this person may not be emailed, or None when they may."""
-    if contacts.opted_out(cid):
-        return "they asked not to be contacted again"
-    if not contacts.get(cid).get("email"):
-        return "no email address"
-    q = (local if local is not None else _local(cid)).get("qualification") or {}
-    if not runner.email_allowed(q):
-        return f"their region ({q.get('region') or 'not recorded'}) is contacted on LinkedIn"
-    if not os.environ.get("POSTAL_ADDRESS", "").strip():
-        return "POSTAL_ADDRESS is not set, and an email must carry it"
-    return None
-
-
-def footer(address: str) -> str:
-    """The text every email ends with: the practice's name and postal address, and how to opt out."""
-    return (f"--\nTuuyi · {os.environ.get('POSTAL_ADDRESS', '').strip()}\n"
-            f"If you'd rather not hear from me again: {OPTOUT_URL}?e={address}")
+    return sending.refusal(cid, None if local is None else local.get("qualification") or {})
 
 
 class Email(BaseModel):
@@ -323,46 +297,14 @@ def send_email(body: Email) -> Dict[str, Any]:
     read. With `confirm`: send that email and record it as /api/sent or
     /api/followup_sent would, with the channel and Message-ID beside the text."""
     try:
-        why_not = _email_refusal(body.record_id)
-        if why_not:
-            raise HTTPException(409, f"not sent: {why_not}")
-        if body.which not in ("draft", "followup"):
-            raise HTTPException(422, "which must be draft or followup")
-        if not body.message.strip() or (body.which == "draft" and not body.subject.strip()):
-            raise HTTPException(422, "the subject and the message are needed")
-        address = contacts.get(body.record_id)["email"]
-        headers = {"List-Unsubscribe": f"<mailto:info@tuuyi.com?subject=unsubscribe>, <{OPTOUT_API}?e={address}>",
-                   "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"}
-        subject = body.subject.strip()
-        if body.which == "followup":
-            first = [n for n in contacts.notes(body.record_id)
-                     if str(n.get("title") or "").startswith(contacts.SENT_NOTE) and n.get("message_id")]
-            if first:                  # a reply in the thread of the first email
-                headers.update({"In-Reply-To": first[-1]["message_id"], "References": first[-1]["message_id"]})
-                subject = subject or f"Re: {first[-1].get('subject', '')}".strip()
-            if not subject:
-                raise HTTPException(422, "the first message did not go by email: give the follow-up a subject")
-        text = body.message.strip() + "\n\n" + footer(address)
-        shown = {"from": os.environ.get("MAIL_FROM") or os.environ.get("SMTP_USER") or "(not set)",
-                 "to": address, "subject": subject, "text": text, "dry_run": mail.dry_run()}
         if not body.confirm:
-            return shown
-        rec = mail.send([address], subject, text, headers=headers)
-        if rec["error"]:
-            raise HTTPException(502, f"not sent: {rec['error']}")
-        if rec["dry_run"]:
-            return {**shown, "sent": False, "note": "dry run: SMTP_PASS is not set, so nothing was sent or recorded"}
-        title, stage, action, days = ((contacts.SENT_NOTE, "Initial sent", "Follow up if no response", FOLLOWUP_AFTER_DAYS)
-                                      if body.which == "draft" else
-                                      (contacts.FOLLOWUP_NOTE, "Follow-up sent", "Close if no response", CLOSE_AFTER_DAYS))
-        contacts.create_note(body.record_id, f"{title} {today()}", body.message.strip(), channel="email",
-                             to=address, subject=subject, message_id=rec["message_id"])
-        contacts.upsert_entry(body.record_id, {"stage": stage, "last_contact": today(), "next_action": action,
-                                               "next_action_date": (datetime.date.today() + datetime.timedelta(
-                                                   days=days)).isoformat()})
+            shown = sending.compose(body.record_id, body.which, body.subject, body.message)
+            return {k: v for k, v in shown.items() if k != "headers"}
+        return sending.send(body.record_id, body.which, body.subject, body.message, today())
+    except sending.Refused as e:
+        raise HTTPException(e.status, str(e))
     except contacts.ContactError as e:
         raise HTTPException(422, str(e))
-    return {**shown, "sent": True}
 
 
 @app.post("/api/opted_out")

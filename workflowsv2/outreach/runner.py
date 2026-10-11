@@ -1,7 +1,7 @@
 """Research, qualify and draft a first message for people the practice names.
 
     workflowsv2/outreach/daily.sh                                  (the whole day's work, and the page)
-    python3 workflowsv2/outreach/runner.py daily [--strong 5] [--most 15] [--plausible 3]
+    python3 workflowsv2/outreach/runner.py daily [--emails 9] [--most 15]
     python3 workflowsv2/outreach/runner.py run --candidates <file.yaml> [--only <slug>]
     python3 workflowsv2/outreach/runner.py research|qualify|draft|brief ...   (one stage)
     python3 workflowsv2/outreach/runner.py followups|replies               (after a message is sent)
@@ -10,10 +10,11 @@
 the practice has recorded and drafts the follow-ups that are due; then scouts, one person
 at a time with the kinds in turn from the day's kind (the day's kind goes by date; people
 an earlier scout found of a kind are taken before any new search), until the day has
-`--strong` new strong candidates or `--most` scouted people have been researched; and
-pushes everything it qualified. Up to `--plausible` plausible candidates a day in the US
-also get a first message, when a work address for them is on record or is found and
-checked first (look under `draft`). The model is the local Qwen unless `--model` names another;
+`--emails` people with a first message and an address it can go to, or `--most` scouted
+people have been researched; and pushes everything it qualified. A person with no address
+does not count toward `--emails`. A plausible candidate in a region the practice emails
+gets a first message while the day is short of that number, when a work address for them
+is on record or is found and checked first (look under `draft`). The model is the local Qwen unless `--model` names another;
 qualification uses the `--qualifier` model, gpt-6.1-sol unless it names another; the three
 calls that write a message to send (the first message, the follow-up, the answer to a reply)
 use the `--writer` model, Claude Opus 5.5 unless it names another.
@@ -35,9 +36,9 @@ no tools; everything that touches the network is code.
                citation is checked against its evidence file by program; one
                whose quote is not in the file is dropped and recorded.
     draft      for a `strong` candidate, the message (§15), checked the
-               same way. Also for a `plausible` candidate in the US while fewer
-               than `--plausible` plausible candidates have a draft dated
-               today, and only when the person has a work address on record,
+               same way. Also for a `plausible` candidate in EMAIL_REGIONS while
+               fewer than `--emails` people have a draft dated today and an
+               address it can go to, and only when the person has a work address on record,
                or one is found (FINDERS) and the evidence shows they work
                there now (§29); the checks are recorded in address.json, and
                the draft records the category it was written for, so that
@@ -87,7 +88,9 @@ WITHOUT --candidates the candidates are the contacts in the outreach list
 at stage Research: a person adds a name there, with how they know them in the
 entry's Notes and any pasted text in a note titled "Evidence: <source>".
 
-NOTHING IS SENT. A person reads the brief, edits the message and sends it.
+THIS PROGRAM SENDS NOTHING. after_daily.py, which daily.sh runs next, sends
+the first messages that can go by email; a person sends everything else from
+the page.
 The category is the model's and is never changed by code; what the checks
 find is written into the brief for the person to weigh.
 
@@ -528,9 +531,9 @@ OURS = (None, "Research")
 
 
 #: The regions (PROSPECT.md §14) where the practice sends a first message by
-#: email. Anyone else is approached on LinkedIn, unless the evidence shows
-#: their own address, which they published themselves.
-EMAIL_REGIONS = ("us", "uk", "eu")
+#: email (Bruce, 2026-10-11). Anyone else is approached on LinkedIn, unless
+#: the evidence shows their own address, which they published themselves.
+EMAIL_REGIONS = ("us", "uk", "ca")
 
 
 def email_allowed(q: Dict[str, Any]) -> bool:
@@ -623,21 +626,31 @@ def find_address(c: Dict[str, Any], cand_dir: Path, q: Dict[str, Any]) -> List[D
     return checks
 
 
-#: Where a plausible candidate may get a first message: by email only, and
-#: so far only in the US (Bruce, 2026-09-30).
-PLAUSIBLE_REGIONS = ("us",)
+def emailable(cid: str, q: Dict[str, Any]) -> bool:
+    """Whether an email can go to this contact: an address on record, a region
+    the practice emails or their own published address (email_allowed), and
+    no request to stop."""
+    try:
+        person = contacts.get(cid)
+    except contacts.ContactError:
+        return False
+    return bool(person.get("email")) and email_allowed(q) and not contacts.opted_out(cid)
 
 
-def plausible_drafted_today(data: Path) -> int:
+def emails_drafted_today(data: Path) -> int:
+    """How many people have a first message dated today that can go by email.
+    This is the number the day's goal counts: a person with no address is
+    not in it."""
     return sum(1 for f in data.glob("*/draft.json")
-               if (d := _read_json(f)) and d.get("at") == today() and d.get("category") == "plausible")
+               if (d := _read_json(f)) and d.get("at") == today()
+               and emailable(f.parent.name, _read_json(f.parent / "qualification.json") or {}))
 
 
-def plausible_gets_draft(c: Dict[str, Any], cand_dir: Path, q: Dict[str, Any], data: Path, most: int) -> bool:
-    """Whether a plausible candidate gets a first message: in PLAUSIBLE_REGIONS,
-    fewer than `most` plausible drafts today, and a work address on record
-    or found and checked now."""
-    if q.get("region") not in PLAUSIBLE_REGIONS or plausible_drafted_today(data) >= most:
+def plausible_gets_draft(c: Dict[str, Any], cand_dir: Path, q: Dict[str, Any], data: Path, emails: int) -> bool:
+    """Whether a plausible candidate gets a first message, which goes by email
+    only: in EMAIL_REGIONS, the day still short of `emails` (emails_drafted_today),
+    and a work address on record or found and checked now."""
+    if q.get("region") not in EMAIL_REGIONS or emails_drafted_today(data) >= emails:
         return False
     person = contacts.find_person(c["name"])
     if person and person.get("email"):
@@ -727,7 +740,7 @@ def push(c: Dict[str, Any], cand_dir: Path) -> Optional[Dict[str, Any]]:
     stage = "Ready to contact" if drafted and reachable else STAGE_OF[category]
     values: Dict[str, Any] = {"stage": stage, "fit_rationale": why}
     if drafted and reachable:
-        values.update(next_action="Review the draft and send" + (" on LinkedIn" if category == "strong" else " by email"),
+        values.update(next_action="Review the draft and send" + (" by email" if emailable(rid, q) else " on LinkedIn"),
                       next_action_date=today())
     elif drafted:
         values.update(next_action="No email address or LinkedIn found; find a way to reach them, then send the draft",
@@ -1141,10 +1154,10 @@ RECORDS = {"research": "research.json", "qualify": "qualification.json", "draft"
 
 
 def work(backend, writer, cands: List[Dict[str, Any]], stages, data: Path, use_contacts: bool,
-         redo: bool = False, plausible: int = 0) -> None:
+         redo: bool = False, emails: int = 0) -> None:
     """Run the named stages for each candidate. A stage whose record exists
-    is not run again unless `redo`. At most `plausible` plausible candidates
-    a day get a draft (plausible_gets_draft)."""
+    is not run again unless `redo`. A plausible candidate gets a draft only
+    while the day is short of `emails` (plausible_gets_draft)."""
     for c in cands:
         cand_dir = data / slug(c["name"])
         cand_dir.mkdir(parents=True, exist_ok=True)
@@ -1167,7 +1180,7 @@ def work(backend, writer, cands: List[Dict[str, Any]], stages, data: Path, use_c
                 continue
             if st == "draft":
                 q = _read_json(cand_dir / "qualification.json") or {}
-                if q.get("category") != "plausible" or plausible_gets_draft(c, cand_dir, q, data, plausible):
+                if q.get("category") != "plausible" or plausible_gets_draft(c, cand_dir, q, data, emails):
                     draft(writer, c, cand_dir)
                 continue
             research(backend, c, cand_dir)
@@ -1214,39 +1227,38 @@ def _is_strong(c: Dict[str, Any], data: Path) -> bool:
     return (_read_json(data / slug(c["name"]) / "qualification.json") or {}).get("category") == "strong"
 
 
-def daily(backend, writer, data: Path, strong: int, most: int, plausible: int = 0) -> str:
+def daily(backend, writer, data: Path, emails: int, most: int) -> str:
     """The whole day's work, in order: a backup of the records; the names waiting at Research in the contacts;
     the replies recorded and not yet read, and the follow-ups that are due;
     then scouting, one person at a time with the kinds in turn from the day's
-    kind, until the day has `strong` new strong candidates or `most` people
-    scouted have been researched. Up to `plausible` plausible people get a
-    draft (work). Everything qualified is pushed. Returns what
-    a person needs to read."""
+    kind, until the day has `emails` people with a first message that can go
+    by email (emails_drafted_today) or `most` people scouted have been
+    researched. Everything qualified is pushed. Returns what a person needs
+    to read."""
     data.mkdir(parents=True, exist_ok=True)
     logger.info("backup: %s", backup(data))
     named = pickup(data)
-    work(backend, writer, named, STAGES + ("push",), data, use_contacts=True, plausible=plausible)
+    work(backend, writer, named, STAGES + ("push",), data, use_contacts=True, emails=emails)
     work(backend, writer, unpushed(data), ("push",), data, use_contacts=True)      # left by an earlier scout
     read, drafted = replies(backend, writer, data), followups(writer, data)
     lines = [f"Names you added, researched today: {len(named)}.",
              f"Replies read: {len(read)}{' (' + ', '.join(read) + ')' if read else ''}.",
              f"Follow-ups drafted: {len(drafted)}{' (' + ', '.join(drafted) + ')' if drafted else ''}."]
-    got = sum(_is_strong(c, data) for c in named)
     start = DAILY_KINDS.index(next_kind())
     kinds = list(DAILY_KINDS[start:] + DAILY_KINDS[:start])
     scouted: List[Dict[str, Any]] = []
-    while kinds and got < strong and len(scouted) < most:
+    while kinds and emails_drafted_today(data) < emails and len(scouted) < most:
         kind = kinds.pop(0)
         found = (scout_firms if kind in FIRM_KINDS else scout)(backend, kind, data, 1)
         if not found:
             logger.info("scout: nobody new for %s; it is left out for the rest of the day", kind)
             continue
         kinds.append(kind)
-        work(backend, writer, found, STAGES + ("push",), data, use_contacts=True, plausible=plausible)
+        work(backend, writer, found, STAGES + ("push",), data, use_contacts=True, emails=emails)
         scouted += found
-        got += _is_strong(found[0], data)
-    lines.append(f"Strong today: {got} (target {strong}); scouted people researched: {len(scouted)} of at most {most}.")
-    lines.append(f"Plausible people drafted today: {plausible_drafted_today(data)} of at most {plausible}.")
+    lines.append(f"First messages that can go by email, drafted today: {emails_drafted_today(data)} (goal {emails}); "
+                 f"scouted people researched: {len(scouted)} of at most {most}.")
+    lines.append(f"Strong today: {sum(_is_strong(c, data) for c in named + scouted)}.")
     ready = sum(1 for e in contacts.entries() if contacts.stage_of(e) == "Ready to contact")
     lines.append(f"Ready to contact now: {ready}.")
     return summary(named + scouted, data) + "\n" + "\n".join(lines) + "\n"
@@ -1271,13 +1283,12 @@ def main() -> int:
     ap.add_argument("--want", type=int, default=3,
                     help="for `scout`: how many of the people found go on to research now; "
                          "the rest wait for the next scout (research costs searches)")
-    ap.add_argument("--strong", type=int, default=5,
-                    help="for `daily`: scouting stops when the day has this many new strong candidates")
+    ap.add_argument("--emails", type=int, default=9,
+                    help="for `daily`: scouting stops when the day has this many people with a first message "
+                         "and an address it can go to; for `daily` and the draft stage: a plausible person "
+                         "gets a first message only while the day is short of this number")
     ap.add_argument("--most", type=int, default=15,
                     help="for `daily`: scouting stops when this many people it found have been researched")
-    ap.add_argument("--plausible", type=int, default=3,
-                    help="for `daily` and the draft stage: at most this many plausible people in the US "
-                         "get a first message a day, each only with a work address found and checked")
     ap.add_argument("--scouted", action="store_true",
                     help="the candidates are the people scouting found to fit who are qualified and not yet pushed")
     ap.add_argument("--only", default=None, help="one candidate, by slug (the name in lower case, _ for spaces)")
@@ -1293,7 +1304,7 @@ def main() -> int:
     writer = (backend_from_model(args.writer)
               if args.stage in ("daily", "followups", "replies") or "draft" in stages else None)
     if args.stage == "daily":
-        print(daily(backend, writer, args.data, args.strong, args.most, args.plausible))
+        print(daily(backend, writer, args.data, args.emails, args.most))
         return 0
     if args.stage in ("followups", "replies"):
         args.data.mkdir(parents=True, exist_ok=True)
@@ -1313,7 +1324,7 @@ def main() -> int:
     todo = [c for c in cands if args.only in (None, slug(c["name"]))]
     if not todo and args.only:
         raise SystemExit(f"no candidate with the slug {args.only}")
-    work(backend, writer, todo, stages, args.data, args.contacts, args.redo, args.plausible)
+    work(backend, writer, todo, stages, args.data, args.contacts, args.redo, args.emails)
     print(summary(cands, args.data))
     return 0
 

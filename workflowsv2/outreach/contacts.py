@@ -135,6 +135,12 @@ def find_person(name: str) -> Optional[Dict[str, Any]]:
     return json.loads(p.read_text(encoding="utf-8")) if slug(name) and p.is_file() else None
 
 
+def find_by_email(address: str) -> Optional[Dict[str, Any]]:
+    """The contact whose email address this is, or None. Case does not count."""
+    address = address.strip().lower()
+    return next((c for c in everyone() if address and (c.get("email") or "").strip().lower() == address), None)
+
+
 def known(name: str) -> bool:
     """Whether the practice already has a person of this name."""
     return find_person(name) is not None

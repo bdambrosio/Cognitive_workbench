@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # The day's outreach work: start the page if it is not up, run `runner.py daily`,
-# and say where to look. Run it from anywhere:
+# then `after_daily.py`, which reads the mailbox for opt-outs and replies, sends
+# the first messages that can go by email, and emails a summary. Run it from
+# anywhere:
 #
-#     workflowsv2/outreach/daily.sh [--strong 5] [--most 15]
+#     workflowsv2/outreach/daily.sh [--emails 9] [--most 15]
 #
 # The API keys come from ~/.config/secrets.env, loaded whole; a value there
 # replaces one already in the environment. A shell that is not interactive does
@@ -32,18 +34,20 @@ if ! curl -s -m 5 "http://127.0.0.1:5000/v1/models" > /dev/null; then
   case " $* " in *" --model "*) ;; *) exit 1 ;; esac
 fi
 
+# The email settings (SMTP_USER, SMTP_PASS, MAIL_FROM, POSTAL_ADDRESS), for the
+# page and for after_daily.py; without the file neither sends anything.
+[ -f "$HOME/.config/tuuyi-outreach.env" ] && { set -a; . "$HOME/.config/tuuyi-outreach.env"; set +a; }
 if ! curl -s -m 5 "http://127.0.0.1:$PORT/api/run" > /dev/null; then
-  # The page's email settings (SMTP_USER, SMTP_PASS, MAIL_FROM, POSTAL_ADDRESS);
-  # without the file the page offers no email and sends nothing.
-  [ -f "$HOME/.config/tuuyi-outreach.env" ] && { set -a; . "$HOME/.config/tuuyi-outreach.env"; set +a; }
   setsid nohup "$PY" "$REPO/workflowsv2/outreach/app.py" --port "$PORT" > "$LOG/app.log" 2>&1 < /dev/null &
   echo "Started the page."
 fi
 
 "$PY" "$REPO/workflowsv2/outreach/runner.py" daily "$@" 2> "$LOG/daily.log"
 status=$?
-[ $status -eq 0 ] || { echo "The daily run failed; the last lines of $LOG/daily.log:"; tail -5 "$LOG/daily.log"; }
-echo "Review and send at http://127.0.0.1:$PORT"
+failed=""
+[ $status -eq 0 ] || { echo "The daily run failed; the last lines of $LOG/daily.log:"; tail -5 "$LOG/daily.log"; failed="--run-failed"; }
+"$PY" "$REPO/workflowsv2/outreach/after_daily.py" $failed 2> "$LOG/after_daily.log" \
+  || { status=1; echo "The step after the daily run reported a problem; the last lines of $LOG/after_daily.log:"; tail -3 "$LOG/after_daily.log"; }
 exit $status
 }
 
