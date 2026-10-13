@@ -466,7 +466,7 @@ class MemoriesMixin:
             props = note.get('properties') or {}
             if props.get('superseded_by') or props.get('retired'):
                 continue
-            text = (note.get('content') or note.get('description') or '').strip()
+            text = str(props.get('content') or '').strip()
             if not text:
                 continue
             out.append((nid, count, text))

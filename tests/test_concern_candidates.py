@@ -164,6 +164,17 @@ def test_near_miss_rows_and_recurrence(tmp_path):
     assert near_miss_recurrent(tmp_path / "absent.jsonl") == []
 
 
+def test_near_miss_recurrent_shows_the_memory_text(loop):
+    """Reflection is shown what the memory says. A note's text is stored in
+    properties['content']; its description is create_note's boilerplate."""
+    from utils.file_utils import append_jsonl
+    nid = _note(loop, "Collection_ac", {"kind": "memory"}, text="the port was open on Tuesday")
+    for _ in range(3):
+        append_jsonl(loop._near_misses_path(), {"note_id": nid, "final": 0.61, "rank": 4, "of": 5},
+                     character="Tester")
+    assert loop._near_miss_recurrent() == [(nid, 3, "the port was open on Tuesday")]
+
+
 def test_recall_records_losers_only_when_asked(loop, tmp_path):
     loop._memories_collection_id = "Collection_mem"
     hits = [{"document": f"m{i}", "score": 0.9 - i * 0.05, "metadata": {"source_note_id": f"Note_{i}"}}
