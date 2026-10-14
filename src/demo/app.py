@@ -269,6 +269,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     from workflowsv2 import engagement_state as state           # noqa: E402
     from workflowsv2.claims_audit.post_session import PostSession  # noqa: E402
+    from workflowsv2.audit_report.render import not_tested      # noqa: E402
     eng_dir = state.ENGAGEMENTS / args.engagement
     if not eng_dir.is_dir():
         raise SystemExit(f"no engagement '{args.engagement}'")
@@ -291,13 +292,16 @@ def main(argv: Optional[List[str]] = None) -> int:
     merged = base.merged
     fig = merged.get("figures") or {}
     asked = {f["claim_source"] for f in merged.get("findings") or [] if f.get("asked_by")}
-    seller_runs = [r for r in merged.get("runs") or [] if r.get("claim_source") not in asked]
+    # A claim source whose every claim went untested has no run, so its name
+    # comes from the frozen surfaces, as in the report's own scope table.
+    sources = ({r.get("claim_source") for r in merged.get("runs") or []}
+               | {r.get("claim_source") for r in not_tested(base.merged_dir)}) - asked
     document = redactor.deep({
         "kind": "report", "engagement": cfg["display_name"], "intake": None,
         "run": "demo", "html": base.document()["html"],
         "findings": base.findings(),
         "banner": banner(cfg["display_name"], fig.get("claims", 0),
-                         fig.get("findings", 0), len(seller_runs),
+                         fig.get("findings", 0), len(sources),
                          cfg["model_label"], question_lists=len(asked))})
     leaks = redactor.leaks(json.dumps(document))
     if leaks:
