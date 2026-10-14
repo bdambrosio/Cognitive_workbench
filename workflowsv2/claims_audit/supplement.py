@@ -4,6 +4,13 @@ test. The practice runs it, after delivery, when a client asks for it.
     python3 workflowsv2/claims_audit/supplement.py run     --engagement E --claim-source SRC --claim N --by NAME [--model yaml]
     python3 workflowsv2/claims_audit/supplement.py approve --engagement E --supplement <directory name> --by NAME
     python3 workflowsv2/claims_audit/supplement.py list    --engagement E
+    python3 workflowsv2/claims_audit/supplement.py run     --engagement E --claim-source SRC --claim N --by NAME --model yaml --experiment
+
+`--experiment` tests a claim the delivered review already tested, to see how
+another model, or the claim tested alone, fares. The record is marked as an
+experiment and can never be approved: it stays in supplements_pending/ and
+reaches no client (Bruce, 2026-10-14: questions/standard-v1.md #5 and
+README.md #50 on chhoto-full, GLM-5.3 full against Flash).
 
 `run` writes a surface holding the one claim, runs the audit runner on it and
 then the review runner on that audit, both unchanged and with the arguments
@@ -114,7 +121,8 @@ def delivered_model(merged_dir: Path, claim_source: str) -> str:
     raise Refused(f"the delivered run records no audit of {claim_source!r}; name the model with --model")
 
 
-def one_claim_surface(surface: Dict[str, Any], claim_source: str, cid: int) -> Dict[str, Any]:
+def one_claim_surface(surface: Dict[str, Any], claim_source: str, cid: int,
+                      experiment: bool = False) -> Dict[str, Any]:
     """The surface the audit runner is given: the one claim with its tier
     removed, because the runner tests a claim that has no tier 2 or 3
     (schemas.split_by_tier). A claim read from another (`implied_by`) needs
@@ -124,7 +132,7 @@ def one_claim_surface(surface: Dict[str, Any], claim_source: str, cid: int) -> D
     claim = by_id.get(cid)
     if claim is None:
         raise Refused(f"{claim_source} has no claim {cid} in its frozen surface")
-    if claim.get("tier") not in (2, 3):
+    if claim.get("tier") not in (2, 3) and not experiment:
         raise Refused(f"{claim_source} #{cid} is tier {claim.get('tier')}: the delivered review tested it")
     claims = [{k: v for k, v in claim.items() if k not in ("tier", "tier_basis")}]
     parent = by_id.get(claim.get("implied_by"))
@@ -189,7 +197,9 @@ def markdown(rec: Dict[str, Any]) -> str:
             + ("" if rec["model_is_delivered"] else " (NOT the model the delivered audit ran on)") + ".", "",
             f"> {' '.join(str(c.get('quote') or '').split())}", "",
             f"**Statement:** {c.get('statement')}", "",
-            f"**As delivered:** listed, not tested, tier {rec['tier']}. {rec.get('tier_basis') or ''}", ""]
+            (f"**As delivered:** tested; its finding is in the delivered report. "
+             "EXPERIMENT: never released to a client." if rec.get("experiment") else
+             f"**As delivered:** listed, not tested, tier {rec['tier']}. {rec.get('tier_basis') or ''}"), ""]
     if rec.get("error"):
         rows += [f"**The test did not finish:** {rec['error']}", ""]
     if f:
@@ -219,14 +229,17 @@ def markdown(rec: Dict[str, Any]) -> str:
     return "\n".join(rows) + "\n"
 
 
-def run(eng_dir: Path, claim_source: str, cid: int, by: str, model: Optional[str] = None) -> Path:
-    """Test one listed claim. Returns the supplement's directory."""
+def run(eng_dir: Path, claim_source: str, cid: int, by: str, model: Optional[str] = None,
+        experiment: bool = False) -> Path:
+    """Test one listed claim, or with `experiment` any claim. Returns the
+    supplement's directory."""
     job = state.running_job(eng_dir)
     if job:
         raise Refused(f"a {job.get('kind')} job is running for this engagement; wait for it to end")
     merged = delivered_run(eng_dir)
     for rec in records(eng_dir) + pending(eng_dir):
-        if (rec["claim_source"], rec["claim"]["id"], rec["delivered_run"]) == (claim_source, cid, merged.name) \
+        if not experiment and not rec.get("experiment") \
+                and (rec["claim_source"], rec["claim"]["id"], rec["delivered_run"]) == (claim_source, cid, merged.name) \
                 and not rec.get("error"):
             raise Refused(f"this claim was already tested after delivery: {rec['dir']} "
                           f"({'released' if rec.get('approved') else 'waiting for approval'})")
@@ -234,22 +247,26 @@ def run(eng_dir: Path, claim_source: str, cid: int, by: str, model: Optional[str
     if not frozen.is_file():
         raise Refused(f"no frozen surface for {claim_source!r}")
     surface = _read(frozen)
-    one = one_claim_surface(surface, claim_source, cid)
+    one = one_claim_surface(surface, claim_source, cid, experiment)
     claim = next(c for c in surface["claims"] if c.get("id") == cid)
     own = delivered_model(merged, claim_source) if model is None else None
     model = model or own
 
     ts = state.stamp()
-    out = pending_dir(eng_dir) / f"{ts}_{jobs.slug(claim_source)}_{cid}"
+    tag = f"experiment_{Path(model).stem}_" if experiment else ""
+    out = pending_dir(eng_dir) / f"{ts}_{tag}{jobs.slug(claim_source)}_{cid}"
     out.mkdir(parents=True)
     _write(out / "surface.json", one)
-    world = f"supp_{eng_dir.name}_{jobs.slug(claim_source)}_{cid}_{ts}"
+    # An experiment's world names its model: two experiments on one claim,
+    # started in the same second on two models, shared a world and so a run
+    # directory, and each runner wrote into the other's (2026-10-14).
+    world = f"supp_{eng_dir.name}_{tag}{jobs.slug(claim_source)}_{cid}_{ts}"
     rec: Dict[str, Any] = {"engagement": eng_dir.name, "claim_source": claim_source,
                            "claim": {k: claim.get(k) for k in ("id", "quote", "lines", "statement", "about")},
                            "tier": claim.get("tier"), "tier_basis": claim.get("tier_basis"),
                            "delivered_run": merged.name, "model": model, "model_is_delivered": own is not None,
                            "world": world, "at": ts, "by": by, "audit_run": None, "error": None,
-                           "approved": None}
+                           "approved": None, "experiment": experiment}
     log = out / "run.log"
     code = _step(audit_command(eng_dir.name, claim_source, out / "surface.json", model, world), log)
     run_dir = jobs._newest(eng_dir / "runs", world)
@@ -282,6 +299,8 @@ def approve(eng_dir: Path, name: str, by: str) -> Dict[str, Any]:
             raise Refused(f"{name} is already approved")
         raise Refused(f"no supplement {name!r} waiting for approval in this engagement")
     rec = _read(src / RECORD)
+    if rec.get("experiment"):
+        raise Refused("this is an experiment; it is never released to a client")
     if rec.get("error") or not rec.get("finding") or not rec.get("review"):
         raise Refused("this test did not finish with a finding and a check; it cannot be approved")
     home = eng_dir / "runs" / rec["audit_run_name"]
@@ -307,6 +326,8 @@ def main() -> int:
     ap.add_argument("--supplement", help="for `approve`: the supplement's directory name")
     ap.add_argument("--by", help="who runs or approves it")
     ap.add_argument("--model", default=None, help="default: the model the delivered audit of the claim source ran on")
+    ap.add_argument("--experiment", action="store_true",
+                    help="for `run`: allow a claim the delivered review tested; the record can never be approved")
     args = ap.parse_args()
     eng_dir = state.ENGAGEMENTS / args.engagement
     if not eng_dir.is_dir():
@@ -329,7 +350,7 @@ def main() -> int:
             return 0
         if not args.claim_source or args.claim is None:
             raise SystemExit("run needs --claim-source and --claim")
-        out = run(eng_dir, args.claim_source, args.claim, args.by, args.model)
+        out = run(eng_dir, args.claim_source, args.claim, args.by, args.model, args.experiment)
     except Refused as e:
         raise SystemExit(f"refused: {e}")
     rec = _read(out / RECORD)

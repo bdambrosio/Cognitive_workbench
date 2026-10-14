@@ -197,3 +197,20 @@ def test_approve_records_who_and_when_and_a_check_that_does_not_hold_is_shown(en
     assert [r["dir"] for r in supplement.records(eng)] == [out.name]
     with pytest.raises(supplement.Refused, match="no supplement"):
         supplement.approve(eng, "nothing", by="Bruce")
+
+
+def test_an_experiment_may_retest_a_tested_claim_and_can_never_be_released(eng, monkeypatch):
+    # Bruce, 2026-10-14: a tested claim re-audited alone, on another model.
+    _fake_runners(monkeypatch, eng, [])
+    with pytest.raises(supplement.Refused, match="tested it"):
+        supplement.run(eng, SRC, 1, by="Bruce")
+    out = supplement.run(eng, SRC, 1, by="Bruce", model="m.yaml", experiment=True)
+    again = supplement.run(eng, SRC, 1, by="Bruce", model="n.yaml", experiment=True)   # no "already tested"
+    assert "experiment_m_" in out.name and "experiment_n_" in again.name
+    worlds = [json.loads((d / "supplement.json").read_text())["world"] for d in (out, again)]
+    assert worlds[0] != worlds[1] and "experiment_m_" in worlds[0]      # never one run directory for two runs
+    rec = json.loads((out / "supplement.json").read_text())
+    assert rec["experiment"] is True and "EXPERIMENT" in (out / "supplement.md").read_text()
+    with pytest.raises(supplement.Refused, match="experiment"):
+        supplement.approve(eng, out.name, by="Bruce")
+    assert not (eng / "supplements").exists()
