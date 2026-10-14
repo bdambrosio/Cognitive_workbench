@@ -1,6 +1,6 @@
 """The materiality output schema, and the checks that run after it is parsed.
 
-MATERIALITY.md §3, §4 and §7 state the contract; this file is the machine
+MATERIALITY.md §3, §4, §5a and §7 state the contract; this file is the machine
 half, and `lint_workflow.check_materiality_vocab` keeps the two in step. Same
 division as the other two schema files: shape and the closed vocabulary in
 the schema; everything that looks at the inputs — does this finding exist,
@@ -20,6 +20,13 @@ from typing import Any, Dict, List, Optional, Sequence
 #: MATERIALITY.md §3, in increasing order of consequence. `exposure` uses the
 #: same values.
 MATERIALITY = ("not_material", "material", "decisive")
+
+#: MATERIALITY.md §5a: how much of the target a change that closes a gap
+#: would touch, in increasing order of risk. Never a time.
+BANDS = ("none", "setting", "one_place", "several_places", "design")
+
+#: MATERIALITY.md §8: the check's verdict on one `in_short`.
+CHECK_VERDICTS = ("holds", "adds", "contradicts", "misattributes", "unmarked_knowledge")
 
 #: MATERIALITY.md §4: the verdicts rated for `materiality`, and the one rated
 #: for `exposure`. `real` is neither.
@@ -51,16 +58,113 @@ def ratings_schema(sources: Optional[Sequence[str]] = None) -> Dict[str, Any]:
     findings; the rows matched no finding and the ratings check failed the
     step after twenty minutes of calls."""
     def item(field: str) -> Dict[str, Any]:
-        return {"type": "object", "properties": {
-            "claim_source": {"enum": list(sources)} if sources else {"type": "string"},
-            "claim_id": {"type": "integer", "minimum": 1},
-            field: {"enum": list(MATERIALITY)},
-            "basis": {"type": "string"}},
-            "required": ["claim_source", "claim_id", field, "basis"]}
+        props = {"claim_source": {"enum": list(sources)} if sources else {"type": "string"},
+                 "claim_id": {"type": "integer", "minimum": 1},
+                 field: {"enum": list(MATERIALITY)},
+                 "basis": {"type": "string"}}
+        required = ["claim_source", "claim_id", field, "basis"]
+        if field == "materiality":   # a gap the review showed has a remedy and a plain account
+            props["remedy"] = remedy_schema()
+            props["in_short"] = {"type": "string"}
+            required += ["remedy", "in_short"]
+        return {"type": "object", "properties": props, "required": required}
     return {"type": "object", "properties": {
         "ratings": {"type": "array", "items": item("materiality")},
         "exposures": {"type": "array", "items": item("exposure")}},
         "required": ["ratings", "exposures"]}
+
+
+def remedy_schema() -> Dict[str, Any]:
+    return {"type": "object", "properties": {"change": {"type": "string"},
+                                             "band": {"enum": list(BANDS)}},
+            "required": ["change", "band"]}
+
+
+def observations_schema() -> Dict[str, Any]:
+    """MATERIALITY.md §7: the observations, grouped by the fact they record,
+    one rating per group."""
+    return {"type": "object", "properties": {"observations": {"type": "array", "items": {
+        "type": "object", "properties": {
+            "members": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+            "materiality": {"enum": list(MATERIALITY)},
+            "basis": {"type": "string"},
+            "in_short": {"type": "string"},
+            "remedy": remedy_schema()},
+        "required": ["members", "materiality", "basis", "in_short", "remedy"]}}},
+        "required": ["observations"]}
+
+
+def _remedy_problems(w: str, remedy: Any) -> List[str]:
+    if not isinstance(remedy, dict):
+        return [f"{w}: no remedy (MATERIALITY §5a)"]
+    out = []
+    if remedy.get("band") not in BANDS:
+        out.append(f"{w}: band {remedy.get('band')!r} is not one of §5a's")
+    if remedy.get("band") != "none" and not (remedy.get("change") or "").strip():
+        out.append(f"{w}: a remedy with band {remedy.get('band')!r} and no change (MATERIALITY §5a)")
+    return out
+
+
+def check_observations(obj: Dict[str, Any], n: int) -> Dict[str, Any]:
+    """What MATERIALITY.md requires of the observation groups that the schema
+    cannot express: every observation, numbered 1..n, in exactly one group."""
+    problems: List[str] = []
+    seen: Dict[int, int] = {}
+    for g, row in enumerate(obj.get("observations") or [], 1):
+        w = f"observation group {g}"
+        members = row.get("members") or []
+        if not members:
+            problems.append(f"{w}: no members")
+        for m in members:
+            if not isinstance(m, int) or not 1 <= m <= n:
+                problems.append(f"{w}: no observation {m!r}")
+            elif m in seen:
+                problems.append(f"{w}: observation {m} is also in group {seen[m]}")
+            else:
+                seen[m] = g
+        if row.get("materiality") not in MATERIALITY:
+            problems.append(f"{w}: materiality {row.get('materiality')!r} is not one of §3's")
+        if not (row.get("basis") or "").strip():
+            problems.append(f"{w}: no basis (MATERIALITY §5)")
+        problems += _remedy_problems(w, row.get("remedy"))
+        if not (row.get("in_short") or "").strip():
+            problems.append(f"{w}: no in_short (MATERIALITY §5b)")
+    problems += [f"observation {m} is in no group" for m in range(1, n + 1) if m not in seen]
+    return {"ok": not problems, "problems": problems}
+
+
+def in_short_checks_schema(keys: Sequence[str]) -> Dict[str, Any]:
+    """MATERIALITY.md §8: one verdict per `in_short`, named by its key."""
+    return {"type": "object", "properties": {"checks": {"type": "array", "items": {
+        "type": "object", "properties": {
+            "key": {"enum": list(keys)},
+            "verdict": {"enum": list(CHECK_VERDICTS)},
+            "words": {"type": "string"},
+            "why": {"type": "string"}},
+        "required": ["key", "verdict", "words", "why"]}}},
+        "required": ["checks"]}
+
+
+def in_short_rewrites_schema(keys: Sequence[str]) -> Dict[str, Any]:
+    """MATERIALITY.md §8: an `in_short` written again after the check."""
+    return {"type": "object", "properties": {"rewrites": {"type": "array", "items": {
+        "type": "object", "properties": {
+            "key": {"enum": list(keys)},
+            "in_short": {"type": "string"}},
+        "required": ["key", "in_short"]}}},
+        "required": ["rewrites"]}
+
+
+def verdicts_of(obj: Dict[str, Any], keys: Sequence[str]) -> Optional[Dict[str, Dict[str, Any]]]:
+    """{key: check row} when the check gave every key exactly one verdict
+    from §8, else None: a check that skipped or doubled a sentence did not
+    check it."""
+    rows = [r for r in (obj or {}).get("checks") or [] if isinstance(r, dict)]
+    got = {r.get("key"): r for r in rows}
+    if len(rows) != len(got) or set(got) != set(keys) or any(
+            r.get("verdict") not in CHECK_VERDICTS for r in rows):
+        return None
+    return got
 
 
 def merge_parts(parts: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
@@ -111,6 +215,10 @@ def check_ratings(obj: Dict[str, Any], merged: Dict[str, Any]
                 problems.append(f"{w}: {field} {m!r} is not one of §3's")
             if not (r.get("basis") or "").strip():
                 problems.append(f"{w}: no basis (MATERIALITY §5)")
+            if field == "materiality":
+                problems += _remedy_problems(w, r.get("remedy"))
+                if not (r.get("in_short") or "").strip() and not r.get("in_short_dropped"):
+                    problems.append(f"{w}: no in_short (MATERIALITY §5b)")
         for k in sorted(wanted[field] - seen[field]):
             problems.append(f"finding {k} was not rated for {field}")
     return {"ok": not problems, "problems": problems,
@@ -150,6 +258,7 @@ def combine(field: str, samples: List[Dict[str, Any]]) -> Dict[str, Any]:
     return {"claim_source": first.get("claim_source"),
             "claim_id": first.get("claim_id"), field: value,
             "basis": first.get("basis"),
+            **{k: first[k] for k in ("remedy", "in_short") if first.get(k) is not None},
             "agreement": f"{top} of {n}", "borderline": bool(borderline),
             "samples": [{field: r.get(field), "basis": r.get("basis")}
                         for r in samples]}

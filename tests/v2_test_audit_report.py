@@ -80,11 +80,13 @@ def test_assemble_without_prose_leaves_markers_and_orders_by_rating():
     assert "## The transaction\n\nBuyer buys.\n\n**The buyer's thresholds.**  \nwalks if no backups" in doc
     ex = doc[doc.index("## Executive summary"):doc.index("## Scope and approach")]
     assert "[[summary]]" in ex
-    assert "- **README.md, claim 5** (true, with something the buyer must know; decisive): g5" in ex
-    assert "- **README.md, claim 1** (contradicted; material): g1" in ex
+    # a rating with no plain account (made before MATERIALITY §5b) falls back to the statement
+    assert "- **README.md, claim 5** (decisive): s — true, with something the buyer must know" in ex
+    assert "- **README.md, claim 1** (material): s — contradicted" in ex
     assert ex.index("claim 5") < ex.index("claim 1")
     # order of sections
-    order = ["## The transaction", "## Executive summary", "## Scope and approach",
+    order = ["## The transaction", "## Executive summary", "## What this document is",
+             "## Scope and approach",
              "## How to read a finding", "## What the review showed", "## Unsettled claims",
              "## Unsettled claims about the seller",
              "## Unexamined claims", "## Claims that hold", "## Questions for the seller",
@@ -96,29 +98,35 @@ def test_assemble_without_prose_leaves_markers_and_orders_by_rating():
     assert "| unsettled, or unexamined |" in doc                    # the crosswalk
     # decisive before material within the shown section
     shown = doc[doc.index("## What the review showed"):doc.index("## Unsettled claims")]
-    assert shown.index("claim 5 — materiality: decisive") < shown.index("claim 1 — materiality: material")
+    assert shown.index("README.md, claim 5 · materiality: decisive") < shown.index("README.md, claim 1 · materiality: material")
+    # the heading is the claim's statement and the verdict in words
+    assert "### s — true, with something the buyer must know\n\n*README.md, claim 5 · materiality: decisive*" in shown
     assert "**The gap:** g5" in shown and "`app/x.py`, lines 3–4" in shown
+    # outside the definitions and the appendices, no rating appears as a code
+    body = doc[doc.index("## What the review showed"):doc.index("## Appendix")]
+    assert "not_material" not in body and "real_with_caveat" not in body
     unsettled = doc[doc.index("## Unsettled claims"):doc.index("## Unsettled claims about the seller")]
-    assert "claim 3 — exposure: not_material" in unsettled
+    assert "README.md, claim 3 · exposure: not material" in unsettled
     assert "material of the right kind was supplied" in unsettled
     assert "**Question for the seller:** where?" in unsettled           # a question rides with its finding
     assert "claim 6" not in unsettled
     seller = doc[doc.index("## Unsettled claims about the seller"):doc.index("## Unexamined claims")]
     assert seller.startswith("## Unsettled claims about the seller\n\n" + render.SELLER_LINE)
-    assert "claim 6 — exposure: material" in seller
+    assert "README.md, claim 6 · exposure: material" in seller
     assert "**Question for the seller:** for how long?" in seller
     assert "claim 7" not in seller and "claim 3" not in seller
     ne = doc[doc.index("## Unexamined claims"):doc.index("## Claims that hold")]
-    assert "claim 4 — exposure: decisive" in ne and "Files named: `app/h.py`" in ne
+    assert "README.md, claim 4 · exposure: decisive" in ne
+    assert "Files named: `app/h.py`" not in ne and "- searched: r" in ne     # in full in the evidence document
     assert "| README.md | 2 | claim 2 text | `app/x.py` lines 3–4 |" in doc
     assert "| README.md | 7 | claim 7 text | `app/x.py` lines 3–4 |" in doc
     cov = doc[doc.index("## Coverage"):doc.index("## Limitations")]
-    assert "| contradicted | shown | 1 |" in cov and "| unverifiable | unsettled | 3 |" in cov
+    assert "| contradicted | 1 |" in cov and "| unsettled | 3 |" in cov
     assert "of which 1 about the seller. Unexamined: 1." in cov and "- `app/h.py`" in cov
-    assert "- (README.md, claim 6) for how long?" in doc                # the checklist stays complete
+    assert "2. (README.md, claim 6) for how long?" in doc               # the checklist stays complete, numbered for the writer
     lim = doc[doc.index("## Limitations"):doc.index("## Appendix")]
     assert "[[limitations]]" in lim and "has not confirmed the review's interpretation" in lim
-    assert "- (README.md) who?" in doc
+    assert "1. (README.md) who?" in doc
 
 
 def test_assemble_places_prose_and_drops_the_not_examined_section_when_empty():
@@ -163,10 +171,13 @@ def test_assemble_carries_a_conclusion_only_when_asked_and_thresholds_exist():
     rec = _record()
     prose = {f: f"[{f}]" for f in schemas.FIELDS}
     doc = render.assemble(rec, prose, "buys it", "eng", "walks if no backups", True)
-    assert "## Conclusion" in doc and "[conclusion]" in doc
-    assert doc.index("## Conclusion") < doc.index("## Scope and approach")
-    assert "## Conclusion" not in render.assemble(rec, prose, "buys it", "eng", "walks", False)
-    assert "## Conclusion" not in render.assemble(rec, prose, "buys it", "eng", None, True)
+    head = "## Against the buyer's thresholds"
+    assert head in doc and "[conclusion]" in doc
+    # the answer comes first: before the summary and before the front matter
+    assert doc.index("## The transaction") < doc.index(head) < doc.index("## Executive summary") \
+        < doc.index("## What this document is")
+    assert head not in render.assemble(rec, prose, "buys it", "eng", "walks", False)
+    assert head not in render.assemble(rec, prose, "buys it", "eng", None, True)
 
 
 def test_header_index_and_worklist(tmp_path):
@@ -252,18 +263,37 @@ def test_a_covered_claim_names_the_wider_claim_and_keeps_its_own_verdict(tmp_pat
     assert render.covered_by(tmp_path / "nowhere" / "merged" / "m") == {}
 
 
-def test_the_executive_summary_carries_a_material_gap_whole(tmp_path):
-    # A gap whose first sentence says what holds, longer than a line, and whose
-    # caveat comes after it: the reader of the summary needs the caveat.
+def test_a_material_finding_is_summed_up_in_the_raters_plain_words_not_its_gap():
+    # Bruce, 2026-10-14: the summary carried a second copy of every material
+    # gap, a page and a half, and "true, with something the buyer must know"
+    # did not say what that something is. The line is the rater's plain
+    # account (MATERIALITY §5b), which also opens the finding.
     rec = _record()
-    holds = ("The released data files are pipeline outputs and not records of real patients: the exporter "
-             "describes them as synthetic, the schema carries generation columns, and the encounter notes "
-             "are written by the pipeline itself rather than taken from any clinical system.")
-    caveat = "No licence document covers the data files; LICENSE covers the code only."
-    next(f for f in rec["merged"]["findings"] if f["claim_id"] == 5)["adjudication"]["gap"] = holds + " " + caveat
+    next(f for f in rec["merged"]["findings"] if f["claim_id"] == 5)["adjudication"]["gap"] = "a long gap"
+    next(r for r in rec["ratings"]["ratings"] if r["claim_id"] == 5)["in_short"] = \
+        "The listing says backups are kept for 30 days. The job keeps them for 7."
     doc = render.assemble(rec)
-    ex = doc[doc.index("## Executive summary"):doc.index("## Scope and approach")]
-    assert holds in ex and caveat in ex
+    ex = doc[doc.index("## Executive summary"):doc.index("## What this document is")]
+    assert ("- **README.md, claim 5** (decisive): The listing says backups are kept for 30 days. "
+            "The job keeps them for 7.") in ex
+    assert "a long gap" not in ex
+    shown = doc[doc.index("## What the review showed"):]
+    assert shown.index("**In short:** The listing says backups") < shown.index("**The gap:** a long gap")
+
+
+def test_the_report_shows_evidence_in_short_and_the_evidence_document_in_full():
+    rec = _record()
+    long_quote = "let Ok(mut statement) = db.prepare_cached(queries::FIND_URL) else { return Err(ServerError); };"
+    f1 = next(f for f in rec["merged"]["findings"] if f["claim_id"] == 1)
+    f1["evidence"] = [{"form": "citation", "document": "app/x.py", "lines": [3, 4], "quote": long_quote, "shows": "binds it"},
+                      {"form": "search", "kind": "lexical", "performed": "grep -rn format! src/", "result": "no SQL built",
+                       "candidates": ["src/db.rs"]}]
+    doc = render.assemble(rec)
+    assert '"let Ok(mut statement) = db.prepare_cached(queries::FIND_URL) else { return …" — binds it' in doc
+    assert long_quote not in doc and "grep -rn format!" not in doc and "- searched: no SQL built" in doc
+    ev = render.evidence_document(rec, "eng")
+    part = ev[ev.index("## README.md, claim 1\n"):ev.index("## README.md, claim 2\n")]
+    assert long_quote.replace("<", "\\<") in part and "grep -rn format! src/" in part and "`src/db.rs`" in part
 
 
 def test_claims_listed_and_not_tested_are_counted_and_given_their_own_appendix(tmp_path):
@@ -279,8 +309,8 @@ def test_claims_listed_and_not_tested_are_counted_and_given_their_own_appendix(t
     assert [c["id"] for c in rec["not_tested"]] == [9]
     text = render.assemble(rec)
     assert "Every claim that was tested received one finding. 1 further claim(s)" in text
-    opening = text.split("## The transaction")[0]              # the first thing a reader is told
-    assert "the others are listed as not tested" in opening and "about each tested claim" in opening
+    about = text[text.index("## What this document is"):text.index("## Scope and approach")]
+    assert "the others are listed as not tested" in about and "about each tested claim" in about
     assert "## Appendix — claims listed, not tested" in text
     assert "| docs/CLI.md | 9 | 40 | page_size defaults to 10 | 2 | A default a developer codes against." in text
 
@@ -295,7 +325,7 @@ def test_the_scope_table_counts_what_was_not_tested_and_names_a_source_with_no_r
     text = render.assemble(rec)
     assert "| claim source | tested | not tested | findings |" in text
     assert "| docs/SECURITY.md | 0 | 1 | 0 | | | | |" in text
-    assert "`docs/SECURITY.md`" in text.split("**What this document is.**")[0]
+    assert "`docs/SECURITY.md`" in text.split("## The transaction")[0]
     row = next(l for l in text.splitlines() if l.startswith(f"| {src} | "))
     assert row.split(" | ")[2] == "1"
 
@@ -338,11 +368,12 @@ def test_a_statement_the_buyer_asked_is_reported_apart_from_the_sellers_claims()
     rec["ratings"]["ratings"].append({"claim_source": "questions/buyer.md", "claim_id": 1,
                                       "materiality": "material", "basis": "b"})
     doc = render.assemble(rec, None, "t", "eng", None, False)
-    head = "### questions/buyer.md, claim 1"
+    head = "questions/buyer.md, claim 1 ·"
     shown = doc[doc.index("## What the review showed"):doc.index("## Unsettled claims")]
     assert head not in shown
     asked = doc[doc.index("## Questions the buyer asked"):doc.index("## Claims that hold")]
-    assert head in asked and "**Asked by the buyer:** Passwords are hashed." in asked
+    assert head in asked and "### Passwords are hashed. — contradicted" in asked
+    assert "Asked by the buyer." in asked
     summary = doc[doc.index("## Executive summary"):doc.index("## Scope and approach")]
     assert "questions/buyer.md, claim 1" in summary
     # The front matter names the buyer's questions apart from the seller's
@@ -351,6 +382,128 @@ def test_a_statement_the_buyer_asked_is_reported_apart_from_the_sellers_claims()
     claim_line = next(l for l in front.splitlines() if l.startswith("Materials as of"))
     assert "Questions tested: `questions/buyer.md` (the buyer's questions)" in claim_line
     assert "questions/buyer.md" not in claim_line.split("Questions tested:")[0]
-    assert "statements the seller did not make" in front
+    about = doc[doc.index("## What this document is"):doc.index("## Scope and approach")]
+    assert "statements the seller did not make" in about
     plain = render.assemble(_record(), None, "t", "eng", None, False)
     assert "Questions tested" not in plain and "statements the seller did not make" not in plain
+
+
+def test_findings_are_shown_under_their_subjects_only_when_the_groups_hold_each_once():
+    rec = _record()
+    sections = render.grouped_sections(render.classify(rec["merged"]))
+    good = {f: f"<{f}>" for f in schemas.FIELDS}
+    good["groups"] = [{"section": "shown", "title": "Backups", "findings": ["README.md#1"]},
+                      {"section": "shown", "title": "Logging", "findings": ["README.md#5"]}]
+    good["duplicate_questions"] = []
+    assert schemas.check_prose(dict(good, not_examined_note="x"), rec["merged"], True,
+                               True, sections)["ok"]
+    doc = render.assemble(rec, good, None, "eng")
+    shown = doc[doc.index("## What the review showed"):doc.index("## Unsettled claims")]
+    # groups follow their highest-rated finding; findings sit one level down
+    assert shown.index("### Logging") < shown.index("#### s — true, with something") \
+        < shown.index("### Backups") < shown.index("#### s — contradicted")
+    bad = dict(good, groups=[{"section": "shown", "title": "Backups", "findings": ["README.md#1", "README.md#1"]}])
+    res = schemas.check_prose(dict(bad, not_examined_note="x"), rec["merged"], True, True, sections)
+    assert "groups (shown): README.md#1 is in two groups; the section is shown ungrouped" in res["problems"]
+    assert "groups (shown): README.md#5 is in no group; the section is shown ungrouped" in res["problems"]
+    shown = render.assemble(rec, bad, None, "eng")
+    assert "### Backups" not in shown and "### s — contradicted" in shown
+
+
+def test_a_withdrawn_finding_left_out_of_the_groups_keeps_its_section_grouped():
+    # chhoto-full 2026-10-14: the writer left the withdrawn practice question
+    # out of the groups, and the whole section was shown ungrouped.
+    rec = _record()
+    f5 = next(f for f in rec["merged"]["findings"] if render._key(f) == "README.md#5")
+    f5["disposition"] = {"disposition": "withdrawn", "note": "n"}
+    classes = render.classify(rec["merged"])
+    prose = {f: f"<{f}>" for f in schemas.FIELDS}
+    prose["groups"] = [{"section": "shown", "title": "Backups", "findings": ["README.md#1"]}]
+    prose["duplicate_questions"] = []
+    res = schemas.check_prose(dict(prose, not_examined_note="x"), rec["merged"], True, True,
+                              render.grouped_sections(classes), render.ungrouped_allowed(classes))
+    assert res["ok"], res["problems"]
+    doc = render.assemble(rec, prose, None, "eng")
+    shown = doc[doc.index("## What the review showed"):doc.index("## Unsettled claims")]
+    assert shown.index("### Backups") < shown.index("### Withdrawn by the practice") \
+        < shown.index("#### s — true, with something")
+
+
+def test_a_question_that_repeats_another_is_left_out_everywhere():
+    rec = _record()
+    rec["merged"]["questions"].append({"claim_source": "README.md", "claim_id": 3, "question": "where, exactly?"})
+    prose = {f: f"<{f}>" for f in schemas.FIELDS}
+    prose["duplicate_questions"] = [[3, 4]]
+    doc = render.assemble(rec, prose, None, "eng")
+    assert "where?" in doc and "where, exactly?" not in doc
+    # a set that names a question twice drops nothing, and is reported
+    prose["duplicate_questions"] = [[3, 4], [4]]
+    assert "where, exactly?" in render.assemble(rec, prose, None, "eng")
+    res = schemas.check_prose(dict(prose, not_examined_note="x"), rec["merged"], True, True)
+    assert "duplicate_questions: question 4 is in two entries; no question was dropped" in res["problems"]
+
+
+def test_rated_observations_get_their_own_section_and_a_material_one_is_listed():
+    rec = _record()
+    ev = {"form": "citation", "document": "app/c.py", "lines": [5, 5], "quote": "key", "shows": "logs the key"}
+    rec["merged"]["unclaimed"] = [
+        {"claim_source": "README.md", "note": "The API key is written to the log.", "evidence": ev},
+        {"claim_source": "docs/CLI.md", "note": "The key is logged in plain text.", "evidence": ev},
+        {"claim_source": "README.md", "note": "A volume name does not match.", "evidence": dict(ev, lines=[9, 9])}]
+    rec["ratings"]["observations"] = [
+        {"members": [3], "materiality": "not_material", "basis": "minor",
+         "remedy": {"change": "rename it", "band": "setting"}},
+        {"members": [1, 2], "materiality": "material", "basis": "a credential in logs",
+         "remedy": {"change": "stop logging the key", "band": "one_place"}}]
+    doc = render.assemble(rec, None, None, "eng")
+    obs = doc[doc.index("## Found without a claim"):doc.index("## Unsettled claims")]
+    assert obs.index("### Observation 1 — material") < obs.index("### Observation 2 — not material")
+    assert "The API key is written to the log." in obs and "The key is logged in plain text." not in obs
+    assert obs.count("`app/c.py`, line 5") == 1                  # the same citation once
+    assert "Recorded while testing `README.md`, `docs/CLI.md`." in obs
+    assert "**What would close it:** stop logging the key — scope: one place in the code." in obs
+    ex = doc[doc.index("## Executive summary"):doc.index("## What this document is")]
+    assert "**Observation 1** (material; the seller claimed nothing about it)" in ex
+    assert "## Observations the seller did not claim" not in doc
+
+
+def test_a_findings_searches_follow_what_settles_it():
+    f = {"claim_source": "README.md", "claim_id": 1, "quote": "q", "lines": [1, 1], "statement": "s",
+         "adjudication": {"verdict": "contradicted", "gap": "g"},
+         "evidence": [{"form": "search", "kind": "lexical", "performed": "grep", "result": "none", "candidates": []},
+                      {"form": "citation", "document": "a.py", "lines": [2, 2], "quote": "x", "shows": "y"}],
+         "review": {"outcome": "holds"}, "citation_problems": []}
+    out = "\n".join(render._finding(f, None, "materiality"))
+    assert out.index("`a.py`, line 2") < out.index("searched:")
+
+
+def test_a_material_finding_the_check_did_not_uphold_is_held_back_until_the_practice_retains_it():
+    # Bruce, 2026-10-14: a finding the check rejected was named on the answer
+    # page and in the summary, contradicting two findings that were right.
+    rec = _record()
+    f1 = next(f for f in rec["merged"]["findings"] if f["claim_id"] == 1)
+    f1["review"] = {"outcome": "does_not_hold", "adverse_observations": ["evidence_supports"]}
+    doc = render.assemble(rec)
+    ex = doc[doc.index("## Executive summary"):doc.index("## What this document is")]
+    assert "- **README.md, claim 1**" not in ex
+    assert "Not listed: README.md, claim 1, rated material. The check did not uphold this finding" in ex
+    assert "the check did not uphold this finding" in doc[doc.index("## What the review showed"):]   # still shown
+    f1["disposition"] = {"disposition": "retained", "note": "n"}
+    ex = render.assemble(rec)
+    ex = ex[ex.index("## Executive summary"):ex.index("## What this document is")]
+    assert "- **README.md, claim 1**" in ex and "Not listed" not in ex
+
+
+def test_a_finding_the_practice_withdrew_is_marked_where_it_was_and_named_in_no_summary(tmp_path):
+    rec = _record()
+    md = tmp_path / "m"; md.mkdir()
+    (md / "dispositions.json").write_text(json.dumps(
+        {"README.md#1": {"disposition": "withdrawn", "note": "the shipped default turns it off"}}))
+    render.apply_dispositions(rec["merged"], md)
+    doc = render.assemble(rec)
+    ex = doc[doc.index("## Executive summary"):doc.index("## What this document is")]
+    assert "README.md, claim 1" not in ex                       # neither listed nor "Not listed"
+    shown = doc[doc.index("## What the review showed"):doc.index("## Unsettled claims")]
+    assert ("Practice review: withdrawn by the practice after review; it is not counted among the "
+            "findings of this document. the shipped default turns it off") in shown
+    assert "Withdrawn by the practice, and counted above as the review recorded them: README.md, claim 1." in doc

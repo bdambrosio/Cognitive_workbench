@@ -87,18 +87,22 @@ def build_config(out: Path, world: str, model_path: Optional[Path]
 
 
 def _printable(out: Path) -> None:
-    """report.html always; report.pdf where a headless Chrome is installed.
-    Markdown is the record; these are the renderings a reader prints."""
+    """report.html and evidence.html always; the PDFs where a headless Chrome
+    is installed. Markdown is the record; these are the renderings a reader
+    prints."""
     # NAMED printable, NOT html: a module called html.py beside a script
     # shadows the standard library's `html` package when the script's own
     # directory is sys.path[0], and markdown-it's import of html.entities
     # then fails (found 2026-09-03; the runner never produced a PDF itself).
     try:
         from workflowsv2.audit_report import printable
-        h = printable.render_file(out / "report.md")
-        pdf = printable.to_pdf(h)
-        logger.info("printable: %s%s", h.name, f", {pdf.name}" if pdf else
-                    " (no Chrome found: no PDF)")
+        for md in ("report.md", "evidence.md"):
+            if not (out / md).is_file():
+                continue
+            h = printable.render_file(out / md)
+            pdf = printable.to_pdf(h)
+            logger.info("printable: %s%s", h.name, f", {pdf.name}" if pdf else
+                        " (no Chrome found: no PDF)")
     except Exception as e:                                     # noqa: BLE001
         logger.warning("printable rendering failed: %s", e)
 
@@ -163,12 +167,15 @@ def main() -> int:
 
     thresholds = eng.get("thresholds")
     # The conclusion is written only when the engagement asked for one and
-    # the buyer's thresholds are recorded (REPORT.md §6 item 3).
+    # the buyer's thresholds are recorded (REPORT.md §6 item 2).
     wants_conclusion = bool(eng.get("conclusion")) and bool(thresholds)
     skeleton = render.assemble(record, None, transaction, eng_name, thresholds,
                                wants_conclusion)
     (out / "report_skeleton.md").write_text(skeleton, encoding="utf-8")
     (out / "worklist.md").write_text(render.worklist(record["merged"], out),
+                                     encoding="utf-8")
+    # The report shows each piece of evidence in short; this is all of it.
+    (out / "evidence.md").write_text(render.evidence_document(record, eng_name),
                                      encoding="utf-8")
     classes = render.classify(record["merged"])
     logger.info("assembled: shown %d, unsettled %d (about the seller %d), "
@@ -220,7 +227,9 @@ def main() -> int:
 
     prose = call.get("obj") or {}
     check = schemas.check_prose(prose, record["merged"],
-                                bool(classes["not_examined"]), wants_conclusion)
+                                bool(classes["not_examined"]), wants_conclusion,
+                                render.grouped_sections(classes),
+                                render.ungrouped_allowed(classes))
     for p in check["problems"]:
         issues.note(out, stage=STAGE, code="prose_check", text=p,
                     severity="check")

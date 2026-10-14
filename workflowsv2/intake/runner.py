@@ -167,7 +167,7 @@ def finish(eng_dir: Path, intake_dir: Path, form: Dict[str, Any],
         text += f"{key}: |\n" + "\n".join(f"  {l}" for l in blocks[key].splitlines()) + "\n"
         written.append(key)
     if conclusion:
-        # The buyer asked for a conclusion (REPORT.md §6 item 3). The
+        # The buyer asked for a conclusion (REPORT.md §6 item 2). The
         # practice's flag, not the form's: the deliverable field is the
         # client's words, this is the engagement's decision.
         text += "conclusion: true\n"

@@ -48,6 +48,7 @@ from chat.workflow import load_workflow                        # noqa: E402
 from workflowsv2 import issues                                 # noqa: E402
 from workflowsv2.audit_materiality import merge as merging     # noqa: E402
 from workflowsv2.audit_materiality import schemas              # noqa: E402
+from workflowsv2.audit_report.render import _from_knowledge     # noqa: E402
 # The review's rendering of a finding, so the rater reads the same text the
 # reviewer did. The review runner configures logging at import without
 # force=True, which is a no-op after the basicConfig above.
@@ -101,6 +102,7 @@ def _rating_text(f: Dict[str, Any]) -> str:
                           "evidence": f.get("evidence") or []}, claim)
     body = body.replace(f"--- claim {f['claim_id']}",
                         f"--- {f['claim_source']} claim {f['claim_id']}", 1)
+    body += "\n" + _facts(f)
     rv = f.get("review") or {}
     line = rv.get("outcome", "unreviewed")
     if rv.get("adverse_observations"):
@@ -109,6 +111,21 @@ def _rating_text(f: Dict[str, Any]) -> str:
     if f.get("citation_problems"):
         body += "\n    citation problems: " + " | ".join(f["citation_problems"])
     return body
+
+
+ASKED_WORDS = {"buyer": "the buyer asked this; the seller did not say it",
+               "standard": "the practice asked this; the seller did not say it",
+               "practice": "the practice asked this; the seller did not say it"}
+
+
+def _facts(f: Dict[str, Any]) -> str:
+    """Two facts the record holds that an `in_short` must respect
+    (MATERIALITY §5b, §8): who made the statement, and whether the finding
+    rests on what a library does, known rather than shown."""
+    who = ASKED_WORDS.get(f.get("asked_by"), "the seller's claim")
+    lib = ("yes: say so in words, \"from the library's documented behaviour\""
+           if _from_knowledge(f) else "no")
+    return f"    said by   : {who}\n    rests on knowledge of a library: {lib}"
 
 
 def rate(loop, method_text: str, transaction: Optional[str],
@@ -130,19 +147,7 @@ def rate(loop, method_text: str, transaction: Optional[str],
         rng = random.Random(seed)
         rateable = list(rateable); rng.shuffle(rateable)
         exposable = list(exposable); rng.shuffle(exposable)
-    head = ("The transaction, as the engagement states it:\n\n"
-            + (transaction.strip() if transaction else
-               "(The engagement states nothing about the transaction. Rate "
-               "against a buyer paying a price that assumes every claim "
-               "holds, per MATERIALITY \u00a72.)")
-            + "\n\nThe buyer's thresholds, as the engagement records them:\n\n"
-            + (thresholds.strip() if thresholds else
-               "(The engagement records no thresholds. Rate as MATERIALITY "
-               "\u00a73 defines the values.)")
-            # The same account of the buyer the claims were rated into tiers
-            # against (claims_audit/reliance.py), where the engagement has one.
-            + ("\n\nThe reliance statement:\n\n" + reliance.strip() if reliance else "")
-            + "\n\n")
+    head = _head(transaction, thresholds, reliance)
 
     def groups_of(xs):
         return ([xs] if not batch else
@@ -155,7 +160,7 @@ def rate(loop, method_text: str, transaction: Optional[str],
     parts, calls = [], []
     for n, (field, array, other, g) in enumerate(plan, 1):
         body = (f"Rate these {len(g)} findings for `{field}`, per MATERIALITY "
-                f"\u00a73 to \u00a75. Each carries its claim source and claim "
+                f"\u00a73 to \u00a7{'5b' if field == 'materiality' else '5'}. Each carries its claim source and claim "
                 f"id; return both as given.\n\n"
                 + "\n\n".join(_rating_text(f) for f in g)
                 + f"\n\nEmit `{array}` for exactly these findings, and an "
@@ -171,6 +176,163 @@ def rate(loop, method_text: str, transaction: Optional[str],
             logger.warning("batch %d/%d did not parse: %s", n, len(plan),
                            out["parse_error"])
     return {"obj": schemas.merge_parts(parts), "calls": calls}
+
+
+def _observation_text(i: int, u: Dict[str, Any]) -> str:
+    """One unclaimed observation as the rater reads it: its number, the claim
+    source whose run recorded it, the note and its one evidence item."""
+    e = u.get("evidence") or {}
+    if e.get("form") == "derived":
+        where = "; ".join(f"{b.get('document')} {b.get('lines')}: {b.get('quote')}"
+                          for b in e.get("basis") or [] if isinstance(b, dict))
+        ev = f"derived from {where} — {e.get('derivation')} — {e.get('consequence')}"
+    else:
+        ev = f"{e.get('document')} {e.get('lines')}: {e.get('quote')} — {e.get('shows')}"
+    return f"--- observation {i} (recorded with {u.get('claim_source')})\n    note    : {u.get('note')}\n    evidence: {ev}"
+
+
+def rate_observations(loop, method_text: str, head: str, unclaimed: List[Dict[str, Any]],
+                      max_tokens: int) -> Dict[str, Any]:
+    """The unclaimed observations, grouped by the fact they record and rated
+    once per group (MATERIALITY §4). One call; asked once more when the
+    groups do not cover every observation exactly once. Returns the groups
+    (empty when both answers fail the check), the check and the calls."""
+    body = (f"Here are {len(unclaimed)} observations the review recorded that no claim "
+            f"asserts, numbered. Group the observations that record the same fact in "
+            f"the target, and rate each group per MATERIALITY \u00a74 to \u00a75b.\n\n"
+            + "\n\n".join(_observation_text(i, u) for i, u in enumerate(unclaimed, 1))
+            + f"\n\nEmit `observations`: every number from 1 to {len(unclaimed)} in exactly one group.")
+    calls, check = [], {"ok": False, "problems": ["not asked"]}
+    for attempt in (1, 2):
+        out = emit(loop, method_text, head + body, schemas.observations_schema(), max_tokens)
+        calls.append({"part": f"observations[{attempt}]", "observations": len(unclaimed),
+                      **{k: v for k, v in out.items() if k not in ("raw", "obj")}})
+        obj = out["obj"] or {}
+        check = schemas.check_observations(obj, len(unclaimed))
+        if check["ok"]:
+            return {"groups": obj["observations"], "check": check, "calls": calls}
+        logger.warning("observation groups, answer %d: %s", attempt, "; ".join(check["problems"]))
+    return {"groups": [], "check": check, "calls": calls}
+
+
+def _in_short_items(ratings: Dict[str, Any], merged: Dict[str, Any]
+                    ) -> List[Tuple[str, Dict[str, Any], str]]:
+    """(key, the row that carries the `in_short`, what the check reads) for
+    every rated gap and every group of observations that has one."""
+    by_key = {f"{f['claim_source']}#{f['claim_id']}": f for f in merged["findings"]}
+    unclaimed = merged.get("unclaimed") or []
+    out = []
+    for r in ratings.get("ratings") or []:
+        k = f"{r.get('claim_source')}#{r.get('claim_id')}"
+        f = by_key.get(k)
+        if f and (r.get("in_short") or "").strip():
+            out.append((k, r, f"--- {k}\n    gap       : {(f.get('adjudication') or {}).get('gap')}\n"
+                              f"{_facts(f)}\n    in_short  : {r['in_short']}"))
+    for n, g in enumerate(ratings.get("observations") or [], 1):
+        if (g.get("in_short") or "").strip():
+            members = [unclaimed[m - 1] for m in g.get("members") or [] if 1 <= m <= len(unclaimed)]
+            knows = any((u.get("evidence") or {}).get("from_knowledge") is True for u in members)
+            out.append((f"observation {n}", g,
+                        f"--- observation {n}\n    note      : "
+                        + " / ".join(str(u.get("note")) for u in members)
+                        + "\n    said by   : nobody: the seller claimed nothing about it"
+                        + f"\n    rests on knowledge of a library: {'yes' if knows else 'no'}"
+                        + f"\n    in_short  : {g['in_short']}"))
+    return out
+
+
+def check_in_short(loop, method_text: str, ratings: Dict[str, Any], merged: Dict[str, Any],
+                   max_tokens: int) -> Dict[str, Any]:
+    """MATERIALITY §8. Every `in_short` that ships is checked against the
+    gap it was written from, in one call. Those that fail are written again,
+    in one call, with the check's reason, and checked once more; any that
+    fail again lose their `in_short`, and the report shows the claim's
+    statement and verdict in its place. A check that does not give every
+    sentence one verdict is asked once more; if it fails again, every
+    `in_short` is withdrawn: nothing unchecked reaches the summary.
+    Returns {checks, rewritten, dropped, calls}."""
+    items = _in_short_items(ratings, merged)
+    calls: List[Dict[str, Any]] = []
+
+    def ask(part, body, schema):
+        out = emit(loop, method_text, body, schema, max_tokens)
+        calls.append({"part": part, "items": len(items),
+                      **{k: v for k, v in out.items() if k not in ("raw", "obj")}})
+        return out["obj"] or {}
+
+    def checked(subset, part):
+        keys = [k for k, _, _ in subset]
+        body = ("Check each `in_short` below against the gap it was written from, per "
+                "MATERIALITY \u00a78. You did not write them.\n\n"
+                + "\n\n".join(t for _, _, t in subset)
+                + f"\n\nEmit `checks`: one verdict for each of the {len(keys)} keys.")
+        for attempt in (1, 2):
+            got = schemas.verdicts_of(ask(f"{part}[{attempt}]", body,
+                                          schemas.in_short_checks_schema(keys)), keys)
+            if got is not None:
+                return got
+        return None
+
+    result: Dict[str, Any] = {"checks": {}, "rewritten": [], "dropped": [], "calls": calls}
+    if not items:
+        return result
+
+    def drop(row, key, why):
+        row.pop("in_short", None)
+        row["in_short_dropped"] = why
+        result["dropped"].append(key)
+
+    first = checked(items, "in_short_check")
+    if first is None:
+        for k, row, _ in items:
+            drop(row, k, "the check did not give a verdict on every sentence")
+        return result
+    result["checks"] = first
+    failed = [(k, row, t) for k, row, t in items if first[k]["verdict"] != "holds"]
+    if not failed:
+        return result
+    keys = [k for k, _, _ in failed]
+    body = ("Each `in_short` below failed the check of MATERIALITY \u00a78 for the reason given. "
+            "Write it again per \u00a75b, stating nothing the gap or the note does not state.\n\n"
+            + "\n\n".join(f"{t}\n    check     : {first[k]['verdict']}: \"{first[k]['words']}\" — {first[k]['why']}"
+                          for k, _, t in failed)
+            + f"\n\nEmit `rewrites`: one for each of the {len(keys)} keys.")
+    new = {r.get("key"): r.get("in_short") for r in
+           ask("in_short_rewrite", body, schemas.in_short_rewrites_schema(keys)).get("rewrites") or []
+           if (r.get("in_short") or "").strip()}
+    for k, row, _ in failed:
+        if k in new:
+            row["in_short"] = new[k]
+            result["rewritten"].append(k)
+        else:
+            drop(row, k, f"failed the check ({first[k]['verdict']}) and was not written again")
+    again = [x for x in _in_short_items(ratings, merged) if x[0] in result["rewritten"]]
+    second = checked(again, "in_short_recheck") if again else {}
+    for k, row, _ in again:
+        v = (second or {}).get(k)
+        result["checks"][k] = v or {"verdict": "unchecked"}
+        if not v or v["verdict"] != "holds":
+            drop(row, k, f"failed the check again ({v['verdict'] if v else 'no verdict'})")
+    return result
+
+
+def _head(transaction: Optional[str], thresholds: Optional[str],
+          reliance: Optional[str]) -> str:
+    """What every rating call is read against: the transaction, the buyer's
+    thresholds and the reliance statement."""
+    return ("The transaction, as the engagement states it:\n\n"
+            + (transaction.strip() if transaction else
+               "(The engagement states nothing about the transaction. Rate "
+               "against a buyer paying a price that assumes every claim "
+               "holds, per MATERIALITY \u00a72.)")
+            + "\n\nThe buyer's thresholds, as the engagement records them:\n\n"
+            + (thresholds.strip() if thresholds else
+               "(The engagement records no thresholds. Rate as MATERIALITY "
+               "\u00a73 defines the values.)")
+            # The same account of the buyer the claims were rated into tiers
+            # against (claims_audit/reliance.py), where the engagement has one.
+            + ("\n\nThe reliance statement:\n\n" + reliance.strip() if reliance else "")
+            + "\n\n")
 
 
 def _table(findings: List[Dict[str, Any]], rated: Dict[str, Dict[str, Any]],
@@ -253,8 +415,14 @@ def render(merged: Dict[str, Any], ratings: Dict[str, Any]) -> str:
                   for q in merged["questions"]]
     if merged.get("unclaimed"):
         lines += ["", "## Unclaimed observations", ""]
-        lines += [f"- ({u['claim_source']}) {u.get('note')}"
-                  for u in merged["unclaimed"]]
+        unclaimed = merged["unclaimed"]
+        for g in ratings.get("observations") or [{"members": [i]} for i in range(1, len(unclaimed) + 1)]:
+            rem = g.get("remedy") or {}
+            lines.append(f"- {g.get('materiality', 'not rated')}: "
+                         + " / ".join(f"[{m}] ({unclaimed[m - 1]['claim_source']}) {unclaimed[m - 1].get('note')}"
+                                      for m in g["members"])
+                         + (f" — {g['basis']}" if g.get("basis") else "")
+                         + (f" — remedy ({rem.get('band')}): {rem.get('change')}" if rem else ""))
     return "\n".join(lines) + "\n"
 
 
@@ -322,25 +490,40 @@ def replicate(loop, method_text: str, eng: Dict[str, Any],
 
 def to_rate(merged: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """(rateable, exposable) findings for the model. A statement the buyer
-    rated at intake keeps the buyer's rating and is left out (INTAKE.md §3)."""
-    fs = [f for f in merged["findings"] if not f.get("buyer_rating")]
-    return ([f for f in fs if schemas.rateable(f)], [f for f in fs if schemas.exposable(f)])
+    rated at intake keeps the buyer's rating (INTAKE.md §3). An unsettled one
+    is left out; a gap is still sent, for its remedy and its plain account
+    (MATERIALITY §5a, §5b), and
+    add_buyer_ratings puts the buyer's rating in place of the model's."""
+    fs = merged["findings"]
+    return ([f for f in fs if schemas.rateable(f)],
+            [f for f in fs if schemas.exposable(f) and not f.get("buyer_rating")])
 
 
 def add_buyer_ratings(ratings: Dict[str, Any], merged: Dict[str, Any]) -> None:
     """Record the buyer's own rating for each finding it covers: as its
-    materiality when the finding shows a gap, its exposure when unsettled."""
+    materiality when the finding shows a gap, its exposure when unsettled.
+    The model's row for such a gap is replaced, keeping only its remedy and
+    its plain account."""
     for f in merged["findings"]:
         if not f.get("buyer_rating"):
             continue
         field, array = (("materiality", "ratings") if schemas.rateable(f) else
                         ("exposure", "exposures") if schemas.exposable(f) else (None, None))
-        if field:
-            ratings.setdefault(array, []).append({
-                "claim_source": f["claim_source"], "claim_id": f["claim_id"],
-                field: f["buyer_rating"], "by": "buyer",
-                "basis": f"The buyer rated this question {f['buyer_rating'].replace('_', ' ')} "
-                         f"at intake; the buyer's own rating stands."})
+        if not field:
+            continue
+        rows = ratings.setdefault(array, [])
+        mine = [r for r in rows if (r.get("claim_source"), r.get("claim_id"))
+                == (f["claim_source"], f["claim_id"])]
+        for r in mine:
+            rows.remove(r)
+        row = {"claim_source": f["claim_source"], "claim_id": f["claim_id"],
+               field: f["buyer_rating"], "by": "buyer",
+               "basis": f"The buyer rated this question {f['buyer_rating'].replace('_', ' ')} "
+                        f"at intake; the buyer's own rating stands."}
+        for k in ("remedy", "in_short", "in_short_dropped"):
+            if mine and mine[0].get(k) is not None:
+                row[k] = mine[0][k]
+        rows.append(row)
 
 
 def _sha(text: Optional[str]) -> Optional[str]:
@@ -433,6 +616,8 @@ def main() -> int:
                                         .get("react_max_tokens", 32768))
     t0 = datetime.datetime.now(datetime.timezone.utc)
     error, result = None, {"obj": {"ratings": [], "exposures": []}, "calls": []}
+    observed: Dict[str, Any] = {"groups": [], "check": None}
+    in_short: Dict[str, Any] = {"checks": {}, "rewritten": [], "dropped": [], "calls": []}
     replicates: Dict[str, Any] = {"passes": 0, "escalated": [], "seeds": []}
     try:
         result = rate(loop, method_text, eng.get("transaction"), rateable,
@@ -443,6 +628,19 @@ def main() -> int:
         if not args.single:
             result = replicate(loop, method_text, eng, rateable, exposable,
                                max_tokens, args.batch, result, replicates)
+        if merged.get("unclaimed"):
+            observed = rate_observations(
+                loop, method_text, _head(eng.get("transaction"), eng.get("thresholds"),
+                                         eng.get("reliance")),
+                merged["unclaimed"], max_tokens)
+            result["calls"] += observed["calls"]
+        # The plain accounts are checked once the ratings are final, while
+        # the model is still open (MATERIALITY §8).
+        add_buyer_ratings(result["obj"], merged)
+        if observed["groups"]:
+            result["obj"]["observations"] = observed["groups"]
+        in_short = check_in_short(loop, method_text, result["obj"], merged, max_tokens)
+        result["calls"] += in_short["calls"]
         for c in result["calls"]:
             if c["response_format_dropped"]:
                 error = (f"the route dropped "
@@ -460,7 +658,21 @@ def main() -> int:
             logger.warning("executor shutdown failed: %s", e)
 
     ratings = result["obj"]
-    add_buyer_ratings(ratings, merged)
+    add_buyer_ratings(ratings, merged)                 # again, should rating have failed before it
+    ratings["in_short_checks"] = in_short["checks"]
+    for k in in_short["dropped"]:
+        issues.note(out, stage=STAGE, code="in_short_dropped",
+                    text=f"{k}: the plain account failed the check and is not shown; the report "
+                         f"gives the claim's statement and verdict instead (MATERIALITY \u00a78)",
+                    severity="check")
+    # THE OBSERVATIONS, GROUPED AND RATED. Absent when the groups failed
+    # their check twice; the report then lists the observations unrated.
+    if observed["groups"]:
+        ratings["observations"] = observed["groups"]
+    elif observed["check"] is not None:
+        for p in observed["check"]["problems"]:
+            issues.note(out, stage=STAGE, code="observations_check", text=p,
+                        severity="check")
     check = schemas.check_ratings(ratings, merged)
     for p in check["problems"]:
         issues.note(out, stage=STAGE, code="ratings_check", text=p,
@@ -518,6 +730,11 @@ def main() -> int:
         "reliance_sha256": _sha(eng.get("reliance")),
         "exposable": len(exposable),
         "calls": result["calls"], "ratings_check": check,
+        "observations_check": observed["check"],
+        "in_short_check": {"verdicts": {v: sum(1 for c in in_short["checks"].values()
+                                               if c.get("verdict") == v)
+                                        for v in schemas.CHECK_VERDICTS + ("unchecked",)},
+                           "rewritten": in_short["rewritten"], "dropped": in_short["dropped"]},
         "wall_clock_s": wall, "error": error,
         "transient_events": getattr(loop, "transient_events", None),
         "captured_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),

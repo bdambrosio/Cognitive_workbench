@@ -116,9 +116,12 @@ def test_merge_refuses_an_unfinished_run(tmp_path):
 def test_ratings_check_wants_every_rateable_finding_once(tmp_path):
     a, b = _fixture(tmp_path)
     m = mg.merge([a, b])
+    fix = {"change": "c", "band": "one_place"}
     ok = {"ratings": [
-        {"claim_source": "doc1.md", "claim_id": 1, "materiality": "decisive", "basis": "b"},
-        {"claim_source": "doc9.md", "claim_id": 1, "materiality": "material", "basis": "b"}],
+        {"claim_source": "doc1.md", "claim_id": 1, "materiality": "decisive", "basis": "b", "remedy": fix,
+         "in_short": "i"},
+        {"claim_source": "doc9.md", "claim_id": 1, "materiality": "material", "basis": "b",
+         "remedy": {"change": "", "band": "none"}, "in_short": "i"}],
         "exposures": [
         {"claim_source": "doc9.md", "claim_id": 2, "exposure": "decisive", "basis": "b"}]}
     res = ms.check_ratings(ok, m)
@@ -128,7 +131,8 @@ def test_ratings_check_wants_every_rateable_finding_once(tmp_path):
                               "exposable": 1, "exposed": 1,
                               "exposure": {"decisive": 1}}
     bad = {"ratings": [
-        {"claim_source": "doc1.md", "claim_id": 1, "materiality": "decisive", "basis": "b"},
+        {"claim_source": "doc1.md", "claim_id": 1, "materiality": "decisive", "basis": "b",
+         "remedy": {"change": "c", "band": "two_weeks"}},
         {"claim_source": "doc1.md", "claim_id": 1, "materiality": "material", "basis": "b"},
         {"claim_source": "doc1.md", "claim_id": 2, "materiality": "material", "basis": ""},
         {"claim_source": "nope.md", "claim_id": 7, "materiality": "material", "basis": "b"},
@@ -146,6 +150,29 @@ def test_ratings_check_wants_every_rateable_finding_once(tmp_path):
     assert "materiality doc9.md#2: this finding is rated for exposure" in text
     assert "exposure doc9.md#1: this finding is rated for materiality" in text
     assert "finding doc9.md#2 was not rated for exposure" in text
+    # a gap carries a remedy whose band is one of MATERIALITY §5a's
+    assert "materiality doc1.md#1: band 'two_weeks' is not one of §5a's" in text
+    assert "materiality doc1.md#2: no remedy" in text
+    assert "materiality doc1.md#1: no in_short (MATERIALITY §5b)" in text
+
+
+def test_observation_groups_hold_every_observation_exactly_once():
+    fix = {"change": "c", "band": "setting"}
+    row = lambda members: {"members": members, "materiality": "material", "basis": "b", "remedy": fix,
+                           "in_short": "i"}
+    assert ms.check_observations({"observations": [row([1, 3]), row([2])]}, 3)["ok"]
+    res = ms.check_observations({"observations": [row([1, 2]), row([2, 4])]}, 3)
+    assert set(res["problems"]) == {"observation group 2: observation 2 is also in group 1",
+                                    "observation group 2: no observation 4",
+                                    "observation 3 is in no group"}
+
+
+def test_a_remedy_survives_combining_its_samples():
+    s = [{"claim_source": "a", "claim_id": 1, "materiality": "material", "basis": "x",
+          "remedy": {"change": "c", "band": "design"}},
+         {"claim_source": "a", "claim_id": 1, "materiality": "material", "basis": "y",
+          "remedy": {"change": "d", "band": "setting"}}]
+    assert ms.combine("materiality", s)["remedy"] == {"change": "c", "band": "design"}
 
 
 import pytest  # noqa: E402
@@ -323,3 +350,56 @@ def test_ratings_schema_limits_claim_source_to_the_sources_given():
     assert item["properties"]["claim_source"] == {"enum": ["claim_sources/site/privacy.md"]}
     assert ms.ratings_schema()["properties"]["exposures"]["items"]["properties"][
         "claim_source"] == {"type": "string"}
+
+
+def _gaps():
+    def f(cid, asked=None):
+        return {"claim_source": "a.md", "claim_id": cid, "quote": "q", "lines": [cid, cid],
+                "statement": "s", "asked_by": asked,
+                "adjudication": {"verdict": "contradicted", "gap": f"gap {cid}"},
+                "evidence": [], "review": {"outcome": "holds"}, "citation_problems": []}
+    merged = {"findings": [f(1), f(2), f(3, asked="buyer")], "unclaimed": []}
+    ratings = {"ratings": [{"claim_source": "a.md", "claim_id": c, "materiality": "material", "basis": "b",
+                            "remedy": {"change": "c", "band": "setting"}, "in_short": f"plain {c}"}
+                           for c in (1, 2, 3)], "exposures": []}
+    return merged, ratings
+
+
+def _scripted(monkeypatch, answers):
+    """runner.emit replaced: each call takes the next answer; returns the prompts."""
+    from workflowsv2.audit_materiality import runner as mr
+    seen = []
+    def fake(loop, method, user, schema, max_tokens):
+        seen.append(user)
+        return {"obj": answers.pop(0), "parse": "parsed", "response_format_dropped": [], "parse_error": None}
+    monkeypatch.setattr(mr, "emit", fake)
+    return mr, seen
+
+
+def test_an_in_short_that_fails_the_check_is_written_again_and_dropped_if_it_fails_twice(monkeypatch):
+    merged, ratings = _gaps()
+    ok = lambda k: {"key": k, "verdict": "holds", "words": "", "why": ""}
+    bad = lambda k, v="adds": {"key": k, "verdict": v, "words": "w", "why": "y"}
+    mr, seen = _scripted(monkeypatch, [
+        {"checks": [ok("a.md#1"), bad("a.md#2"), bad("a.md#3", "misattributes")]},
+        {"rewrites": [{"key": "a.md#2", "in_short": "plain 2, again"},
+                      {"key": "a.md#3", "in_short": "plain 3, again"}]},
+        {"checks": [ok("a.md#2"), bad("a.md#3")]}])
+    res = mr.check_in_short(None, "m", ratings, merged, 100)
+    by = {r["claim_id"]: r for r in ratings["ratings"]}
+    assert by[1]["in_short"] == "plain 1" and by[2]["in_short"] == "plain 2, again"
+    assert "in_short" not in by[3] and by[3]["in_short_dropped"].startswith("failed the check again")
+    assert res["rewritten"] == ["a.md#2", "a.md#3"] and res["dropped"] == ["a.md#3"]
+    assert ms.check_ratings(ratings, merged)["ok"]          # a dropped account is not a missing one
+    # the check is told who made the statement, and only the rewritten are checked again
+    assert "the buyer asked this; the seller did not say it" in seen[0]
+    assert "a.md#1" not in seen[2]
+
+
+def test_a_check_that_misses_a_sentence_twice_withdraws_every_in_short(monkeypatch):
+    merged, ratings = _gaps()
+    partial = {"checks": [{"key": "a.md#1", "verdict": "holds", "words": "", "why": ""}]}
+    mr, _ = _scripted(monkeypatch, [partial, partial])
+    res = mr.check_in_short(None, "m", ratings, merged, 100)
+    assert res["dropped"] == ["a.md#1", "a.md#2", "a.md#3"]
+    assert all("in_short" not in r for r in ratings["ratings"])

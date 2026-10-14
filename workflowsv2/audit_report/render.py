@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from workflowsv2.audit_materiality import schemas as ms
+from workflowsv2.audit_report import schemas as rs
 from workflowsv2.claims_audit.schemas import NOT_EXAMINED
 
 logger = logging.getLogger("audit_report.render")
@@ -49,6 +50,15 @@ DISPOSITION_WORDS = {
     NOT_EXAMINED: "the searches named files that were not opened",
 }
 
+#: A rating as the reader sees it outside the definitions and the appendices.
+RATING_LABEL = {"not_material": "not material", "material": "material",
+                "decisive": "decisive"}
+
+#: MATERIALITY.md §5a's bands, as the reader sees them. `none` is not shown.
+BAND_WORDS = {"setting": "a setting", "one_place": "one place in the code",
+              "several_places": "several places in the code",
+              "design": "a design change"}
+
 RATING_WORDS = {
     "not_material": "would change neither the price, the terms, nor the "
                     "decision to close",
@@ -60,7 +70,9 @@ RATING_WORDS = {
 
 DISPOSITIONS = "dispositions.json"
 PRACTICE_REVIEW_WORDS = {"retained": "retained after review by the practice",
-                         "unresolved": "unresolved; the practice has not decided between the finding and the check"}
+                         "unresolved": "unresolved; the practice has not decided between the finding and the check",
+                         "withdrawn": "withdrawn by the practice after review; it is not counted among "
+                                      "the findings of this document"}
 
 
 def apply_dispositions(merged: Dict[str, Any], merged_dir: Path) -> None:
@@ -68,7 +80,9 @@ def apply_dispositions(merged: Dict[str, Any], merged_dir: Path) -> None:
     into that finding as `disposition`. The decisions are written by hand,
     after reading the finding and the check, in DISPOSITIONS beside
     merged.json: {"<claim source>#<claim id>": {"disposition": "retained" |
-    "unresolved", "note": "..."}}."""
+    "unresolved" | "withdrawn", "note": "..."}}. `withdrawn` (Bruce,
+    2026-10-14): the practice agrees the finding is wrong; it stays in its
+    section, marked, and is named in no summary or conclusion."""
     p = Path(merged_dir) / DISPOSITIONS
     disp = json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {}
     for f in merged.get("findings") or []:
@@ -217,12 +231,14 @@ def _ratings_by_key(ratings: Dict[str, Any], array: str
             for r in ratings.get(array) or []}
 
 
-def _questions_by_key(merged: Dict[str, Any]) -> Dict[str, List[str]]:
+def _questions_by_key(merged: Dict[str, Any], dropped: Optional[set] = None
+                      ) -> Dict[str, List[str]]:
     """The questions for the seller that name a claim, by that claim's key,
-    in record order."""
+    in record order. `dropped`: the numbers (from 1, in record order) of
+    questions that repeat an earlier one, left out."""
     out: Dict[str, List[str]] = {}
-    for q in merged.get("questions") or []:
-        if q.get("claim_id") is None or not q.get("question"):
+    for i, q in enumerate(merged.get("questions") or [], 1):
+        if i in (dropped or set()) or q.get("claim_id") is None or not q.get("question"):
             continue
         out.setdefault(f"{q.get('claim_source')}#{q.get('claim_id')}", []).append(q["question"])
     return out
@@ -267,32 +283,56 @@ def _lines_bare(lines: Any) -> str:
     return ""
 
 
-def _evidence(items: Sequence[Dict[str, Any]]) -> List[str]:
+#: How many words of a quoted line the report shows; the evidence document
+#: carries the whole of it (Bruce, 2026-10-14).
+OPENING_WORDS = 8
+
+
+def _opening(quote: Any) -> str:
+    """The first words of a quoted line, enough to find it at the cited lines."""
+    words = _md_safe(quote).split()
+    return " ".join(words[:OPENING_WORDS]) + (" …" if len(words) > OPENING_WORDS else "")
+
+
+def _evidence(items: Sequence[Dict[str, Any]], full: bool = False) -> List[str]:
+    """Citations and derived facts first, in record order, then the
+    searches: what settles a claim before the record of where else the
+    practice looked.
+
+    The report shows each item short: a citation's place, the first words of
+    its quote and what it shows; a derived fact's sources and consequence; a
+    search's result. `full` gives every field, for the evidence document."""
+    items = [e for e in items or [] if isinstance(e, dict)]
+    items = ([e for e in items if e.get("form") != "search"]
+             + [e for e in items if e.get("form") == "search"])
     out = []
-    for e in items or []:
-        if not isinstance(e, dict):
-            continue
+    for e in items:
         form = e.get("form")
         if form == "citation":
+            shows = _md_safe(e.get("shows"))
+            quote = _md_safe(e.get("quote")) if full else _opening(e.get("quote"))
             out.append(f"- `{e.get('document')}`, {_lines(e.get('lines'))}: "
-                       f"\"{_md_safe(e.get('quote'))}\" — "
-                       f"{_md_safe(e.get('shows'))}")
+                       f"\"{quote}\"" + (f" — {shows}" if shows else ""))
         elif form == "derived":
             basis = "; ".join(f"`{b.get('document')}` {_lines(b.get('lines'))}"
+                              + (f": \"{_md_safe(b.get('quote'))}\"" if full else "")
                               for b in (e.get("basis") or []) if isinstance(b, dict))
             if e.get("from_knowledge") is True:
                 head = ("- derived **from knowledge of the dependency, not from the "
                         f"supplied materials**, with {basis} as its basis: ")
             else:
                 head = f"- derived from {basis}: "
-            out.append(f"{head}{_md_safe(e.get('derivation'))} "
-                       f"— {_md_safe(e.get('consequence'))}")
+            out.append(head + (f"{_md_safe(e.get('derivation'))} — " if full else "")
+                       + _md_safe(e.get("consequence")))
         elif form == "search":
-            cands = ", ".join(f"`{c}`" for c in (e.get("candidates") or []))
-            out.append(f"- searched ({e.get('kind')}): "
-                       f"{_md_safe(e.get('performed'))} — "
-                       f"{_md_safe(e.get('result'))}"
-                       + (f" Files named: {cands}." if cands else ""))
+            if full:
+                cands = ", ".join(f"`{c}`" for c in (e.get("candidates") or []))
+                out.append(f"- searched ({e.get('kind')}): "
+                           f"{_md_safe(e.get('performed'))} — "
+                           f"{_md_safe(e.get('result'))}"
+                           + (f" Files named: {cands}." if cands else ""))
+            else:
+                out.append(f"- searched: {_md_safe(e.get('result'))}")
     return out
 
 
@@ -345,23 +385,39 @@ def _links(f: Dict[str, Any]) -> List[str]:
     return out
 
 
+def _verdict_short(v: Any) -> str:
+    """The verdict in words, without its explanation: "partly true"."""
+    return VERDICT_WORDS.get(v, str(v)).split(" — ")[0]
+
+
 def _finding(f: Dict[str, Any], rating: Optional[Dict[str, Any]],
              field: str, questions: Optional[List[str]] = None,
              covered: Optional[Dict[str, Any]] = None,
-             verdicts: Optional[Dict[str, str]] = None) -> List[str]:
+             verdicts: Optional[Dict[str, str]] = None,
+             level: int = 3) -> List[str]:
     adj = f.get("adjudication") or {}
     v = adj.get("verdict")
-    head = f"### {f.get('claim_source')}, claim {f.get('claim_id')}"
+    # THE HEADING SAYS WHAT WAS TESTED AND HOW IT CAME OUT, in the record's
+    # words: the claim's plain statement and the verdict. Where the claim
+    # came from goes on the line below (Bruce, 2026-10-14).
+    head = f"{'#' * level} {_md_safe(f.get('statement') or f.get('quote'))} — {_verdict_short(v)}"
+    where = f"*{f.get('claim_source')}, claim {f.get('claim_id')}"
     if rating:
-        head += f" — {field}: {rating.get(field)}"
+        where += f" · {field}: {RATING_LABEL.get(rating.get(field), rating.get(field))}"
+    where += "*"
     if f.get("asked_by"):
         # The quote is the statement: a question source holds nothing else.
         who = "buyer" if f["asked_by"] == "buyer" else "practice"
-        out = [head, "", f"**Asked by the {who}:** {_md_safe(f.get('statement'))}"]
+        out = [head, "", where, ""]
+        if rating and rating.get("in_short"):
+            out += [f"**In short:** {_md_safe(rating['in_short'])}", ""]
+        out += [f"Asked by the {who}."]
     else:
-        out = [head, "",
-               f"> \"{_md_safe(f.get('quote'))}\" "
-               f"({f.get('claim_source')}, {_lines(f.get('lines'))})"]
+        out = [head, "", where, ""]
+        if rating and rating.get("in_short"):
+            out += [f"**In short:** {_md_safe(rating['in_short'])}", ""]
+        out += [f"> \"{_md_safe(f.get('quote'))}\" "
+                f"({f.get('claim_source')}, {_lines(f.get('lines'))})"]
     for loc in f.get("locations") or []:
         out.append(f"> also, at {_lines(loc.get('lines'))}: "
                    f"\"{_md_safe(loc.get('quote'))}\"")
@@ -411,24 +467,118 @@ def _finding(f: Dict[str, Any], rating: Optional[Dict[str, Any]],
         elif agree:
             tag = (f" (rated {agree.split(' of ')[1]} times, {agree.split(' of ')[0]} agree"
                    + ("; **borderline**" if rating.get("borderline") else "") + ")")
-        out += [f"**{field.capitalize()} — {rating.get(field)}{tag}:** "
-                f"{RATING_WORDS.get(rating.get(field), '')}. "
-                f"{_md_safe(rating.get('basis'))}", ""]
+        out += [f"**{field.capitalize()}: {RATING_LABEL.get(rating.get(field), rating.get(field))}**"
+                f"{tag}. {_md_safe(rating.get('basis'))}", ""]
         if rating.get("borderline"):
             out += ["The replicates split on this rating. The other readings:", ""]
-            out += [f"- *{sm.get(field)}* — {_md_safe(sm.get('basis'))}"
+            out += [f"- *{RATING_LABEL.get(sm.get(field), sm.get(field))}* — {_md_safe(sm.get('basis'))}"
                     for sm in rating.get("samples") or []
                     if sm.get(field) != rating.get(field)] + [""]
-    if f.get("correction"):
-        out += [f"**Correction:** {_md_safe(f['correction'])}", ""]
+        out += _remedy_line(rating.get("remedy"))
+    # A `correction` is the audit's note on its own process; it stays in the
+    # record and is not shown to the buyer.
     for q in questions or []:
         out += [f"**Question for the seller:** {_md_safe(q)}", ""]
-    out += ["", "Evidence:", ""] + (_evidence(f.get("evidence")) or ["- (none)"])
+    out += ["Evidence:", ""] + (_evidence(f.get("evidence")) or ["- (none)"])
     out += ["", f"Check: {_review_line(f)}.", ""]
     d = f.get("disposition")
     if d:
         out += [f"Practice review: {PRACTICE_REVIEW_WORDS[d['disposition']]}."
                 + (f" {_md_safe(d['note'])}" if d.get("note") else ""), ""]
+    return out
+
+
+def _remedy_line(remedy: Optional[Dict[str, Any]]) -> List[str]:
+    """MATERIALITY.md §5a's remedy, unless the band says nothing needs to
+    change."""
+    if not remedy or remedy.get("band") not in BAND_WORDS:
+        return []
+    return [f"**What would close it:** {_md_safe(remedy.get('change'))} — scope: "
+            f"{BAND_WORDS[remedy['band']]}. The practice's estimate; not checked.", ""]
+
+
+def observation_groups(merged: Dict[str, Any], ratings: Dict[str, Any]
+                       ) -> List[Dict[str, Any]]:
+    """The rated groups of observations, highest rating first, each with its
+    number as the document shows it (1, 2, ...) and its members' records."""
+    unclaimed = merged.get("unclaimed") or []
+    groups = [dict(g, items=[unclaimed[m - 1] for m in g.get("members") or []
+                             if 1 <= m <= len(unclaimed)])
+              for g in ratings.get("observations") or []]
+    groups = [g for g in groups if g["items"]]
+    groups.sort(key=lambda g: _ORDER.get(g.get("materiality"), 99))
+    for n, g in enumerate(groups, 1):
+        g["number"] = n
+    return groups
+
+
+OBSERVATIONS_LINE = ("The review recorded these while testing claims. The seller asserted "
+                     "nothing about them, so none is a claim that failed. Each is rated as a "
+                     "gap the review showed, and they are ordered by rating.")
+
+
+def _observation(g: Dict[str, Any]) -> List[str]:
+    first = g["items"][0]
+    out = [f"### Observation {g['number']} — {RATING_LABEL.get(g.get('materiality'), g.get('materiality'))}", ""]
+    if g.get("in_short"):
+        out += [f"**In short:** {_md_safe(g['in_short'])}", ""]
+    out += [_md_safe(first.get("note")), "",
+           f"**Materiality: {RATING_LABEL.get(g.get('materiality'), g.get('materiality'))}** "
+           f"(rated once). {_md_safe(g.get('basis'))}", ""]
+    out += _remedy_line(g.get("remedy"))
+    seen, items = set(), []
+    for u in g["items"]:
+        e = u.get("evidence") or {}
+        k = (e.get("document"), json.dumps(e.get("lines")), e.get("form"))
+        if k not in seen:
+            seen.add(k)
+            items.append(e)
+    srcs = sorted({u.get("claim_source") for u in g["items"]} - {None})
+    out += ["Evidence:", ""] + (_evidence(items) or ["- (none)"])
+    out += ["", f"Recorded while testing {', '.join(f'`{x}`' for x in srcs)}.", ""]
+    return out
+
+
+def grouped_sections(classes: Dict[str, List[Dict[str, Any]]]) -> Dict[str, set]:
+    """The finding keys of each section whose findings may be grouped by
+    subject (REPORT.md §6)."""
+    return {"shown": {_key(f) for f in classes["shown"]},
+            "buyer": {_key(f) for f in classes["asked_buyer"]},
+            "practice": {_key(f) for f in classes["asked_practice"]}}
+
+
+def ungrouped_allowed(classes: Dict[str, List[Dict[str, Any]]]) -> set:
+    """The keys of the grouped sections' withdrawn findings, which the
+    groups may leave out: a withdrawn finding is counted nowhere."""
+    return {_key(f) for cls in ("shown", "asked_buyer", "asked_practice")
+            for f in classes[cls] if withdrawn(f)}
+
+
+def _in_groups(rows: List[Tuple[Dict[str, Any], Optional[Dict[str, Any]], str]],
+               groups: Optional[List[Dict[str, Any]]], render_one) -> List[str]:
+    """`rows` (finding, rating, field), already in order, under their
+    subject headings when `groups` is given: each group keeps the rows' order,
+    and the groups follow the position of their first row."""
+    if not groups:
+        out = []
+        for row in rows:
+            out += render_one(row, 3)
+        return out
+    pos = {_key(r[0]): i for i, r in enumerate(rows)}
+    groups = sorted(groups, key=lambda g: min(pos.get(k, 1 << 30) for k in g["findings"]))
+    by_key = {_key(r[0]): r for r in rows}
+    out = []
+    for g in groups:
+        out += [f"### {_md_safe(g['title'])}", ""]
+        for k in sorted(g["findings"], key=lambda k: pos.get(k, 1 << 30)):
+            out += render_one(by_key[k], 4)
+    # Only a withdrawn finding can be in no group (valid_groups).
+    grouped = {k for g in groups for k in g["findings"]}
+    rest = [r for r in rows if _key(r[0]) not in grouped]
+    if rest:
+        out += ["### Withdrawn by the practice", ""]
+        for row in rest:
+            out += render_one(row, 4)
     return out
 
 
@@ -472,11 +622,39 @@ def _slot(name: str, prose: Optional[Dict[str, Any]]) -> List[str]:
     return [f"[[{name}]]", ""]
 
 
+def awaiting_practice(f: Dict[str, Any]) -> bool:
+    """The check did not uphold this finding and the practice has not
+    retained it. Such a finding stays in its section, with the check's
+    outcome, but is not named among the material findings or in the
+    conclusion until the practice decides (Bruce, 2026-10-14: a finding the
+    check rejected was the answer page's one contradiction)."""
+    return ((f.get("review") or {}).get("outcome") == "does_not_hold"
+            and (f.get("disposition") or {}).get("disposition") not in ("retained", "withdrawn"))
+
+
+def withdrawn(f: Dict[str, Any]) -> bool:
+    return (f.get("disposition") or {}).get("disposition") == "withdrawn"
+
+
+def held_back(classes: Dict[str, List[Dict[str, Any]]],
+              by_m: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """The findings rated material or decisive that awaiting_practice holds
+    back from the summary and the conclusion, in rating order."""
+    fs = classes["shown"] + [f for k in ("asked_buyer", "asked_practice")
+                             for f in classes.get(k) or [] if ms.rateable(f)]
+    return [f for f in _ordered(fs, by_m, "materiality")
+            if awaiting_practice(f)
+            and (by_m.get(_key(f)) or {}).get("materiality") in ("material", "decisive")]
+
+
 def key_findings(classes: Dict[str, List[Dict[str, Any]]],
-                 by_m: Dict[str, Dict[str, Any]]) -> List[str]:
-    """The shown findings rated material or decisive, one item each, in
-    rating order, each with its whole gap: a gap's first sentence often says
-    what holds and the caveat comes after it. Computed, so the executive
+                 by_m: Dict[str, Dict[str, Any]],
+                 observations: Optional[List[Dict[str, Any]]] = None) -> List[str]:
+    """The shown findings rated material or decisive, one line each, in
+    rating order: the rating and the rater's plain account of the finding
+    (MATERIALITY §5b), which a buyer can read on its own (Bruce,
+    2026-10-14). The gap is under the finding; the summary carried a second
+    copy of every gap until 2026-10-14, a page and a half of it. Computed, so the executive
     summary lists what the ratings say and not what a writer chose to
     mention."""
     rows = []
@@ -484,13 +662,22 @@ def key_findings(classes: Dict[str, List[Dict[str, Any]]],
              if ms.rateable(f)]
     for f in _ordered(classes["shown"] + asked, by_m, "materiality"):
         r = by_m.get(_key(f))
-        if not r or r.get("materiality") not in ("material", "decisive"):
+        if not r or r.get("materiality") not in ("material", "decisive") \
+                or awaiting_practice(f) or withdrawn(f):
             continue
         adj = f.get("adjudication") or {}
-        rows.append(f"- **{f.get('claim_source')}, claim {f.get('claim_id')}** "
-                    f"({VERDICT_WORDS.get(adj.get('verdict'), adj.get('verdict')).split(' — ')[0]}; "
-                    f"{r.get('materiality')}): {_md_safe(' '.join((adj.get('gap') or '').split()))}"
-                    + (f" — *{KNOWLEDGE_MARK}*" if _from_knowledge(f) else ""))
+        head = f"- **{f.get('claim_source')}, claim {f.get('claim_id')}** ({RATING_LABEL.get(r.get('materiality'))}): "
+        if r.get("in_short"):
+            rows.append(head + _md_safe(r["in_short"]))
+        else:                       # a rating made before MATERIALITY §5b
+            rows.append(head + f"{_md_safe(f.get('statement') or f.get('quote'))} — "
+                        f"{_verdict_short(adj.get('verdict'))}"
+                        + (f" — *{KNOWLEDGE_MARK}*" if _from_knowledge(f) else ""))
+    for g in observations or []:
+        if g.get("materiality") in ("material", "decisive"):
+            rows.append(f"- **Observation {g['number']}** ({RATING_LABEL[g['materiality']]}; "
+                        f"the seller claimed nothing about it): "
+                        f"{_md_safe(g.get('in_short') or g['items'][0].get('note'))}")
     return rows
 
 
@@ -501,13 +688,14 @@ ASKED_BY_WORDS = {"buyer": "the buyer's questions", "standard": "the practice's 
 
 def _front_matter(engagement: str, dates: List[str], revs: List[str],
                   sources: List[str], tiered: bool = False,
-                  asked: Optional[Dict[str, str]] = None) -> List[str]:
-    """Title, the materials' date and version, the assurance given, and who
-    is responsible for what. Fixed text from the record; defines the terms it
-    uses at first use. `tiered`: some claims were listed and not tested.
-    `asked`: question sources by claim source, with their kind; they are
-    named apart from the seller's claim sources, as statements the seller
-    did not make."""
+                  asked: Optional[Dict[str, str]] = None) -> Tuple[List[str], List[str]]:
+    """(the title and the materials' date and version; what the document
+    is, the assurance given, and who is responsible for what). Fixed text
+    from the record; defines the terms it uses at first use. The second part
+    follows the answer and the summary (Bruce, 2026-10-14). `tiered`: some
+    claims were listed and not tested. `asked`: question sources by claim
+    source, with their kind; they are named apart from the seller's claim
+    sources, as statements the seller did not make."""
     asked = asked or {}
     when = ", ".join(dates) if dates else "an undated run"
     rev = (" at commit " + ", ".join(r[:12] for r in revs)) if revs else ""
@@ -518,8 +706,9 @@ def _front_matter(engagement: str, dates: List[str], revs: List[str],
     return [
         f"# Claims review — {engagement}", "",
         f"Materials as of {when}{rev}. Claim sources: {src}."
-        + (f" Questions tested: {questions}." if questions else ""), "",
-        "**What this document is.** A claims review: "
+        + (f" Questions tested: {questions}." if questions else ""), ""], [
+        "## What this document is", "",
+        "A claims review: "
         + ("every assertion the seller makes in the claim sources is listed, "
            "and each is rated by what it would change for the buyer if it were "
            "untrue. The claims the buyer's decision rests on are tested, one by "
@@ -568,10 +757,17 @@ def _how_to_read() -> List[str]:
         "second check, blind to the first, on the findings the check "
         "questioned. Each finding ends with the check's outcome; where the "
         "check did not uphold a finding, a *practice review* line may follow, "
-        "saying whether the practice retained it or left it unresolved. A finding "
+        "saying whether the practice retained it, withdrew it, or left it unresolved. "
+        "A withdrawn finding is shown where it was, marked, and counted nowhere. A finding "
         "marked *covered by* names a wider claim of which this one is a "
         "part, with that claim's verdict beside it; the two were tested "
         "separately and each verdict is its own.", "",
+        "**Evidence, in short and in full.** A finding's evidence here gives "
+        "the file and lines, the first words of the quoted text and what it "
+        "shows; for a search, what it found. The quoted text in full, the "
+        "reasoning behind each derived fact, and every search with what was "
+        "searched and the files it named are in the companion *evidence* "
+        "document, under the same claim source and claim id.", "",
         "**Verdicts**, and the class each puts a claim in:", "",
         "| verdict | meaning | class |", "|---|---|---|",
         "| contradicted | " + VERDICT_WORDS["contradicted"] + " | shown |",
@@ -635,7 +831,11 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
     classes = classify(merged)
     by_m = _ratings_by_key(ratings, "ratings")
     by_e = _ratings_by_key(ratings, "exposures")
-    by_q = _questions_by_key(merged)
+    dropped, _ = rs.dropped_questions(prose, len(merged.get("questions") or []))
+    groups, _ = rs.valid_groups(prose, grouped_sections(classes),
+                                ungrouped_allowed(classes))
+    by_q = _questions_by_key(merged, dropped)
+    observations = observation_groups(merged, ratings)
     covered = record.get("covered") or {}
     verdicts = {_key(f): (f.get("adjudication") or {}).get("verdict")
                 for f in merged.get("findings") or []}
@@ -649,8 +849,8 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
     sources = sources + unrun
     asked = {f["claim_source"]: f["asked_by"] for f in merged.get("findings") or []
              if f.get("asked_by")}
-    out = _front_matter(engagement or merged.get("engagement") or "engagement",
-                        dates, revs, sources, tiered=bool(untested), asked=asked)
+    out, about = _front_matter(engagement or merged.get("engagement") or "engagement",
+                               dates, revs, sources, tiered=bool(untested), asked=asked)
 
     out += ["## The transaction", ""]
     out += ["  \n".join(transaction.strip().splitlines()), ""] if transaction else [
@@ -661,24 +861,38 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
         "None recorded. Ratings are read against the rating scale alone, not "
         "against what the buyer said would change the price or end the deal."), ""]
 
-    out += ["## Executive summary", ""] + _slot("summary", prose)
-    kf = key_findings(classes, by_m)
-    out += ["**The material findings**, ordered by rating — each is set out in "
-            "full under *What the review showed*"
-            + (", or under the questions asked" if classes["asked_buyer"] or classes["asked_practice"]
-               else "") + ":", ""]
-    out += kf + [""] if kf else ["No finding was rated material or decisive.", ""]
-
     # THE CONCLUSION IS OPT-IN AND CONDITIONAL. Present only when the
     # engagement asked for one and the buyer's thresholds are recorded; the
     # front matter says an overall assessment is given only against stated
-    # thresholds, and this is where it is given.
+    # thresholds, and this is where it is given. It comes first, right after
+    # the thresholds it is read against (Bruce, 2026-10-14).
     if conclusion and thresholds:
-        out += ["## Conclusion", "",
+        out += ["## Against the buyer's thresholds", "",
                 "The engagement asked for a conclusion. It is read against "
                 "the buyer's thresholds stated above and against nothing "
                 "else; it counts what the review showed, not what it could "
                 "not settle.", ""] + _slot("conclusion", prose)
+
+    out += ["## Executive summary", ""] + _slot("summary", prose)
+    kf = key_findings(classes, by_m, observations)
+    out += ["**The material findings**, ordered by rating — each is set out in "
+            "full under *What the review showed*"
+            + (", or under the questions asked" if classes["asked_buyer"] or classes["asked_practice"]
+               else "")
+            + (", or under *Found without a claim*" if any(
+                g.get("materiality") in ("material", "decisive") for g in observations) else "")
+            + ":", ""]
+    out += kf + [""] if kf else ["No finding was rated material or decisive.", ""]
+    hb = held_back(classes, by_m)
+    if hb:
+        out += [("Not listed: " + ", ".join(f"{f.get('claim_source')}, claim {f.get('claim_id')}" for f in hb)
+                 + ", rated " + " or ".join(sorted({RATING_LABEL[(by_m.get(_key(f)) or {}).get("materiality")]
+                                                    for f in hb}, reverse=True)) + ". "
+                 "The check did not uphold " + ("these findings" if len(hb) > 1 else "this finding")
+                 + " and the practice has not yet decided " + ("them" if len(hb) > 1 else "it")
+                 + "; each is set out in its section with the check's outcome."), ""]
+
+    out += about
 
     listed = {s: sum(1 for c in untested if c.get("claim_source") == s) for s in sources}
     out += ["## Scope and approach", "",
@@ -723,11 +937,20 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
 
     out += _how_to_read()
 
+    def one(row, level):
+        f, r, field = row
+        return _finding(f, r, field, by_q.get(_key(f)), covered.get(_key(f)), verdicts, level)
+
     out += ["## What the review showed", ""] + _slot("shown_note", prose)
-    for f in _ordered(classes["shown"], by_m, "materiality"):
-        out += _finding(f, by_m.get(_key(f)), "materiality", by_q.get(_key(f)), covered.get(_key(f)), verdicts)
+    out += _in_groups([(f, by_m.get(_key(f)), "materiality")
+                       for f in _ordered(classes["shown"], by_m, "materiality")],
+                      groups.get("shown"), one)
     if not classes["shown"]:
         out += ["No finding showed a gap.", ""]
+    if observations:
+        out += ["## Found without a claim", "", OBSERVATIONS_LINE, ""]
+        for g in observations:
+            out += _observation(g)
     out += ["## Unsettled claims", ""] + _slot("unsettled_note", prose)
     for f in _ordered(classes["unsettled"], by_e, "exposure"):
         out += _finding(f, by_e.get(_key(f)), "exposure", by_q.get(_key(f)), covered.get(_key(f)), verdicts)
@@ -744,8 +967,8 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
     for cls, (title, line) in ASKED_LINES.items():
         if classes[cls]:
             out += [f"## {title}", "", line, ""]
-            for f, r, field in _asked_ordered(classes[cls], by_m, by_e):
-                out += _finding(f, r, field, by_q.get(_key(f)), covered.get(_key(f)), verdicts)
+            out += _in_groups(_asked_ordered(classes[cls], by_m, by_e),
+                              groups.get("buyer" if cls == "asked_buyer" else "practice"), one)
     out += ["## Claims that hold", "",
             "| claim source | id | claim | evidence |", "|---|---|---|---|"]
     for f in sorted(classes["holds"], key=lambda x: (x.get("claim_source") or "",
@@ -760,12 +983,15 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
         out.append("| | | none | |")
     out.append("")
     if merged.get("questions"):
+        # Numbered while the passages are being written, so the writer can
+        # name the questions that repeat one another (REPORT.md §6); in the
+        # document, a repeat is left out.
         out += ["## Questions for the seller", ""]
-        out += [f"- ({q.get('claim_source')}"
+        out += [(f"{i}. " if prose is None else "- ") + f"({q.get('claim_source')}"
                 + (f", claim {q['claim_id']}" if q.get("claim_id") is not None else "")
                 + f") {q.get('question')}"
-                for q in merged["questions"]] + [""]
-    if merged.get("unclaimed"):
+                for i, q in enumerate(merged["questions"], 1) if i not in dropped] + [""]
+    if merged.get("unclaimed") and not observations:
         out += ["## Observations the seller did not claim", ""]
         for u in merged["unclaimed"]:
             out.append(f"- ({u.get('claim_source')}) {u.get('note')}")
@@ -777,28 +1003,30 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
             f"claim(s) were rated before testing as claims whose being untrue in any way "
             f"would not lead the buyer to reopen the price or the terms; they are listed in the "
             f"second appendix, each with the reason, and were not tested. ")
-            + "By verdict and class:", "", "| verdict | class | claims |", "|---|---|---|"]
+            + "By verdict:", "", "| verdict | claims |", "|---|---|"]
     counts = {"contradicted": 0, "partial": 0, "real_with_caveat": 0,
               "unverifiable": 0, "real": 0}
     for f in merged.get("findings") or []:
         v = (f.get("adjudication") or {}).get("verdict")
         counts[v] = counts.get(v, 0) + 1
-    cls = {"contradicted": "shown", "partial": "shown", "real_with_caveat": "shown",
-           "unverifiable": "unsettled", "real": "holds"}
     for v, n in counts.items():
-        out.append(f"| {v} | {cls.get(v, '')} | {n} |")
+        out.append(f"| {_verdict_short(v)} | {n} |")
     rf = ratings.get("figures") or {}
     out += ["",
-            "Shown findings by materiality: "
-            + (", ".join(f"{k} {n}" for k, n in sorted((rf.get('materiality') or {}).items()))
+            "Gaps by materiality: "
+            + (", ".join(f"{RATING_LABEL.get(k, k)} {n}" for k, n in sorted((rf.get('materiality') or {}).items()))
                or "none") + ". Unsettled claims by exposure: "
-            + (", ".join(f"{k} {n}" for k, n in sorted((rf.get('exposure') or {}).items()))
+            + (", ".join(f"{RATING_LABEL.get(k, k)} {n}" for k, n in sorted((rf.get('exposure') or {}).items()))
                or "none") + f", of which {len(classes['seller_unsettled'])} about the seller. "
             f"Unexamined: {len(classes['not_examined'])}."
             + (f" Of all the findings, {len(classes['asked_buyer'])} are on statements the "
                f"buyer asked and {len(classes['asked_practice'])} on statements the practice "
                "asked; they are counted above by verdict and set out under the questions "
                "asked." if classes["asked_buyer"] or classes["asked_practice"] else ""), ""]
+    gone = [f for f in merged.get("findings") or [] if withdrawn(f)]
+    if gone:
+        out += ["Withdrawn by the practice, and counted above as the review recorded them: "
+                + ", ".join(f"{f.get('claim_source')}, claim {f.get('claim_id')}" for f in gone) + ".", ""]
     unopened = sorted({f for r in runs for f in (r.get("unopened_candidates") or [])})
     if unopened:
         out += [f"Files the searches named that were not opened ({len(unopened)}):", ""]
@@ -846,6 +1074,30 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
         from workflowsv2.composition import appendix
         out += [""] + appendix.render(record["composition"])
         out += [""] + appendix.render_secrets(record["composition"])
+    return "\n".join(out).rstrip() + "\n"
+
+
+def evidence_document(record: Dict[str, Any], engagement: Optional[str] = None) -> str:
+    """evidence.md: every finding's and every observation's evidence in
+    full, the companion to the report, for a reader who checks a finding
+    against the materials. Findings in claim-source and claim-id order."""
+    merged, ratings = record["merged"], record["ratings"]
+    name = engagement or merged.get("engagement") or "engagement"
+    out = [f"# Evidence — claims review — {name}", "",
+           "The evidence for every finding of the claims review, in full: each quoted "
+           "line as it appears in the materials, the reasoning behind each derived "
+           "fact, and every search, with what was searched and the files it named. "
+           "The report shows the same evidence in short. Findings are in order of "
+           "claim source and claim id.", ""]
+    for f in sorted(merged.get("findings") or [],
+                    key=lambda x: (x.get("claim_source") or "", x.get("claim_id") or 0)):
+        out += [f"## {f.get('claim_source')}, claim {f.get('claim_id')}", "",
+                f"{_md_safe(f.get('statement') or f.get('quote'))} — "
+                f"{_verdict_short((f.get('adjudication') or {}).get('verdict'))}", ""]
+        out += (_evidence(f.get("evidence"), full=True) or ["- (none)"]) + [""]
+    for g in observation_groups(merged, ratings):
+        out += [f"## Observation {g['number']}", "", _md_safe(g["items"][0].get("note")), ""]
+        out += _evidence([u.get("evidence") or {} for u in g["items"]], full=True) + [""]
     return "\n".join(out).rstrip() + "\n"
 
 

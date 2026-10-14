@@ -633,6 +633,7 @@ def make_site_app(access: Access, model: Optional[Path] = None,
                 d["signature"] = rec
             # The printable copy of the report this page shows, signed when it is.
             d["pdf"] = (Path(e["session"].merged_dir) / "report.pdf").is_file()
+            d["evidence_pdf"] = (Path(e["session"].merged_dir) / "evidence.pdf").is_file()
         return d
 
     async def _turn(kind: str, name: str, text: str) -> None:
@@ -684,6 +685,17 @@ def make_site_app(access: Access, model: Optional[Path] = None,
                     raise HTTPException(status_code=404, detail="this report has no printable copy")
                 return FileResponse(str(p), media_type="application/pdf",
                                     filename=f"{name}-claims-review.pdf")
+
+            @app.get(prefix + "/api/evidence.pdf")
+            async def evidence_pdf(name: str, request: Request):
+                # The report's evidence in full: every quoted line and every search.
+                _allowed(request, name)
+                e = await _entry_or_503(kind, name)
+                p = Path(e["session"].merged_dir) / "evidence.pdf"
+                if not p.is_file():
+                    raise HTTPException(status_code=404, detail="this report has no evidence document")
+                return FileResponse(str(p), media_type="application/pdf",
+                                    filename=f"{name}-claims-review-evidence.pdf")
 
         @app.get(prefix + "/api/history")
         async def history(name: str, request: Request):

@@ -30,7 +30,8 @@ html { font-family: Georgia, "Times New Roman", serif; color: var(--ink); }
 body { max-width: 52em; margin: 2em auto; padding: 0 1.5em; line-height: 1.45; font-size: 11.5pt; }
 h1 { font-size: 20pt; margin: 0 0 .3em; }
 h2 { font-size: 15pt; margin: 1.6em 0 .5em; border-bottom: 1px solid var(--rule); padding-bottom: .2em; }
-h3 { font-size: 11.5pt; margin: 0 0 .4em; }
+h3, h4 { font-size: 11.5pt; margin: 0 0 .4em; }
+h3.subject { font-size: 12.5pt; margin: 1.2em 0 .2em; break-after: avoid; }
 p { margin: .5em 0; }
 blockquote { margin: .4em 0 .6em; padding: .3em .8em; border-left: 3px solid var(--rule); color: var(--muted); font-style: italic; }
 code { font-family: "DejaVu Sans Mono", Menlo, monospace; font-size: 9.5pt; background: var(--box); padding: 0 .2em; }
@@ -39,7 +40,7 @@ th, td { border: 1px solid var(--rule); padding: .25em .45em; vertical-align: to
 thead { display: table-header-group; }
 tr { break-inside: avoid; }
 .finding { border: 1px solid var(--rule); border-radius: 3px; padding: .7em .9em .3em; margin: .9em 0; break-inside: avoid; }
-.finding h3 { margin-top: 0; }
+.finding h3, .finding h4 { margin-top: 0; }
 .finding ul { margin: .3em 0 .4em 1.2em; padding: 0; }
 .front { color: var(--muted); font-size: 10pt; }
 .page-break { break-before: page; }
@@ -67,11 +68,17 @@ def to_body(md_text: str) -> str:
     for name in PAGE_BREAK_BEFORE:
         body = re.sub(r"<h2>(" + re.escape(html_std.escape(name, quote=False)) + r")</h2>",
                       r'<h2 class="page-break">\1</h2>', body, count=1)
-    # Each finding — an h3 and everything to the next heading — in a box.
-    parts = re.split(r"(?=<h[23]>)", body)
+    # Each finding — an h3, or an h4 under a subject, and everything to the
+    # next heading — in a box. An h3 with nothing under it before the next
+    # heading is a subject's title: it is not boxed, and stays with the
+    # finding after it. Boxing the subject with its findings made one box
+    # too tall for a page, printed after a blank one (2026-10-14).
+    parts = re.split(r"(?=<h[234]>)", body)
     out = []
     for part in parts:
-        if part.startswith("<h3>"):
+        if part.startswith("<h3>") and part.strip().endswith("</h3>"):
+            out.append(part.replace("<h3>", '<h3 class="subject">', 1))
+        elif part.startswith(("<h3>", "<h4>")):
             out.append('<section class="finding">' + part + "</section>")
         else:
             out.append(part)

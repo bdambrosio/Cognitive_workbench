@@ -112,15 +112,19 @@
     findings = d.findings || {};
     sources = Array.from(new Set(Object.values(findings).map((f) => f.claim_source)));
     doc.innerHTML = (d.pdf ? '<p class="download"><a href="' + base + "/api/report.pdf" + qs
-                     + '" download>Download the report (PDF)</a></p>' : "")
+                     + '" download>Download the report (PDF)</a>'
+                     + (d.evidence_pdf ? ' · <a href="' + base + "/api/evidence.pdf" + qs
+                        + '" download>Download the evidence (PDF)</a>' : "") + "</p>" : "")
       + '<div class="banner">' + esc(d.banner || "") + '</div><div class="report">'
       + (d.html || "<p><i>No report has been written for this run yet.</i></p>") + "</div>";
-    // Every finding heading reads "<source>, claim <id> — …"; a click shows its evidence.
-    for (const h3 of doc.querySelectorAll(".report h3")) {
-      const m = /^(\S+), claim (\d+)/.exec(h3.textContent.trim());
+    // Under every finding heading (h3, or h4 within a subject) is the line
+    // "<source>, claim <id> · …"; a click on the heading shows its evidence.
+    for (const h of doc.querySelectorAll(".report h3, .report h4")) {
+      const next = h.nextElementSibling;
+      const m = next && /^(\S+), claim (\d+)/.exec(next.textContent.trim());
       if (!m) continue;
-      h3.dataset.key = m[1] + "#" + m[2];
-      h3.addEventListener("click", () => showFinding(h3.dataset.key, false));
+      h.dataset.key = m[1] + "#" + m[2];
+      h.addEventListener("click", () => showFinding(h.dataset.key, false));
     }
     linkReferences();
     buildOutline();
@@ -132,7 +136,7 @@
     // A source may sit in a folder (claim_sources/site.md, questions/buyer.md).
     const re = /([\w.\-\/]+\.\w+), claim (\d+)/g;
     for (const el of doc.querySelectorAll(".report p, .report li, .report td")) {
-      if (el.closest("h3")) continue;
+      if (el.closest("h3, h4")) continue;
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
       const nodes = [];
       while (walker.nextNode()) nodes.push(walker.currentNode);

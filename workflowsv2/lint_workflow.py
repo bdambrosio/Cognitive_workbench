@@ -393,18 +393,10 @@ def check_review_vocab(path: str, raw: str) -> List[str]:
     return bad
 
 
-def check_materiality_vocab(path: str, raw: str) -> List[str]:
-    """MATERIALITY §3's scale against `schemas.MATERIALITY`. The same invariant
-    as the other two vocabulary checks, for a one-column table."""
-    from workflowsv2.audit_materiality import schemas as ms          # noqa: E402
-    bodies = {re.match(r"## (\d+[a-z]?)\.", b.splitlines()[0]).group(1): b
-              for _, b in sections(raw)
-              if b.strip() and re.match(r"## (\d+[a-z]?)\.", b.splitlines()[0])}
-    three = bodies.get("3", "")
-    if not three:
-        return ["MATERIALITY has no §3 to declare the scale in"]
+def _first_column(body: str) -> List[str]:
+    """The backticked values in the first column of a section's table."""
     declared, in_body = [], False
-    for line in three.splitlines():
+    for line in body.splitlines():
         if not line.lstrip().startswith("|"):
             in_body = False
             continue
@@ -415,15 +407,32 @@ def check_materiality_vocab(path: str, raw: str) -> List[str]:
             m = re.match(r"^\s*\|\s*`([a-z_]+)`\s*\|", line)
             if m:
                 declared.append(m.group(1))
+    return declared
+
+
+def check_materiality_vocab(path: str, raw: str) -> List[str]:
+    """MATERIALITY §3's scale against `schemas.MATERIALITY`, and §5a's bands
+    against `schemas.BANDS`. The same invariant as the other two vocabulary
+    checks, for one-column tables."""
+    from workflowsv2.audit_materiality import schemas as ms          # noqa: E402
+    bodies = {re.match(r"## (\d+[a-z]?)\.", b.splitlines()[0]).group(1): b
+              for _, b in sections(raw)
+              if b.strip() and re.match(r"## (\d+[a-z]?)\.", b.splitlines()[0])}
     bad = []
-    for v in ms.MATERIALITY:
-        if v not in declared:
-            bad.append(f"schemas.py value {v!r} is not in §3's table")
-    for v in declared:
-        if v not in ms.MATERIALITY:
-            bad.append(f"§3 declares {v!r}, which schemas.py does not define")
-    if tuple(declared) != tuple(ms.MATERIALITY):
-        bad.append("§3 lists the scale in a different order from schemas.py")
+    for sec, values, what in (("3", ms.MATERIALITY, "the scale"), ("5a", ms.BANDS, "the bands"),
+                              ("8", ms.CHECK_VERDICTS, "the check's verdicts")):
+        if not bodies.get(sec):
+            bad.append(f"MATERIALITY has no §{sec} to declare {what} in")
+            continue
+        declared = _first_column(bodies[sec])
+        for v in values:
+            if v not in declared:
+                bad.append(f"schemas.py value {v!r} is not in §{sec}'s table")
+        for v in declared:
+            if v not in values:
+                bad.append(f"§{sec} declares {v!r}, which schemas.py does not define")
+        if tuple(declared) != tuple(values):
+            bad.append(f"§{sec} lists {what} in a different order from schemas.py")
     return bad
 
 
@@ -439,10 +448,11 @@ def check_report_fields(path: str, raw: str) -> List[str]:
     if not seven:
         return ["REPORT has no §7 to declare the fields in"]
     declared = set(re.findall(r"(?m)^\s*\|\s*`([a-z_]+)`\s*\|", seven))
+    fields = rs.FIELDS + rs.ARRANGEMENTS
     bad = [f"schemas.py field {f!r} is not in §7's table"
-           for f in rs.FIELDS if f not in declared]
+           for f in fields if f not in declared]
     bad += [f"§7 declares {d!r}, which schemas.py does not define"
-            for d in sorted(declared - set(rs.FIELDS))]
+            for d in sorted(declared - set(fields))]
     return bad
 
 
