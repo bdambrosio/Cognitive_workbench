@@ -150,7 +150,7 @@ def load_engagement(name: str, intake: Optional[str] = None) -> Dict[str, Any]:
             # The buyer's own thresholds — what changes the price, what ends
             # the deal — written by the intake stage. Free text; may be absent.
             "thresholds": blocks.get("thresholds") or cfg.get("thresholds"),
-            # Whether the buyer asked for a conclusion (REPORT.md §6 item 3):
+            # Whether the buyer asked for a conclusion (REPORT.md §6 item 2):
             # written by the intake's --finish --conclusion; may be absent.
             "conclusion": bool(blocks.get("conclusion", cfg.get("conclusion")))}
 
@@ -1395,7 +1395,11 @@ def main() -> int:
                          f"claim_sources: {', '.join(eng['claim_sources'])}")
     from workflowsv2 import engagement_state as state           # noqa: E402
     src_doc = state.claim_source_file(eng["dir"], claim_source)
-    method_text = load_workflow(REPO / METHOD_PATH)
+    # ONE TEXT FOR THE WHOLE RUN: the method the loop read when it was built,
+    # which is its system prompt. Read again here, or at the end for the
+    # record, an edit to the file during the run would put a text the agent
+    # never had into the emit calls and into method_as_delivered.md.
+    method_text = loop.workflow_text
     emit_tokens = int((cfg.get("chat") or {}).get("react_max_tokens", 32768))
     try:
         # ---- phase one: enumerate section by section, then freeze --------
@@ -2054,10 +2058,9 @@ def main() -> int:
     # self-contained and is the artifact itself.
     record.mkdir(parents=True, exist_ok=True)
     try:
-        wf = (cfg.get("workflow") or "").strip()
-        if wf:
+        if loop.workflow_text:
             (record / "method_as_delivered.md").write_text(
-                load_workflow(REPO / wf), encoding="utf-8")
+                loop.workflow_text, encoding="utf-8")
     except Exception as e:                                     # noqa: BLE001
         logger.warning("working record: method not copied (%s)", e)
     try:
