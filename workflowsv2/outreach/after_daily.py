@@ -17,8 +17,14 @@ In this order:
   2. Send the first message to everyone at Ready to contact who can be
      emailed (runner.emailable) and whose draft has a subject and no flags
      from the writer. Each goes through sending.send, so it is the email the
-     page would send and leaves the same record. Follow-ups are not sent.
-  3. Email the summary to SUMMARY_TO and print it; daily.sh puts what is
+     page would send and leaves the same record.
+  3. Send the follow-up drafted by the daily run (`runner.py followups`) to
+     everyone at Initial sent whose follow-up date has come, whose first
+     message went by email, and who can still be emailed. It goes as a reply
+     in the thread of the first email. A follow-up with flags from the writer
+     is held; someone whose first message went another way is left to the
+     page.
+  4. Email the summary to SUMMARY_TO and print it; daily.sh puts what is
      printed into the report for Jill.
 
 A message is sorted by its headers, not by what it says. A reply that asks
@@ -210,6 +216,33 @@ def read_mailbox(messages: List[EmailMessage], dry: bool) -> Dict[str, List[str]
 
 # ---- sending --------------------------------------------------------------------
 
+def _send_one(c: Dict[str, Any], which: str, drafted: Dict[str, Any], dry: bool,
+              out: Dict[str, List[str]]) -> None:
+    """Send `drafted` (draft.json or followup.json) to the contact `c` as
+    `which`, unless it has flags or lacks text, and add one line to `out`
+    under `sent`, `held` or `failed`. A follow-up needs no subject: it goes
+    as a reply to the first email."""
+    cid, who = c["id"], f"{c['name']} <{c['email']}>"
+    subject = drafted.get("edited_subject") or drafted.get("subject") or ""
+    message = drafted.get("edited_message") or drafted.get("message") or ""
+    if drafted.get("flags"):
+        out["held"].append(f"{who}: {'; '.join(str(f) for f in drafted['flags'])}")
+        return
+    if not message.strip() or (which == "draft" and not subject.strip()):
+        out["held"].append(f"{who}: the draft has no {'subject' if message.strip() else 'message'}")
+        return
+    try:
+        if dry:
+            sending.compose(cid, which, subject, message)
+            rec = {"sent": True}
+        else:
+            rec = sending.send(cid, which, subject, message, today())
+    except (sending.Refused, contacts.ContactError) as e:
+        out["failed"].append(f"{who}: {e}")
+        return
+    (out["sent"] if rec["sent"] else out["failed"]).append(who if rec["sent"] else f"{who}: {rec['note']}")
+
+
 def send_ready(dry: bool, only: Optional[str] = None) -> Dict[str, List[str]]:
     """Send the first message to each person at Ready to contact who can be
     emailed and whose draft has a subject and no flags from the writer.
@@ -221,27 +254,29 @@ def send_ready(dry: bool, only: Optional[str] = None) -> Dict[str, List[str]]:
         if contacts.stage_of(c) != "Ready to contact" or (only and cid != only):
             continue
         d = runner.DATA / cid
-        draft = runner._read_json(d / "draft.json") or {}
         if not runner.emailable(cid, runner._read_json(d / "qualification.json") or {}):
             continue
-        subject = draft.get("edited_subject") or draft.get("subject") or ""
-        message = draft.get("edited_message") or draft.get("message") or ""
-        who = f"{c['name']} <{c['email']}>"
-        if draft.get("flags"):
-            out["held"].append(f"{who}: {'; '.join(str(f) for f in draft['flags'])}")
-        elif not subject.strip() or not message.strip():
-            out["held"].append(f"{who}: the draft has no {'subject' if message.strip() else 'message'}")
-        else:
-            try:
-                if dry:
-                    sending.compose(cid, "draft", subject, message)
-                    rec = {"sent": True}
-                else:
-                    rec = sending.send(cid, "draft", subject, message, today())
-            except (sending.Refused, contacts.ContactError) as e:
-                out["failed"].append(f"{who}: {e}")
-                continue
-            (out["sent"] if rec["sent"] else out["failed"]).append(who if rec["sent"] else f"{who}: {rec['note']}")
+        _send_one(c, "draft", runner._read_json(d / "draft.json") or {}, dry, out)
+    return out
+
+
+def send_followups(dry: bool, only: Optional[str] = None) -> Dict[str, List[str]]:
+    """Send the drafted follow-up to each person at Initial sent whose
+    follow-up date has come, whose first message went by email, and who can
+    still be emailed. Returns lines under `sent`, `held`, `failed`, as
+    send_ready does."""
+    out: Dict[str, List[str]] = {"sent": [], "held": [], "failed": []}
+    for c in contacts.entries():
+        cid = c["id"]
+        if not contacts.due(c, "Initial sent", today()) or (only and cid != only):
+            continue
+        if not any(str(n.get("title") or "").startswith(contacts.SENT_NOTE) and n.get("message_id")
+                   for n in contacts.notes(cid)):
+            continue                     # the first message did not go by email; the page lists them
+        d = runner.DATA / cid
+        if not runner.emailable(cid, runner._read_json(d / "qualification.json") or {}):
+            continue
+        _send_one(c, "followup", runner._read_json(d / "followup.json") or {}, dry, out)
     return out
 
 
@@ -302,6 +337,8 @@ def main() -> int:
             logger.error("runner.py replies failed: %s", read.stderr[-2000:])
             problems.append("the new replies were recorded but could not be read; the next daily run reads them")
     sent = send_ready(dry, args.only)
+    for k, lines in send_followups(dry, args.only).items():
+        sent[k] += [f"follow-up to {line}" for line in lines]
     subject, text = summary(found, sent, problems, dry)
     if dry:
         print(f"DRY RUN: nothing was recorded or sent.\n\n{subject}\n\n{text}")

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # The day's outreach work: start the page if it is not up, run `runner.py daily`,
 # then `after_daily.py`, which reads the mailbox for opt-outs and replies, sends
-# the first messages that can go by email, and emails a summary. Run it from
-# anywhere:
+# the first messages and the due follow-ups that can go by email, and emails a
+# summary. Run it from anywhere:
 #
 #     workflowsv2/outreach/daily.sh [--emails 9] [--most 15]
 #

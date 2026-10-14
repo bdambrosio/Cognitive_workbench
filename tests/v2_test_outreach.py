@@ -687,6 +687,41 @@ def test_an_email_the_mail_server_did_not_take_is_not_recorded_as_sent(tmp_path,
     assert store.stage_of(store.get(jane)) == "Ready to contact" and store.get(jane)["notes"] == []
 
 
+def _awaiting(tmp_path, name, email, first_by_email=True, due="2026-01-01", flags=()):
+    """A contact at Initial sent whose first message went on 2026-01-01 and
+    whose follow-up is drafted. Returns the id."""
+    cid = _ready(tmp_path, name, email, stage="Initial sent")
+    contacts.upsert_entry(cid, {"next_action_date": due})
+    sent = {"channel": "email", "subject": "Tuuyi", "message_id": f"<first-{cid}@tuuyi.com>"} if first_by_email else {}
+    contacts.create_note(cid, f"{contacts.SENT_NOTE} 2026-01-01", f"{name}, a line.", **sent)
+    (tmp_path / cid / "followup.json").write_text(json.dumps({"message": f"{name}, a follow-up.",
+                                                              "flags": list(flags)}))
+    return cid
+
+
+def test_after_the_daily_run_a_due_follow_up_goes_by_email_only_in_the_thread_of_a_first_email(
+        tmp_path, monkeypatch, store):
+    from workflowsv2.outreach import after_daily, sending
+    monkeypatch.setattr(runner, "DATA", tmp_path)
+    monkeypatch.setenv("POSTAL_ADDRESS", "PO Box 1, Town")
+    went = []
+    monkeypatch.setattr(sending.mail, "send", lambda to, subject, text, headers=None: went.append(
+        (to[0], subject, headers)) or {"error": None, "dry_run": False, "message_id": f"<m{len(went)}@tuuyi.com>"})
+    jane = _awaiting(tmp_path, "Jane Smith", "jane@acme.example")
+    others = [_awaiting(tmp_path, "On Linkedin", "li@acme.example", first_by_email=False),
+              _awaiting(tmp_path, "Not Yet", "notyet@acme.example", due="2999-01-01"),
+              _awaiting(tmp_path, "Too Long", "long@acme.example", flags=["the follow-up is 97 words"])]
+    out = after_daily.send_followups(dry=False)
+    assert went == [("jane@acme.example", "Re: Tuuyi", {
+        "List-Unsubscribe": went[0][2]["List-Unsubscribe"], "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        "In-Reply-To": f"<first-{jane}@tuuyi.com>", "References": f"<first-{jane}@tuuyi.com>"})]
+    assert out["sent"] == ["Jane Smith <jane@acme.example>"] and out["failed"] == []
+    assert out["held"] == ["Too Long <long@acme.example>: the follow-up is 97 words"]
+    assert store.stage_of(store.get(jane)) == "Follow-up sent"
+    assert [store.stage_of(store.get(c)) for c in others] == ["Initial sent"] * 3
+    assert after_daily.send_followups(dry=False)["sent"] == [] and len(went) == 1    # not sent twice
+
+
 def _mail(sender, subject, body="", to="bruce@tuuyi.com", **headers):
     from email.message import EmailMessage
     msg = EmailMessage()
