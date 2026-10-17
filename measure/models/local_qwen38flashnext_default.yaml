@@ -44,7 +44,7 @@
 expects_served_model: "Qwen3.8-Flash-Next"
 llm_config:
   server: local
-  model: "primitive-ai/Qwen3.8-Flash-Next-NVFP4"
+  model: "nvidia/Qwen3.8-Flash-Next-FP4-Local"
   vllm_url: http://127.0.0.1:5000
   is_reasoning_model: true
   # NO reasoning_effort — see above. This is the experiment.

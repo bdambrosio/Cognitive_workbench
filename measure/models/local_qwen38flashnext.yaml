@@ -1,11 +1,18 @@
-# Qwen3.8-Flash-Next, served locally by vLLM as primitive-ai's NVFP4 repack.
+# Qwen3.8-Flash-Next, served locally by vLLM as NVIDIA's FP4-Local checkpoint.
 #
-# THE ROUTE. `vllm/vllm-openai:qwen38-flash-next` in Docker on a single RTX PRO
-# 6000 Blackwell (97.9 GB), container port 8000 published on host 5000.
-# 91.8 GB of 97.9 resident at --gpu-memory-utilization 0.92, so roughly 6 GB of
-# headroom. The second GPU (5060 Ti) is not used. Throughput sat at 85-88 tok/s
-# across every setting probed on 2026-08-28 — the steadiest of any candidate on
-# record here.
+# THE ROUTE (since 2026-10-17). `nvidia/Qwen3.8-Flash-Next-FP4-Local`, which
+# NVIDIA quantized by distillation from the BF16 model, in the
+# local-inference-lab vLLM container on the RTX PRO 6000 only, host port 5000.
+# Started by serve_qwen38_fp4local.sh at the repo root, which says why each
+# setting differs from NVIDIA's card. Max context 262144.
+#
+# THE MEASUREMENTS BELOW WERE TAKEN ON THE BUILD THIS REPLACED:
+# primitive-ai/Qwen3.8-Flash-Next-NVFP4, a plain post-training quant, 85-88
+# tok/s, 128768 context (container qwen38-flash-next, stopped and kept). The
+# same weights before quantization, so the effort ladder and the inert
+# parameters probably carry over, but none of it has been re-measured on this
+# build, and the citation-integrity result that qualified it as auditor at
+# medium has not been re-run.
 #
 # THIS IS NOT THE SAME MODEL AS `qwen/qwen3.8-flash` ON OPENROUTER, and the two
 # must not be compared. Different weights, different quantization, and the
@@ -116,7 +123,7 @@ llm_config:
   # Spelled out rather than "" so a row can name its own backend even if the
   # /v1/models check is ever skipped. expects_served_model is the guard that
   # catches the box being switched under us.
-  model: "primitive-ai/Qwen3.8-Flash-Next-NVFP4"
+  model: "nvidia/Qwen3.8-Flash-Next-FP4-Local"
   vllm_url: http://127.0.0.1:5000
   is_reasoning_model: true
   reasoning_effort: medium
