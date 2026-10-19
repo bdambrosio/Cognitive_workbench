@@ -24,6 +24,8 @@ from typing import Optional
 
 import numpy as np
 
+from utils.gpu import SPARE_GPU_MATCH, spare_cuda_device
+
 logger = logging.getLogger(__name__)
 
 # audio_frame header: magic, ver, fmt, channels, _rsvd, sample_rate, seq, ts
@@ -55,7 +57,7 @@ VOICE_MODALITY = "voice"
 # the CUDA device name to run on (the spare card, never the one serving the
 # live model). No match -> CPU int8, slower but still local.
 _DEFAULT_STT_MODEL = os.environ.get("CW_STT_MODEL", "large-v3-turbo")
-_STT_GPU_MATCH = os.environ.get("CW_STT_GPU", "5060")
+_STT_GPU_MATCH = os.environ.get("CW_STT_GPU", SPARE_GPU_MATCH)
 
 # ElevenLabs TTS — the output side (docs/audio-out-design.md). The audio/out
 # path is fixed 16 kHz mono S16_LE, so we always request `pcm_16000` (drop-in,
@@ -221,29 +223,13 @@ def _preload_cuda_libs() -> None:
             logger.warning(f"voice: could not preload {pkg} libs: {e}")
 
 
-def _pick_stt_device() -> tuple:
-    """(device, device_index) for faster-whisper: the CUDA device whose name
-    contains CW_STT_GPU, else CPU. Uses torch's enumeration, which is the
-    same CUDA runtime order ctranslate2 sees."""
-    try:
-        import torch
-        for i in range(torch.cuda.device_count()):
-            if _STT_GPU_MATCH in torch.cuda.get_device_name(i):
-                return "cuda", i
-        logger.warning(f"voice: no CUDA device matching {_STT_GPU_MATCH!r}; "
-                       "STT on CPU")
-    except Exception as e:
-        logger.warning(f"voice: torch unavailable for GPU pick ({e}); STT on CPU")
-    return "cpu", 0
-
-
 def _whisper_model():
     global _whisper
     with _whisper_lock:
         if _whisper is None:
             _preload_cuda_libs()
             from faster_whisper import WhisperModel
-            device, idx = _pick_stt_device()
+            device, idx = spare_cuda_device(_STT_GPU_MATCH)
             compute = "float16" if device == "cuda" else "int8"
             _whisper = WhisperModel(_DEFAULT_STT_MODEL, device=device,
                                     device_index=idx, compute_type=compute)

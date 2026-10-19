@@ -17,6 +17,7 @@ from typing import Dict, Any, Optional, List, Tuple
 
 from infospace_types import InfospaceResources, ResourceTypeRegistry
 from utils.file_utils import atomic_write_bytes, atomic_write_json
+from utils.gpu import spare_cuda_device
 
 logger = logging.getLogger(__name__)
 
@@ -900,9 +901,11 @@ class InfospaceResourceManager:
             # Recommended: BGE-Small (33MB, much smarter than MiniLM, 512 context)
             model_name = 'BAAI/bge-small-en-v1.5'
             from sentence_transformers import SentenceTransformer
-            # Use GPU if available for ~10x faster embedding
-            import torch
-            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            # Use the spare GPU if there is one for ~10x faster embedding;
+            # never the card serving the local LLM
+            device, idx = spare_cuda_device()
+            if device == 'cuda':
+                device = f'cuda:{idx}'
             try:
                 embedder = SentenceTransformer(model_name, local_files_only=True, device=device)
                 logger.info(f"Initialized embedding model: {model_name} (from cache, device={device})")
