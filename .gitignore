@@ -172,3 +172,13 @@ workflowsv2/claims_audit/engagements/*/.logs/
 scenarios/jill-tempsweep.yaml
 measure/temp_sweep/results/
 measure/temp_sweep/prompts.jsonl
+
+# Kept local, never pushed (Bruce, 2026-10-19; the repository is public).
+# Engagement data: every new file under an engagement. Files already tracked
+# stay tracked: the demo server receives them by git pull.
+workflowsv2/claims_audit/engagements/*/
+# Business research and drafts not yet published.
+reports/
+research_notes/
+docs/*-draft.md
+site/delivered.html
