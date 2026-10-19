@@ -9,7 +9,7 @@ Runs only when the engagement enables it (`composition: true` in
 engagement.yaml). The chain job calls it first when it is enabled; it can
 also be run on its own.
 
-WHAT RUNS. Three programs, all run locally, and no model:
+WHAT RUNS. Three programs, all run locally, then a licence lookup; no model:
 
   syft    reads the dependency files under the target (lockfiles, manifests,
           CI workflow files) and lists every component they declare, with the
@@ -26,6 +26,16 @@ WHAT RUNS. Three programs, all run locally, and no model:
           .gitleaks.toml, .gitleaksignore and gitleaks:allow comments are not
           honoured, because the seller writes them.
 
+  licences.py  asks deps.dev for the licence each public package declared to
+          its registry for that exact version, and GitHub for each Action's
+          repository licence, through a cache shared by every engagement and
+          kept outside the repository; classifies each licence by what it asks
+          of the buyer; and, for a flagged package, reads the manifest and the
+          licence files of the archive published for that version. This is
+          the one part of the scan that sends anything out: the names and
+          versions of public components, never a path, git or private one.
+          A flagged component is a `check` issue in the scan's issues.jsonl.
+
 WHAT A SECRET MATCH IS. Text that fits a credential pattern. Nobody checked
 whether it is a real credential, or whether it still works; examples and test
 values match too.
@@ -40,7 +50,8 @@ target because the seller sees the target:
 
   syft.json        syft's own output, kept whole
   grype.json       grype's own output, kept whole
-  components.json  one row per component, with a stable id
+  components.json  one row per component, with a stable id and its
+                   `licence`: expression, where it came from, class, flags
   matches.json     one row per match, with a stable id; the practice's record,
                    not shown to the client
   gitleaks_files.json, gitleaks_history.json
@@ -71,6 +82,8 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from workflowsv2 import engagement_state as state              # noqa: E402
+from workflowsv2 import issues                                  # noqa: E402
+from workflowsv2.composition import licences                    # noqa: E402
 
 logger = logging.getLogger("composition.scan")
 
@@ -260,6 +273,30 @@ def run(eng_dir: Path) -> Path:
     if not db.get("valid"):
         raise SystemExit(f"the vulnerability database at {GRYPE_DB} is not valid: {db}")
     comps = components(syft_doc)
+    licence_counts = licences.complete(syft_doc, comps)
+    for c in comps:
+        if licences.to_read(c):
+            issues.note(out, "composition", "licence_flagged",
+                        f"{c['name']} {c['version'] or c['version_range'] or ''}: "
+                        f"licence {c['licence']['expression'] or 'none found'} — "
+                        f"{'; '.join(c['licence']['flags'])}. "
+                        + ("The licence its published archive declares, and the first "
+                           "lines of its licence files, are in components.json; read "
+                           "them before the report is released."
+                           if (c["licence"]["archive"] or {}).get("files") is not None
+                           and "error" not in (c["licence"]["archive"] or {}) else
+                           "Its archive was not read; find and read its licence "
+                           "before the report is released."),
+                        severity="check", component=c["id"])
+    unlooked = [c for c in comps if c["licence"]["flags"] and not licences.to_read(c)]
+    if unlooked:
+        issues.note(out, "composition", "licence_not_looked_up",
+                    f"{len(unlooked)} component(s) were not looked up, so their licence "
+                    "is not known: " + "; ".join(
+                        f"{c['name']} {c['version'] or c['version_range'] or ''} "
+                        f"({c['licence']['flags'][0].split(': ', 1)[1]})" for c in unlooked)
+                    + ". Ask the seller for the versions in use, or read their licences.",
+                    severity="check")
     found = matches(grype_doc, comps)
     rev = _target_rev(target)
     if not GITLEAKS_RULES.is_file():
@@ -285,6 +322,7 @@ def run(eng_dir: Path) -> Path:
                    "by_type": dict(Counter(c["type"] for c in comps)),
                    "version_range": sum(1 for c in comps if c["version_range"]),
                    "no_licence": sum(1 for c in comps if not c["licences"]),
+                   **{f"licence_{k}": v for k, v in licence_counts.items()},
                    "matches": len(found),
                    "matched_components": len({m["component"] for m in found}),
                    "secrets_files": sum(1 for x in found_secrets if x["where"] == "files"),

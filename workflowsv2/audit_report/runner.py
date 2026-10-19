@@ -172,7 +172,8 @@ def main() -> int:
     skeleton = render.assemble(record, None, transaction, eng_name, thresholds,
                                wants_conclusion)
     (out / "report_skeleton.md").write_text(skeleton, encoding="utf-8")
-    (out / "worklist.md").write_text(render.worklist(record["merged"], out),
+    (out / "worklist.md").write_text(render.worklist(record["merged"], out,
+                                   (record.get("composition") or {}).get("dir")),
                                      encoding="utf-8")
     # The report shows each piece of evidence in short; this is all of it.
     (out / "evidence.md").write_text(render.evidence_document(record, eng_name),

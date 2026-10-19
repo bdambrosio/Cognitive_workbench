@@ -119,3 +119,84 @@ def test_secrets_the_seller_exempts_or_removed_are_still_reported_without_values
     for f in out.iterdir():
         text = f.read_text(encoding="utf-8")
         assert SECRET not in text and SECRET[::-1] not in text, f.name
+
+
+# ---- licences ---------------------------------------------------------------------
+
+from workflowsv2.composition import licences                 # noqa: E402
+
+
+def test_a_licence_is_classed_by_what_it_asks_and_flagged_when_it_asks_more():
+    c = licences.classify
+    # An OR lets the buyer take the permissive option; an AND imposes all.
+    assert c("Apache-2.0 OR LGPL-2.1-or-later OR MIT") == "permissive"
+    assert c("MIT AND AGPL-3.0-only") == "network copyleft"
+    assert c("(MIT OR Apache-2.0) AND Unicode-3.0") == "permissive"
+    assert c("GPL-2.0-only WITH Classpath-exception-2.0") == "strong copyleft"
+    assert c("mit") == "permissive"
+    assert c("LicenseRef-Proprietary") == "unknown"
+    assert c("MIT OR") == "unknown"
+    assert c(None) is None
+    assert licences._flags("permissive", "MIT OR Apache-2.0", None) == []
+    assert licences._flags("strong copyleft", "GPL-3.0-only", None) == ["strong copyleft"]
+    assert licences._flags("unknown", "LicenseRef-x", None) == ["identifier not recognised"]
+    assert licences._flags(None, None, None) == ["no licence found"]
+    assert licences._flags("permissive", "MIT", "Apache-2.0") == \
+        ["the dependency file and the registry disagree"]
+
+
+def _crate(i, name, version, source="registry+https://github.com/rust-lang/crates.io-index"):
+    a = _artifact(i, name, version, typ="rust-crate")
+    a["purl"] = f"pkg:cargo/{name}@{version}"
+    a["metadata"] = {"source": source} if source else {}
+    return a
+
+
+def test_only_public_exact_versions_are_sent_out_and_the_cache_answers_again(tmp_path, monkeypatch):
+    monkeypatch.setattr(licences, "CACHE", tmp_path / "licences.json")
+    asked = []
+
+    def fake_get(url, limit=0):
+        asked.append(url)
+        return json.dumps({"licenses": ["MIT"]}).encode()
+    monkeypatch.setattr(licences, "_get", fake_get)
+    syft = {"artifacts": [
+        _crate("a", "serde", "1.0.0"),
+        _crate("b", "our-internal-crate", "0.1.0", source="registry+https://crates.example.corp/index"),
+        _crate("c", "the-target", "2.0.0", source=None),
+        _artifact("d", "pinned-elsewhere", "1.0", constraint=">=1.0")]}
+    syft["artifacts"][3]["purl"] = "pkg:pypi/pinned-elsewhere@1.0"
+    comps = scan.components(syft)
+    licences.complete(syft, comps)
+    assert len(asked) == 1 and "serde" in asked[0]
+    assert not any(n in u for u in asked for n in ("our-internal-crate", "the-target", "pinned-elsewhere"))
+    by = {x["name"]: x["licence"] for x in comps}
+    assert by["serde"]["expression"] == "MIT" and by["serde"]["from"] == "deps.dev"
+    assert by["the-target"]["from"] == "local" and by["the-target"]["flags"] == []
+    assert by["our-internal-crate"]["flags"] == ["not looked up: not from a public registry"]
+    asked.clear()
+    comps = scan.components(syft)
+    counts = licences.complete(syft, comps)
+    assert asked == [] and counts["cached"] == 1
+
+
+def test_the_appendix_leads_with_what_the_licences_ask_and_names_the_flagged():
+    comps = scan.components({"artifacts": [_artifact("a", "lib-a", "1.0"), _artifact("b", "lib-b", "2.0"),
+                                           _artifact("c", "app", "0.1")]})
+    given = {"lib-a": ("MIT OR Apache-2.0", "deps.dev", "permissive", []),
+             "lib-b": ("GPL-3.0-only", "deps.dev", "strong copyleft", ["strong copyleft"]),
+             "app": (None, "local", None, [])}
+    for x in comps:
+        expr, frm, cls, flags = given[x["name"]]
+        x["licence"] = {"expression": expr, "from": frm, "class": cls, "flags": flags,
+                        "at": "2026-10-19T00:00:00+00:00", "url": None, "archive": None}
+    md = "\n".join(appendix.render(_scan(comps)))
+    assert "Of the 2 third-party components: 1 permissive; 1 strong copyleft." in md
+    assert "lib-b 2.0 (GPL-3.0-only, strong copyleft)" in md
+    assert "app is the target's own code" in md
+    assert "not recorded" not in md
+    lib_b = next(x for x in comps if x["name"] == "lib-b")
+    lib_b["licence"].update(expression="MIT", flags=[])
+    lib_b["licence"]["class"] = "permissive"
+    md = "\n".join(appendix.render(_scan(comps)))
+    assert "All 2 third-party components declare permissive licences." in md

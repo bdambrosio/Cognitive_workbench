@@ -1101,10 +1101,11 @@ def evidence_document(record: Dict[str, Any], engagement: Optional[str] = None) 
     return "\n".join(out).rstrip() + "\n"
 
 
-def worklist(merged: Dict[str, Any], merged_dir: Optional[Path] = None) -> str:
+def worklist(merged: Dict[str, Any], merged_dir: Optional[Path] = None,
+             composition_dir: Optional[str] = None) -> str:
     """worklist.md: what a person still has to look at, gathered from every
-    stage's issues file — each run directory's, its review's, and the merged
-    directory's. v1's editor notes did this from one run; v2 spread the
+    stage's issues file — each run directory's, its review's, the merged
+    directory's, and the composition scan's (a flagged licence). v1's editor notes did this from one run; v2 spread the
     record across stages and consolidated nothing until 2026-09-02."""
     rows: List[Dict[str, Any]] = []
     places = []
@@ -1114,6 +1115,8 @@ def worklist(merged: Dict[str, Any], merged_dir: Optional[Path] = None) -> str:
                    (r.get("claim_source"), d / "review" / "issues.jsonl")]
     if merged_dir is not None:
         places.append(("merged", Path(merged_dir) / "issues.jsonl"))
+    if composition_dir:
+        places.append(("composition", Path(composition_dir) / "issues.jsonl"))
     for source, path in places:
         if not path.is_file():
             continue

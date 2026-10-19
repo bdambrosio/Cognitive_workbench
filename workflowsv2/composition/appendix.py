@@ -11,6 +11,8 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any, Dict, List
 
+from workflowsv2.composition import licences
+
 #: Plain names for syft's component types; an unlisted type is shown as syft
 #: names it.
 KINDS = {
@@ -88,17 +90,10 @@ def render(scan: Dict[str, Any]) -> List[str]:
             "fixed version, by name and version. That is a statement about the "
             "advisory database on the date below, not an assurance that none "
             "exists."), ""]
-        lic = Counter(" OR ".join(x["licences"]) if x["licences"] else None for x in comps)
-        none = lic.pop(None, 0)
-        if not lic:
-            out += ["**Declared licences.** The dependency files record no licence "
-                    f"for any of the {len(comps)} components; their licences were "
-                    "not determined.", ""]
+        if any("licence" in x for x in comps):
+            out += _licences(comps)
         else:
-            out += ["**Declared licences.** " + ", ".join(
-                f"{k} {n}" for k, n in sorted(lic.items(), key=lambda kv: (-kv[1], kv[0])))
-                + "." + (f" For {none} components the dependency file records no "
-                         "licence; their licences were not determined." if none else ""), ""]
+            out += _lockfile_licences(comps)
 
     out += [f"**Programs.** Syft {meta.get('syft')}, Grype {meta.get('grype')}; "
             f"vulnerability database built {(db.get('built') or '')[:10]} "
@@ -119,8 +114,118 @@ def render(scan: Dict[str, Any]) -> List[str]:
     for x in comps:
         out.append(f"| {_cell(KINDS.get(x['type'], x['type']))} | {_cell(x['name'])} | "
                    f"{_cell(x['version'] or x['version_range'])} | "
-                   f"{_cell(' OR '.join(x['licences']) or 'not recorded')} | "
+                   f"{_cell(_licence_cell(x))} | "
                    f"{_cell(', '.join(x['files']))} |")
+    return out
+
+
+def _licence_cell(x: Dict[str, Any]) -> str:
+    lic = x.get("licence")
+    if lic is None:                                   # a scan made before the lookup
+        return " OR ".join(x["licences"]) or "not recorded"
+    if lic["from"] == "local":
+        return "part of the target"
+    return lic["expression"] or "not found"
+
+
+#: Plain words for what each class of licence asks; said once, not per row.
+CLASS_NOTE = ("A permissive licence (MIT, Apache-2.0, BSD and the like) asks for "
+              "little beyond keeping its notice. A copyleft licence attaches "
+              "conditions to software that includes the component: a weak one to "
+              "changes to the component itself, a strong one to the whole program "
+              "when it is distributed, and a network one even when the program is "
+              "only run as a service for others.")
+
+
+#: Why a component was not looked up, as (plural, singular) predicates.
+UNLOOKED = {"not from a public registry": ("are not from a public registry",
+                                           "is not from a public registry"),
+            "no single version": ("are declared with a range of versions",
+                                  "is declared with a range of versions"),
+            "a kind the lookup does not cover": ("are of a kind the lookup does not cover",
+                                                 "is of a kind the lookup does not cover")}
+
+
+def _lockfile_licences(comps: List[Dict[str, Any]]) -> List[str]:
+    """A scan made before the licence lookup: the licences the dependency
+    files record, and nothing else."""
+    lic = Counter(" OR ".join(x["licences"]) if x["licences"] else None for x in comps)
+    none = lic.pop(None, 0)
+    if not lic:
+        return ["**Declared licences.** The dependency files record no licence "
+                f"for any of the {len(comps)} components; their licences were "
+                "not determined.", ""]
+    return ["**Declared licences.** " + ", ".join(
+        f"{k} {n}" for k, n in sorted(lic.items(), key=lambda kv: (-kv[1], kv[0])))
+        + "." + (f" For {none} components the dependency file records no "
+                 "licence; their licences were not determined." if none else ""), ""]
+
+
+def _licences(comps: List[Dict[str, Any]]) -> List[str]:
+    """The licence of every third-party component, by what it asks of the
+    buyer, the flagged ones by name, and where the licences came from."""
+    local = [x for x in comps if x["licence"]["from"] == "local"]
+    third = [x for x in comps if x["licence"]["from"] != "local"]
+    out: List[str] = []
+    def kind(x):
+        if x["licence"]["class"]:
+            return x["licence"]["class"]
+        return "not looked up" if x["licence"]["flags"] and not licences.to_read(x) else "none found"
+    by = Counter(kind(x) for x in third)
+    words = {"unknown": "with a licence identifier the scan does not recognise",
+             "none found": "with no licence found", "not looked up": "not looked up"}
+    if third and set(by) == {"permissive"}:
+        head = f"All {len(third)} third-party components declare permissive licences."
+    elif third:
+        order = list(licences.CLASSES) + ["none found", "not looked up"]
+        head = (f"Of the {len(third)} third-party components: "
+                + "; ".join(f"{by[k]} {words.get(k, k)}" for k in order if by.get(k)) + ".")
+    else:
+        head = "Every component listed is part of the target itself."
+    out += ["**Licences.** " + head + " " + CLASS_NOTE, ""]
+
+    flagged = [x for x in third if licences.to_read(x)]
+    unlooked = Counter(x["licence"]["flags"][0].split(": ", 1)[1] for x in third
+                       if x["licence"]["flags"] and not licences.to_read(x))
+    if flagged:
+        out += ["**Licences to read.** " + "; ".join(
+            f"{x['name']} {x['version'] or x['version_range'] or ''}".strip()
+            + " (" + ", ".join(([x["licence"]["expression"]] if x["licence"]["expression"] else [])
+                               + x["licence"]["flags"]) + ")" for x in flagged)
+            + ". These need their licence text read by a person; the review did "
+              "not read it.", ""]
+    if unlooked:
+        out += ["**Not looked up.** " + "; ".join(
+            f"{_n(n, 'component', 'components')} {UNLOOKED[why][n == 1]}"
+            for why, n in sorted(unlooked.items()))
+            + ". Their licences were not looked up and are not known from the materials.", ""]
+    if local:
+        names = sorted({x["name"] for x in local})
+        out += [f"**Part of the target.** {', '.join(names)} "
+                + ("is the target's own code, not a third-party component, and was "
+                   "not looked up." if len(names) == 1 else
+                   "are the target's own code, not third-party components, and were "
+                   "not looked up."), ""]
+
+    src = Counter(x["licence"]["from"] for x in third)
+    dates = sorted(x["licence"]["at"][:10] for x in third if x["licence"].get("at"))
+    said = []
+    if src.get("lockfile"):
+        said.append(f"for {src['lockfile']}, the dependency file")
+    if src.get("deps.dev"):
+        said.append(f"for {src['deps.dev']}, the licence the package declared to its "
+                    "registry for that version, as deps.dev reports it")
+    if src.get("github"):
+        said.append(f"for {src['github']} GitHub Actions, the current licence of "
+                    "the Action's repository, as GitHub reports it")
+    if said:
+        said = "; ".join(said)
+        out += ["**Where the licences come from.** " + said[0].upper() + said[1:]
+                + (f". Looked up {dates[0]}" if dates and dates[0] == dates[-1] else
+                   f". Looked up between {dates[0]} and {dates[-1]}" if dates else "")
+                + ". A declared licence is what the component's author stated. Files "
+                  "inside a component can carry other licences, and none of this is a "
+                  "legal opinion.", ""]
     return out
 
 
