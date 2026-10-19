@@ -24,8 +24,8 @@ CATEGORIES = ("strong", "plausible", "weak", "reject")
 ABOUT = ("yes", "no", "unsure")
 CURRENT = ("yes", "no", "unsure")
 QUESTIONS = 9
-#: PROSPECT.md §11 asks for about 100 words and never more than 140; the flag allows a
-#: few words over the ceiling, which read no worse (Bruce, 2026-09-26).
+#: PROSPECT.md §11 asks for 100 to 130 words; the flag allows some words over the
+#: ceiling, which read no worse (Bruce, 2026-09-26; ceiling lowered 2026-10-17).
 MESSAGE_WORDS = 145
 #: PROSPECT.md §21 asks for 60 to 80 words.
 FOLLOWUP_WORDS = 95

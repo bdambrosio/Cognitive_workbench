@@ -1,6 +1,6 @@
 # Timer for the outreach daily run
 
-The two unit files here start `daily.sh` every day at 08:30 as a user
+The two unit files here start `daily.sh` at 08:30 on weekdays (Monday to Friday) as a user
 systemd timer. To install or update them:
 
     cp workflowsv2/outreach/systemd/outreach-daily.* ~/.config/systemd/user/
