@@ -121,6 +121,13 @@ _HOST_STATE_COMMANDS: Dict[str, List[str]] = {
     'enabled_units': ['systemctl', 'list-unit-files', '--state=enabled',
                       '--no-pager'],
     'failed_units':  ['systemctl', 'list-units', '--failed', '--no-pager'],
+    # User units (systemctl --user): the timers and services Bruce runs
+    # without root, such as outreach-daily. The two system-scope
+    # categories above do not list them.
+    'user_timers':   ['systemctl', '--user', 'list-timers', '--all',
+                      '--no-pager'],
+    'user_failed_units': ['systemctl', '--user', 'list-units', '--failed',
+                          '--no-pager'],
     'upgradable':    ['apt', 'list', '--upgradable'],
     # Host identity for security-notice triage. A USN names an Ubuntu
     # release and a kernel flavour; without both of these, applicability
@@ -282,6 +289,10 @@ def _build_system_prompt() -> str:
         "    `timers`         — systemd timers (list-timers --all)\n"
         "    `enabled_units`  — enabled systemd unit files\n"
         "    `failed_units`   — systemd units in a failed state\n"
+        "    `user_timers`    — systemd --user timers, with last and "
+        "next run (list-timers --all)\n"
+        "    `user_failed_units` — systemd --user units in a failed "
+        "state\n"
         "    `user_persistence` — ~/.config/autostart, enabled "
         "systemd --user units, shell startup files. Plantable WITHOUT "
         "root, so a user-account compromise shows here first.\n"
