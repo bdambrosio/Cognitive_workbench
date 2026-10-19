@@ -891,6 +891,11 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
                  "The check did not uphold " + ("these findings" if len(hb) > 1 else "this finding")
                  + " and the practice has not yet decided " + ("them" if len(hb) > 1 else "it")
                  + "; each is set out in its section with the check's outcome."), ""]
+    if record.get("composition"):
+        # Computed from the scan and the practice's readings; the passage
+        # writer is told to leave licences alone (REPORT.md §4).
+        from workflowsv2.composition import judgements
+        out += judgements.summary_line(record["composition"])
 
     out += about
 
@@ -1102,7 +1107,7 @@ def evidence_document(record: Dict[str, Any], engagement: Optional[str] = None) 
 
 
 def worklist(merged: Dict[str, Any], merged_dir: Optional[Path] = None,
-             composition_dir: Optional[str] = None) -> str:
+             composition: Optional[Dict[str, Any]] = None) -> str:
     """worklist.md: what a person still has to look at, gathered from every
     stage's issues file — each run directory's, its review's, the merged
     directory's, and the composition scan's (a flagged licence). v1's editor notes did this from one run; v2 spread the
@@ -1115,8 +1120,8 @@ def worklist(merged: Dict[str, Any], merged_dir: Optional[Path] = None,
                    (r.get("claim_source"), d / "review" / "issues.jsonl")]
     if merged_dir is not None:
         places.append(("merged", Path(merged_dir) / "issues.jsonl"))
-    if composition_dir:
-        places.append(("composition", Path(composition_dir) / "issues.jsonl"))
+    if composition:
+        places.append(("composition", Path(composition["dir"]) / "issues.jsonl"))
     for source, path in places:
         if not path.is_file():
             continue
@@ -1127,6 +1132,9 @@ def worklist(merged: Dict[str, Any], merged_dir: Optional[Path] = None,
                 continue
             d["source"] = source
             rows.append(d)
+    if composition:
+        from workflowsv2.composition import judgements
+        rows += judgements.worklist_rows(composition)
     order = {"blocking": 0, "check": 1, "note": 2}
     rows.sort(key=lambda d: (order.get(d.get("severity"), 9), d.get("stage") or "",
                              d.get("code") or ""))

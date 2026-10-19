@@ -192,7 +192,7 @@ def test_the_appendix_leads_with_what_the_licences_ask_and_names_the_flagged():
                         "at": "2026-10-19T00:00:00+00:00", "url": None, "archive": None}
     md = "\n".join(appendix.render(_scan(comps)))
     assert "Of the 2 third-party components: 1 permissive; 1 strong copyleft." in md
-    assert "lib-b 2.0 (GPL-3.0-only, strong copyleft)" in md
+    assert "- lib-b 2.0 (GPL-3.0-only; strong copyleft): **not yet read**." in md
     assert "app is the target's own code" in md
     assert "not recorded" not in md
     lib_b = next(x for x in comps if x["name"] == "lib-b")
@@ -229,3 +229,27 @@ def test_a_licence_only_the_archive_declares_is_used_and_clears_the_flag(tmp_pat
     lic = comps[0]["licence"]
     assert (lic["expression"], lic["from"], lic["class"], lic["flags"]) == ("MIT", "archive", "permissive", [])
     assert lic["archive"]["files"][0]["first_lines"][0] == "Copyright (c) 2010 passive.ly LLC"
+
+
+def test_the_summary_and_the_appendix_carry_the_practices_reading():
+    from workflowsv2.composition import judgements
+    comps = scan.components({"artifacts": [_artifact("a", "lib-a", "1.0"), _artifact("b", "agno", "1.7.6"),
+                                           _artifact("c", "fastembed", "0.7.3")]})
+    given = {"lib-a": ("MIT", "permissive", []),
+             "agno": ("non-standard", "unknown", ["identifier not recognised"]),
+             "fastembed": ("non-standard", "unknown", ["identifier not recognised"])}
+    for x in comps:
+        expr, cls, flags = given[x["name"]]
+        x["licence"] = {"expression": expr, "from": "deps.dev", "class": cls, "flags": flags,
+                        "at": "2026-10-19T00:00:00+00:00", "url": None, "archive": None}
+    s = _scan(comps)
+    s["judgements"] = {"agno@1.7.6": {"verdict": "conditions apply", "note": "MPL-2.0 binds changed agno files.",
+                                      "by": "p", "at": "t"}}
+    line = " ".join(judgements.summary_line(s))
+    assert line.startswith("**The components' licences.** 1 of the 3 third-party components declare permissive")
+    assert "The practice read the 1 licence the scan flagged: conditions apply to agno." in line
+    assert "1 flagged licence is not yet read: fastembed@0.7.3." in line
+    md = "\n".join(appendix.render(s))
+    assert "- agno 1.7.6 (non-standard; identifier not recognised): **conditions apply**. MPL-2.0" in md
+    assert "- fastembed 0.7.3 (non-standard; identifier not recognised): **not yet read**." in md
+    assert [r["code"] for r in judgements.worklist_rows(s)] == ["licence_not_read"]

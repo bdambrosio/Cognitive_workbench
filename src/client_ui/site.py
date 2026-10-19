@@ -947,6 +947,11 @@ def make_site_app(access: Access, model: Optional[Path] = None,
             cur = state.current_run(eng_dir, state.current_intake(eng_dir))
             if not (cur and (cur / "report.md").is_file()):
                 raise HTTPException(status_code=400, detail="no report to release")
+            # A licence the scan flagged is read before the report goes out.
+            from workflowsv2.composition import judgements, scan as composition
+            problem = judgements.release_problem(composition.latest(eng_dir))
+            if problem:
+                raise HTTPException(status_code=400, detail=problem)
             # Who released which text is recorded beside the report before the
             # stage moves. Releasing is not signing (signoff.py).
             from workflowsv2.audit_report import signoff

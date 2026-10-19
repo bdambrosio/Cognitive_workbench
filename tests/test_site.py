@@ -608,3 +608,29 @@ def test_intake_uploads_land_in_the_materials_and_a_clone_joins_them(env, tmp_pa
     with pytest.raises(SystemExit, match="README.md"):
         st.clone_target(eng, str(src))
     assert (eng / "target" / "README.md").read_text() == "# r\n"
+
+
+def test_release_waits_until_every_flagged_licence_is_read(env):
+    from workflowsv2 import engagement_state
+    c, root = env
+    _new(c)
+    eng = root / "e1"
+    engagement_state.update_engagement(eng, composition=True)
+    (eng / "intakes" / "I1").mkdir(parents=True)
+    merged = eng / "merged" / "2026-09-05T01-00-00Z_chain_T"
+    merged.mkdir(parents=True)
+    (merged / "meta.json").write_text(json.dumps({"intake": "I1"}))
+    (merged / "report.md").write_text("# r\n")
+    scan_dir = eng / "composition" / "2026-09-05T00-00-00Z"
+    scan_dir.mkdir(parents=True)
+    agno = {"id": "a", "name": "agno", "version": "1.7.6", "version_range": None, "type": "python",
+            "licences": [], "files": [], "licence": {"expression": "non-standard", "from": "deps.dev",
+                                                     "class": "unknown", "flags": ["identifier not recognised"]}}
+    for n, doc in (("scan_meta.json", {"counts": {}}), ("components.json", [agno]), ("matches.json", [])):
+        (scan_dir / n).write_text(json.dumps(doc))
+    release = {"stage": "release", "value": "released"}
+    r = c.post("/p/api/engagements/e1/stage" + _as(PRACTICE), json=release)
+    assert r.status_code == 400 and "agno@1.7.6" in r.json()["detail"]
+    (eng / "composition" / "licence_judgements.json").write_text(json.dumps(
+        {"agno@1.7.6": {"verdict": "conditions apply", "note": "MPL-2.0.", "by": PRACTICE, "at": "t"}}))
+    assert c.post("/p/api/engagements/e1/stage" + _as(PRACTICE), json=release).status_code == 200

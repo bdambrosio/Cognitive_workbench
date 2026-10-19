@@ -91,7 +91,7 @@ def render(scan: Dict[str, Any]) -> List[str]:
             "advisory database on the date below, not an assurance that none "
             "exists."), ""]
         if any("licence" in x for x in comps):
-            out += _licences(comps)
+            out += _licences(comps, scan.get("judgements") or {})
         else:
             out += _lockfile_licences(comps)
 
@@ -161,9 +161,11 @@ def _lockfile_licences(comps: List[Dict[str, Any]]) -> List[str]:
                  "licence; their licences were not determined." if none else ""), ""]
 
 
-def _licences(comps: List[Dict[str, Any]]) -> List[str]:
+def _licences(comps: List[Dict[str, Any]], read: Dict[str, Any]) -> List[str]:
     """The licence of every third-party component, by what it asks of the
-    buyer, the flagged ones by name, and where the licences came from."""
+    buyer, the flagged ones by name with the practice's reading, and where
+    the licences came from."""
+    from workflowsv2.composition import judgements
     local = [x for x in comps if x["licence"]["from"] == "local"]
     third = [x for x in comps if x["licence"]["from"] != "local"]
     out: List[str] = []
@@ -188,12 +190,15 @@ def _licences(comps: List[Dict[str, Any]]) -> List[str]:
     unlooked = Counter(x["licence"]["flags"][0].split(": ", 1)[1] for x in third
                        if x["licence"]["flags"] and not licences.to_read(x))
     if flagged:
-        out += ["**Licences to read.** " + "; ".join(
-            f"{x['name']} {x['version'] or x['version_range'] or ''}".strip()
-            + " (" + ", ".join(([x["licence"]["expression"]] if x["licence"]["expression"] else [])
-                               + x["licence"]["flags"]) + ")" for x in flagged)
-            + ". These need their licence text read by a person; the review did "
-              "not read it.", ""]
+        out += ["**Licences the practice read.** Each licence the scan flagged, why, and "
+                "what the practice found on reading it:", ""]
+        for x in flagged:
+            j = read.get(judgements.key(x))
+            out.append(f"- {x['name']} {x['version'] or x['version_range'] or ''}".rstrip()
+                       + f" ({x['licence']['expression'] or 'no licence declared'}; "
+                       + ", ".join(x["licence"]["flags"]) + "): "
+                       + (f"**{j['verdict']}**. {j['note'].rstrip('. ')}." if j else "**not yet read**."))
+        out.append("")
     if unlooked:
         out += ["**Not looked up.** " + "; ".join(
             f"{_n(n, 'component', 'components')} {UNLOOKED[why][n == 1]}"

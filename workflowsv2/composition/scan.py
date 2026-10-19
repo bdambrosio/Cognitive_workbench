@@ -34,7 +34,8 @@ WHAT RUNS. Three programs, all run locally, then a licence lookup; no model:
           licence files of the archive published for that version. This is
           the one part of the scan that sends anything out: the names and
           versions of public components, never a path, git or private one.
-          A flagged component is a `check` issue in the scan's issues.jsonl.
+          A flagged licence is read by the practice and the reading recorded
+          with judgements.py; the report's worklist lists those not yet read.
 
 WHAT A SECRET MATCH IS. Text that fits a credential pattern. Nobody checked
 whether it is a real credential, or whether it still works; examples and test
@@ -82,7 +83,6 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from workflowsv2 import engagement_state as state              # noqa: E402
-from workflowsv2 import issues                                  # noqa: E402
 from workflowsv2.composition import licences                    # noqa: E402
 
 logger = logging.getLogger("composition.scan")
@@ -274,29 +274,6 @@ def run(eng_dir: Path) -> Path:
         raise SystemExit(f"the vulnerability database at {GRYPE_DB} is not valid: {db}")
     comps = components(syft_doc)
     licence_counts = licences.complete(syft_doc, comps)
-    for c in comps:
-        if licences.to_read(c):
-            issues.note(out, "composition", "licence_flagged",
-                        f"{c['name']} {c['version'] or c['version_range'] or ''}: "
-                        f"licence {c['licence']['expression'] or 'none found'} — "
-                        f"{'; '.join(c['licence']['flags'])}. "
-                        + ("The licence its published archive declares, and the first "
-                           "lines of its licence files, are in components.json; read "
-                           "them before the report is released."
-                           if (c["licence"]["archive"] or {}).get("files") is not None
-                           and "error" not in (c["licence"]["archive"] or {}) else
-                           "Its archive was not read; find and read its licence "
-                           "before the report is released."),
-                        severity="check", component=c["id"])
-    unlooked = [c for c in comps if c["licence"]["flags"] and not licences.to_read(c)]
-    if unlooked:
-        issues.note(out, "composition", "licence_not_looked_up",
-                    f"{len(unlooked)} component(s) were not looked up, so their licence "
-                    "is not known: " + "; ".join(
-                        f"{c['name']} {c['version'] or c['version_range'] or ''} "
-                        f"({c['licence']['flags'][0].split(': ', 1)[1]})" for c in unlooked)
-                    + ". Ask the seller for the versions in use, or read their licences.",
-                    severity="check")
     found = matches(grype_doc, comps)
     rev = _target_rev(target)
     if not GITLEAKS_RULES.is_file():
@@ -340,7 +317,7 @@ def run(eng_dir: Path) -> Path:
 
 def latest(eng_dir: Path) -> Optional[Dict[str, Any]]:
     """The newest scan of an engagement that enables composition analysis, as
-    {"dir", "meta", "components", "matches", "secrets"}, or None. `secrets` is
+    {"dir", "meta", "components", "matches", "secrets", "judgements"}, or None. `secrets` is
     None for a scan made before the secrets scan was added."""
     if not enabled(eng_dir):
         return None
@@ -350,9 +327,11 @@ def latest(eng_dir: Path) -> Optional[Dict[str, Any]]:
         return None
     s = scans[-1]
     load = lambda n: json.loads((s / n).read_text(encoding="utf-8"))   # noqa: E731
+    from workflowsv2.composition import judgements
     return {"dir": str(s), "meta": load("scan_meta.json"),
             "components": load("components.json"), "matches": load("matches.json"),
-            "secrets": load("secrets.json") if (s / "secrets.json").is_file() else None}
+            "secrets": load("secrets.json") if (s / "secrets.json").is_file() else None,
+            "judgements": judgements.load(s)}
 
 
 def main() -> int:
