@@ -200,3 +200,32 @@ def test_the_appendix_leads_with_what_the_licences_ask_and_names_the_flagged():
     lib_b["licence"]["class"] = "permissive"
     md = "\n".join(appendix.render(_scan(comps)))
     assert "All 2 third-party components declare permissive licences." in md
+
+
+def test_a_licence_only_the_archive_declares_is_used_and_clears_the_flag(tmp_path, monkeypatch):
+    # xmlhttprequest-ssl 2.1.2: deps.dev has no licence for it, and its
+    # package.json declares MIT only in npm's old `licenses` array.
+    import io
+    import tarfile
+    monkeypatch.setattr(licences, "CACHE", tmp_path / "licences.json")
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tf:
+        for name, text in (("package/package.json", json.dumps({"licenses": [{"type": "MIT"}]})),
+                           ("package/LICENSE", "Copyright (c) 2010 passive.ly LLC\n\nPermission is hereby granted")):
+            data = text.encode()
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            tf.addfile(info, io.BytesIO(data))
+    pages = {"api.deps.dev": json.dumps({"licenses": []}).encode(),
+             "registry.npmjs.org/xmlhttprequest-ssl/": json.dumps({"dist": {"tarball": "https://registry.npmjs.org/x.tgz"}}).encode(),
+             "registry.npmjs.org/x.tgz": buf.getvalue()}
+    monkeypatch.setattr(licences, "_get", lambda url, limit=0: next(v for k, v in pages.items() if k in url))
+    art = _artifact("x", "xmlhttprequest-ssl", "2.1.2", typ="npm")
+    art["purl"] = "pkg:npm/xmlhttprequest-ssl@2.1.2"
+    art["metadata"] = {"resolved": "https://registry.npmjs.org/xmlhttprequest-ssl/-/xmlhttprequest-ssl-2.1.2.tgz"}
+    syft = {"artifacts": [art]}
+    comps = scan.components(syft)
+    licences.complete(syft, comps)
+    lic = comps[0]["licence"]
+    assert (lic["expression"], lic["from"], lic["class"], lic["flags"]) == ("MIT", "archive", "permissive", [])
+    assert lic["archive"]["files"][0]["first_lines"][0] == "Copyright (c) 2010 passive.ly LLC"

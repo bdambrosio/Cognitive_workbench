@@ -321,7 +321,13 @@ def _archive_record(system: str, name: str, version: str) -> Dict[str, Any]:
             members = {m.name: m for m in tf.getmembers() if m.isfile()}
             pj = members.get("package/package.json")
             if pj is not None:
-                lic = json.loads(tf.extractfile(pj).read()).get("license")
+                manifest = json.loads(tf.extractfile(pj).read())
+                lic = manifest.get("license")
+                if lic is None and isinstance(manifest.get("licenses"), list):
+                    # The field npm replaced with `license`; its entries are
+                    # alternatives (xmlhttprequest-ssl 2.1.2 declares MIT here).
+                    lic = " OR ".join(str(x.get("type") if isinstance(x, dict) else x)
+                                      for x in manifest["licenses"]) or None
                 rec["declared"] = lic.get("type") if isinstance(lic, dict) else lic
             rec["files"] = [{"file": m[8:], "first_lines": _first_lines(tf.extractfile(members[m]).read())}
                             for m in sorted(members) if m.startswith("package/") and "/" not in m[8:]
@@ -365,6 +371,9 @@ def _archive_record(system: str, name: str, version: str) -> Dict[str, Any]:
 #: Some manifests put a whole licence text in the licence field (agno 1.7.6
 #: carries all of MPL-2.0 in PKG-INFO's License); the record keeps its start.
 DECLARED_CHARS = 200
+#: Cache prefix for archive records; raised when what a record holds changes,
+#: so records written by an earlier reading are read again once.
+ARCHIVE_KEY = "archive.v2:"
 
 
 def _short(declared: Optional[str]) -> Optional[str]:
@@ -393,7 +402,7 @@ def complete(syft_doc: Dict[str, Any], comps: List[Dict[str, Any]]) -> Dict[str,
     """Add `licence` to each component row in place; return the counts for
     scan_meta. Never raises for a lookup: a failure is recorded on the row."""
     arts = {a.get("id"): a for a in syft_doc.get("artifacts") or []}
-    cache = _load_cache()
+    cache = {k: v for k, v in _load_cache().items() if not k.startswith("archive:")}
     plan, wanted = [], set()
     for c in comps:
         how, key = eligibility(c, arts.get(c["id"]) or {})
@@ -449,7 +458,7 @@ def complete(syft_doc: Dict[str, Any], comps: List[Dict[str, Any]]) -> Dict[str,
 
     def check(item):
         c, key = item
-        akey = "archive:" + key
+        akey = ARCHIVE_KEY + key
         if akey in cache:
             return c, key, cache[akey], True
         system, rest = key.split("/", 1)
@@ -463,13 +472,19 @@ def complete(syft_doc: Dict[str, Any], comps: List[Dict[str, Any]]) -> Dict[str,
     with ThreadPoolExecutor(WORKERS) as pool:
         for c, key, rec, was_cached in pool.map(check, archives):
             if not was_cached and "error" not in rec:
-                cache["archive:" + key] = rec
+                cache[ARCHIVE_KEY + key] = rec
             # The cache keeps the declaration whole; the row shows its start.
             full = rec.get("declared")
             c["licence"]["archive"] = {**rec, "declared": _short(full)}
-            if full and c["licence"]["expression"] and \
-                    _ids(full) != _ids(c["licence"]["expression"]):
-                c["licence"]["flags"].append("the package's own manifest disagrees")
+            lic = c["licence"]
+            if full and not lic["expression"] and classify(full) not in (None, "unknown"):
+                # Nothing else gave a licence and the archive's own manifest
+                # declares one the table knows: that is the licence.
+                lic.update(expression=full, **{"from": "archive"})
+                lic["class"] = classify(full)
+                lic["flags"] = _flags(lic["class"], full, None)
+            elif full and lic["expression"] and _ids(full) != _ids(lic["expression"]):
+                lic["flags"].append("the package's own manifest disagrees")
 
     CACHE.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_json(CACHE, cache, indent=1)

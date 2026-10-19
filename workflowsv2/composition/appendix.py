@@ -215,6 +215,9 @@ def _licences(comps: List[Dict[str, Any]]) -> List[str]:
     if src.get("deps.dev"):
         said.append(f"for {src['deps.dev']}, the licence the package declared to its "
                     "registry for that version, as deps.dev reports it")
+    if src.get("archive"):
+        said.append(f"for {src['archive']}, the licence the manifest inside the "
+                    "package's published archive declares")
     if src.get("github"):
         said.append(f"for {src['github']} GitHub Actions, the current licence of "
                     "the Action's repository, as GitHub reports it")
