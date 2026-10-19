@@ -53,6 +53,8 @@ pymupdf>=1.24.0           # fetch_text PDF extraction
 lxml>=4.9.0               # utils/grobid.py (PDF metadata)
 python-docx>=1.1.0        # fetch_text .docx extraction
 wordfreq>=3.0.0           # token-frequency utilities used by retrieval
+icalendar>=7.3.0          # check-calendar .ics parsing
+recurring-ical-events>=3.8.2  # check-calendar recurring-event expansion
 
 # --- Sensors ---
 feedparser>=6.0.0         # rss-watcher sensor

@@ -931,6 +931,7 @@ characters:
         - ramana-saying
         - check-x-feed
         - check-email
+        - check-calendar
         - semantic-scholar
 
   # Co-op partner (2026-08-11). A third character so cooperation has two
@@ -1107,6 +1108,7 @@ characters:
         - ramana-saying
         - check-x-feed
         - check-email
+        - check-calendar
         - obsidian
         # exec-script is NOT omitted (2026-08-21). Jack exists as a
         # near-clone of Jill so that coordination is the only variable
