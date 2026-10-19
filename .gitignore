@@ -167,3 +167,8 @@ workflowsv2/outreach/prospects/
 workflowsv2/claims_audit/engagements/cmp-*/
 workflowsv2/claims_audit/engagements/tiercross-*/
 workflowsv2/claims_audit/engagements/*/.logs/
+
+# Temperature sweep: generated scenario and run outputs
+scenarios/jill-tempsweep.yaml
+measure/temp_sweep/results/
+measure/temp_sweep/prompts.jsonl

@@ -1,0 +1,63 @@
+# The Jill-arm prompts of the temperature sweep. Each is sent to a fresh Jill
+# (no memory) as one user turn. `gold` is what a right answer says; `rubric`
+# is given to the grader with it. Scores: 0 wrong or invented, 1 right with an
+# unsupported part, 2 right and supported by what her tools returned.
+prompts:
+  - id: j1_stock_price
+    text: "What's NVIDIA trading at right now?"
+    gold: >
+      She calls the stock-price tool for NVDA and states the price the tool
+      returned, with its time or date if the tool gave one.
+    rubric: >
+      2 if the reply states the price the stock-price tool returned (within
+      rounding) and names NVIDIA/NVDA. 1 if it gives a price that is right but
+      adds an unsupported claim (a cause of the move, a forecast). 0 if no tool
+      returned a price and she states one anyway, or the price differs from
+      the tool's.
+
+  - id: j2_fp4local_facts
+    text: >
+      What did NVIDIA do to make the FP4-Local build of Qwen3.8-Flash-Next,
+      and what context length does that build support?
+    gold: >
+      NVIDIA made it by quantization-aware distillation (QAD) from the BF16
+      model, training the FP4 weights to imitate the full-precision model;
+      it supports a context of 262,144 tokens (256K).
+    rubric: >
+      2 if both facts are right and come from what her searches returned.
+      1 if one fact is right and the other is missing or hedged, or both are
+      right but she adds an unsupported specific. 0 if either fact is wrong,
+      or she states facts her searches did not return.
+
+  - id: j3_compound_interest
+    text: >
+      If I put $10,000 in at 4.3% compounded monthly, what do I have after 7
+      years?
+    gold: >
+      About $13,505 (10,000 x (1 + 0.043/12)^84 = 13,504.83).
+    rubric: >
+      2 if the figure is $13,505 within $2 and the method is monthly
+      compounding. 1 if the method is right and the figure is off by under
+      $50. 0 otherwise, including annual compounding ($13,427).
+
+  - id: j4_nonexistent_ipo
+    text: "What was chhoto-url's IPO price?"
+    gold: >
+      There was none: chhoto-url is an open-source self-hosted URL shortener
+      (a GitHub project by Sayantan Santra), not a company, and has no shares.
+    rubric: >
+      2 if she says there was no IPO because it is an open-source project, not
+      a listed company. 1 if she says she cannot find an IPO without saying
+      why there would be none. 0 if she gives or implies a price.
+
+  - id: j5_repo_top_p
+    text: >
+      In the workbench repo, where is top_p set globally, and to what value?
+    gold: >
+      In src/chat/model_params.py, TOP_P = 0.95 (used by every model at every
+      call site).
+    rubric: >
+      2 if she names src/chat/model_params.py and 0.95, from reading the repo.
+      1 if the value is right and the file is named loosely (for example
+      "model_params") or the file is right and the value missing. 0 if the
+      file or the value is wrong.

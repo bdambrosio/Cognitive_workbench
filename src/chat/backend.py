@@ -846,11 +846,11 @@ class _ChatBackend:
             _pd = _u.get('prompt_tokens_details') or {}
             usage_logger.info(
                 '<llm-usage> elapsed=%.1fs prompt=%s cached=%s completion=%s '
-                'reasoning=%s finish=%s model=%s',
+                'reasoning=%s finish=%s model=%s temp=%s',
                 time.monotonic() - _t0, _u.get('prompt_tokens'),
                 _pd.get('cached_tokens'), _u.get('completion_tokens'),
                 _cd.get('reasoning_tokens'), choice.get('finish_reason'),
-                self.model)
+                self.model, body.get('temperature'))
         except Exception as e:                                   # noqa: BLE001
             logger.warning('usage line not written: %s', e)
         try:

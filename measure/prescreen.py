@@ -91,7 +91,8 @@ def probe(model: str, tag: str, effort: str | None = "low",
           url: str = URL, key_env: str | None = "OPENROUTER_API_KEY",
           temperature: float | None = None,
           system: str = SYSTEM, user: str = USER,
-          schema: dict | None = REACT_ACTION_SCHEMA) -> dict:
+          schema: dict | None = REACT_ACTION_SCHEMA,
+          keep_content: bool = False) -> dict:
     """One endpoint, one call. Returns a row; never raises.
 
     `tag` pins the OpenRouter provider. For a direct route (a provider's own
@@ -105,6 +106,9 @@ def probe(model: str, tag: str, effort: str | None = "low",
     gate probe unchanged, and every row in docs/model-prescreen.md was taken
     with them — a caller that overrides `system`, `user` or `schema` is NOT
     producing a row comparable to that table.
+
+    `keep_content` returns the answer text even when a schema is sent, for a
+    caller that scores the answer (measure/temp_sweep).
     """
     direct = "openrouter.ai" not in url
     body = {
@@ -174,6 +178,8 @@ def probe(model: str, tag: str, effort: str | None = "low",
             "secs": round(dt, 1),
             "prompt_tok": usage.get("prompt_tokens"),
             "completion_tok": ctok,
+            "reasoning_tok": (usage.get("completion_tokens_details")
+                              or {}).get("reasoning_tokens"),
             "reasoning_chars": len(reasoning),
             # Needed to settle whether `completion_tokens` bills the reasoning
             # channel or only the visible answer: with both lengths and the
@@ -184,7 +190,7 @@ def probe(model: str, tag: str, effort: str | None = "low",
             "tok_s": round(ctok / dt, 1) if ctok and dt else None,
             "schema_valid": valid, "tool": tool,
             "provider": d.get("provider"),
-            "content": content if schema is None else None,
+            "content": content if schema is None or keep_content else None,
             "content_head": content[:80].replace("\n", " ")}
 
 
