@@ -55,6 +55,8 @@
 <header>
   <h1>Tuuyi outreach</h1>
   <span id="counts">loading…</span>
+  <input id="find" type="search" placeholder="Find by name or email" oninput="filterCards()"
+         onkeydown="if (event.key === 'Escape') { this.value = ''; filterCards(); }" style="margin-left:auto; width:240px">
 </header>
 <main>
   <section>
@@ -302,7 +304,7 @@ function card(c, i) {
       </div>${replyBox(i, "They replied again")}${exchange(c)}${brief}</div>`;
   }
 
-  return `<div class="card">${head}${why}${flags}${brief}</div>`;
+  return `<div class="card" id="card${i}">${head}${why}${flags}${brief}</div>`;
 }
 
 let cards = [];
@@ -317,6 +319,23 @@ async function load() {
     $(g).parentElement.classList.toggle("empty", !html && !["ready", "qualified", "research"].includes(g));
   }
   if (!$("r_kind").options.length) $("r_kind").innerHTML = q.kinds.map(k => `<option>${esc(k)}</option>`).join("");
+  filterCards();
+}
+// Hides the cards whose name and email do not contain the search text, and
+// the sections left with none; hiding, not redrawing, keeps unsaved edits.
+function filterCards() {
+  const q = $("find").value.trim().toLowerCase();
+  const shown = {};
+  cards.forEach((c, i) => {
+    const el = $("card" + i);
+    if (!el) return;
+    const hit = !q || (c.name || "").toLowerCase().includes(q)
+                   || (c.contact.email || "").toLowerCase().includes(q);
+    el.style.display = hit ? "" : "none";
+    if (hit) shown[c.group] = true;
+  });
+  for (const g of ["replies", "followup", "ready", "noresponse", "waiting", "qualified", "research"])
+    $(g).parentElement.style.display = q && !shown[g] ? "none" : "";
 }
 async function copyMsg(i) { await navigator.clipboard.writeText($("msg" + i).value); note("Copied. Paste it into LinkedIn, then press Sent."); }
 async function saveMsg(i, which, note_id) {
