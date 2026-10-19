@@ -84,7 +84,7 @@ logger.setLevel(logging.INFO)
 from chat.workflow import load_workflow                          # noqa: E402
 from workflowsv2 import issues                                    # noqa: E402
 from workflowsv2.claims_audit import behaviour_split, duplicates, schemas  # noqa: E402
-from workflowsv2.emit import emit                                 # noqa: E402
+from workflowsv2.emit import emit, run_tasks, set_parallel        # noqa: E402
 
 # The brief lives with its engagement, in engagements/<name>/brief.md — it is
 # what a client says, and it differs per engagement. Its history travels with
@@ -1265,7 +1265,13 @@ def main() -> int:
     ap.add_argument("--workflow-mode", choices=("on", "off"), default=None,
                     help="override the scenario's workflow_mode; omit to use "
                          "whatever audit.yaml declares")
+    ap.add_argument("--parallel", type=int, default=1,
+                    help="adjudication calls in flight at once (default 1). "
+                         "The site's production jobs raise it; a measurement "
+                         "run keeps 1, so its calls do not compete for the "
+                         "route's rate limit")
     args = ap.parse_args()
+    set_parallel(args.parallel)
 
     if (REPO / "scenarios" / args.world).exists():
         raise SystemExit(
@@ -1602,7 +1608,9 @@ def main() -> int:
             index = trace_index(traces_dir)
             batches = evidence_batches(list(ids), index, args.batch,
                                        args.evidence_budget)
-            emissions = []
+            # The batches share nothing, so with --parallel they are
+            # adjudicated at once; the findings are merged in batch order
+            # either way.
             for bi, b in enumerate(batches, 1):
                 logger.info("adjudicating batch %d/%d: %d claim(s), %d "
                             "trace(s)", bi, len(batches), len(b["claims"]),
@@ -1612,20 +1620,30 @@ def main() -> int:
                                    "filed and are adjudicated on the batch's "
                                    "other evidence", bi,
                                    ", ".join(str(c) for c in b["untagged"]))
-                e = emit_findings(
-                    loop, method_text=method_text, claim_source=src_doc,
+
+            def task(b):
+                return lambda lp: emit_findings(
+                    lp, method_text=method_text, claim_source=src_doc,
                     frozen=[by_id[c] for c in b["claims"] if c in by_id],
                     traces=b["traces"], max_tokens=emit_tokens,
                     evidence_budget=args.evidence_budget, note=note)
-                emissions.append(e)
+
+            landed: Dict[int, Dict[str, Any]] = {}
+
+            def write_partial(i: int, e: Dict[str, Any]) -> None:
+                landed[i] = e
+                (out / "findings.partial.json").write_text(json.dumps(
+                    _merge_emissions([landed[k] for k in sorted(landed)]).get("obj") or {},
+                    indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+
+            emissions = run_tasks(loop, [task(b) for b in batches],
+                                  on_done=write_partial)
+            for b, e in zip(batches, emissions):
                 batch_log.append({"claims": b["claims"],
                                   "traces": len(b["traces"]),
                                   "untagged": b["untagged"],
                                   "parse": e["parse"], "finish": e["finish"],
                                   "evidence": e["evidence"]})
-                (out / "findings.partial.json").write_text(json.dumps(
-                    _merge_emissions(emissions).get("obj") or {},
-                    indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
             return _merge_emissions(emissions) if emissions else {
                 "raw": "", "obj": None, "parse": "unparseable",
                 "parse_error": "no claims to adjudicate", "finish": None,
@@ -2155,6 +2173,7 @@ def main() -> int:
         # still unopened at the end is the not-examined figure.
         "chase": chase,
         "evidence_budget": args.evidence_budget,
+        "parallel": args.parallel,
         "wall_clock_s": wall,
         # Action emissions the token ceiling cut off, across the gathering
         # legs. The emission call reports its own separately, below.

@@ -310,7 +310,15 @@ source, then duplicates on the low-reasoning model file, reliance, tiers);
 materiality over those runs with the current intake, then the report). The
 chain is refused if any source has no frozen surface or no claim would be
 tested, and it skips a source with nothing to test. A step that exits non-zero
-ends the job as failed. `mail.py` sends the practice a notice when a job ends
+ends the job as failed. Since 2026-10-19 the per-source steps of both jobs run
+as lanes, up to `jobs.LANES` (3) at once, each with its own log
+`jobs/<id>_<source>.log`; the steps after the lanes wait for all of them, and
+a failed step stops the lanes not yet started. Each runner a job starts is
+given `--parallel` `jobs.PARALLEL` (4): its independent schema-constrained
+calls (adjudication batches, review parts, adverse recall, retest, rating
+batches, tier batches) run that many at once, capped per process in
+`workflowsv2/emit.py`. Every runner's default is 1, one call at a time, which
+is what a measurement run uses. `mail.py` sends the practice a notice when a job ends
 and the client a notice on release; without `SMTP_PASS`, or with
 `MAIL_DRY_RUN`, it logs the notice and sends nothing.
 

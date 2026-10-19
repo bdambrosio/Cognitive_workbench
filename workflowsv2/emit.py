@@ -18,10 +18,93 @@ traces; the review hands over each citation's lines).
 """
 from __future__ import annotations
 
+import copy
 import json
-from typing import Any, Callable, Dict, Optional
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from utils.json_utils import repair_json_string
+
+# CALLS IN FLIGHT, PER PROCESS. None means one call at a time, the way every
+# runner worked before 2026-10-19 and the way a measurement run must still
+# work: a run whose calls compete for one rate limit is not a sample of the
+# model. The site's production jobs set it with each runner's `--parallel`
+# (Bruce, 2026-10-19). The cap is here, around the call, rather than in each
+# pool, so pools started inside other pools (materiality's replicates) cannot
+# exceed it.
+_in_flight: Optional[threading.BoundedSemaphore] = None
+_workers = 1
+
+
+def set_parallel(n: int) -> None:
+    """Allow up to `n` calls at once in this process; 1 restores serial."""
+    global _in_flight, _workers
+    _workers = max(1, int(n))
+    _in_flight = threading.BoundedSemaphore(_workers) if _workers > 1 else None
+
+
+class _LoopView:
+    """A loop with its own copy of the backend, for one task on a worker
+    thread. The backend records each call's finish reason and reasoning size
+    on itself, and `emit` reads them back after the call; two threads sharing
+    one backend would read each other's. The copy is shallow, so route-wide
+    state (parameters the route dropped or renamed) stays shared; the retry
+    counters start empty and are added back to the loop's backend when the
+    task ends."""
+
+    def __init__(self, loop):
+        self._loop = loop
+        self.backend = copy.copy(loop.backend)
+        self.backend.transient_events = {}
+        self.backend.transient_exhausted = 0
+
+    def __getattr__(self, name):
+        return getattr(self._loop, name)
+
+    def fold_back(self) -> None:
+        own = self._loop.backend
+        for status, n in self.backend.transient_events.items():
+            own.transient_events[status] = own.transient_events.get(status, 0) + n
+        own.transient_exhausted += self.backend.transient_exhausted
+
+
+def run_tasks(loop, tasks: Sequence[Callable[[Any], Any]],
+              on_done: Optional[Callable[[int, Any], None]] = None) -> List[Any]:
+    """Run each task, `task(loop)`, and return the results in task order.
+
+    Serial unless `set_parallel` allowed more: then each task runs on a
+    worker thread with a `_LoopView` in place of the loop. `on_done(i,
+    result)` runs on this thread as each task finishes, in finishing order;
+    a runner writes its partial file there. The first task to raise ends the
+    call with that exception, once the other tasks have finished.
+    """
+    if _workers <= 1 or len(tasks) <= 1:
+        results = []
+        for i, task in enumerate(tasks):
+            results.append(task(loop))
+            if on_done is not None:
+                on_done(i, results[-1])
+        return results
+    lock = threading.Lock()
+
+    def run(task):
+        view = _LoopView(loop)
+        try:
+            return task(view)
+        finally:
+            with lock:
+                view.fold_back()
+
+    results: List[Any] = [None] * len(tasks)
+    with ThreadPoolExecutor(max_workers=min(_workers, len(tasks))) as pool:
+        futures = {pool.submit(run, t): i for i, t in enumerate(tasks)}
+        for fut in as_completed(futures):
+            i = futures[fut]
+            results[i] = fut.result()
+            if on_done is not None:
+                on_done(i, results[i])
+    return results
 
 
 def emit(loop, system: str, user: str, schema: Dict[str, Any],
@@ -51,9 +134,15 @@ def emit(loop, system: str, user: str, schema: Dict[str, Any],
         # The read timeout scales with the budget: at 40 tok/s, the slowest
         # rate seen on either route, max_tokens takes max_tokens/40 seconds.
         # Never below the backend's default.
-        raw = loop.backend.chat(messages, max_tokens=max_tokens,
-                                response_schema=schema,
-                                timeout_s=max(300.0, max_tokens / 40.0))
+        if _in_flight is not None:
+            _in_flight.acquire()
+        try:
+            raw = loop.backend.chat(messages, max_tokens=max_tokens,
+                                    response_schema=schema,
+                                    timeout_s=max(300.0, max_tokens / 40.0))
+        finally:
+            if _in_flight is not None:
+                _in_flight.release()
         attempts.append({
             "chars": len(raw or ""),
             "finish": getattr(loop.backend, "last_finish_reason", None),

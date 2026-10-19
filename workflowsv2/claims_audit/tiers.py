@@ -41,7 +41,7 @@ for p in (str(REPO), str(REPO / "src")):
         sys.path.insert(0, p)
 
 from workflowsv2 import engagement_state as state                  # noqa: E402
-from workflowsv2.emit import emit                                   # noqa: E402
+from workflowsv2.emit import emit, run_tasks, set_parallel          # noqa: E402
 from workflowsv2.claims_audit.decompose import backend_from_model   # noqa: E402
 from chat.workflow import load_workflow                            # noqa: E402
 from utils.file_utils import atomic_write_text                    # noqa: E402
@@ -154,11 +154,16 @@ def run(eng_name: str, model_yaml: Path, only: Optional[str] = None) -> Dict[str
                   if not c.get("same_as")]
         tiers: List[Dict[str, Any]] = []
         unrated: List[int] = []
-        for i in range(0, len(claims), BATCH):
-            batch = claims[i:i + BATCH]
-            got = propose(backend, str(eng.get("transaction") or ""),
-                          str(eng.get("thresholds") or ""), src, batch,
-                          reliance.render(statement) if statement else "")
+        batches = [claims[i:i + BATCH] for i in range(0, len(claims), BATCH)]
+        # The batches are independent; with --parallel they are rated at
+        # once, and read back in order.
+        results = run_tasks(types.SimpleNamespace(backend=backend), [
+            lambda lp, batch=batch: propose(
+                lp.backend, str(eng.get("transaction") or ""),
+                str(eng.get("thresholds") or ""), src, batch,
+                reliance.render(statement) if statement else "")
+            for batch in batches])
+        for batch, got in zip(batches, results):
             if got["parse"] not in ("parsed", "repaired"):
                 raise SystemExit(f"{src} claims {batch[0]['id']}-{batch[-1]['id']}: the rating "
                                  f"returned nothing usable ({got['parse']}: {got['parse_error']})")
@@ -188,7 +193,11 @@ def main() -> int:
     ap.add_argument("--model", type=Path, required=True)
     ap.add_argument("--source", default=None,
                     help="rate one claim source only, by its path as engagement.yaml lists it")
+    ap.add_argument("--parallel", type=int, default=1,
+                    help="rating calls in flight at once (default 1); the "
+                         "site's enumerate job raises it")
     args = ap.parse_args()
+    set_parallel(args.parallel)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     rec = run(args.engagement, args.model, args.source)
     for src, r in rec["sources"].items():

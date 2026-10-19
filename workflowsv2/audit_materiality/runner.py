@@ -54,7 +54,7 @@ from workflowsv2.audit_report.render import _from_knowledge     # noqa: E402
 # force=True, which is a no-op after the basicConfig above.
 from workflowsv2.audit_review.runner import _finding_text      # noqa: E402
 from workflowsv2.claims_audit.runner import load_engagement    # noqa: E402
-from workflowsv2.emit import emit                              # noqa: E402
+from workflowsv2.emit import emit, run_tasks, set_parallel     # noqa: E402
 
 SCENARIO = HERE / "scenario.yaml"
 METHOD_PATH = "workflowsv2/audit_materiality/method/MATERIALITY.md"
@@ -157,7 +157,7 @@ def rate(loop, method_text: str, transaction: Optional[str],
              for g in groups_of(rateable)]
             + [("exposure", "exposures", "ratings", g)
                for g in groups_of(exposable)])
-    parts, calls = [], []
+    parts, calls, asks = [], [], []
     for n, (field, array, other, g) in enumerate(plan, 1):
         body = (f"Rate these {len(g)} findings for `{field}`, per MATERIALITY "
                 f"\u00a73 to \u00a7{'5b' if field == 'materiality' else '5'}. Each carries its claim source and claim "
@@ -165,9 +165,13 @@ def rate(loop, method_text: str, transaction: Optional[str],
                 + "\n\n".join(_rating_text(f) for f in g)
                 + f"\n\nEmit `{array}` for exactly these findings, and an "
                   f"empty `{other}`.")
-        out = emit(loop, method_text, head + body,
-                   schemas.ratings_schema(sorted({f["claim_source"] for f in g})),
-                   max_tokens)
+        asks.append(lambda lp, body=body, g=g: emit(
+            lp, method_text, head + body,
+            schemas.ratings_schema(sorted({f["claim_source"] for f in g})),
+            max_tokens))
+    # The batches are independent; with --parallel they are asked at once.
+    for n, ((field, array, other, g), out) in enumerate(
+            zip(plan, run_tasks(loop, asks)), 1):
         calls.append({"part": f"{array}[{n}/{len(plan)}]", "findings": len(g),
                       **{k: v for k, v in out.items() if k not in ("raw", "obj")}})
         if out["obj"] is not None:
@@ -467,10 +471,15 @@ def replicate(loop, method_text: str, eng: Dict[str, Any],
                     "— rating each three more times", len(cm) + len(ce), len(cm), len(ce))
         r_sub = [by_key[k] for k in cm if k in by_key]
         e_sub = [by_key[k] for k in ce if k in by_key]
-        for seed in seeds[1:]:
-            more = rate(loop, method_text, eng.get("transaction"), r_sub, e_sub,
-                        max_tokens, batch, thresholds=eng.get("thresholds"), seed=seed,
-                        reliance=eng.get("reliance"))
+        # The three further samples are independent of each other; with
+        # --parallel they are rated at once.
+        mores = run_tasks(loop, [
+            lambda lp, seed=seed: rate(
+                lp, method_text, eng.get("transaction"), r_sub, e_sub,
+                max_tokens, batch, thresholds=eng.get("thresholds"), seed=seed,
+                reliance=eng.get("reliance"))
+            for seed in seeds[1:]])
+        for seed, more in zip(seeds[1:], mores):
             calls += more["calls"]; log["passes"] += 1; log["seeds"].append(seed)
             take(more["obj"], "materiality", "ratings")
             take(more["obj"], "exposure", "exposures")
@@ -552,7 +561,12 @@ def main() -> int:
     ap.add_argument("--single", action="store_true",
                     help="one rating pass; the default rates twice and "
                          "escalates a disagreement to five samples")
+    ap.add_argument("--parallel", type=int, default=1,
+                    help="rating calls in flight at once (default 1). The "
+                         "site's production jobs raise it; a measurement run "
+                         "keeps 1")
     args = ap.parse_args()
+    set_parallel(args.parallel)
 
     eng = load_engagement(args.engagement, intake=args.intake)
     from workflowsv2.claims_audit import reliance as reliance_statement
@@ -735,7 +749,7 @@ def main() -> int:
                                                if c.get("verdict") == v)
                                         for v in schemas.CHECK_VERDICTS + ("unchecked",)},
                            "rewritten": in_short["rewritten"], "dropped": in_short["dropped"]},
-        "wall_clock_s": wall, "error": error,
+        "wall_clock_s": wall, "error": error, "parallel": args.parallel,
         "transient_events": getattr(loop, "transient_events", None),
         "captured_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     }, indent=2, default=str) + "\n", encoding="utf-8")

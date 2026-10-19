@@ -63,7 +63,7 @@ import yaml                                                    # noqa: E402
 from chat.workflow import load_workflow                        # noqa: E402
 from workflowsv2 import issues                                 # noqa: E402
 from workflowsv2.audit_review import schemas                   # noqa: E402
-from workflowsv2.emit import emit                              # noqa: E402
+from workflowsv2.emit import emit, run_tasks, set_parallel     # noqa: E402
 from workflowsv2.claims_audit import schemas as audit_schemas  # noqa: E402
 from workflowsv2.turns import last_exit_reason, latest_reply   # noqa: E402
 
@@ -406,10 +406,14 @@ def emit_parts(loop, method_text: str, stats: Dict[str, Any],
     head = ("The audit under review is in the run directory. Its claim surface "
             "and findings follow, and the statistics the client's process "
             "computed are:\n\n" + facts + "\n\n")
-    parts, calls = [], []
 
-    def ask(what: str, body: str, schema) -> Optional[Dict[str, Any]]:
-        out = emit(loop, method_text, head + body, schema, max_tokens)
+    # EACH TASK IS ONE GROUP'S CALLS, and returns the parts and the call
+    # records it made instead of adding them to shared lists, so that with
+    # --parallel the groups run at once and the merge is still in the order
+    # below: claim checks, finding reviews, the record check.
+    def ask(lp, parts, calls, what: str, body: str,
+            schema) -> Optional[Dict[str, Any]]:
+        out = emit(lp, method_text, head + body, schema, max_tokens)
         calls.append({"part": what,
                       **{k: v for k, v in out.items() if k not in ("raw", "obj")}})
         if out["obj"] is None:
@@ -422,7 +426,7 @@ def emit_parts(loop, method_text: str, stats: Dict[str, Any],
             # one part is reported, not hidden behind a loop.
             logger.warning("%s did not parse: %s; retrying once", what,
                            out["parse_error"])
-            out = emit(loop, method_text, head + body, schema, max_tokens)
+            out = emit(lp, method_text, head + body, schema, max_tokens)
             calls.append({"part": what, "retry": True,
                           **{k: v for k, v in out.items() if k not in ("raw", "obj")}})
         if out["obj"] is not None:
@@ -430,16 +434,11 @@ def emit_parts(loop, method_text: str, stats: Dict[str, Any],
         else:
             logger.warning("%s did not parse on the retry: %s", what,
                            out["parse_error"])
-        if partial is not None:
-            partial.write_text(json.dumps(schemas.merge_parts(parts), indent=1,
-                                          ensure_ascii=False) + "\n",
-                               encoding="utf-8")
         return out["obj"]
 
-    groups = ([list(frozen)] if not batch
-              else [list(frozen)[i:i + batch]
-                    for i in range(0, len(frozen), batch)])
-    for n, g in enumerate(groups, 1):
+    tasks = []
+
+    def claim_checks_task(n, total, g):
         body = ("Check the fidelity of these claims, per REVIEW §5 check 1 — "
                 "does each `statement` faithfully render its `quote`? A claim "
                 "carrying `implied_by` and the claim it names each render part of "
@@ -449,13 +448,21 @@ def emit_parts(loop, method_text: str, stats: Dict[str, Any],
                 "`understates` for leaving the rest to the other claim.\n\n"
                 + json.dumps(g, ensure_ascii=False, indent=1)
                 + "\n\nEmit `claim_checks` for exactly these claims.")
-        ask(f"claim_checks[{n}/{len(groups)}]", body,
-            schemas.claim_checks_schema())
 
-    groups = ([list(findings)] if not batch
-              else [list(findings)[i:i + batch]
-                    for i in range(0, len(findings), batch)])
-    for n, g in enumerate(groups, 1):
+        def run(lp):
+            parts, calls = [], []
+            ask(lp, parts, calls, f"claim_checks[{n}/{total}]", body,
+                schemas.claim_checks_schema())
+            return parts, calls
+        return run
+
+    groups = ([list(frozen)] if not batch
+              else [list(frozen)[i:i + batch]
+                    for i in range(0, len(frozen), batch)])
+    tasks += [claim_checks_task(n, len(groups), g)
+              for n, g in enumerate(groups, 1)]
+
+    def finding_reviews_task(n, total, g):
         body = ("Review these findings, per REVIEW §5 checks 2 to 5. Record "
                 "the four observations for each; the outcome is derived from "
                 "them and is not yours to write. Under each finding, the "
@@ -465,7 +472,11 @@ def emit_parts(loop, method_text: str, stats: Dict[str, Any],
                                 + "\n    cited material:\n"
                                 + _cited_materials(f, docs, excludes=stats.get("evidence_excludes"), about=(claims_by_id.get(f.get("claim_id")) or {}).get("about")) for f in g)
                 + "\n\nEmit `finding_reviews` for exactly these findings.")
-        got = ask(f"finding_reviews[{n}/{len(groups)}]", body,
+        return lambda lp: _finding_reviews(lp, n, total, g, body)
+
+    def _finding_reviews(lp, n, total, g, body):
+        parts, calls = [], []
+        got = ask(lp, parts, calls, f"finding_reviews[{n}/{total}]", body,
                   schemas.finding_reviews_schema())
         # AN ADVERSE OBSERVATION WITHOUT ITS EXCEPTION IS NOT A REVIEW. The
         # schema cannot require `exception` only when an observation is not
@@ -479,7 +490,7 @@ def emit_parts(loop, method_text: str, stats: Dict[str, Any],
             got["finding_reviews"] = [r for r in got["finding_reviews"]
                                       if r.get("claim_id") not in bad]
             redo = [f for f in g if f.get("claim_id") in bad]
-            ask(f"finding_reviews[{n}/{len(groups)} again]",
+            ask(lp, parts, calls, f"finding_reviews[{n}/{total} again]",
                 "These reviews came back with an observation that is not "
                 "clean and no exception. REVIEW \u00a76 requires the "
                 "exception: the specific mismatch, with `finding_says` and "
@@ -491,9 +502,16 @@ def emit_parts(loop, method_text: str, stats: Dict[str, Any],
                                 + _cited_materials(f, docs, excludes=stats.get("evidence_excludes"), about=(claims_by_id.get(f.get("claim_id")) or {}).get("about")) for f in redo)
                 + "\n\nEmit `finding_reviews` for exactly these findings.",
                 schemas.finding_reviews_schema())
+        return parts, calls
+
+    groups = ([list(findings)] if not batch
+              else [list(findings)[i:i + batch]
+                    for i in range(0, len(findings), batch)])
+    tasks += [finding_reviews_task(n, len(groups), g)
+              for n, g in enumerate(groups, 1)]
 
     never = stats.get("documents_cited_but_never_opened") or {}
-    ask("record_check",
+    record_body = (
         "You have checked every finding. Report the one statement REVIEW §7 "
         "asks for: whether the audit's record bears out the work the findings "
         "claim. The client's process read the record; these are its facts.\n\n"
@@ -506,9 +524,27 @@ def emit_parts(loop, method_text: str, stats: Dict[str, Any],
         + "\n\nCited documents the record does not show being opened, with "
           "the claims whose findings cite them:\n"
         + ("\n".join(f"  {d}: claims {', '.join(str(c) for c in cs)}"
-                      for d, cs in never.items()) or "  (none)"),
-        schemas.record_check_schema())
+                      for d, cs in never.items()) or "  (none)"))
 
+    def record_check(lp):
+        parts, calls = [], []
+        ask(lp, parts, calls, "record_check", record_body,
+            schemas.record_check_schema())
+        return parts, calls
+    tasks.append(record_check)
+
+    landed: Dict[int, List[Dict[str, Any]]] = {}
+
+    def write_partial(i: int, result) -> None:
+        landed[i] = result[0]
+        if partial is not None:
+            partial.write_text(json.dumps(
+                schemas.merge_parts([p for k in sorted(landed) for p in landed[k]]),
+                indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    results = run_tasks(loop, tasks, on_done=write_partial)
+    parts = [p for ps, _ in results for p in ps]
+    calls = [c for _, cs in results for c in cs]
     return {"obj": schemas.merge_parts(parts), "calls": calls,
             "batched": bool(batch)}
 
@@ -565,6 +601,7 @@ def adverse_recall(loop, method_text: str, run: Path,
     index = trace_index(traces)
     batches = evidence_batches(sorted(k for k in subjects if k is not None),
                                index, batch, budget)
+    tasks = []
     for b in batches:
         out["untagged"].extend(b["untagged"])
         ids = [c for c in b["claims"] if c not in b["untagged"]]
@@ -599,8 +636,10 @@ def adverse_recall(loop, method_text: str, run: Path,
                 + "\n\nThe material the audit read, filed under these claims:\n\n"
                 + ev["text"]
                 + "\n\nEmit `adverse_recall` with one row for exactly these claims.")
-        got = emit(loop, method_text, body, schemas.adverse_recall_schema(),
-                   max_tokens)
+        tasks.append((ids, b, ev, lambda lp, body=body: emit(
+            lp, method_text, body, schemas.adverse_recall_schema(), max_tokens)))
+    results = run_tasks(loop, [t[3] for t in tasks])
+    for (ids, b, ev, _), got in zip(tasks, results):
         out["calls"].append({"claims": ids, "traces": len(b["traces"]),
                              "evidence": {k: v for k, v in ev.items() if k != "text"},
                              **{k: v for k, v in got.items() if k not in ("raw", "obj")}})
@@ -649,6 +688,9 @@ def retest(run: Path, world: str, model_path: Optional[Path], target: Path,
                            "resolved_model": loop.backend.resolved_model(),
                            "results": {}}
     try:
+        # One call per finding, none depending on another; with --parallel
+        # they run at once.
+        asked = []
         for cid in subjects:
             f = findings_by_id.get(cid)
             if f is None:
@@ -661,8 +703,10 @@ def retest(run: Path, world: str, model_path: Optional[Path], target: Path,
                     + "\n    cited material:\n"
                     + _cited_materials(f, docs or {})
                     + "\n\nEmit `finding_reviews` for this finding only.")
-            r = emit(loop, method_text, body,
-                      schemas.finding_reviews_schema(), max_tokens)
+            asked.append((cid, lambda lp, body=body: emit(
+                lp, method_text, body, schemas.finding_reviews_schema(),
+                max_tokens)))
+        for (cid, _), r in zip(asked, run_tasks(loop, [t for _, t in asked])):
             rows = ((r.get("obj") or {}).get("finding_reviews") or [])
             row = next((x for x in rows if x.get("claim_id") == cid),
                        rows[0] if rows else None)
@@ -821,7 +865,12 @@ def main() -> int:
     ap.add_argument("--adverse-recall-only", action="store_true",
                     help="run only that check, against a run that already "
                          "holds a review; writes review/adverse_recall.json")
+    ap.add_argument("--parallel", type=int, default=1,
+                    help="review calls in flight at once outside the reading "
+                         "legs (default 1). The site's production jobs raise "
+                         "it; a measurement run keeps 1")
     args = ap.parse_args()
+    set_parallel(args.parallel)
 
     run = Path(args.run).resolve()
     for needed in ("claims.json", "findings.json", "run_meta.json"):
@@ -964,6 +1013,7 @@ def main() -> int:
         "reviewed_run": run.name, "world": world,
         "model_config": args.model, "resolved_model": loop.backend.resolved_model(),
         "batch": args.batch, "held_sample": len(sampled),
+        "parallel": args.parallel,
         "adverse_recall": (None if recall is None else
                            {k: v for k, v in recall.items() if k in ("subjects", "untagged", "error")}
                            | ({"hits": [r.get("claim_id") for r in recall.get("hits", [])],
