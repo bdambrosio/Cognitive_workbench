@@ -218,10 +218,11 @@
       const box = h3.closest(".finding"); if (box) box.classList.add("named");
       if (scroll) h3.scrollIntoView({block: "start", behavior: "smooth"});
     }
-    const adverse = ["contradicted", "partial", "real_with_caveat"].includes(f.verdict);
+    const adverse = ["contradicted", "partial", "real_with_caveat"].includes(f.verdict)
+      && (f.practice_review || {}).disposition !== "withdrawn";
     let h = '<div class="head"><h4>' + esc(f.claim_source) + ", claim " + esc(f.claim_id)
-      + ' <span class="verdict' + (adverse ? " adverse" : "") + '">' + esc(f.verdict)
-      + (f.review ? " · review: " + esc(f.review) : "") + "</span></h4>"
+      + ' <span class="verdict' + (adverse ? " adverse" : "") + '">' + esc(f.verdict_words || f.verdict)
+      + (f.review ? " · check: " + esc(f.review) : "") + "</span></h4>"
       + '<button class="close" id="evClose" title="close">×</button></div>';
     h += "<blockquote>" + esc(f.quote) + " (" + esc(f.claim_source) + ", lines " + esc((f.lines || []).join("–")) + ")</blockquote>";
     if (f.gap) h += '<p class="gap"><b>The gap:</b> ' + esc(f.gap) + "</p>";

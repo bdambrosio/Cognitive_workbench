@@ -426,7 +426,7 @@ def test_a_withdrawn_finding_left_out_of_the_groups_keeps_its_section_grouped():
     doc = render.assemble(rec, prose, None, "eng")
     shown = doc[doc.index("## What the review showed"):doc.index("## Unsettled claims")]
     assert shown.index("### Backups") < shown.index("### Withdrawn by the practice") \
-        < shown.index("#### s — true, with something")
+        < shown.index("#### s — withdrawn by the practice")
 
 
 def test_a_question_that_repeats_another_is_left_out_everywhere():
@@ -507,3 +507,5 @@ def test_a_finding_the_practice_withdrew_is_marked_where_it_was_and_named_in_no_
     assert ("Practice review: withdrawn by the practice after review; it is not counted among the "
             "findings of this document. the shipped default turns it off") in shown
     assert "Withdrawn by the practice, and counted above as the review recorded them: README.md, claim 1." in doc
+    head = next(l for l in shown.splitlines() if l.startswith("#") and "withdrawn" in l)
+    assert head.endswith("— withdrawn by the practice")              # not the withdrawn verdict

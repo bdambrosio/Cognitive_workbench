@@ -177,9 +177,12 @@ class PostSession:
         """Every finding's claim, verdict and evidence, keyed `<claim
         source>#<claim id>`, for the evidence pane: what the page shows
         beside a finding a reply names or the reader clicks."""
+        from workflowsv2.audit_report import render
         out: Dict[str, Any] = {}
         for f in self.merged.get("findings") or []:
             adj = f.get("adjudication") or {}
+            v = adj.get("verdict")
+            why = adj.get("unresolved_because")
             ev = []
             for e in f.get("evidence") or []:
                 if e.get("form") == "citation":
@@ -197,10 +200,14 @@ class PostSession:
             out[f"{f.get('claim_source')}#{f.get('claim_id')}"] = {
                 "claim_source": f.get("claim_source"), "claim_id": f.get("claim_id"),
                 "quote": f.get("quote"), "lines": f.get("lines"),
-                "statement": f.get("statement"), "verdict": adj.get("verdict"),
+                "statement": f.get("statement"), "verdict": v,
+                # The pane shows these in the report's words, not the codes.
+                "verdict_words": ("withdrawn by the practice" if render.withdrawn(f)
+                                  else render._verdict_short(v)),
                 "gap": adj.get("gap"),
-                "unresolved_because": adj.get("unresolved_because"),
-                "review": (f.get("review") or {}).get("outcome"),
+                "unresolved_because": render.DISPOSITION_WORDS.get(why, why),
+                "review": {"holds": "upheld", "does_not_hold": "not upheld"}.get(
+                    (f.get("review") or {}).get("outcome")),
                 "practice_review": f.get("disposition"),
                 "evidence": ev}
         return out

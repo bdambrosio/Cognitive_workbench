@@ -400,7 +400,11 @@ def _finding(f: Dict[str, Any], rating: Optional[Dict[str, Any]],
     # THE HEADING SAYS WHAT WAS TESTED AND HOW IT CAME OUT, in the record's
     # words: the claim's plain statement and the verdict. Where the claim
     # came from goes on the line below (Bruce, 2026-10-14).
-    head = f"{'#' * level} {_md_safe(f.get('statement') or f.get('quote'))} — {_verdict_short(v)}"
+    # A withdrawn finding is headed as withdrawn and has no In short: both
+    # would state the verdict the practice withdrew as the finding.
+    gone = withdrawn(f)
+    head = (f"{'#' * level} {_md_safe(f.get('statement') or f.get('quote'))} — "
+            + ("withdrawn by the practice" if gone else _verdict_short(v)))
     where = f"*{f.get('claim_source')}, claim {f.get('claim_id')}"
     if rating:
         where += f" · {field}: {RATING_LABEL.get(rating.get(field), rating.get(field))}"
@@ -409,12 +413,12 @@ def _finding(f: Dict[str, Any], rating: Optional[Dict[str, Any]],
         # The quote is the statement: a question source holds nothing else.
         who = "buyer" if f["asked_by"] == "buyer" else "practice"
         out = [head, "", where, ""]
-        if rating and rating.get("in_short"):
+        if rating and rating.get("in_short") and not gone:
             out += [f"**In short:** {_md_safe(rating['in_short'])}", ""]
         out += [f"Asked by the {who}."]
     else:
         out = [head, "", where, ""]
-        if rating and rating.get("in_short"):
+        if rating and rating.get("in_short") and not gone:
             out += [f"**In short:** {_md_safe(rating['in_short'])}", ""]
         out += [f"> \"{_md_safe(f.get('quote'))}\" "
                 f"({f.get('claim_source')}, {_lines(f.get('lines'))})"]
