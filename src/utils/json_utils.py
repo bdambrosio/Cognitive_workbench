@@ -145,6 +145,12 @@ def repair_json_string(json_str: str) -> Optional[Dict]:
             expr = match.group(3).strip()
             close_quote = match.group(4)
 
+            # A quoted value whose quote does not close right after the
+            # expression is a string that merely starts with a number
+            # ("-0.29%", "+14 pp"); rewriting it drops the opening quote.
+            if open_quote and not close_quote:
+                return match.group(0)
+
             # Only process if it contains arithmetic operators and isn't a variable reference
             if any(op in expr for op in ['+', '-', '*', '/']) and not expr.startswith('$'):
                 try:
@@ -159,6 +165,13 @@ def repair_json_string(json_str: str) -> Optional[Dict]:
             return match.group(0)
 
         return re.sub(pattern, replace, text)
+
+    # Valid JSON is returned as parsed; the arithmetic pass is for input
+    # that does not parse, such as {"yaw": 1.0236+3.14159}.
+    try:
+        return json.loads(response)
+    except json.JSONDecodeError:
+        pass
 
     # Try evaluating arithmetic expressions before parsing
     response = eval_arithmetic_in_json(response)
