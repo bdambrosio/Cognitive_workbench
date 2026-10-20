@@ -14,6 +14,8 @@ Tuuyi will carry out a claims review for the client named at intake.
 
 **Materials.** The seller supplies the repository and the documents to be examined on a page of this site that only the seller and the practice can open, arranges them there, and says when they are complete. Where the client holds the materials, the client supplies them the same way. The client names the documents that carry the seller's claims. The client does not receive the materials: the report names files by their path and quotes the lines each finding rests on, and nothing more of them leaves the engagement. The practice holds the materials on hardware it controls, in an environment created for this engagement and deleted afterwards. The model that reads them is a cloud model service that retains no data, unless otherwise agreed with the client. For a pilot engagement, model calls may run on a hosted inference service that does not undertake to retain no data; the materials are public or the client has agreed to that.
 
+**Turnaround.** The target is the report within 24 to 48 hours, on working days, of the seller marking the materials complete, for most repositories. It is a target, not a guarantee.
+
 **Retention.** The engagement file, the record and the report are kept for the period stated at intake and then deleted.
 
 **Fee.** Pilot engagements are free. A later engagement is $499 for most repositories, paid by the seller; a larger target is quoted after intake, and the fee is agreed before work begins.
