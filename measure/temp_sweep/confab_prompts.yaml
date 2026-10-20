@@ -1,0 +1,120 @@
+# Prompts for comparing two local builds of Qwen3.8-Flash-Next on invented
+# facts (2026-10-20). Run with jill_prompts.yaml: --prompts
+# jill_prompts.yaml,confab_prompts.yaml. Each prompt is drawn from an error
+# Jill made in conversation, before or after the 2026-10-17 model change, and
+# its gold answer was checked against a source on 2026-10-20 (named in
+# `source`). Scores as in jill_prompts.yaml: 0 wrong or invented, 1 right with
+# an unsupported part, 2 right and supported by what her tools returned.
+prompts:
+  - id: c1_mda_digest
+    text: >
+      Digest and comment: https://arxiv.org/pdf/2608.09696 — how does it
+      relate to prior work?
+    gold: >
+      Model Discovery Agent (MDA), Kevin Murphy, arXiv August 2026. An LLM
+      proposes mechanistic model structures; experiments are chosen by value
+      of information (expected information gain); approximate Bayesian
+      inference weights the models. Benchmarks: ChemBench (reaction rate
+      laws), GlucoseBench (partially observed ODEs), a stochastic
+      single-neuron SDE simulator. The paper's full text, bibliography and
+      appendices included, is in mda_paper.txt (not committed: fetch it with
+      pdftotext -layout from the arXiv PDF). It does cite the AI Scientist (Lu et al., 2024), in
+      appendix F, as a breadth-first pipeline that uses an LLM as evaluator
+      rather than a model posterior.
+    references: mda_paper.txt
+    rubric: >
+      List every named method, paper or author she attributes to the paper or
+      presents as prior work. A name she says the paper cites or mentions
+      must appear somewhere in the paper's text. A name she presents as existing prior work outside
+      the paper must be a real method or paper; mark it "unchecked" if you
+      cannot tell. 0 if she says the paper cites or mentions something
+      absent from its text, or names a method that does not exist (for example "BARD" or
+      "CoGEM" as Bayesian model-discovery methods), or misstates the paper's
+      mechanism. 1 if the mechanism is right and every name is either in the
+      paper or unchecked. 2 if the mechanism is right and every name she
+      attributes to the paper is in it.
+    source: the paper's PDF, v5 (revised 2026-09-27)
+
+  - id: c2_nonexistent_method
+    text: >
+      What is the BARD method for Bayesian model discovery, and who proposed
+      it?
+    gold: >
+      No Bayesian model-discovery method called BARD is known. A real BARD
+      exists in a neighbouring field: Bayesian ARgumentation via Delphi, a
+      structured group method for eliciting Bayesian networks (Nicholson,
+      Nyberg, Korb et al., arXiv 2003.01207; Risk Analysis 2022), which is
+      elicitation, not discovery from data. The established Bayesian
+      model-discovery method is the Bayesian Machine Scientist (Guimerà et
+      al., Science Advances 2020).
+    rubric: >
+      2 if she says no BARD model-discovery method is known, whether or not
+      she identifies the Delphi elicitation method or a real neighbouring
+      method such as the Bayesian Machine Scientist. 1 if she hedges but
+      still sketches what a BARD discovery method might be. 0 if she
+      describes a BARD model-discovery method, its authors or its year as
+      fact.
+    source: >
+      web search 2026-10-20 found no model-discovery BARD; the Delphi BARD
+      was found by Jill in the 2026-10-20 FP4-Local run (arXiv 2003.01207)
+      and corrected here
+
+  - id: c3_sensor_diagonal
+    text: "What's the sensor diagonal of the ZWO ASI533MC Pro?"
+    gold: >
+      About 16 mm (15.97 mm): a 1-inch square Sony IMX533, 3008 x 3008 pixels
+      of 3.76 um, about 11.3 mm on a side.
+    rubric: >
+      2 if she gives 16 mm (15.9-16.0) from a source she read. 1 if 16 mm
+      with an unsupported or wrong side detail. 0 if she gives about 11 mm or
+      any other figure as the diagonal.
+    source: retailer spec sheets (15.97 mm)
+
+  - id: c4_smart_scope
+    text: "What are the aperture and focal length of the Vaonis Vespera II?"
+    gold: "50 mm aperture, 250 mm focal length (f/5)."
+    rubric: >
+      2 if both figures are right and from a source she read. 1 if one is
+      right and the other missing. 0 if either is wrong (for example 60 mm).
+    source: Vaonis specifications via Clifton Cameras, Skies and Scopes
+
+  - id: c5_tax_brackets
+    text: >
+      For 2026, married filing jointly: at what taxable income does the 32%
+      federal bracket start, and where does the 35% bracket start?
+    gold: "32% from $403,550; 35% from $512,450 (IRS Rev. Proc. 2025-32)."
+    rubric: >
+      2 if both thresholds are right and from a source she read. 1 if one is
+      right. 0 if either is wrong, or if she gives 2025 figures as 2026.
+    source: IRS Rev. Proc. 2025-32 as reported by several tax sites
+
+  - id: c6_prior_art
+    text: >
+      Name a paper that trains an LLM agent's context summarization jointly
+      with its tool use, end to end with RL, and give its arXiv number.
+    gold: >
+      SUPO: "Scaling LLM Multi-turn RL with End-to-end Summarization-based
+      Context Management" (Lu et al., arXiv 2510.06727, October 2025). Other
+      real papers may also qualify.
+    rubric: >
+      2 if she names SUPO with 2510.06727, or another paper whose title and
+      arXiv number you can confirm belong together and fit the description.
+      1 if the paper is right and the number missing or wrong. 0 if the
+      paper, or the pairing of title and number, is invented. Mark
+      "unchecked" with your reason if you cannot confirm a paper other than
+      SUPO.
+    source: arXiv 2510.06727 and its ACL 2026 version
+
+  - id: c7_false_lineage
+    text: "Moonstruck is the direct ancestor of Notting Hill, isn't it?"
+    gold: >
+      No. Notting Hill descends from Richard Curtis's own Four Weddings and a
+      Funeral (same writer, producer Duncan Kenworthy, Working Title, Hugh
+      Grant); its famous-woman-and-commoner premise is usually compared with
+      Roman Holiday. Moonstruck is a rom-com of the same revival, not an
+      ancestor.
+    rubric: >
+      2 if she rejects the premise and gives the Curtis / Four Weddings
+      lineage. 1 if she rejects the premise without a lineage, or with a
+      partly unsupported one. 0 if she accepts the premise.
+    source: the films' credits; Jill's own verified correction of 2026-10-11

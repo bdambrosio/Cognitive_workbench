@@ -12,7 +12,7 @@ Each run (one prompt, one temperature, one repeat):
      Jill, changed only as WORLD and _sweep_character() say, with
      chat.react_temperature set to the run's temperature;
   3. launches `launcher.py jill-tempsweep.yaml --reasoning` with its console
-     log captured, waits for the agent thread, and sends the prompt on
+     log captured, waits for her zenoh subscriber, and sends the prompt on
      cognitive/Jill/sense_data in the envelope cli.py sends;
   4. waits for her reply in memory/conversation.txt, then for the post-turn
      work to go quiet (no new <llm-usage> line for --quiet seconds);
@@ -55,6 +55,10 @@ SCENARIO = REPO / "scenarios" / "jill-tempsweep.yaml"
 WORLD_DIR = REPO / "scenarios" / WORLD
 LIVE = REPO / "scenarios" / "jill-chat.yaml"
 PYTHON = REPO / "zenoh_venv" / "bin" / "python3"
+# The launcher's console shows WARNING and above; its INFO lines, the
+# "agent threads started" line and <llm-usage> among them, go only to this
+# file. A run reads the part written since it started.
+LAUNCHER_LOG = REPO / "logs" / "character_launcher.log"
 
 # Tools with effects outside this machine's scratch state, or that need
 # hardware or a running world: mail, the vault, scripts, images, the head,
@@ -145,9 +149,17 @@ def _stop(proc: subprocess.Popen) -> None:
             continue
 
 
-def usage_lines(log: Path) -> list:
+def _since(offset: int) -> str:
+    """The launcher log written after `offset`; all of it if it rotated."""
+    with LAUNCHER_LOG.open("rb") as fh:
+        if LAUNCHER_LOG.stat().st_size >= offset:
+            fh.seek(offset)
+        return fh.read().decode("utf-8", errors="replace")
+
+
+def usage_lines(text: str) -> list:
     rows = []
-    for line in log.read_text(encoding="utf-8", errors="replace").splitlines():
+    for line in text.splitlines():
         m = USAGE.match(line)
         if m:
             def num(x):
@@ -168,12 +180,16 @@ def one_run(p: dict, t: float, rep: int, out_root: Path, args) -> dict:
                                        allow_unicode=True), encoding="utf-8")
     meta = {"prompt": p["id"], "text": p["text"], "temperature": t, "repeat": rep}
     t0 = time.time()
-    with log.open("w") as fh:
+    offset = LAUNCHER_LOG.stat().st_size if LAUNCHER_LOG.exists() else 0
+    with (run / "console.log").open("w") as fh:
         proc = subprocess.Popen([str(PYTHON), "launcher.py", SCENARIO.name, "--reasoning"],
                                 cwd=SRC, stdout=fh, stderr=subprocess.STDOUT,
                                 stdin=subprocess.DEVNULL, start_new_session=True)
     try:
-        while "agent threads started" not in log.read_text(errors="replace"):
+        # Her subscriber is up only at "chat zenoh ready", which can come
+        # well after the thread starts (53 s on 2026-10-20 with the old quant
+        # holding 108 GB of host RAM); a message sent before it is lost.
+        while "chat zenoh ready" not in _since(offset):
             if proc.poll() is not None or time.time() - t0 > args.startup_timeout:
                 meta["error"] = "launcher did not start"
                 return meta
@@ -190,15 +206,16 @@ def one_run(p: dict, t: float, rep: int, out_root: Path, args) -> dict:
             time.sleep(3)
         meta["reply"] = reply
         meta["reply_secs"] = round(time.time() - sent, 1)
-        n, quiet_since = len(usage_lines(log)), time.time()
+        n, quiet_since = len(usage_lines(_since(offset))), time.time()
         while time.time() - quiet_since < args.quiet and time.time() - sent < args.turn_timeout:
             time.sleep(5)
-            m = len(usage_lines(log))
+            m = len(usage_lines(_since(offset)))
             if m != n:
                 n, quiet_since = m, time.time()
         meta["done_secs"] = round(time.time() - sent, 1)
     finally:
         _stop(proc)
+        log.write_text(_since(offset), encoding="utf-8")
         for sub in ("memory", "subagent_traces", "inspect_traces"):
             src = WORLD_DIR / "Jill" / sub
             if src.exists():
@@ -214,10 +231,14 @@ def main() -> int:
     ap.add_argument("--temperatures", required=True)
     ap.add_argument("--repeats", type=int, default=3)
     ap.add_argument("--only", default=None)
+    ap.add_argument("--prompts", default="jill_prompts.yaml",
+                    help="comma-separated prompt files in this directory")
+    ap.add_argument("--label", default="",
+                    help="appended to the results directory name, e.g. the model")
     ap.add_argument("--seed", type=int, default=20261017)
     ap.add_argument("--startup-timeout", type=float, default=300)
     ap.add_argument("--settle", type=float, default=15,
-                    help="seconds between the agent thread starting and the send")
+                    help="seconds between her subscriber being ready and the send")
     ap.add_argument("--turn-timeout", type=float, default=1800)
     ap.add_argument("--quiet", type=float, default=90,
                     help="post-turn work is done after this long with no LLM call")
@@ -227,7 +248,8 @@ def main() -> int:
     if running:
         raise SystemExit(f"a launcher is running ({running}); stop it first — "
                          f"this arm uses Jill's topics")
-    prompts = yaml.safe_load((HERE / "jill_prompts.yaml").read_text())["prompts"]
+    prompts = [p for name in args.prompts.split(",")
+               for p in yaml.safe_load((HERE / name).read_text())["prompts"]]
     if args.only:
         keep = set(args.only.split(","))
         prompts = [p for p in prompts if p["id"] in keep]
@@ -237,7 +259,7 @@ def main() -> int:
     random.Random(args.seed).shuffle(order)
     by_id = {p["id"]: p for p in prompts}
     started = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
-    out_root = HERE / "results" / f"jill_{started}"
+    out_root = HERE / "results" / f"jill_{started}{'_' + args.label if args.label else ''}"
     print(f"{len(order)} runs -> {out_root}", flush=True)
     for n, (rep, t, pid) in enumerate(order, 1):
         meta = one_run(by_id[pid], t, rep, out_root, args)

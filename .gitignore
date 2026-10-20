@@ -172,6 +172,7 @@ workflowsv2/claims_audit/engagements/*/.logs/
 scenarios/jill-tempsweep.yaml
 measure/temp_sweep/results/
 measure/temp_sweep/prompts.jsonl
+measure/temp_sweep/mda_paper.txt
 
 # Kept local, never pushed (Bruce, 2026-10-19; the repository is public).
 # Engagement data: every new file under an engagement. Files already tracked
