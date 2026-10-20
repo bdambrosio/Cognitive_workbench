@@ -151,17 +151,15 @@ an engagement). Checked 2026-10-02.
 
 ## Where does the code go? Who sees it?
 
-For a buyer's paid claims review, the repository is examined on single-tenant
-hardware the practice controls, in an environment created for the engagement
-and deleted at the end of the period set in the engagement letter. The buyer
-never sees the environment or the materials in it. The code goes to a cloud
-model service only when the client and the seller both agree, and then only to
-one that retains no data. A review done during the beta may run on a hosted
-model instead; the engagement letter says which applies. A seller's own claims
-check is handled privately.
+For a paid claims review, the repository is held on hardware the practice
+controls, in an environment created for the engagement and deleted at the end
+of the period set in the engagement letter. The buyer never sees the
+environment or the materials in it. The model that reads the code is a cloud
+model service that retains no data. A seller's own claims check is handled
+privately.
 
-Source: site /pricing ("Where the work runs"); site /privacy. Checked
-2026-09-27.
+Source: site /pricing ("Where the work runs"); site /privacy; site /faq.
+Checked 2026-10-20.
 
 ## Does the seller have to take part?
 
