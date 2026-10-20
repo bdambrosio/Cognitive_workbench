@@ -17,3 +17,13 @@ def test_identifiers_urls_and_roots(tmp_path):
     d = r.deep({"a": ["chhoto-url", {"b": "ok"}], "c": 3})
     assert d == {"a": ["the target", {"b": "ok"}], "c": 3}
     assert "identity withheld" in banner("the target", 43, 43, 1, "a local model")
+
+
+def test_an_identifier_inside_a_code_token_becomes_a_code_marker():
+    # chhoto-full demo 2026-10-14: quoted code read "warn,a self-hosted URL
+    # shortener=info" and "a self-hosted URL shortener_PASSWORD".
+    r = Redactor("a self-hosted URL shortener", ["chhoto_url", "chhoto-url", "chhoto"])
+    out = r.text('unwrap_or("warn,chhoto=info") reads CHHOTO_URL_PASSWORD; image: sintan/chhoto-url:latest. '
+                 'Chhoto is small.')
+    assert 'warn,target=info' in out and "TARGET_PASSWORD" in out and "sintan/target:latest" in out
+    assert out.endswith("a self-hosted URL shortener is small.")

@@ -8,6 +8,11 @@ the findings, the history, every reply. It is substitution over a known
 list, not detection: a name the practice did not list is not withheld, and
 the practice reads the demo page before publishing it.
 
+An identifier written as part of a longer token, such as an environment
+variable, a log filter or an image name, is replaced by CODE_MARKER rather
+than the display name, so a quoted line still reads as code:
+`warn,target=info`, not `warn,a self-hosted URL shortener=info`.
+
 Three fixed rules ride along because the record produces them
 mechanically: an absolute path under the repository or the engagement
 becomes a relative one; a GitHub URL becomes a marker; a run directory's
@@ -21,6 +26,10 @@ from typing import Any, Dict, Iterable, List, Optional
 
 GITHUB = re.compile(r"https?://(?:www\.)?github\.com/[^\s)\]>\"'`]*")
 LINK_WITHHELD = "[repository link withheld]"
+CODE_MARKER = "target"
+# A character that, next to an identifier with no space between, makes it
+# part of a longer token.
+_TOKEN_CHAR = re.compile(r"[\w./:=@-]")
 
 
 class Redactor:
@@ -41,8 +50,16 @@ class Redactor:
             out = out.replace(root + "/", "").replace(root, ".")
         out = GITHUB.sub(LINK_WITHHELD, out)
         for rx in self._ids:
-            out = rx.sub(self.marker, out)
+            out = rx.sub(lambda m: self._marker_for(m), out)
         return out
+
+    def _marker_for(self, m: "re.Match[str]") -> str:
+        s, i, j = m.string, m.start(), m.end()
+        in_token = ((i > 0 and _TOKEN_CHAR.match(s[i - 1]))
+                    or (j < len(s) and _TOKEN_CHAR.match(s[j])))
+        if not in_token:
+            return self.marker
+        return CODE_MARKER.upper() if m.group(0).isupper() else CODE_MARKER
 
     def deep(self, obj: Any) -> Any:
         """The same substitution over every string in a JSON-like value."""

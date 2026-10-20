@@ -18,6 +18,9 @@ redact:
   - chhoto
   - SinTan1729
   - Sayantan Santra
+  # The author's address, in the SPDX header of every source file.
+  - sayantan.santra689@gmail.com
+  - sayantan
   - sintan
   # The name in Bengali script, and its percent-encoded form in the
   # Wiktionary link the site and README carry.
