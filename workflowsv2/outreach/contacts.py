@@ -67,6 +67,9 @@ ANSWER_NOTE = "Answer sent"
 #: The note that records a request not to be contacted again, and the one
 #: that records where an email address found by lookup came from.
 OPTED_OUT_NOTE, EMAIL_FOUND_NOTE = "Opted out", "Email found"
+#: The note that records an address an email could not be delivered to, and
+#: the one the runner writes when it has read a reply.
+DELIVERY_FAILED_NOTE, REPLY_READ_NOTE = "Delivery failed", "Reply read"
 
 
 class ContactError(RuntimeError):
@@ -303,6 +306,28 @@ def not_pursuing(cid: str, reason: str, on: str) -> None:
 def opted_out(cid: str) -> bool:
     """True when the person asked not to be contacted again (opt_out)."""
     return any(str(n.get("title") or "").startswith(OPTED_OUT_NOTE) for n in notes(cid))
+
+
+def failed_addresses(cid: str) -> List[str]:
+    """The addresses an email to this person could not be delivered to."""
+    return [str(n.get("to") or "").lower() for n in notes(cid)
+            if str(n.get("title") or "").startswith(DELIVERY_FAILED_NOTE)]
+
+
+def delivery_failed(cid: str, address: str, on: str, report: str) -> bool:
+    """An email to `address` came back undelivered: a note "Delivery failed
+    <date>" holding the report's subject, with the address beside it, and the
+    address removed from the person if it is still theirs, so that nothing
+    more is sent to it. Returns False, and records nothing, when that address
+    is already recorded as failed."""
+    address = address.strip().lower()
+    if address in failed_addresses(cid):
+        return False
+    create_note(cid, f"{DELIVERY_FAILED_NOTE} {on}",
+                f"An email to {address} was not delivered. The report's subject: {report}", to=address)
+    if (get(cid).get("email") or "").strip().lower() == address:
+        update_person(cid, {"email": ""})
+    return True
 
 
 def opt_out(cid: str, on: str) -> None:

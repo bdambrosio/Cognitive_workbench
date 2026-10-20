@@ -596,7 +596,13 @@ def record_address(cid: str, cand_dir: Path, email: str, organisation: str, sour
     """Check one address against the evidence in `cand_dir` and write it to
     the contact only when the evidence shows the person works there now. A
     note records the address, where it came from and the check's answer
-    either way."""
+    either way. An address an email was not delivered to is not checked
+    again, and not recorded."""
+    if email.strip().lower() in contacts.failed_addresses(cid):
+        contacts.create_note(cid, f"{contacts.EMAIL_FOUND_NOTE} {today()}",
+                             f"{source} gave {email}. Not recorded: an email to it was not delivered.")
+        return {"email": email, "source": source, "organisation_given": organisation,
+                "current": "no", "organisation": "", "citation": None, "reason": "an email to it was not delivered"}
     c = (yaml.safe_load((cand_dir / "candidate.yaml").read_text(encoding="utf-8"))
          if (cand_dir / "candidate.yaml").is_file() else {"name": contacts.get(cid)["name"]})
     chk = check_address(c, cand_dir, email, organisation, source)
@@ -898,7 +904,7 @@ def replies(backend, writer, data: Path) -> List[str]:
             body = "\n".join([f"- **{g['what']}**: {g['note']} (\"{g['quote']}\")" for g in rec["gives"]]
                              + ([f"\nIntroduces: {rec['introduced_name']}"] if rec["introduced_name"] else [])
                              + [f"\nNext step: {rec['next_step']}"] + [f"- CHECK: {f}" for f in rec["flags"]])
-            contacts.create_note(rid, f"Reply read {today()}: {gave}", body)
+            contacts.create_note(rid, f"{contacts.REPLY_READ_NOTE} {today()}: {gave}", body)
             if rec["next_step"]:
                 contacts.upsert_entry(rid, {"next_action": rec["next_step"], "next_action_date": today()})
             names.append(c["name"])

@@ -10,9 +10,13 @@ In this order:
        a reply         the person's words are recorded as the page's "Record
                        the reply" button records them, and the reply is read
                        and an answer drafted (`runner.py replies`);
-       a message from the website contact form, or an automatic message
-                       (an out-of-office answer, a delivery failure): listed
-                       in the summary, and nothing else is done with it.
+       a delivery failure   the address is removed from the contact and
+                       a note "Delivery failed <date>" keeps it
+                       (contacts.delivery_failed), so neither this run nor
+                       the page sends to it again;
+       a message from the website contact form, or another automatic
+                       message (an out-of-office answer, a delayed delivery):
+                       listed in the summary, and nothing else is done with it.
      Any other mail is left alone and not counted.
   2. Send the first message to everyone at Ready to contact who can be
      emailed (runner.emailable) and whose draft has a subject and no flags
@@ -25,7 +29,9 @@ In this order:
      is held; someone whose first message went another way is left to the
      page.
   4. Email the summary to SUMMARY_TO and print it; daily.sh puts what is
-     printed into the report for Jill.
+     printed into the report for Jill. Each reply is listed with what the
+     reply reader found it gives and the next step, so a reply marked
+     `declined` can be checked without searching the page.
 
 A message is sorted by its headers, not by what it says. A reply that asks
 not to be contacted again is therefore recorded as a reply: the reply reader
@@ -81,6 +87,8 @@ FORM_SUBJECT = "[tuuyi.com]"
 UNSUBSCRIBE_TO, UNSUBSCRIBE_SUBJECT = "info@tuuyi.com", "unsubscribe"
 #: Gmail's folder of everything received and sent, archived or not.
 FOLDER = '"[Gmail]/All Mail"'
+#: The headings read_mailbox sorts the mail under.
+FOUND = ("optouts", "replies", "reply_ids", "bounces", "forms", "automatic", "attention")
 
 
 def today() -> str:
@@ -117,12 +125,13 @@ def _address(header: Any) -> str:
 
 
 def _failed_recipient(msg: EmailMessage) -> str:
-    """The address a delivery report says could not be reached, or ''."""
+    """The address a delivery report says could not be delivered to, or ''.
+    A report that delivery is only delayed names none."""
     for part in msg.walk():
         if part.get_content_type() == "message/delivery-status":
             for block in part.get_payload():
                 recipient = str(block.get("Final-Recipient") or "")
-                if recipient:
+                if recipient and str(block.get("Action") or "").strip().lower() == "failed":
                     return recipient.split(";")[-1].strip().lower()
     return _address(msg.get("X-Failed-Recipients"))
 
@@ -152,9 +161,10 @@ def sent_ids() -> Dict[str, str]:
 
 def sort_message(msg: EmailMessage, sent: Dict[str, str]) -> Optional[Dict[str, str]]:
     """What one message is, from its headers: `{kind, ...}` with kind
-    `optout` (and `address`), `form` (and `subject`, `address`), `automatic`
-    (and `subject`, `address`: the sender, or for a delivery failure the
-    address that failed), or `reply` (and `contact`: the id, `text`). None
+    `optout` (and `address`), `form` (and `subject`, `address`), `bounce`
+    (and `subject`, `address`: the address that failed), `automatic` (and
+    `subject`, `address`: the sender), or `reply` (and `contact`: the id,
+    `text`). None
     for mail that is none of these, which includes what the practice sent."""
     sender, subject = _address(msg.get("From")), str(msg.get("Subject") or "").strip()
     if sender in own_addresses():
@@ -167,7 +177,8 @@ def sort_message(msg: EmailMessage, sent: Dict[str, str]) -> Optional[Dict[str, 
     if UNSUBSCRIBE_TO in to and subject.lower() == UNSUBSCRIBE_SUBJECT:
         return {"kind": "optout", "address": sender}
     if msg.get_content_type() == "multipart/report":
-        return {"kind": "automatic", "subject": subject, "address": _failed_recipient(msg) or sender}
+        failed = _failed_recipient(msg)
+        return {"kind": "bounce" if failed else "automatic", "subject": subject, "address": failed or sender}
     if str(msg.get("Auto-Submitted") or "no").strip().lower() != "no":
         return {"kind": "automatic", "subject": subject, "address": sender}
     thread = " ".join(str(msg.get(h) or "") for h in ("In-Reply-To", "References")).split()
@@ -183,8 +194,8 @@ def sort_message(msg: EmailMessage, sent: Dict[str, str]) -> Optional[Dict[str, 
 def read_mailbox(messages: List[EmailMessage], dry: bool) -> Dict[str, List[str]]:
     """Sort each message and record the opt-outs and replies (nothing is
     recorded when `dry`). Returns, per heading of the summary, one line for
-    each message."""
-    out: Dict[str, List[str]] = {"optouts": [], "replies": [], "forms": [], "automatic": [], "attention": []}
+    each message, and under `reply_ids` the contacts whose reply was recorded."""
+    out: Dict[str, List[str]] = {k: [] for k in FOUND}
     sent = sent_ids()
     for msg in messages:
         what = sort_message(msg, sent)
@@ -198,6 +209,14 @@ def read_mailbox(messages: List[EmailMessage], dry: bool) -> Dict[str, List[str]
             if not dry and not contacts.opted_out(person["id"]):
                 contacts.opt_out(person["id"], today())
             out["optouts"].append(f"{person['name']} <{what['address']}>")
+        elif what["kind"] == "bounce":
+            person = contacts.find_by_email(what["address"])
+            if person is None:
+                out["bounces"].append(f"{what['address']} (not the address of any contact; nothing recorded)")
+                continue
+            if not dry:
+                contacts.delivery_failed(person["id"], what["address"], today(), what["subject"])
+            out["bounces"].append(f"{person['name']} <{what['address']}>")
         elif what["kind"] == "form":
             out["forms"].append(f"{what['subject']} <{what['address']}>")
         elif what["kind"] == "automatic":
@@ -211,6 +230,7 @@ def read_mailbox(messages: List[EmailMessage], dry: bool) -> Dict[str, List[str]
                 out["attention"].append(f"{name}, who opted out, wrote again; read it in the mailbox.")
             elif dry or sending.record_reply(what["contact"], what["text"], today()):
                 out["replies"].append(name)
+                out["reply_ids"].append(what["contact"])
     return out
 
 
@@ -288,12 +308,28 @@ def emailed_today() -> int:
 
 # ---- the summary ----------------------------------------------------------------
 
+def reply_line(cid: str) -> str:
+    """One line for a recorded reply: who, what the reply reader found it
+    gives (runner.py replies), and the next step on the entry."""
+    c = contacts.get(cid)
+    read = [n for n in c.get("notes") or [] if str(n.get("title") or "").startswith(contacts.REPLY_READ_NOTE)]
+    if not read:
+        return f"{c['name']}: not read yet; read it on the page"
+    gives = read[-1]["title"].split(": ", 1)[-1]
+    step = str((c.get("entry") or {}).get("next_action") or "")
+    line = f"{c['name']}: {gives}" + (f". Next step: {step}" if step else "")
+    if "declined" in gives.split(", "):
+        line += ". If they asked not to be written to again, press Opted out on the page"
+    return line
+
+
 def summary(found: Dict[str, List[str]], sent: Dict[str, List[str]], problems: List[str], dry: bool) -> Tuple[str, str]:
     """The subject and text of the summary."""
     due = [c["name"] for c in contacts.entries() if contacts.due(c, "Initial sent", today())]
     n_sent = len(sent["sent"]) if dry else emailed_today()
     subject = (f"Tuuyi outreach {today()}: {n_sent} {'to send' if dry else 'sent'}, {len(found['replies'])} replies, "
-               f"{len(found['optouts'])} opt-outs, {len(found['forms'])} from the contact form")
+               f"{len(found['optouts'])} opt-outs, {len(found['bounces'])} not delivered, "
+               f"{len(found['forms'])} from the contact form")
     rows: List[str] = [f"NOT DONE: {p}" for p in problems + sent["failed"]]
     for title, lines in (
             (f"Emails that would be sent: {n_sent}" if dry else
@@ -301,8 +337,11 @@ def summary(found: Dict[str, List[str]], sent: Dict[str, List[str]], problems: L
             (f"Drafts not sent, for you to look at on the page: {len(sent['held'])}", sent["held"]),
             (f"Opt-outs: {len(found['optouts'])}", found["optouts"]),
             (f"Replies: {len(found['replies'])}", found["replies"]),
+            (f"Not delivered, so the address was removed; find another on the page: {len(found['bounces'])}",
+             found["bounces"]),
             (f"Messages from the contact form: {len(found['forms'])}", found["forms"]),
-            (f"Automatic messages (out of office, delivery failures): {len(found['automatic'])}", found["automatic"]),
+            (f"Other automatic messages (out of office, delayed delivery): {len(found['automatic'])}",
+             found["automatic"]),
             (f"Follow-ups due, not sent automatically: {len(due)}", due)):
         rows += ["", title + ("." if not lines else ":")] + [f"  {line}" for line in lines]
     rows += [""] + found["attention"] + ["The page: http://127.0.0.1:8810"]
@@ -321,7 +360,7 @@ def main() -> int:
     if mail.dry_run() and not dry:
         problems.append("SMTP_PASS is not set, so no email could be sent")
     state_file = runner.DATA / "mailbox.json"
-    found = {"optouts": [], "replies": [], "forms": [], "automatic": [], "attention": []}
+    found: Dict[str, List[str]] = {k: [] for k in FOUND}
     try:
         messages, state = new_mail(state_file)
         found = read_mailbox(messages, dry)
@@ -336,6 +375,8 @@ def main() -> int:
         if read.returncode:
             logger.error("runner.py replies failed: %s", read.stderr[-2000:])
             problems.append("the new replies were recorded but could not be read; the next daily run reads them")
+    if not dry:
+        found["replies"] = [reply_line(cid) for cid in found["reply_ids"]]
     sent = send_ready(dry, args.only)
     for k, lines in send_followups(dry, args.only).items():
         sent[k] += [f"follow-up to {line}" for line in lines]

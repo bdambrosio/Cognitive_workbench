@@ -764,6 +764,68 @@ def test_mail_that_arrived_is_recorded_by_what_its_headers_show(tmp_path, monkey
     assert len(store.note_texts(bob, store.REPLY_NOTE)) == 1
 
 
+def _report(failed, action="failed"):
+    """A delivery report as Gmail's mailer-daemon sends one."""
+    import email
+    import email.policy
+    raw = f"""From: Mail Delivery Subsystem <mailer-daemon@googlemail.com>
+To: bruce@tuuyi.com
+Subject: Delivery Status Notification (Failure)
+Auto-Submitted: auto-replied
+MIME-Version: 1.0
+Content-Type: multipart/report; report-type=delivery-status; boundary="b1"
+
+--b1
+Content-Type: text/plain; charset="UTF-8"
+
+Address not found.
+
+--b1
+Content-Type: message/delivery-status
+
+Reporting-MTA: dns; googlemail.com
+
+Final-Recipient: rfc822; {failed}
+Action: {action}
+Status: 5.1.1
+
+--b1--
+"""
+    return email.message_from_string(raw, policy=email.policy.default)
+
+
+def test_an_address_an_email_was_not_delivered_to_gets_nothing_more(tmp_path, monkeypatch, store):
+    # Before 2026-10-19 a bounce was only listed, and the follow-up went to the dead address.
+    after_daily, went = _unattended(tmp_path, monkeypatch)
+    jane = _awaiting(tmp_path, "Jane Smith", "jane@acme.example")
+    bob = _awaiting(tmp_path, "Bob Jones", "bob@acme.example")
+    found = after_daily.read_mailbox([_report("Jane@acme.example"), _report("bob@acme.example", "delayed")],
+                                     dry=False)
+    assert found["bounces"] == ["Jane Smith <jane@acme.example>"]
+    assert store.get(jane)["email"] == "" and store.failed_addresses(jane) == ["jane@acme.example"]
+    assert store.get(bob)["email"] == "bob@acme.example"                         # delayed is not failed
+    assert after_daily.send_followups(dry=False)["sent"] == ["Bob Jones <bob@acme.example>"]
+    assert went == ["bob@acme.example"]
+    # a service that offers the same address again is not believed
+    monkeypatch.setattr(runner, "address_current", lambda *a: pytest.fail("the dead address was checked"))
+    assert runner.record_address(jane, tmp_path / jane, "jane@acme.example", "", "Findymail")["current"] == "no"
+    assert store.get(jane)["email"] == ""
+
+
+def test_the_summary_says_what_each_reply_gives(tmp_path, monkeypatch, store):
+    # A reply listed by name alone sent Bruce searching the page for the one that declined.
+    after_daily, _ = _unattended(tmp_path, monkeypatch)
+    monkeypatch.setenv("MAIL_FROM", "bruce@tuuyi.com")
+    bob = _ready(tmp_path, "Bob Jones", "bob@acme.example", stage="Initial sent")
+    store.create_note(bob, "Message sent 2026-10-01", "Bob, a line.", channel="email", message_id="<first@tuuyi.com>")
+    found = after_daily.read_mailbox([_mail("bob@acme.example", "Re: Tuuyi", "Please take me off your list.",
+                                            In_Reply_To="<first@tuuyi.com>")], dry=False)
+    store.create_note(bob, f"{store.REPLY_READ_NOTE} 2026-10-19: declined", "")   # as runner.py replies writes it
+    store.upsert_entry(bob, {"next_action": "Close the entry"})
+    line = after_daily.reply_line(found["reply_ids"][0])
+    assert line.startswith("Bob Jones: declined. Next step: Close the entry") and "Opted out" in line
+
+
 def test_someone_who_opted_out_is_not_pushed_again_nor_added_again(tmp_path, monkeypatch, store):
     from workflowsv2.outreach import app
     cid = _person("Jane Smith", "Initial sent")
