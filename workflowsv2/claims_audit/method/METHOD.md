@@ -237,7 +237,7 @@ The client's process may hand a claim back to you with the adjudication you gave
 - It is not a general code-quality review.
 - It does not imply anything about claims it did not resolve.
 - It does not provide legal advice.
-- It is not acceptance testing of contracted work. The comparison is similar; this method is for a buyer evaluating a target they do not own.
+- It is not acceptance testing of contracted work. A party evaluating software it did not write, including work delivered under contract, may use the findings as one step in its own decision; the decision remains theirs.
 
 ## 12. Running the audit
 
