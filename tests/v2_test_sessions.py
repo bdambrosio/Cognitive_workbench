@@ -119,7 +119,7 @@ def test_post_session_findings_for_the_evidence_pane(tmp_path):
          "evidence": []}]}
     f = s.findings()
     assert set(f) == {"README.md#20", "README.md#2"}
-    assert f["README.md#20"]["verdict"] == "partial" and f["README.md#20"]["review"] == "holds"
+    assert f["README.md#20"]["verdict"] == "partial" and f["README.md#20"]["review"] == "upheld"
     assert [e["form"] for e in f["README.md#20"]["evidence"]] == ["citation", "search", "derived"]
     assert "extra" not in f["README.md#20"]["evidence"][0]
-    assert f["README.md#2"]["unresolved_because"] == "outside_the_materials" and f["README.md#2"]["review"] is None
+    assert f["README.md#2"]["unresolved_because"] == "the kind of material needed was not supplied" and f["README.md#2"]["review"] is None
