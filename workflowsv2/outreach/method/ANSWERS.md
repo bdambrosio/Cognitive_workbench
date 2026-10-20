@@ -41,8 +41,8 @@ claims were listed and 38 were tested; each of the 38 has a finding with its
 evidence. The buyer's 5 questions and 14 of the 15 standard questions were
 tested too.
 
-Source: the demo review of 2026-10-02 (report scope table and second
-appendix), served at demo.tuuyi.com. Checked 2026-10-02.
+Source: the demo review of 2026-10-14 (report scope table and second
+appendix), served at demo.tuuyi.com. Checked 2026-10-20.
 
 ## Does it only check what the seller claims?
 
@@ -54,7 +54,7 @@ not about what the seller said. In the demo, the buyer asked whether each
 customer's links could be kept separate; the code has no way to do that.
 
 Source: PROSPECT.md §2; site /how-it-works ("Your questions, and the standard
-ones"); the demo review of 2026-10-02. Checked 2026-10-02.
+ones"); the demo review of 2026-10-14. Checked 2026-10-20.
 
 ## Is this a PCI DSS, SOC 2 or GDPR compliance assessment?
 
