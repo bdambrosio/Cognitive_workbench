@@ -134,6 +134,11 @@ def in_report(report: str, f: Dict[str, Any]) -> Dict[str, Any]:
     src, cid = f["claim_source"], f["claim_id"]
     cites = [e for e in f.get("evidence") or [] if isinstance(e, dict) and e.get("form") == "citation"]
     m = re.search(rf"^### {re.escape(src)}, claim {cid} — .*?(?=^### |^## |\Z)", report, re.S | re.M)
+    if not m:
+        # Since 2026-10-14 a section is headed by the claim's statement, and
+        # the source and id are on the line under it: `*<src>, claim N · ...*`.
+        m = re.search(rf"^#{{3,4}} [^\n]*\n\n\*{re.escape(src)}, claim {cid}[ ·*].*?(?=^#|\Z)",
+                      report, re.S | re.M)
     if m:
         sec = m.group(0)
         gap = (f.get("adjudication") or {}).get("gap")
