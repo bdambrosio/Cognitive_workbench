@@ -213,6 +213,11 @@ HUMAN_COUNTERPART = 'User'
 # being paid for on every request in August.
 _DISCOURSE_STATE_MAX_CHARS = 10000
 
+# The notice cap_discourse_state appends, with the blank line before it.
+_PRUNE_NOTICE = re.compile(
+    r"\n*\[\d+ older entries pruned to keep this state under \d+ characters; "
+    r"they are not lost from memory, only from this summary\.\][ \t]*")
+
 
 def cap_discourse_state(text: str,
                         limit: int = _DISCOURSE_STATE_MAX_CHARS) -> str:
@@ -225,6 +230,14 @@ def cap_discourse_state(text: str,
     agreements should say so, or the next reader will treat what remains as
     the whole record.
     """
+    # Earlier passes' notices go first. Only bullets were prunable, so a
+    # notice, once written, was never removed; the reflection pass copied
+    # each one forward, every cap added another, and from 2026-09-08 the
+    # notices alone filled the limit and every agreement was pruned the
+    # moment it was written (User state: 492 notices, 61k characters, no
+    # bullets, by 2026-10-20). The match is on this function's own output.
+    if text and _PRUNE_NOTICE.search(text):
+        text = _PRUNE_NOTICE.sub("", text).rstrip("\n")
     if not text or len(text) <= limit:
         return text
     lines = text.split("\n")

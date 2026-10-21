@@ -51,3 +51,30 @@ def test_nothing_droppable_keeps_headers_rather_than_crashing():
     s = "DISCOURSE STATE (segment 0-1):\n\nCURRENT AGREEMENTS:\n[none]"
     out = cap_discourse_state(s, limit=10)   # limit is unreachable here
     assert out == s
+
+
+def test_earlier_notices_do_not_accumulate():
+    """Regression, 2026-10-20: each cap appended a notice, only bullets were
+    prunable, and the reflection pass carried every notice forward. The User
+    state reached 492 notices and no bullets: every agreement was pruned on
+    arrival. Copied notices must be removed, the result must fit, and the
+    newest agreements must survive."""
+    notice = ("[3 older entries pruned to keep this state under 10000 characters; "
+              "they are not lost from memory, only from this summary.]")
+    head = "DISCOURSE STATE (segment 0-19):\n\nCURRENT AGREEMENTS:\n\nKEY DECISIONS MADE:"
+    s = head + "\n" + "\n".join([notice] * 492) + "\n" + "\n".join(
+        f"- {i:03d} agreement text that is reasonably long" for i in range(30))
+    out = cap_discourse_state(s, limit=10000)
+    assert len(out) <= 10000
+    assert out.count("older entries pruned") <= 1
+    assert "- 029 agreement" in out
+
+
+def test_a_copied_notice_in_a_short_state_is_removed():
+    """Under the limit, a notice carried forward from an earlier cap is
+    still removed: it describes a pruning that no longer applies."""
+    s = ("DISCOURSE STATE (segment 0-1):\n\nCURRENT AGREEMENTS:\n- one\n\n"
+         "[2 older entries pruned to keep this state under 10000 characters; "
+         "they are not lost from memory, only from this summary.]")
+    assert cap_discourse_state(s, limit=10000) == (
+        "DISCOURSE STATE (segment 0-1):\n\nCURRENT AGREEMENTS:\n- one")
