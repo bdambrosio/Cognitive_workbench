@@ -6,6 +6,8 @@ A claim source often says what the software does when it runs: "the assistant an
 
 Left as one claim, the sentence gets one verdict, and a verdict on the mechanism reads as a verdict on the behaviour. This step separates the two before the surface is frozen, so each gets its own verdict.
 
+This step runs only when the materials include records of the software running: test results, logs, monitoring or support records. Without them no behaviour statement can be settled, so the claim is left whole and tested against its mechanism, and the report says once that claims about behaviour in operation were tested against the code.
+
 > Say which of these claims promise conduct in operation, and for each write the mechanism it asserts and the behaviour it asserts, as two statements.
 
 You propose. The practice sees every split on its surface page before the freeze and removes any it does not accept.

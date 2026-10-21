@@ -143,6 +143,9 @@ def load_engagement(name: str, intake: Optional[str] = None) -> Dict[str, Any]:
             "evidence_excludes": state.evidence_excludes(d),
             "brief": brief, "runs": d / "runs",
             "retention": cfg.get("retention"),
+            # Whether the materials include records of the software running
+            # (BEHAVIOUR_SPLIT.md §1). Set by the practice; absent means no.
+            "operation_records": bool(cfg.get("operation_records")),
             "intake_id": intake_id,
             # What the practice knows of the deal, for the materiality stage.
             # Free text, handed over verbatim; may be absent.
@@ -1464,10 +1467,13 @@ def main() -> int:
         # A claim that says what the software does when it runs becomes a
         # mechanism claim and a behaviour claim (BEHAVIOUR_SPLIT.md). Only an
         # enumerated surface: an edited one is the practice's, and the pass
-        # ran when it was enumerated. A section whose call fails keeps its
+        # ran when it was enumerated. Only when the materials include records
+        # of the software running: without them a behaviour claim cannot be
+        # settled (BEHAVIOUR_SPLIT.md §1). A section whose call fails keeps its
         # claims as enumerated, and the run record says so.
         split_record: Dict[str, Any] = {"ran": False, "calls": [], "applied": []}
-        if not error and parts and not args.surface and not args.no_behaviour_split:
+        if (not error and parts and not args.surface and not args.no_behaviour_split
+                and eng["operation_records"]):
             split_record["ran"] = True
             src_lines = src_doc.read_text(encoding="utf-8", errors="replace").splitlines()
             for n, (lo, hi) in enumerate(sections, 1):

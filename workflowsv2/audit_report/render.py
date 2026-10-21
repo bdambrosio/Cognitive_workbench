@@ -738,7 +738,11 @@ def _front_matter(engagement: str, dates: List[str], revs: List[str],
         "settle is reported as unsettled, not as false, and the document "
         "states no overall conclusion on the target or the transaction. An "
         "overall assessment is given only against thresholds the buyer has "
-        "stated; where this document carries none, none was recorded.", "",
+        "stated; where this document carries none, none was recorded. The "
+        "practice did not run the software: a claim about what it does in "
+        "operation is tested against the code that provides for it, unless "
+        "the materials include records of the software running, such as test "
+        "results or logs.", "",
         "**Responsibilities.** The seller made the claims and was not "
         "consulted; the seller has not confirmed the review's reading of any "
         "claim. "

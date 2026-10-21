@@ -300,8 +300,7 @@ answers:
     tier: [1]
     basis: >
       The frozen statement is the mechanism reading of README.md:58 ("Shortens
-      URLs of any length to a randomly generated link"); the behaviour reading
-      is claim 59, shortening-behaviour. Verified: POST /api/new
+      URLs of any length to a randomly generated link"). Verified: POST /api/new
       (backend/src/services/post.rs:29-30) passes the body to add_links_helper;
       a request with no shortlink gets one from gen_link
       (backend/src/services/utils.rs:203-204 and 214-221), which picks a random
@@ -432,104 +431,6 @@ answers:
       "Authentication and access control" (depends) is not defeated. Rated
       against the buyer's stated threshold: "a hardening step the README implies
       is on by default but is not".
-
-  - id: shortening-behaviour
-    selected: sample
-    source: README.md
-    lines: [58, 58]
-    statement: When a URL is submitted to the running service, it returns a randomly generated short link for that URL.
-    verdict: [unverifiable]
-    tier: [1]
-    exposure: [decisive]
-    basis: >
-      Claim 59 is the behaviour half of the split of claim 15, made by the
-      automatic behaviour-split pass (implied_by 15, property "behaviour in
-      operation"). Its statement says what the running service does. METHOD §7:
-      a code path shows that a capability exists, not the behaviour in operation
-      claimed for it; a test file shows that a test is written, not that it
-      passes; where the evidence reaches less than the claim states it does not
-      settle the claim. The materials hold the code
-      (backend/src/services/post.rs:29-39,
-      backend/src/services/utils.rs:203-221), tests
-      (backend/src/tests/insertion.rs) and no record of the software running, so
-      the verdict is unverifiable, unresolved_because outside_the_materials. The
-      code facts belong to shortening-mechanism. Note for the practice: this
-      split fails the second test in BEHAVIOUR_SPLIT.md §3 (once the handler and
-      gen_link are found, nothing is left for a run record to show; the
-      document's own example, "users sign in with their email address", is the
-      same case). The answer scores the frozen surface as it is. If the split is
-      dropped from chhoto-full's surface, drop this answer too: the scorer would
-      otherwise match it to claim 15.
-    tier_basis: >
-      Step 1: the claim describes the running behaviour of shortening and falls
-      under the depends item "Shortening a submitted long URL into a short link"
-      (the buyer said "a small, private link shortener the buyer can run for its
-      customers"); no stated threshold names this kind of failure. Step 4: it
-      could be untrue because the running service returns no short link, returns
-      a link that does not lead to the submitted URL, or returns links that are
-      not randomly generated. Step 5: the first two defeat the core function the
-      buyer is buying, which the reliance statement says staff cannot patch at
-      acceptable cost; predictable links would let outsiders guess links on a
-      service the buyer said is private, and doubt about the effect of that
-      resolves to tier 1. Rated on the buyer's plan as the buyer stated it.
-    rating_basis: >
-      If the claim were false, the running service would not return a short link
-      for a submitted URL; the review found the handler and generator code and
-      tests but "no record of the software running". The reliance item
-      "Shortening a submitted long URL into a short link" (depends) rests on the
-      buyer's own words and states that failure means "the service cannot do the
-      one thing the buyer is buying it for" and is not something staff can patch
-      at acceptable cost, so the buyer would not close. Rated against the
-      buyer's stated threshold: "a small, private link shortener the buyer can
-      run for its customers". Adjudicated: decisive. Read as false, the service
-      does not shorten URLs; §3's definition applies directly, since the buyer
-      would not close on a shortener that does not shorten. No run has rated
-      this exposure, since every run settled the claim.
-
-  - id: redirect-behaviour
-    selected: sample
-    source: README.md
-    lines: [62, 63]
-    statement: When a short URL is visited in a browser, the running service redirects the browser to the correct destination long URL.
-    verdict: [unverifiable]
-    tier: [1]
-    exposure: [decisive]
-    basis: >
-      Claim 61 is the behaviour half of the split of claim 20, made by the
-      automatic behaviour-split pass (implied_by 20, property "behaviour in
-      operation"). Its statement says what the running service does. METHOD §7:
-      a code path shows that a capability exists, not the behaviour in operation
-      claimed for it; a test file shows that a test is written, not that it
-      passes. The materials hold the redirect handler
-      (backend/src/services/get.rs:124-137), tests (backend/src/tests/access.rs)
-      and no record of the software running, so the verdict is unverifiable,
-      unresolved_because outside_the_materials. The code facts belong to
-      redirect-mechanism. As for shortening-behaviour, this split fails the
-      second test in BEHAVIOUR_SPLIT.md §3; the answer scores the frozen surface
-      as it is, and if the split is dropped from the surface this answer goes
-      with it.
-    tier_basis: >
-      Step 1: the claim describes the running behaviour of resolving and falls
-      under the depends item "Resolving a short link by redirecting the visitor
-      straight to the destination" (the buyer said "a small, private link
-      shortener the buyer can run for its customers"); no stated threshold names
-      this kind of failure. Step 4: it could be untrue because the service does
-      not redirect, redirects to the wrong destination, or redirects only for
-      some links or some browsers. Step 5: each way means links the buyer's
-      customers share fail or mislead their visitors, which the reliance
-      statement says the buyer cannot repair, and no other documented path
-      substitutes for the redirect, so the failure is material. Rated on the
-      buyer's plan as the buyer stated it.
-    rating_basis: >
-      If the claim were false, a visited short link would not reach its
-      destination; the review found the redirect handler and tests but "no
-      record of the software running". The reliance item "Resolving a short link
-      by redirecting the visitor straight to the destination" (depends) rests on
-      the buyer's own words and states that failure means "every link the
-      buyer's customers share would fail or mislead", which the buyer cannot
-      repair, so the buyer would not close. Rated against the buyer's stated
-      threshold: "a small, private link shortener the buyer can run for its
-      customers". Adjudicated: decisive, as for shortening-behaviour.
 
   - id: container-image-size
     selected: sample
@@ -1396,10 +1297,9 @@ answers:
     selected: sample
     source: claim_sources/site_index_html.md
     lines: [69, 69]
-    statement: Through that web interface on a running instance, a user can create, edit and manage short URLs.
-    verdict: [unverifiable]
+    statement: A user can create, edit and manage short URLs through the web interface on their own instance.
+    verdict: [real]
     tier: [2]
-    exposure: [not_material]
     basis: >
       A claim that a capability exists, settled by the code path (METHOD section
       7: a code path shows a capability exists, which is the scope this claim
@@ -1422,27 +1322,14 @@ answers:
       in the shipped frontend and backed by a registered route, so the claim
       holds in full (section 6, real). Nothing needs a caveat: the frontend can
       be turned off by CHHOTO_DISABLE_FRONTEND, but that is an operator choice
-      against the default and does not change how the claim is read. Review
-      (changes the verdict from real): claim 31 is the behaviour half of the
-      split of claim 21 (implied_by 21, property 'behaviour in operation'), and
-      its statement says what happens on a running instance. As for
-      shortening-behaviour: METHOD §7, a code path shows a capability, not
-      behaviour in operation; no run record was supplied; unverifiable,
-      outside_the_materials. The code facts above belong to the mechanism claim.
-      This split, too, fails BEHAVIOUR_SPLIT.md §3's second test.
+      against the default and does not change how the claim is read. The
+      materials include no records of the software running, so the claim is
+      left whole and tested against its mechanism (BEHAVIOUR_SPLIT.md §1).
     tier_basis: >
       Tier 2, rated by Claude on 2026-09-26 against TIERS.md §4 (not blind:
       these ten were drawn as the surface's remaining tier-1 claims): the web
       administration interface is an item the buyer uses, not one it depends on;
       the surface has 1.
-    rating_basis: >
-      If the web interface did not let a user create, edit and manage links on a
-      running instance, the buyer's staff would work through the API routes the
-      finding shows registered ("/api/new", "/api/edit", "/api/del/{shortlink}")
-      or patch the plain HTML and JavaScript frontend, which the reliance
-      statement calls a day's repair. The web administration interface is an
-      item the buyer uses, not one it depends on. Rated on the practice's
-      reading of the buyer's plan.
 
   - id: cli-api-key-validation-env
     selected: sample
@@ -1919,30 +1806,27 @@ answers:
       threshold: "a hardening step the README implies is on by default but is
       not".
 
-  - id: short-links-work-in-operation
+  - id: self-hosted-url-shortener
     selected: sample
     source: claim_sources/site_index_html.md
     lines: [1, 1]
-    statement: "When the target runs, short links created on it actually work in operation: a visitor who follows a created short link is sent to its destination."
-    verdict: [unverifiable]
+    statement: Chhoto URL is a self-hosted URL shortener.
+    verdict: [real]
     tier: [1]
-    exposure: [decisive]
     basis: >
-      The statement asks about behaviour in operation. METHOD §7: a code path
-      shows that a capability exists, not the behaviour in operation claimed for
-      it, and a test file shows a test is written, not that it passes. Verified:
-      the redirect code path exists at backend/src/services/get.rs:124-146
-      (`#[get("/{shortlink}")]` link_handler, which on a database hit returns
+      The materials include no records of the software running, so the claim
+      is left whole and tested against its mechanism (BEHAVIOUR_SPLIT.md §1).
+      Verified: shortening is the route backend/src/services/post.rs:29-30
+      '#[post("/api/new")]'; resolving is backend/src/services/get.rs:124-146,
+      `#[get("/{shortlink}")]` link_handler, which on a database hit returns
       `Redirect::to(longlink).permanent()` or a temporary redirect when
-      `use_temp_redirect`), and a test is written at
-      backend/src/tests/access.rs:10-24 (`link_resolution`, asserting
-      `resp.status().is_redirection()` and a `location` header of
-      "https://example-test1.com"). Neither reaches operation. No run record,
-      log, deployment observation or test result is supplied, so the kind of
-      material needed was not supplied at all: unresolved_because
-      outside_the_materials. Searches: lexical for Redirect/redirection over
-      backend/src, structural over services/ and tests/; candidates get.rs and
-      access.rs opened.
+      `use_temp_redirect`. Self-hosted: the operator runs it from the shipped
+      deployment files (deploy/compose.yaml:4-6, deploy/chhoto-url.container,
+      deploy/Containerfile.scratch:4-20), and the links are kept in a bundled
+      SQLite database (backend/Cargo.toml:42, rusqlite with "bundled"), so no
+      outside service is needed. The test at backend/src/tests/access.rs:10-24
+      shows only that a test is written (METHOD §7); the verdict rests on the
+      code path.
     tier_basis: >
       Step 1: no stated threshold names the redirect (what the buyer is "paying
       for" describes the purchase as a whole and is not a threshold), and the
@@ -1953,18 +1837,6 @@ answers:
       buyer's customers share would fail or mislead, no other documented way
       keeps the plan, and repair by the buyer does not count as the plan
       holding. Rated on the buyer's plan as the buyer stated it.
-    rating_basis: >
-      The finding shows the redirect path exists
-      (backend/src/services/get.rs:124-146 returns `Redirect::to(longlink)`) and
-      a test is written (backend/src/tests/access.rs:10-24) but nothing that
-      reaches operation. If the claim were false, every link the buyer's
-      customers share would fail to reach its destination, which the reliance
-      statement records as one of the two core functions the buyer depends on
-      and cannot repair at acceptable cost; the buyer would not close on a link
-      shortener whose links do not resolve. Rated against the buyer's stated
-      threshold: "a small, private link shortener the buyer can run for its
-      customers at low cost, as the README describes it".
-
   - id: configured-through-required-env-vars
     selected: sample
     source: claim_sources/site_index_html.md
