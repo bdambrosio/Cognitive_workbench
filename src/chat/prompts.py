@@ -73,6 +73,17 @@ def _cap_turn(text: str) -> str:
             + f"\n…[turn truncated at {_HISTORY_TURN_MAX_CHARS} chars of "
               f"{len(text)}; use recall to retrieve the rest]")
 
+def _history_stamp(turn: Dict[str, Any]) -> str:
+    """'[YYYY-MM-DD HH:MM] ' from a stored turn's timestamp: local time, as
+    written by the conversation store and as the "Now" line shows it. Empty
+    when the turn has none."""
+    ts = str(turn.get('timestamp') or '')
+    try:
+        return f"[{datetime.fromisoformat(ts):%Y-%m-%d %H:%M}] "
+    except ValueError:
+        return ''
+
+
 _REASONING_HISTORY_FULL = 3          # of those, how many in full vs compressed
 
 # Per-iteration observation cap in the stored trace.
@@ -737,9 +748,11 @@ class PromptsMixin:
             history = history[:-1]
         if history:
             parts.append("## Conversation history (verbatim session turns)")
+            stamps = getattr(self, 'history_timestamps', False)
             for t in history:
                 who = history_entity if t.get('direction') == 'in' else self.character_name
-                parts.append(f"{who}: {_cap_turn(str(t.get('text', '')))}")
+                stamp = _history_stamp(t) if stamps else ''
+                parts.append(f"{stamp}{who}: {_cap_turn(str(t.get('text', '')))}")
             parts.append("")
         # Awareness feed: prior ReAct traces (Jill's own thinking from
         # recent turns) sit between conversation history and current

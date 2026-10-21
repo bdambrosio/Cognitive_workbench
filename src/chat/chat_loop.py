@@ -327,6 +327,14 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # _cap_turn, so this count no longer implies an unbounded prompt.
         self.history_limit = int((character_config.get('chat') or {}).get(
             'history_limit', _DEFAULT_HISTORY_LIMIT))
+        # Off unless a scenario turns them on (jill-chat does): each history
+        # turn carries its local time, and the substrate line names the
+        # sensors and when the record with the user begins. Other scenarios
+        # (the audit and post-delivery ones) keep their prompts unchanged.
+        self.history_timestamps = bool((character_config.get('chat') or {}).get(
+            'history_timestamps', False))
+        self.substrate_setup = bool((character_config.get('chat') or {}).get(
+            'substrate_setup', False))
         # Agent→agent legs allowed in one exchange (see zenoh_io). Six suits
         # a working agent that trades a few messages and moves on; a
         # coordination or improv scenario needs far more, and hitting the
@@ -1120,6 +1128,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             model = ''
         if model:
             parts.append(f"backend model {model}")
+        if getattr(self, 'substrate_setup', False):
+            parts.extend(self._substrate_setup_parts())
         try:
             marker_path.parent.mkdir(parents=True, exist_ok=True)
             atomic_write_json(marker_path, {
@@ -1129,6 +1139,27 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             logger.warning(
                 f"[{self.character_name}] substrate marker write failed: {e}")
         return "; ".join(parts)
+
+    def _substrate_setup_parts(self) -> List[str]:
+        """The sensors this session runs, read from the scenario config, and
+        the date of the first turn with the user, read from the store. Asked
+        about her own setup, she was answering from memory: no mail sensor
+        the day after one was committed, a date for her own history months
+        out (fact-check of 144 replies, 2026-10-20)."""
+        parts = []
+        sensors = [f"{s.get('name')} every {s.get('schedule') or s.get('interval') or '?'}"
+                   for s in (self.config.get('sensors') or []) if s.get('name')]
+        if sensors:
+            parts.append("sensors this session: " + ", ".join(sensors))
+        try:
+            first = self.store.get_recent_turns('User', limit=10 ** 9)[:1]
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] substrate: record start unread: {e}")
+            first = []
+        ts = str((first[0] if first else {}).get('timestamp') or '')[:10]
+        if ts:
+            parts.append(f"my record with User begins {ts}")
+        return parts
 
     @property
     def finish_length_events(self) -> int:

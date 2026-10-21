@@ -65,3 +65,17 @@ def test_worst_case_prompt_is_bounded():
     turns = ['w' * 200_000 for _ in range(20)]
     total = sum(len(_cap_turn(t)) for t in turns)
     assert total < 20 * (_HISTORY_TURN_MAX_CHARS + 200)
+
+
+def test_history_stamp_shows_a_stored_turns_local_time():
+    """jill-chat turns on history_timestamps: each history turn is prefixed
+    with its time, as the conversation store wrote it (naive local
+    isoformat with microseconds), to the minute."""
+    from chat.prompts import _history_stamp
+    assert _history_stamp({'timestamp': '2026-10-20T18:31:07.123456'}) == '[2026-10-20 18:31] '
+
+
+def test_history_stamp_is_empty_without_a_usable_timestamp():
+    from chat.prompts import _history_stamp
+    assert _history_stamp({}) == ''
+    assert _history_stamp({'timestamp': 'not a time'}) == ''
