@@ -1142,7 +1142,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
 
     def _substrate_setup_parts(self) -> List[str]:
         """The sensors this session runs, read from the scenario config, and
-        the date of the first turn with the user, read from the store. Asked
+        the date of the first turn with the user. Asked
         about her own setup, she was answering from memory: no mail sensor
         the day after one was committed, a date for her own history months
         out (fact-check of 144 replies, 2026-10-20)."""
@@ -1151,14 +1151,19 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                    for s in (self.config.get('sensors') or []) if s.get('name')]
         if sensors:
             parts.append("sensors this session: " + ", ".join(sensors))
+        # The first User turn in conversation.txt, which keeps every turn.
+        # The conversation store does not: asked for all of User's turns at
+        # start-up it returned today's, and the line read "begins 2026-10-20"
+        # (2026-10-21, her first turn with this change).
         try:
-            first = self.store.get_recent_turns('User', limit=10 ** 9)[:1]
-        except Exception as e:
+            with (self._memory_dir() / 'conversation.txt').open(encoding='utf-8') as fh:
+                for line in fh:
+                    m = re.match(r'\[(\d{4}-\d\d-\d\d) [\d:]+ UTC\] User (?:->|<-) ', line)
+                    if m:
+                        parts.append(f"my record with User begins {m.group(1)}")
+                        break
+        except OSError as e:
             logger.warning(f"[{self.character_name}] substrate: record start unread: {e}")
-            first = []
-        ts = str((first[0] if first else {}).get('timestamp') or '')[:10]
-        if ts:
-            parts.append(f"my record with User begins {ts}")
         return parts
 
     @property

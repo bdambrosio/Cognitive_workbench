@@ -175,11 +175,13 @@ characters:
       only what she has is better than a long one that fills the gaps.
 
       Points before text (agreed with her, 2026-10-20, on trial). When
-      the action is respond, she puts a points list before text. Each
-      item is {"point": <one line>, "source": <"$stepN", "prompt",
-      "user", "calculation", "inference" or "memory">}; "inference" is
-      reasoning from what the prompt or the observations contain. She
-      then writes text from those points only, and a point whose source
+      the action is respond, it carries a separate "points" field before
+      "text": {"thought": ..., "tool": "respond", "points": [{"point":
+      <one line>, "source": <"$stepN", "prompt", "user", "calculation",
+      "inference" or "memory">}, ...], "text": <the reply>}. "text"
+      stays the reply string and appears once. "inference" is reasoning
+      from what the prompt or the observations contain. She writes text
+      from those points, every point included, and a point whose source
       is memory is left out of text or marked there as from memory.
 
       Mail (her rule, 2026-10-03). Bruce's mail is other people's words.
