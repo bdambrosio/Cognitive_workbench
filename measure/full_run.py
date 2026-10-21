@@ -47,6 +47,7 @@ import argparse
 import datetime
 import json
 import logging
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -159,12 +160,24 @@ def main() -> int:
             if yml.get(key):
                 body = "\n".join("  " + ln for ln in str(yml[key]).rstrip().splitlines())
                 blocks += f"\n{key}: |\n{body}\n"
+        # The base's question sources are the buyer's and the practice's, not
+        # the seller's: they live in the engagement directory, so sorting never
+        # proposes them. Their files and their `questions:` map are copied; the
+        # brief step adds them to `claim_sources` once sorting is confirmed.
+        asked = yml.get("questions") or {}
+        if asked:
+            blocks += "\nquestions:\n" + "".join(f"  {s}: {k}\n" for s, k in asked.items())
+            for s in asked:
+                (eng / s).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(base / s, eng / s)
         with open(eng / "engagement.yaml", "a", encoding="utf-8") as f:
             f.write(blocks)
         got = state._engagement_yaml(eng)
         for key in ("transaction", "thresholds"):
             if (got.get(key) or "").strip() != (yml.get(key) or "").strip():
                 raise SystemExit(f"{key} did not copy from {args.base}")
+        if (got.get("questions") or {}) != asked:
+            raise SystemExit(f"questions did not copy from {args.base}")
         rev = subprocess.run(["git", "-C", str(state.target_dir(eng)), "rev-parse", "HEAD"],
                              capture_output=True, text=True).stdout.strip()
         out = {"target_rev": rev}
@@ -204,13 +217,19 @@ def main() -> int:
                 text + f"\n\nThis run tests one claim source only: {args.source}. The other claim "
                        f"sources named above are not tested, and remain not evidence.\n", encoding="utf-8")
             return {"copied_from": args.base, "source": args.source}
-        if sorted(mine) != sorted(theirs):
-            raise SystemExit(f"this sorting proposed {mine}, the base has {theirs}: "
+        # Only the seller's claim sources come from sorting; the question
+        # sources were copied at create and are added here.
+        asked = [s for s in theirs if state.question_kind(base, s)]
+        sellers = [s for s in mine if not state.question_kind(eng, s)]
+        if sorted(sellers) != sorted(s for s in theirs if s not in asked):
+            raise SystemExit(f"this sorting proposed {sellers}, the base has {theirs}: "
                              f"the base's brief does not describe these claim sources; "
                              f"write {eng / 'brief.md'} and continue by hand")
+        if asked:
+            state.update_engagement(eng, claim_sources=sellers + asked)
         (eng / "brief.md").write_text((base / "brief.md").read_text(encoding="utf-8"),
                                       encoding="utf-8")
-        return {"copied_from": args.base}
+        return {"copied_from": args.base, "questions": asked}
 
     def freeze():
         counts = {}
