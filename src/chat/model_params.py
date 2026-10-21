@@ -100,7 +100,9 @@ MODEL_TEMPERATURE: Dict[str, float] = {
     # DeepSeek-V4.1-Flash on Fireworks (accounts/fireworks/models/
     # deepseek-v4p1-flash). The V4.1 model card (read 2026-09-10) gives
     # temperature 1.0 and top_p 0.95 for its agentic evals. Bruce confirmed
-    # 2026-09-12. `v4p1` does not match the V4 key above.
+    # 2026-09-12. `v4p1` does not match the V4 key above. The key also
+    # matches the 1017 snapshot (deepseek-v4p1-flash-1017); Bruce confirmed
+    # on 2026-10-21 that it covers that snapshot too.
     "deepseek-v4p1-flash": 1.0,
     # Ember-1 on Fireworks (accounts/fireworks/models/ember-1), Fireworks'
     # retraining of Kimi K3 for shorter reasoning. NO PUBLISHER RECOMMENDATION

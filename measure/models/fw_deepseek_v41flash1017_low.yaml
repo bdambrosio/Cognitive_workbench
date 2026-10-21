@@ -1,0 +1,25 @@
+# DeepSeek-V4.1-Flash, snapshot 1017, served by Fireworks directly, added
+# 2026-10-21. Fireworks recommends it in place of the GLM 5.3 Flash US
+# endpoint, which it is retiring; the global GLM endpoint stays.
+#
+# Prescreened 2026-10-21 with the real payload (measure/prescreen.py, direct
+# URL): schema-valid 6/6 across low and medium; low 706-1,847 completion
+# tokens in 5.5-15 s, medium 572-1,281 in 6-11 s; 99-129 tok/s. More tokens
+# per call at low than the September snapshot (251-446), about twice its
+# speed.
+#
+# EFFORT `low`, for gate 3.
+#
+# QUANTIZATION UNKNOWN, as for fw_deepseek_v4flash.yaml.
+#
+# TEMPERATURE resolves through src/chat/model_params.py: the key
+# "deepseek-v4p1-flash" matches this id -> 1.0, the publisher's value; Bruce
+# confirmed on 2026-10-21 that the key covers this snapshot.
+llm_config:
+  server: local
+  model: "accounts/fireworks/models/deepseek-v4p1-flash-1017"
+  vllm_url: https://api.fireworks.ai/inference/v1
+  # NAME of the env var holding the bearer token, not the token.
+  api_key: FIREWORKS_API_KEY
+  is_reasoning_model: true
+  reasoning_effort: low

@@ -41,6 +41,7 @@ numbers are trusted.**
 | `Qwen3.8-27B` (local) | 0.25 | Bruce, 2026-08-24. Key **narrowed** from the bare `Qwen3.8` on 2026-08-26: that spelling also matched `qwen3.8-flash` and `qwen3.8-max`, handing each a temperature nobody chose |
 | `gemma-4-31B` | 0.25 | Bruce, 2026-08-24 |
 | `DeepSeek-V4-Flash` | 1.0 | publisher, for agentic scenarios |
+| `deepseek-v4p1-flash` | 1.0 | publisher (V4.1 model card: agentic evals at 1.0 / top_p 0.95), confirmed by Bruce 2026-09-12. The key also matches the 1017 snapshot `deepseek-v4p1-flash-1017`; Bruce confirmed 2026-10-21 that it covers it. Routes `measure/models/fw_deepseek_v41flash_low.yaml`, `fw_deepseek_v41flash1017_low.yaml` |
 | `ember-1` | 1.0 | Bruce, 2026-09-27. **Fireworks publishes no recommendation** — checked the Ember-1 announcement and model page. Its base model's card (Kimi K3) reports evaluations at 1.0, with top_p 1.0 for agentic tasks; Bruce kept the global top_p 0.95. Route `measure/models/fw_ember1_low.yaml` |
 | `muse-spark-open` | 1.0 | publisher (model card: 1.0, top_p 1.0, top_k off, for all uses), confirmed by Bruce 2026-10-21 with the global top_p 0.95. Route `measure/models/fw_musesparkopen_low.yaml` |
 | `nemotron-3-ultra` | 1.0 | publisher (NVIDIA examples run 1.0 / 0.95) |
