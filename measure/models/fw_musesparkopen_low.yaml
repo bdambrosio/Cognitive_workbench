@@ -1,0 +1,29 @@
+# Muse Spark Open served by Fireworks directly, added 2026-10-21: Meta's
+# open-weights model (816B total / 42B active, 1M context), released
+# 2026-10-15.
+#
+# Prescreened 2026-10-21 with the real payload (measure/prescreen.py, direct
+# URL): schema-valid 4/4; low 313-361 completion tokens in 5-7 s, medium
+# 729-1,197 in 10-17 s; 45-76 tok/s.
+#
+# EFFORT `low`, for gate 3. The model card lists low / medium / high / xhigh
+# (default xhigh) and recommends high or xhigh for agentic tasks.
+#
+# PRICE $1.25 in / $0.15 cached / $4.25 out per M tokens (model page,
+# 2026-10-21).
+#
+# DATA RETENTION: open weights, so Fireworks' documented default applies:
+# zero data retention for open models on serverless. Not confirmed by
+# Fireworks for this model in writing. For paid work the production rule
+# still needs the client's and the seller's agreement to a ZDR cloud service.
+#
+# TEMPERATURE resolves through src/chat/model_params.py ("muse-spark-open" ->
+# 1.0; publisher value, Bruce confirmed 2026-10-21).
+llm_config:
+  server: local
+  model: "accounts/fireworks/models/muse-spark-open"
+  vllm_url: https://api.fireworks.ai/inference/v1
+  # NAME of the env var holding the bearer token, not the token.
+  api_key: FIREWORKS_API_KEY
+  is_reasoning_model: true
+  reasoning_effort: low

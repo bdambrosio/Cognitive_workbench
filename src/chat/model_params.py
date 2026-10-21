@@ -108,6 +108,12 @@ MODEL_TEMPERATURE: Dict[str, float] = {
     # 2026-09-27). Kimi K3's card reports its evaluations at 1.0, top_p 1.0 for
     # agentic tasks. Bruce chose 1.0 with the global top_p 0.95 on 2026-09-27.
     "ember-1": 1.0,
+    # Muse Spark Open on Fireworks (accounts/fireworks/models/muse-spark-open),
+    # Meta's open-weights model of 2026-10-15. Its model card recommends
+    # temperature 1.0, top_p 1.0, top_k off, one setting for all uses (read
+    # 2026-10-21). Bruce confirmed 1.0 with the global top_p 0.95 on
+    # 2026-10-21. The key does not match the closed `muse-spark-1.3`.
+    "muse-spark-open": 1.0,
     "nemotron-3-ultra": 1.0,
     "nemotron-3-super": 1.0,
     # MiniMax publishes 1.0 / top_p 0.95 as general guidance rather than as a
