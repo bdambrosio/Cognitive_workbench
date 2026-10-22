@@ -169,16 +169,56 @@ it is the same family and the defect was a citation convention. Check the
 
 ## Current gate-3 standing
 
-**No model holds a gate-3 result on the current instrument.** Every run was
-withdrawn on 2026-08-27 when METHOD §4 and §16 were amended — report length,
-finding count and the review's surface all move under that change, so nothing
-measured before it compares with anything after. See
-`measure/fixtures/dataroom/RESULTS.md`.
+*Rewritten 2026-10-22. The earlier text said no model held a gate-3 result on
+the current instrument; that was true of the dataroom report instrument, whose
+runs were all withdrawn on 2026-08-27 (`measure/fixtures/dataroom/RESULTS.md`).
+Gate 3 has since been run as a claims-review audit of the doc9 fixture
+(engagement `dataroom-fixture-doc9`), reviewed by GLM-5.3-Flash.*
 
-GLM-5.3-Flash passed gate 3 and a three-run qualification **on the superseded
-instrument**; neither result stands. It has been used since as the reviewer and
-as an auditor without re-screening — a deliberate choice, not an oversight, but
-one to state rather than let a reader infer from an empty board.
+Gate 3 on the doc9 fixture, by model. Each is one run unless stated. Since
+commit 9c26e220 (2026-10-21) the behaviour split runs only when the materials
+include records of the software running, which doc9 does not, so runs before
+and after that date enumerate different numbers of claims and their counts do
+not compare.
+
+| model | effort | result |
+|---|---|---|
+| DeepSeek-V4.1-Flash (September snapshot) | low, medium | passed, three runs at each; then a chhoto audit at low held 53 of 58 |
+| DeepSeek-V4.1-Flash 1017 | low | passed; then a full chhoto run, see the next section |
+| MiMo-V2.6-Flash | medium | passed; a triple was run; dropped from the chhoto comparison for 300 s read timeouts on DeepInfra |
+| Ember-1 | low, medium | passed; three runs at medium all clean; not adopted on price ($3 / $15 per M) |
+| gpt-6-luna | medium | three findings with no evidence; not adopted |
+| gpt-6.1-sol | medium | passed, but 15 of 21 claims unverifiable; used only as the outreach qualifier |
+| Muse Spark Open | low, medium | passed |
+| gemini-3.8-flash | low | failed: actions carried no tool arguments; retired |
+
+GLM-5.3-Flash, the default route, was not put through the gates: it has been
+the auditor and the reviewer throughout, has audited doc9 (2026-09-06 and
+since) as the comparison for the runs above, and is the reviewer in every one
+of them. The full GLM-5.3
+(`measure/models/fw_glm53fast_medium.yaml`) is configured but has not been
+through gate 3.
+
+## Standing for the claims review
+
+The claims review's default route is GLM-5.3-Flash
+(`measure/models/fw_glm53flash.yaml`, `src/client_ui/jobs.py` `MODEL`).
+
+**DeepSeek-V4.1-Flash 1017 is admissible, and is the preferred step up from
+GLM-5.3-Flash**: the route to choose when a run needs more than GLM-5.3-Flash
+gives and the full GLM-5.3 (`measure/models/fw_glm53fast_medium.yaml`) is more
+than it needs. Bruce, 2026-10-22. Route
+`measure/models/fw_deepseek_v41flash1017_low.yaml` (Fireworks,
+`accounts/fireworks/models/deepseek-v4p1-flash-1017`, low effort, temperature
+1.0).
+
+What the decision rests on, 2026-10-21: gates 1 and 2 passed (6 of 6
+schema-valid, 99–129 tok/s); gate 3 on the doc9 fixture at low passed (clean
+output check, six of seven must-finds, 13 of 14 findings held); a full chhoto
+run (`cmp-chhoto-ds1017-low`, 113 min) found 3 of 4 known failures, got 15 of
+21 sampled verdicts right, and enumerated 42 of 47 known claims, the most of
+any model compared. Its wrong verdicts lean harsh. It is slower than
+Muse Spark Open at low and its price is not confirmed.
 
 ## Adding a candidate
 
