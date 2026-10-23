@@ -24,7 +24,7 @@ import smtplib
 import sys
 from email.message import EmailMessage
 from email.utils import make_msgid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("client_ui.mail")
 
@@ -32,8 +32,9 @@ logger = logging.getLogger("client_ui.mail")
 sent: List[Dict[str, Any]] = []
 
 
-def dry_run() -> bool:
-    return bool(os.environ.get("MAIL_DRY_RUN")) or not os.environ.get("SMTP_PASS")
+def dry_run(account: Optional[Tuple[str, str]] = None) -> bool:
+    password = account[1] if account else os.environ.get("SMTP_PASS")
+    return bool(os.environ.get("MAIL_DRY_RUN")) or not password
 
 
 def practice_emails() -> List[str]:
@@ -46,16 +47,19 @@ def site_url() -> str:
 
 
 def send(to: List[str], subject: str, body: str, link: Optional[str] = None,
-         headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+         headers: Optional[Dict[str, str]] = None,
+         account: Optional[Tuple[str, str]] = None) -> Dict[str, Any]:
     """Send one plain-text notice. `link` is appended on its own line;
-    `headers` are added to the message as given. Returns the record kept in
-    `sent`, whose `message_id` is the Message-ID header sent. Never raises on
-    delivery failure: the site's stages do not depend on mail, so a failed
-    notice is logged and the record says so."""
+    `headers` are added to the message as given. `account`, an (address, app
+    password) pair, sends from that Gmail account in place of SMTP_USER,
+    SMTP_PASS and MAIL_FROM. Returns the record kept in `sent`, whose
+    `message_id` is the Message-ID header sent. Never raises on delivery
+    failure: the site's stages do not depend on mail, so a failed notice is
+    logged and the record says so."""
     to = [t for t in to if t]
     text = body.rstrip() + (f"\n\n{link}\n" if link else "\n")
     rec: Dict[str, Any] = {"to": to, "subject": subject, "body": text,
-                           "dry_run": dry_run(), "error": None,
+                           "dry_run": dry_run(account), "error": None,
                            "message_id": make_msgid(domain="tuuyi.com")}
     if not to:
         rec["error"] = "no recipient"
@@ -63,8 +67,9 @@ def send(to: List[str], subject: str, body: str, link: Optional[str] = None,
     elif rec["dry_run"]:
         logger.info("mail (dry run) to %s: %s", ", ".join(to), subject)
     else:
+        user, password = account or (os.environ["SMTP_USER"], os.environ["SMTP_PASS"])
         msg = EmailMessage()
-        msg["From"] = os.environ.get("MAIL_FROM") or os.environ["SMTP_USER"]
+        msg["From"] = user if account else (os.environ.get("MAIL_FROM") or user)
         msg["To"] = ", ".join(to)
         msg["Subject"] = subject
         msg["Message-ID"] = rec["message_id"]
@@ -75,7 +80,7 @@ def send(to: List[str], subject: str, body: str, link: Optional[str] = None,
         port = int(os.environ.get("SMTP_PORT", "465"))
         try:
             with smtplib.SMTP_SSL(host, port, timeout=30) as s:
-                s.login(os.environ["SMTP_USER"], os.environ["SMTP_PASS"])
+                s.login(user, password)
                 s.send_message(msg)
             logger.info("mail to %s: %s", ", ".join(to), subject)
         except Exception as e:                                 # noqa: BLE001

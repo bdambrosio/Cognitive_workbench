@@ -452,6 +452,21 @@ class ToolsMixin:
             "a label you will recognise later; a label still running cannot be reused. At "
             "most three run at once. The result is a tool's output, not your own reasoning: "
             "check it as you would any other observation. Non-terminal — the loop continues."))
+        # The action list (2026-10-22, Bruce's request, agreed with Jill).
+        tools.append(("actions",
+            "`{\"thought\": \"<one terse sentence>\", \"tool\": \"actions\", "
+            "\"op\": \"add\"|\"list\"|\"done\"|\"edit\", ...}` — Bruce's action list, kept "
+            "for him; the tool makes every change, so you never rewrite it. "
+            "`add`: `text` (what to do) and `context` (why it exists: who or what prompted "
+            "it) are required; `due` (any wording), `remind_at` (local time, "
+            "YYYY-MM-DD HH:MM) and `follows` (the id of a done item this reopens) are "
+            "optional; returns the new item's id. `list`: `which` is \"open\" (default) "
+            "or \"all\". `done`: `id`; done is final and cannot be undone. `edit`: `id` "
+            "and any of `text`, `context`, `due`, `remind_at` (an empty value clears `due` "
+            "or `remind_at`); a done item cannot be edited. A `remind_at` fires once at "
+            "that time: Bruce is emailed, and you get a turn to put it on the canvas. "
+            "Nothing repeats; a recurring job belongs in Bruce's schedule. Non-terminal "
+            "— the loop continues."))
         tools.append(("display",
             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"display\", "
             "\"content\": <string|$stepN>, \"format\": \"markdown\"|\"html\"}` — "

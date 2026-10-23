@@ -505,6 +505,11 @@ class PromptsMixin:
         schedule = self._render_schedule_block()
         if schedule:
             parts.append(schedule)
+        # Reminders on her action list, apart from his schedule
+        # (chat/actions.py). Absent when there are none.
+        reminders = self._render_reminders_block()
+        if reminders:
+            parts.append(reminders)
         # Fire digest: pending autonomous fires being surfaced this turn
         # (set at user-turn entry in _process_user_turn; empty on
         # autonomous turns). Absent when empty — prompt stability.

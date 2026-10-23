@@ -960,6 +960,9 @@ characters:
         - check-x-feed
         - check-email
         - check-calendar
+        # Bruce's action list and his Gmail drafts are Jill's (2026-10-22).
+        - actions
+        - draft-email
         - semantic-scholar
 
   # Co-op partner (2026-08-11). A third character so cooperation has two
@@ -1137,6 +1140,9 @@ characters:
         - check-x-feed
         - check-email
         - check-calendar
+        # Bruce's action list and his Gmail drafts are Jill's (2026-10-22).
+        - actions
+        - draft-email
         - obsidian
         # exec-script is NOT omitted (2026-08-21). Jack exists as a
         # near-clone of Jill so that coordination is the only variable

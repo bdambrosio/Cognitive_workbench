@@ -82,6 +82,7 @@ from chat.prompts import (  # noqa: E402,F401
     _ATTRIBUTION_OBS_CAP)
 from chat.disposition import DispositionMixin  # noqa: E402
 from chat.background import BackgroundMixin, HUMAN_SOURCES  # noqa: E402
+from chat.actions import ActionsMixin  # noqa: E402
 from chat.zenoh_io import ZenohMixin, AGENT_HOP_BUDGET  # noqa: E402
 
 
@@ -283,7 +284,7 @@ def is_sensor_source(source: str) -> bool:
 
 class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                ReactMixin, ConcernsMixin, DispositionMixin, ToolsMixin,
-               PromptsMixin, ZenohMixin, BackgroundMixin):
+               PromptsMixin, ZenohMixin, BackgroundMixin, ActionsMixin):
     def __init__(
         self,
         character_name: str,
@@ -2632,6 +2633,10 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # one session guaranteed not to clean up any. Sweeping is
         # housekeeping, not behaviour; only firing is behaviour.
         self._sweep_stale_agent_concerns()
+        # A reminder from her action list is emailed to Bruce whether or not
+        # autonomy is on; her turn on it needs autonomy (chat/actions.py).
+        if self._fire_due_reminder():
+            return
         if not self._autonomy_enabled:
             return
         # An item Bruce scheduled fires at its time, ahead of the concerns;
