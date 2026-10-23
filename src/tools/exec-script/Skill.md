@@ -43,6 +43,15 @@ The script is not reviewed or approved — it is contained.
 - **No network.** `pip install` will not work, and neither will fetching —
   use `fetch-text` / `tavily` / `search-web` for anything off-machine.
 
+## When a scenario narrows the sandbox
+
+A scenario (or a workflow runner) may set `exec_scope`: the paths bound
+read-only, the paths bound writable, and paths masked inside them. Then
+only those paths exist, each at its usual absolute path; cwd is the first
+read path instead of the repo root, and a masked directory is empty. The
+claims-review runs use this to show an auditor or reviewer only the
+materials under review.
+
 ## What you cannot observe from in here
 
 The sandbox has its own empty network and process namespaces. Commands that

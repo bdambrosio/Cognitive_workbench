@@ -11,8 +11,44 @@ from typing import Any, Dict, List, Optional, Tuple
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _SRC_DIR = os.path.dirname(_THIS_DIR)
 _TOOLS_DIR = os.path.join(_SRC_DIR, 'tools')
+_REPO_ROOT = os.path.dirname(_SRC_DIR)
 
 logger = logging.getLogger('chat_loop')
+
+
+def resolve_exec_scope(raw: Any, character_name: str) -> Optional[Dict[str, List[str]]]:
+    """Turn a scenario's `exec_scope` into absolute paths, or None when unset.
+
+    `read` and `write` are bound into exec-script's sandbox, read-only and
+    writable; `mask` hides paths inside them. Relative paths resolve against
+    the repo root. A read path that does not exist stops the run: binding
+    less than the scenario asked for would leave the agent blind, and the
+    scenario is the thing to fix. A write path is created. A mask that does
+    not exist hides nothing and is dropped.
+    """
+    if not raw:
+        return None
+    if not isinstance(raw, dict):
+        raise SystemExit(f"exec_scope must be a mapping with read/write/mask, got {raw!r}")
+
+    def paths(key: str) -> List[str]:
+        out = []
+        for p in raw.get(key) or []:
+            cand = p if os.path.isabs(str(p)) else os.path.join(_REPO_ROOT, str(p))
+            out.append(os.path.realpath(cand))
+        return out
+
+    scope = {"read": paths("read"), "write": paths("write"), "mask": paths("mask")}
+    for p in scope["read"]:
+        if not os.path.exists(p):
+            raise SystemExit(f"exec_scope read path {p} does not exist. Fix the "
+                             f"scenario rather than running with less in view than it names.")
+    for p in scope["write"]:
+        os.makedirs(p, exist_ok=True)
+    scope["mask"] = [p for p in scope["mask"] if os.path.exists(p)]
+    logger.info(f"[{character_name}] exec-script scope: read {scope['read']}, "
+                f"write {scope['write']}, masked {scope['mask']}")
+    return scope
 
 
 class ToolsMixin:
@@ -211,12 +247,19 @@ class ToolsMixin:
                 tool_args[k] = self._resolve_react_value(v, log)
             else:
                 tool_args[k] = v
+        extra: Dict[str, Any] = {}
+        # Only a tool that declares `exec_scope` is handed it (exec-script);
+        # the other tools' entry points do not take it.
+        import inspect as _inspect
+        if "exec_scope" in _inspect.signature(invoke).parameters:
+            extra["exec_scope"] = getattr(self, "_exec_scope", None)
         try:
             result = invoke(
                 tool_args,
                 character_name=self.character_name,
                 backend=self.backend,
                 logger=logger,
+                **extra,
             )
         except Exception as e:
             logger.warning(f"[{self.character_name}] tool {name} raised: {e}")

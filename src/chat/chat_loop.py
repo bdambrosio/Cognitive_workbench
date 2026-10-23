@@ -74,7 +74,7 @@ from chat.concerns import (  # noqa: E402,F401
     _FIRE_OUTCOME_EVIDENCE_CHARS, _FIRE_OUTCOME_JUDGED,
     _agent_concern_growth_for_elapsed, _triage_defer_cooldown_hours,
     _snap_rhythm_hours)
-from chat.tools import ToolsMixin, _TOOLS_DIR as _TOOLS_DIR  # noqa: E402,F401
+from chat.tools import ToolsMixin, _TOOLS_DIR as _TOOLS_DIR, resolve_exec_scope  # noqa: E402,F401
 from chat.prompts import (  # noqa: E402,F401
     PromptsMixin, _REASONING_HISTORY_COLLECTION_NAME,
     _REASONING_HISTORY_RING_SIZE, _REASONING_HISTORY_RECENT,
@@ -543,6 +543,14 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                     f"inspect_repo {yaml_inspect!r} is not a directory "
                     f"(resolved {cand}). Fix the scenario rather than "
                     f"running with the geofence silently wide open.")
+
+        # What exec-script's sandbox can see, set by the scenario or the
+        # workflow runner: the paths bound read-only, the paths bound
+        # writable, and paths hidden inside those. None means the default,
+        # the whole checkout read-only plus the agent's scratch directory.
+        # Not persisted, like inspect_repo: a property of the scenario.
+        self._exec_scope: Optional[Dict[str, List[str]]] = resolve_exec_scope(
+            character_config.get('exec_scope'), self.character_name)
 
         # THE WORKFLOW. The procedure this agent executes — its phases, the
         # vocabulary its output must use, what a finished deliverable is.

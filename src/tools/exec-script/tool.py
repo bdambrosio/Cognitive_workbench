@@ -25,7 +25,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 # infospace_executor was the planner-side runtime; the chat ReAct loop
 # bypasses it. Keep the import optional so this module loads in chat-only
@@ -73,13 +73,44 @@ def _scratch_dir(agent_name):
     return path
 
 
-def _sandbox_argv(script_text: str, scratch: Path):
+def _scope_binds(scope: Dict[str, List[str]]) -> Tuple[List[str], str]:
+    """The bwrap arguments for a scenario's exec_scope, and the cwd.
+
+    Each path is bound at its own absolute path, so a path an agent already
+    knows still resolves. A masked directory becomes an empty read-only
+    tmpfs; a masked file becomes /dev/null. Masks come after every bind, so
+    they apply inside whichever bind holds them.
+    """
+    argv: List[str] = []
+    for p in scope.get("read") or []:
+        argv += ["--ro-bind", p, p]
+    for p in (_SANDBOX_VENV_BIN.parent, _SANDBOX_HF_HOME):
+        if p.is_dir():
+            argv += ["--ro-bind", str(p), str(p)]
+    return argv, (scope.get("read") or [None])[0]
+
+
+def _mask_binds(scope: Dict[str, List[str]]) -> List[str]:
+    argv: List[str] = []
+    for p in scope.get("mask") or []:
+        if os.path.isdir(p):
+            argv += ["--tmpfs", p, "--remount-ro", p]
+        else:
+            argv += ["--ro-bind", "/dev/null", p]
+    return argv
+
+
+def _sandbox_argv(script_text: str, scratch: Path,
+                  scope: Optional[Dict[str, List[str]]] = None):
     """Wrap `bash -c script_text` in bubblewrap.
 
-    --unshare-all covers the network (no exfiltration, no fetching). The
-    repo is bound read-only, so a script can read source and run `git log`
-    but cannot modify the tree — including the tool that contains it. The
-    single read-write bind is `scratch`, layered over the read-only repo.
+    --unshare-all covers the network (no exfiltration, no fetching). With
+    no `scope`, the repo is bound read-only, so a script can read source and
+    run `git log` but cannot modify the tree — including the tool that
+    contains it. The single read-write bind is `scratch`, layered over the
+    read-only repo. With a `scope` (the scenario's exec_scope), only its
+    read paths are bound, its write paths are writable, and its masks hide
+    what they name; scratch stays writable either way.
     """
     argv = ["bwrap", "--unshare-all", "--die-with-parent",
             "--ro-bind", "/usr", "/usr",
@@ -94,11 +125,19 @@ def _sandbox_argv(script_text: str, scratch: Path):
         elif path.is_dir():
             argv += ["--ro-bind", top, top]
     root = str(_PROJECT_ROOT)
-    # Order matters: the read-write scratch bind is applied after the
-    # read-only repo bind so it wins for that subtree.
-    argv += ["--ro-bind", root, root,
-             "--bind", str(scratch), str(scratch),
-             "--chdir", root, "--clearenv"]
+    # Order matters: the read-write binds are applied after the read-only
+    # ones so they win for their subtrees, and the masks after both.
+    if scope is None:
+        argv += ["--ro-bind", root, root,
+                 "--bind", str(scratch), str(scratch),
+                 "--chdir", root, "--clearenv"]
+    else:
+        binds, cwd = _scope_binds(scope)
+        argv += binds + ["--bind", str(scratch), str(scratch)]
+        for p in scope.get("write") or []:
+            argv += ["--bind", p, p]
+        argv += _mask_binds(scope)
+        argv += ["--chdir", cwd or str(scratch), "--clearenv"]
     env = dict(_SANDBOX_ENV)
     if _SANDBOX_VENV_BIN.is_dir():
         env["PATH"] = f"{_SANDBOX_VENV_BIN}:{env['PATH']}"
@@ -121,7 +160,8 @@ def _success(executor: InfospaceExecutor, value: str, extra: Optional[Dict[str, 
     return executor._create_uniform_return("success", value=value, extra=extra)
 
 
-def react_invoke(args, *, character_name=None, backend=None, logger=None):
+def react_invoke(args, *, character_name=None, backend=None, logger=None,
+                 exec_scope=None):
     """ReAct entry-point — see Skill.md for the args contract.
 
     No interactive prompt: the chat loop has no channel to ask the user
@@ -136,7 +176,7 @@ def react_invoke(args, *, character_name=None, backend=None, logger=None):
         return {"status": "error", "text": "exec-script requires non-empty `script`"}
 
     mgr = CapturingResourceManager()
-    result = tool(script, **build_tool_kwargs(
+    result = tool(script, exec_scope=exec_scope, **build_tool_kwargs(
         character_name=character_name, backend=backend, manager=mgr,
         target=script,
     ))
@@ -215,7 +255,8 @@ def tool(input_value=None, runtime=None, **kwargs):
 
     try:
         result = subprocess.run(
-            _sandbox_argv(script_text, _scratch_dir(kwargs.get("agent_name"))),
+            _sandbox_argv(script_text, _scratch_dir(kwargs.get("agent_name")),
+                          kwargs.get("exec_scope")),
             cwd=str(_PROJECT_ROOT),
             capture_output=True,
             text=True,
