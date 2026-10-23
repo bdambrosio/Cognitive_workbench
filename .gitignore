@@ -162,7 +162,9 @@ logs/
 site/media/*.mp4
 
 # Outreach prospect records hold personal data and relationship notes; they stay on this machine.
-workflowsv2/outreach/prospects/
+# Since 2026-10-22 this is a link to ~/claims/prospects. No trailing slash: with one, the
+# pattern matches only a directory, and git would add the link.
+workflowsv2/outreach/prospects
 # Model-comparison and tier-crossing experiment engagements: made by measure/ runs, not client work
 workflowsv2/claims_audit/engagements/cmp-*/
 workflowsv2/claims_audit/engagements/tiercross-*/

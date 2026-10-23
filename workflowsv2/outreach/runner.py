@@ -1205,8 +1205,9 @@ def next_kind(day: Optional[datetime.date] = None) -> str:
     return DAILY_KINDS[(day or datetime.date.today()).toordinal() % len(DAILY_KINDS)]
 
 
-#: How many backups of the records `backup` keeps.
-BACKUPS_KEPT = 14
+#: How many backups of the records `backup` keeps. Two: the disk itself is
+#: backed up daily, so these only cover a bad run since the last disk backup.
+BACKUPS_KEPT = 2
 
 
 def backup(data: Path) -> Path:
