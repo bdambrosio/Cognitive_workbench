@@ -66,6 +66,24 @@ characters:
     # Note exists.
     external_repo: /home/bruce/Downloads/ChatterBot
 
+    # What exec-script's sandbox shows her (src/chat/tools.py
+    # resolve_exec_scope), agreed with her 2026-10-23: the repo read-only,
+    # as before, without client engagement material or the measurement
+    # answer keys, which she has no use for; and src/tools_jill/ writable,
+    # where she writes her own tools.
+    exec_scope:
+      read: ["."]
+      write: [src/tools_jill]
+      mask:
+        - workflowsv2/claims_audit/engagements
+        - measure/known_answers
+        - measure/fixtures/dataroom/answer_key.md
+        - measure/fixtures/excludes/answer_key.json
+    # Tools she writes, discovered after src/tools/ at startup. A new or
+    # changed tool there loads at the next restart, after Bruce has read the
+    # diff (src/tools_jill/README.md).
+    tool_dirs: [src/tools_jill]
+
     # Three parts: who she is, how she engages, how she operates.
     # Deliberately NOT here: state-and-proceed on underspecified
     # requests (companion-model OBSERVED DEFAULTS carries it with
