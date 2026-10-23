@@ -550,7 +550,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # the whole checkout read-only plus the agent's scratch directory.
         # Not persisted, like inspect_repo: a property of the scenario.
         self._exec_scope: Optional[Dict[str, List[str]]] = resolve_exec_scope(
-            character_config.get('exec_scope'), self.character_name)
+            character_config.get('exec_scope'), self.character_name,
+            (self._external_repo, self._inspect_root, self._evidence_excludes))
 
         # THE WORKFLOW. The procedure this agent executes — its phases, the
         # vocabulary its output must use, what a finished deliverable is.

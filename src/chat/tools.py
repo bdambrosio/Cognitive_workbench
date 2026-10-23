@@ -16,7 +16,9 @@ _REPO_ROOT = os.path.dirname(_SRC_DIR)
 logger = logging.getLogger('chat_loop')
 
 
-def resolve_exec_scope(raw: Any, character_name: str) -> Optional[Dict[str, List[str]]]:
+def resolve_exec_scope(raw: Any, character_name: str,
+                       materials: Optional[Tuple[Any, Any, List[str]]] = None
+                       ) -> Optional[Dict[str, List[str]]]:
     """Turn a scenario's `exec_scope` into absolute paths, or None when unset.
 
     `read` and `write` are bound into exec-script's sandbox, read-only and
@@ -25,11 +27,25 @@ def resolve_exec_scope(raw: Any, character_name: str) -> Optional[Dict[str, List
     less than the scenario asked for would leave the agent blind, and the
     scenario is the thing to fix. A write path is created. A mask that does
     not exist hides nothing and is dropped.
+
+    `exec_scope: materials` is the workflow runs' setting: read the bound
+    external repo and the inspect root, and mask the external repo's .git and
+    the evidence excludes. `materials` is (external_repo, inspect_root,
+    evidence_excludes) as the chat loop holds them.
     """
     if not raw:
         return None
+    if raw == "materials":
+        repo, inspect_root, excludes = materials or (None, None, [])
+        if repo is None:
+            raise SystemExit("exec_scope: materials needs an external_repo bound")
+        repo = str(repo)
+        raw = {"read": [repo] + ([str(inspect_root)] if inspect_root else []),
+               "mask": [os.path.join(repo, ".git")]
+                       + [os.path.join(repo, e) for e in excludes or []]}
     if not isinstance(raw, dict):
-        raise SystemExit(f"exec_scope must be a mapping with read/write/mask, got {raw!r}")
+        raise SystemExit(f"exec_scope must be `materials` or a mapping with "
+                         f"read/write/mask, got {raw!r}")
 
     def paths(key: str) -> List[str]:
         out = []

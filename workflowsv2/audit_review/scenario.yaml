@@ -58,6 +58,10 @@ characters:
 
     # Replaced by the runner: the target the audited engagement examined.
     external_repo: /path/to/target
+    # exec-script's sandbox sees only the materials: external_repo and
+    # inspect_repo, with the target's .git and the evidence excludes
+    # masked (src/chat/tools.py resolve_exec_scope).
+    exec_scope: materials
 
     # Replaced by the runner: the audit run directory under review.
     inspect_repo: /path/to/run

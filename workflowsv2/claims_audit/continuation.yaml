@@ -53,6 +53,10 @@ characters:
 
     # Replaced by the launcher: the target the audit examined.
     external_repo: /path/to/target
+    # exec-script's sandbox sees only the materials: external_repo and
+    # inspect_repo, with the target's .git and the evidence excludes
+    # masked (src/chat/tools.py resolve_exec_scope).
+    exec_scope: materials
 
     # Replaced by the launcher: the run directory. Deliberately NOT `audit/`
     # as in an engagement — what this session reads is the record, and

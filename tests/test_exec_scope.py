@@ -70,6 +70,17 @@ def test_masked_paths_inside_the_scope_cannot_be_read(target):
     assert "THE CODE" in out
 
 
+def test_materials_scope_shows_the_target_and_run_and_hides_git_and_excludes(target, tmp_path):
+    run = tmp_path / "run"
+    run.mkdir()
+    (run / "findings.json").write_text("FINDINGS\n")
+    scope = resolve_exec_scope("materials", AGENT, (target, run, ["docs/README.md"]))
+    out = _run(f"cat main.rs; cat {run}/findings.json; cat .git/HEAD; cat docs/README.md; "
+               f"cat {target.parent}/other/key.txt", scope)
+    assert "HISTORY" not in out and "CLAIM SOURCE" not in out and "OTHER ENGAGEMENT" not in out
+    assert "THE CODE" in out and "FINDINGS" in out
+
+
 def test_write_paths_are_writable_and_read_paths_are_not(target, tmp_path):
     tools = tmp_path / "tools_dir"
     scope = resolve_exec_scope({"read": [str(target)], "write": [str(tools)]}, AGENT)
