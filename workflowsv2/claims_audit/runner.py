@@ -1134,8 +1134,18 @@ def _claim_line(c: Dict[str, Any]) -> str:
     claim may sit in another batch. The statement is where the enumeration
     resolves the referent ("The platform (Heroku) provides..."), and it was
     not being handed over (Bruce, 2026-09-02).
+
+    THE ID IS LABELLED. It was rendered `1. [[7, 7]] quote`, and on a claim
+    source of five one-line questions MiniMax-M3.1-Flash read the line span
+    as the id: all its evidence was filed under claims 7-11, claims 1-5 had
+    none, and nothing was adjudicated (cmp-chhoto-mm31-low, 2026-10-23).
     """
-    line = (f"  {c.get('id')}. [{c.get('lines')}] {c.get('quote')}\n"
+    lines = c.get("lines")
+    if isinstance(lines, list) and len(lines) == 2 and all(isinstance(n, int) for n in lines):
+        where = f" (line {lines[0]})" if lines[0] == lines[1] else f" (lines {lines[0]}-{lines[1]})"
+    else:
+        where = f" (lines {lines})" if lines else ""
+    line = (f"  claim {c.get('id')}{where}: {c.get('quote')}\n"
             f"      statement: {c.get('statement')}")
     if c.get("about") == "seller":
         line += "  (about the seller, per METHOD \u00a75)"
