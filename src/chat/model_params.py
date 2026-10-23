@@ -122,6 +122,13 @@ MODEL_TEMPERATURE: Dict[str, float] = {
     # benchmark config. top_p is not recorded here — theirs happens to equal
     # the global, and TOP_P stays a single value with no per-model override.
     "minimax-m3": 1.0,
+    # MiniMax-M3.1-Flash on Fireworks (accounts/fireworks/models/
+    # minimax-m3p1-flash), open weights released 2026-10-20. Its model card
+    # recommends 1.0 / top_p 0.95 without saying for which uses (read
+    # 2026-10-23). Bruce confirmed 1.0 under its own key on 2026-10-23. The
+    # `minimax-m3` key above also matches this id; the resolver accepts the
+    # double match only while both keys hold the same value.
+    "minimax-m3p1-flash": 1.0,
     # NO PUBLISHER RECOMMENDATION EXISTS for this one. The card gives only
     # per-benchmark configurations and they disagree (1.0/0.95 HLE-with-tools,
     # 1.0/1.0 NL2Repo and Terminal-Bench, 0.95/1.0 DeepSWE). Bruce chose the
