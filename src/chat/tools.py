@@ -103,10 +103,14 @@ class ToolsMixin:
         """
         import yaml
         registry: Dict[str, Dict[str, Any]] = {}
-        if not os.path.isdir(_TOOLS_DIR):
-            return registry
-        for entry in sorted(os.listdir(_TOOLS_DIR)):
-            tool_dir = os.path.join(_TOOLS_DIR, entry)
+        entries = []
+        for root in getattr(self, "_tool_dirs", None) or [_TOOLS_DIR]:
+            if not os.path.isdir(root):
+                logger.warning(f"[{self.character_name}] tool directory {root} does not exist")
+                continue
+            entries += [os.path.join(root, e) for e in sorted(os.listdir(root))]
+        for tool_dir in entries:
+            entry = os.path.basename(tool_dir)
             if not os.path.isdir(tool_dir):
                 continue
             skill_path = os.path.join(tool_dir, "SKILL.md")

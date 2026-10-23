@@ -435,6 +435,13 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # `react_invoke`; the catalog and dispatch path read from this
         # registry rather than hardcoded if/elif chains. Adding a tool =
         # dropping a dir under src/tools/ — no chat_loop edit required.
+        # A scenario's `tool_dirs` adds directories scanned after src/tools/
+        # (relative to the repo root), such as one the agent writes her own
+        # tools into. They are read once, here, so a new tool appears after a
+        # restart; src/tools/ wins a name both hold.
+        self._tool_dirs: List[str] = [_TOOLS_DIR] + [
+            d if os.path.isabs(d) else os.path.join(os.path.dirname(_SRC_DIR), d)
+            for d in (str(x) for x in (character_config.get('tool_dirs') or []))]
         self._discovered_tools: Dict[str, Dict[str, Any]] = self._discover_tools()
         self._tool_module_cache: Dict[str, Any] = {}
         if self._discovered_tools:
