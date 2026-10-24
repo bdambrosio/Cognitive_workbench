@@ -177,8 +177,8 @@ measure/temp_sweep/prompts.jsonl
 measure/temp_sweep/mda_paper.txt
 
 # Kept local, never pushed (Bruce, 2026-10-19; the repository is public).
-# Engagement data: every new file under an engagement. Files already tracked
-# stay tracked: the demo server receives them by git pull.
+# Engagement data: every file under an engagement. None is tracked since
+# 2026-10-24; the demo server receives chhoto-full's by rsync.
 workflowsv2/claims_audit/engagements/*/
 # Business research and drafts not yet published.
 reports/
