@@ -778,10 +778,11 @@ def standings(first: Dict[str, Any], second: Dict[str, Any],
 
 BRIEF = """You are reviewing the claims audit in this run directory, per REVIEW.md.
 
-Under `inspect`: the audit's frozen claim surface (`claims.json`), its findings
-(`findings.json`), the statistics the client's process computed
-(`review/statistics.json`), and the auditor's working record. The materials that
-audit examined are under `inspect_external`.
+The audit's frozen claim surface (`claims.json`) and its findings
+(`findings.json`) are given in full at the end of this message, so you do not
+need to read those two files. Under `inspect`: the statistics the client's
+process computed (`review/statistics.json`) and the auditor's working record.
+The materials that audit examined are under `inspect_external`.
 
 Every mechanical property of the output has been checked already, per REVIEW §4.
 Each cited document exists, each line range is inside its file, and each quoted
@@ -796,6 +797,28 @@ say continue, or with `respond` when you have read what you need.
 Do not write the review in a leg. When you stop reading I will ask you for it,
 under the schema in REVIEW §8.
 """
+
+
+def opening_brief(claims_doc: Dict[str, Any], findings_doc: Dict[str, Any]) -> str:
+    """BRIEF with the claim surface and the findings appended.
+
+    A reviewer told to read `findings.json` through `inspect` spent its steps
+    on that file instead of on the materials: `inspect` returns at most 10,000
+    characters a read and stops at 12 steps, and the chhoto README lane's file
+    is 144 KB. MiniMax M3.1 Flash spent 10 of its 16 steps re-reading windows
+    of it and hit max_iters (cmp-chhoto-mm31-low, 2026-10-23). The runner
+    already holds both files, so it hands them over.
+
+    Later legs see this text through the chat loop's history. Its conversation
+    history cuts a turn to 4,000 characters, but the first leg's trace carries
+    it whole while that trace is among the last three rendered in full, which
+    is through leg 4. Of 168 reviews on record, 3 ran past leg 4.
+    """
+    return (BRIEF
+            + "\nThe claim surface (`claims.json`):\n\n"
+            + json.dumps(claims_doc, ensure_ascii=False, indent=1)
+            + "\n\nThe findings (`findings.json`):\n\n"
+            + json.dumps(findings_doc, ensure_ascii=False, indent=1) + "\n")
 
 
 def _write_recall(out: Path, recall: Dict[str, Any]) -> None:
@@ -926,7 +949,7 @@ def main() -> int:
 
     try:
         # ---- part two: the reviewer reads ---------------------------------
-        text, reason = BRIEF, "opening brief"
+        text, reason = opening_brief(claims_doc, findings_doc), "opening brief"
         for i in range(args.max_turns):
             loop._process_user_turn(source=SOURCE, text=text, close=False)
             reply = latest_reply(loop, SOURCE)
