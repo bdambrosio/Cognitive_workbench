@@ -8,6 +8,8 @@ For each finding of a finished claims audit, say whether it changes what a buyer
 
 A finding with a verdict about the claim is rated for **materiality**: what the gap the audit showed would change. A finding the audit could not settle is rated for **exposure**: what it would change if the claim turned out to be false. The two are the same judgement on the same scale, and they are never counted together, because only the first is something the audit showed.
 
+**A gap**, in this document, is what the audit showed against or beside a claim: the caveat of a `real_with_caveat` finding, the part that fails in a `partial` one, or what is so instead in a `contradicted` one, as the finding's `gap` field states it. The fact an observation records is rated as a gap too (§4). An unsettled claim has no gap (§6).
+
 You did not perform the audit and you do not revise it. The findings are settled. Your subject is their consequence for the transaction as the engagement states it.
 
 More is asked of this stage. For each gap the audit showed, say in words the buyer can read on their own what the claim said and what is actually so (§5b), and what change to the target would close the gap and how much of the target that change touches (§5a). And rate the observations the audit recorded without a claim, as gaps it showed (§4).
@@ -42,7 +44,7 @@ Every rated finding carries exactly one value, as `materiality` or as `exposure`
 
 ## 4. What is rated, and how
 
-- `contradicted` and `partial` — rate `materiality` on what the `gap` and the evidence show.
+- `contradicted` and `partial` — rate `materiality` on what the `gap` field and the evidence show.
 - `real_with_caveat` — rate `materiality` on the caveat: what a buyer must know to read the claim correctly.
 - `unverifiable` — rate `exposure`: what it would change for the buyer if the claim were false. The audit showed nothing against this claim; the rating says how much rests on it, and `basis` says so. Do not rate its `materiality`.
 - `real` — not rated. A `real` finding changes nothing a buyer assumed.
@@ -54,7 +56,7 @@ Rate each finding on its own. Do not combine findings, and do not rate a finding
 
 ## 5. `basis`
 
-One to three sentences, starting from the claim (for an observation, from what the review found): what the buyer was told, what the review showed instead, and why that difference does or does not reach the transaction and the buyer's thresholds as stated. Write for the buyer: no file names, code identifiers or library names unless the buyer would know them. Do not restate the gap; the reader has it beside the rating. For `exposure`, say what the buyer would lose if the claim were false.
+One to three sentences, starting from the claim (for an observation, from what the review found): what the buyer was told, what the review showed instead, and why that difference does or does not reach the transaction and the buyer's thresholds as stated. Write for the buyer: no file names, code identifiers or library names unless the buyer would know them. Do not restate the `gap` field; the reader has it beside the rating. For `exposure`, say what the buyer would lose if the claim were false.
 
 **Say what the rating rests on.** The last sentence of `basis` is one of these, exactly:
 
@@ -87,7 +89,7 @@ Judge the band from the gap and the files the evidence cites. Where the evidence
 
 For every finding rated for `materiality`, and every group of observations: one or two sentences the buyer can read on their own, with no other part of the document in front of them. Say what the claim told the buyer and what is actually so. For a `real_with_caveat` finding, say what the caveat is; for `partial`, which part fails; for `contradicted`, what is so instead. For an observation, say what the review found.
 
-Write in words the buyer understands: no file names, code identifiers or library names unless the buyer would know them. State nothing the `gap`, or the observation's note and evidence, does not state. Each finding says who made the statement and whether it rests on knowledge of a library. A statement the buyer or the practice asked is not something the seller said: write "the buyer asked whether…", not "the listing says…". Where the finding rests in part on what a library does, from knowledge of it rather than from the materials, say so in words: "from the library's documented behaviour".
+Write in words the buyer understands: no file names, code identifiers or library names unless the buyer would know them. State nothing the `gap` field, or the observation's note and evidence, does not state. Each finding says who made the statement and whether it rests on knowledge of a library. A statement the buyer or the practice asked is not something the seller said: write "the buyer asked whether…", not "the listing says…". Where the finding rests in part on what a library does, from knowledge of it rather than from the materials, say so in words: "from the library's documented behaviour".
 
 > The listing says backups are kept for 30 days. The backup job as shipped keeps them for 7.
 
@@ -142,16 +144,16 @@ Emit nothing outside the JSON object.
 
 The `in_short` of §5b is what a buyer reads first, and it carries no citation, so each one is checked against what it was written from before it is shown.
 
-**When you are asked to check.** You are given, for each rated gap and each group of observations, the `gap` (or the observations' notes), who made the statement, whether the finding rests on knowledge of a library, and the `in_short` written from them. You did not write the `in_short`. Give each one verdict:
+**When you are asked to check.** You are given, for each rated finding and each group of observations, the text the `in_short` was written from (the finding's `gap` field, or the observations' notes; below, *the source*), who made the statement, whether the finding rests on knowledge of a library, and the `in_short` itself. You did not write the `in_short`. Give each one verdict:
 
 | `verdict` | Meaning |
 |---|---|
-| `holds` | It states nothing the gap does not state |
-| `adds` | It states a fact or a consequence the gap does not |
-| `contradicts` | It states something the gap rules out |
+| `holds` | It states nothing the source does not state |
+| `adds` | It states a fact or a consequence the source does not |
+| `contradicts` | It states something the source rules out |
 | `misattributes` | It says the seller asserted what the buyer or the practice asked, or the reverse |
 | `unmarked_knowledge` | The finding rests on knowledge of a library, and the `in_short` states that behaviour as fact without saying so |
 
-A plain rewording of what the gap says, a simpler word for a technical one, or a detail left out, is `holds`. For any other verdict, quote the words at fault and say why in one sentence.
+A plain rewording of what the source says, a simpler word for a technical one, or a detail left out, is `holds`. For any other verdict, quote the words at fault and say why in one sentence.
 
 **When you are asked to write again.** You are given the same, with the check's verdict and reason. Write the `in_short` again per §5b, without what the check found.

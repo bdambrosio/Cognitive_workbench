@@ -38,13 +38,13 @@ A claim is an assertion the seller makes to the buyer in the designated claim so
 
 **An assertion about the seller rather than the target is still a claim**, enumerated with `about` set to `seller`, per §5.
 
-**A question source is a claim source the practice wrote.** It states, one per line, what the target is expected to have: statements the buyer asked to have tested, or that the practice tests on every engagement. Each line is one claim, already enumerated and frozen, and is marked as asked by the buyer or the practice. Adjudicate it as a seller's claim about the target, under the same verdicts and evidence rules. The seller did not make it: write a gap as what the target lacks, not as something the seller said.
+**A question source is a claim source the practice wrote.** It states, one per line, what the target is expected to have: statements the buyer asked to have tested, or that the practice tests on every engagement. Each line is one claim, already enumerated and frozen, and is marked as asked by the buyer or the practice. Adjudicate it as a seller's claim about the target, under the same verdicts and evidence rules. The seller did not make it: write the `gap` field as what the target lacks, not as something the seller said.
 
 Other supplied documents are not claim sources for this run, even when they assert something; §7 says which of them are evidence.
 
 Business claims are in scope as well as technical ones. Revenue, customer counts, contracts and external dependencies are evaluated the same way as backups, uptime, architecture or test coverage.
 
-The audit does not recommend how the target should be built or how the transaction should be structured. It reports the state of each claim and the consequence of any gap.
+The audit does not recommend how the target should be built or how the transaction should be structured. It reports the state of each claim: what it asserts, what the evidence shows, and where the two differ.
 
 ## 3. Scope varies by target; the method does not
 
@@ -62,7 +62,7 @@ Four terms, and they nest:
 
 - **claim** — one seller assertion, or one statement of a question source (§2), that can be evaluated as true or false, enumerated and frozen in §5.
 - **verdict** — the classification assigned after comparing the claim with the evidence, from §6.
-- **adjudication** — the verdict, together with the `gap` or `unresolved_because` field that verdict requires, per §13.
+- **adjudication** — the verdict, together with the field that verdict requires, per §13: for `real_with_caveat`, `partial` and `contradicted`, the `gap` field, which states the caveat, the part of the claim that fails, or the contradiction; for `unverifiable`, the `unresolved_because` field, called the **disposition**, which records what the searches established, per §8.
 - **finding** — one output record: the `claim_id` of a frozen claim, its adjudication, and the evidence used.
 
 Every frozen claim produces exactly one finding, and every finding adjudicates exactly one claim. A claim carries one verdict, so two findings on one claim are either redundant or in conflict.
@@ -71,7 +71,7 @@ Every frozen claim produces exactly one finding, and every finding adjudicates e
 
 Where one piece of evidence settles several claims, write a finding for each and cite that evidence in each. Do not join claims into one finding to avoid repeating a citation.
 
-**Attempt every claim.** You may not skip one because it looks unimportant — the significance of a gap is not known until the claim is tested.
+**Attempt every claim.** You may not skip one because it looks unimportant — whether it holds, and whether that matters, is not known until the claim is tested.
 
 If you cannot attempt every claim you were given, say so in `not_completed`, give the reason, and emit an empty list for the phase you are in. The client's process carries that into the run, and a run with any claim not attempted does not produce an audit. Do not mark the claims you did not reach as `unverifiable`: that verdict states that the materials cannot settle a claim, and what is true here is that the claim was never attempted.
 
@@ -124,9 +124,9 @@ Every finding carries exactly one.
 | `contradicted` | The subject does not have the property the claim asserts, or has its opposite: the thing does not exist, the boundary is crossed, a default that is not a number is otherwise, the provenance is different |
 | `unverifiable` | The claim was attempted and the supplied materials cannot settle it |
 
-**`partial` is a difference of extent; `contradicted` is a difference of kind.** A claim asserts one property, per §5. Ask whether the subject has that property at all. Where it does, and the evidence shows a different measure or a missing member — retention claimed at 30 days and configured at 7; six subcommands claimed and five registered — the verdict is `partial`, and `gap` states the difference. Where it does not — no retention configured at all; a boundary the claim draws and the evidence crosses; a database other than the one named — the verdict is `contradicted`. A default stated as a number is a quantity. A quantity that differs is `partial` whatever the size of the difference: `gap` records the size, and whether it matters is judged later, per the last rule of this section.
+**`partial` is a difference of extent; `contradicted` is a difference of kind.** A claim asserts one property, per §5. Ask whether the subject has that property at all. Where it does, and the evidence shows a different measure or a missing member — retention claimed at 30 days and configured at 7; six subcommands claimed and five registered — the verdict is `partial`, and the `gap` field states the difference. Where it does not — no retention configured at all; a boundary the claim draws and the evidence crosses; a database other than the one named — the verdict is `contradicted`. A default stated as a number is a quantity. A quantity that differs is `partial` whatever the size of the difference: the `gap` field records the size, and whether it matters is judged in a later stage, not here.
 
-**A gap must be citable, not merely unfound.** `partial` and `contradicted` require evidence you can point at showing the gap. Evidence you looked for and did not find is not a gap: for a claim that something exists, that is `unverifiable`, and §8 governs it. For a claim that names several things, where some are found and the rest are neither found nor shown absent, the claim is `unverifiable`, and the citations record what was found.
+**What fails must be cited, not merely unfound.** `partial` and `contradicted` require a citation showing the part of the claim that does not hold. Material you looked for and did not find is not such a citation: for a claim that something exists, that is `unverifiable`, and §8 governs it. For a claim that names several things, where some are found and the rest are neither found nor shown absent, the claim is `unverifiable`, and the citations record what was found.
 
 **Choosing between `partial` and `real_with_caveat`.** Ask whether you can cite a part of the claim — a measure, or one of the things it names — that the evidence shows is not as claimed. If you can, the verdict is `partial`. If every part holds and there is still something to say, it is `real_with_caveat`.
 
@@ -142,7 +142,7 @@ Every finding carries exactly one.
 >
 > "Never the message", the boundary claim §5 splits from "only the message count is stored", against a debug middleware that writes each message body to the log. The thing excluded is found, and the log line can be cited. `contradicted`. The claim that the count is stored is a separate claim, settled by the counter column.
 
-**Do not judge whether a gap matters to the buyer.** That judgement depends on the transaction and on what every other claim source shows, and a later stage makes it. Record what the claim says, what the evidence shows, and the difference.
+**Do not judge whether a difference between the claim and the evidence matters to the buyer.** That judgement depends on the transaction and on what every other claim source shows, and a later stage makes it. Record what the claim says, what the evidence shows, and the difference.
 
 ## 7. Evidence
 
@@ -171,7 +171,7 @@ Derive only from facts supplied in the materials; do not import market forecasts
 - **`kind`** — `lexical` or `structural`;
 - **`performed`** — what you actually searched;
 - **`result`** — what came back;
-- **`candidates`** — every file the search found where material that could settle the claim would appear, each by its path from the target root. An empty list when the search found none. A file listed here and not opened makes the claim `not_examined`, per §8.
+- **`candidates`** — every file the search found where material that could settle the claim would appear, each by its path from the target root. An empty list when the search found none. A file listed here and not opened makes the verdict `unverifiable` with the disposition `not_examined`, unless a citation settles the claim, per §8.
 
 **For numbers and dates, quote the source line.** A summary produced by a tool is useful for navigation and is not sufficient evidence for an exact quantitative claim.
 
@@ -200,7 +200,7 @@ Two are required, and they are complementary:
 
 For each, state what you actually searched, what came back, and in `candidates` the files it found where the material would appear. A search shows what the materials hold where you looked and nothing about where you did not, which is why both kinds are required and every candidate is opened.
 
-**Every candidate is opened before a claim resting on searches gets its verdict.** A file the searches named and nobody read does not show that the thing is absent, or that the materials cannot settle the claim; it shows that the engagement has not looked. *Opened* means a read of the file was requested and what came back is in the evidence requests: its contents, or the failure to read them. A candidate that was opened and could not be read — a binary, a compiled archive, a truncated or encrypted file — settles nothing, and where no other evidence settles the claim, the disposition — the `unresolved_because` field, from the table below — is `present_but_not_readable`. If a candidate of any search on the claim was not opened, and no citation settles the claim, the verdict is `unverifiable` with the disposition `not_examined`; the client's process then asks you to open those files and to adjudicate the claim again, per §10. The other three dispositions are recorded only when every candidate has been opened. `not_examined` requires a named file: where the searches named no file, one of the other three applies.
+**Every candidate is opened before a claim resting on searches gets its verdict.** A file the searches named and nobody read does not show that the thing is absent, or that the materials cannot settle the claim; it shows that the engagement has not looked. *Opened* means a read of the file was requested and what came back is in the evidence requests: its contents, or the failure to read them. A candidate that was opened and could not be read — a binary, a compiled archive, a truncated or encrypted file — settles nothing, and where no other evidence settles the claim, the disposition (§4), from the table below, is `present_but_not_readable`. If a candidate of any search on the claim was not opened, and no citation settles the claim, the verdict is `unverifiable` with the disposition `not_examined`; the client's process then asks you to open those files and to adjudicate the claim again, per §10. The other three dispositions are recorded only when every candidate has been opened. `not_examined` requires a named file: where the searches named no file, one of the other three applies.
 
 **A claim of absence.** "No telemetry", "only the count is stored", "never writes to disk". The two searches are its evidence, made over every place the excluded thing could occur: the code path the claim concerns, and the paths around it that could do the same thing another way — handlers, middleware, logging, configuration, dependencies. A citation showing the mechanism the seller names — a schema without the column, a handler that records only the count — shows what that mechanism does and by itself settles nothing about the rest. Where the searches find the thing active as shipped, per §2, the verdict is `contradicted`, per §6, citing what was found; where they find it only behind a setting the shipped configuration leaves off, it is a caveat, per §2. Where both searches were made, every candidate opened and nothing found, the verdict is `real`, with the searches as its evidence. `unverifiable` is for the case where the places the thing could live were not supplied: the deployment that would show a logging sidecar, the configuration that would show an outbound endpoint.
 
@@ -219,7 +219,7 @@ For a claim that something exists, searches that find nothing settle nothing, an
 
 The materials may show something relevant that the seller never asserted. It is not a finding — there is no claim for it to adjudicate — and it is not discarded. Record it as an unclaimed observation with a short note saying what it shows.
 
-**This is the only thing an unclaimed observation is.** It is not a place for an assertion the frozen surface missed: §5 freezes the surface, and nothing adds to it afterwards by any route. Nor is it a place to say again what a finding already says: material that bears on a frozen claim belongs in that claim's finding, as its evidence or its `gap`, and is not recorded here as well.
+**This is the only thing an unclaimed observation is.** It is not a place for an assertion the frozen surface missed: §5 freezes the surface, and nothing adds to it afterwards by any route. Nor is it a place to say again what a finding already says: material that bears on a frozen claim belongs in that claim's finding, as its evidence or in its `gap` field, and is not recorded here as well.
 
 What the observation rests on is written as one §7 evidence item: a `citation` where a single place shows it, or a `derived` item where it follows from two or more facts and no single quote holds it.
 
@@ -286,7 +286,7 @@ Two kinds of JSON object, one per phase. Phase one is emitted once per section o
 | `findings[]` | One per frozen claim, per §4 |
 | `findings[].claim_id` | The `id` of the frozen claim this finding adjudicates |
 | `findings[].adjudication.verdict` | One value from §6 |
-| `findings[].adjudication.gap` | What the verdict rests on: the caveat a reader needs, the part of the assertion that fails, or the contradiction. Required for `real_with_caveat`, `partial` and `contradicted`. Absent for `real`, which has nothing beside it, and for `unverifiable`, which uses the field below. **Where there is no gap, leave the field out.** Do not write "None" — an absent field is how the output says there is nothing, and the word is a value like any other. Why a claim holds belongs in its evidence, under a citation's `shows` or a search's `result` |
+| `findings[].adjudication.gap` | The caveat a reader needs (`real_with_caveat`), the part of the assertion that fails (`partial`), or the contradiction (`contradicted`). Required for those three verdicts. Absent for `real`, which has no caveat and nothing that fails, and for `unverifiable`, which uses the field below. **For those two verdicts, leave the field out.** Do not write "None" — an absent field is how the output says there is nothing, and the word is a value like any other. Why a claim holds belongs in its evidence, under a citation's `shows` or a search's `result` |
 | `findings[].adjudication.unresolved_because` | Per §8, required when the verdict is `unverifiable` |
 | `findings[].evidence[]` | One list, each item declaring its `form` — per §7 |
 | `findings[].correction` | Per §10, where a finding changed |
