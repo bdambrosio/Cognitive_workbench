@@ -1,3 +1,6 @@
+# INADMISSIBLE 2026-10-24 (Bruce): see docs/model-prescreen.md. Kept as a record;
+# model_params.RETIRED makes a run naming this model fail with the reason.
+#
 # MiniMax-M3.1-Flash served by Fireworks directly, added 2026-10-23: open
 # weights (about 428B total / 23B active, 1M context), released 2026-10-20.
 #

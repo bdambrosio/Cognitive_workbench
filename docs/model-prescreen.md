@@ -161,6 +161,19 @@ on DeepInfra, and this model is slower. Bruce ruled it inadmissible; no
 temperature was requested and none is configured. Re-screen if a faster host
 serves it.
 
+**Inadmissible on the chhoto chain — `MiniMax-M3.1-Flash`, 2026-10-24.**
+Fireworks, `accounts/fireworks/models/minimax-m3p1-flash`. Gates 1 and 2
+passed (7 of 7 schema-valid, 123–163 tok/s) and gate 3 on doc9 at low passed
+(14 of 15 findings held). On the full chhoto run, three of six chains failed,
+each at a different stage: a review that hit its step limit, a buyer-questions
+lane that filed no evidence request, and, at medium, a materiality rating
+written under a claim id that does not exist, which the ratings check blocked.
+The three that completed (all at low) scored about the same as GLM-5.3-Flash on
+sampled verdicts (17/18, 20/23, 20/21 against 20/22) and worse on tiers;
+medium was harsher than low (21 of 31 right, 8 too harsh). Bruce ruled it
+inadmissible; recorded in `model_params.RETIRED`, routes in
+`measure/retired_models/`.
+
 **Watch item, open.** `Qwen3.8-27B` is on record as unusable for this METHOD —
 two of three runs inadmissible, from citing claim ordinals rather than line
 numbers. `qwen/qwen3.8-flash` is a different model, so it does not transfer, but
@@ -190,6 +203,7 @@ not compare.
 | gpt-6-luna | medium | three findings with no evidence; not adopted |
 | gpt-6.1-sol | medium | passed, but 15 of 21 claims unverifiable; used only as the outreach qualifier |
 | Muse Spark Open | low, medium | passed |
+| MiniMax-M3.1-Flash | low | passed; then inadmissible on the chhoto chain, see above |
 | gemini-3.8-flash | low | failed: actions carried no tool arguments; retired |
 
 GLM-5.3-Flash, the default route, was not put through the gates: it has been
