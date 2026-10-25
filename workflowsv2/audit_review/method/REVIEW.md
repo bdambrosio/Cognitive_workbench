@@ -24,21 +24,17 @@ The audit's own method states what this review adds. METHOD §7: *"This check co
 
 ## 3. What you have
 
+Each request gives you what that part of the review needs. You do not open files.
+
 **The claim surface** — `claims.json`. Every claim the audit froze, each with an `id`, the seller's assertion `quote`d verbatim, the `lines` it sits on, the auditor's `statement` of it, whom it is `about`, and any further `locations` where the claim source makes the same assertion again.
 
 **The findings** — `findings.json`. One finding per frozen claim, each naming its claim by `claim_id`, carrying an `adjudication` and the `evidence` it rests on. The adjudication holds the `verdict` and, for `real_with_caveat`, `partial` and `contradicted`, the `gap` field: the auditor's statement of the caveat, the part of the claim that fails, or the contradiction (METHOD §13). The `gap` field is the auditor's assertion, like a citation's `shows`. It is not evidence, and §5 checks it against the cited material.
 
 **The statistics** — `review/statistics.json`, computed by the client's process before you start: counts of claims, findings, verdicts and evidence, and the result of every mechanical citation check. §7 says how to read them and §4 says what they have already settled.
 
-**The materials** — the target itself, under `inspect_external`. The same tree the auditor read.
+**The cited material** — for every citation in a finding, the lines it names and the lines around them, placed under the finding. A citation that does not resolve is marked so there, with the reason. This is the material you judge each finding against.
 
-**The cited material** — for every citation in a finding, the lines it names and the lines around them, placed under the finding by the client's process when it asks for your review. A citation that does not resolve is marked so there, with the reason.
-
-**The method the audit worked to** — `working_record/method_as_delivered.md`, the text that engagement actually received. Use this file, not any current version: you are checking whether the audit followed the method it was given.
-
-**The working record** — the auditor's reasoning trace and one file per evidence request.
-
-**Read the findings and the materials first, and the working record last.** A reviewer who reads the auditor's log first adopts its framing, and then checks whether the reasoning was followed rather than whether the conclusion is supported.
+**The method the audit worked to** — the text that engagement actually received, given after this document in every request. Where this document cites a section of METHOD, it means that text. Use it, not any current version: you are checking whether the audit followed the method it was given.
 
 ## 4. What is already settled before you start
 
@@ -46,7 +42,7 @@ The client's process has checked every mechanical property of the output and wil
 
 **So a citation that does not resolve is not an exception you raise.** The statistics already record it. Your subject is the citations that do resolve, where the only remaining question is what they mean.
 
-**The statistics are an index over the materials, and the materials are authoritative.** Where a figure and the document disagree, open the document. An index that resolves a name to the wrong file marks a sound reference broken, and the reverse.
+**The statistics are an index over the materials, and the cited material is authoritative.** Where a figure and the cited material shown under a finding disagree, judge from the cited material. An index that resolves a name to the wrong file marks a sound reference broken, and the reverse.
 
 ## 5. What to check
 

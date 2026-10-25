@@ -5,16 +5,25 @@
     python3 workflowsv2/audit_review/runner.py --run <dir> \
             --model measure/models/grok_4p6.yaml
 
-A review has three parts, in this order:
+A review has two parts, in this order:
 
   1. STATISTICS. Every mechanical property of the audit's output, recomputed
      here from `claims.json`, `findings.json` and the materials. Written to
-     `review/statistics.json` for the reviewer to read.
-  2. GATHER. The reviewer opens the documents it needs, for as long as it
-     keeps yielding.
-  3. EMIT. Schema-constrained calls producing the observations REVIEW.md §6
-     defines. The outcome — whether each finding holds — is derived from those
-     observations here, not written by the reviewer.
+     `review/statistics.json`.
+  2. EMIT. Schema-constrained calls producing the observations REVIEW.md §6
+     defines, each given what it needs: the statistics, the claims, the
+     findings with their cited material. The outcome — whether each finding
+     holds — is derived from those observations here, not written by the
+     reviewer.
+
+NO READING PHASE (removed 2026-10-24, Bruce). Until then the reviewer first
+read the run and the materials in ReAct legs. Nothing it read reached the
+emission, which is two messages with no history, so the legs only cost time
+(13 of 15.5 minutes on one lane) and failed reviews that hit max_iters.
+
+THE SYSTEM TEXT of every call is REVIEW.md followed by the METHOD the audit
+actually received (`working_record/method_as_delivered.md`), because REVIEW's
+checks are stated against METHOD's sections (`review_method`).
 
 Then the retest: the adverse observations that qualify, plus a sample of
 findings that hold, given to a second reviewer that has not seen the first.
@@ -65,15 +74,28 @@ from workflowsv2 import issues                                 # noqa: E402
 from workflowsv2.audit_review import schemas                   # noqa: E402
 from workflowsv2.emit import emit, run_tasks, set_parallel     # noqa: E402
 from workflowsv2.claims_audit import schemas as audit_schemas  # noqa: E402
-from workflowsv2.turns import last_exit_reason, latest_reply   # noqa: E402
 
 SCENARIO = HERE / "scenario.yaml"
 REVIEW_PATH = "workflowsv2/audit_review/method/REVIEW.md"
-SOURCE = "User"
-CONTINUE = "continue"
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger("audit_review.run")
+
+
+def review_method(run: Path) -> str:
+    """REVIEW.md, then the METHOD this audit received, as one system text.
+
+    REVIEW sends the reviewer to METHOD §6, §7 and §8 for its checks, and §3
+    promises the text the engagement actually received. A run without that
+    file stops the review rather than letting it judge against a paraphrase.
+    """
+    delivered = run / "working_record" / "method_as_delivered.md"
+    if not delivered.is_file():
+        raise SystemExit(f"{run}: no working_record/method_as_delivered.md — "
+                         f"the review needs the METHOD the audit received")
+    return (load_workflow(REPO / REVIEW_PATH)
+            + "\n\n# The method the audit worked to (METHOD, as delivered)\n\n"
+            + delivered.read_text(encoding="utf-8"))
 logger.setLevel(logging.INFO)
 
 
@@ -310,7 +332,7 @@ def _cited_materials(f: Dict[str, Any], docs: Dict[str, List[str]],
     """The lines each citation of one finding points at, with context.
 
     WHY THE EMISSION NEEDS THIS. `emit` is a two-message call with no tools
-    and no history: nothing the reviewer opened in its reading legs reaches it.
+    and no history, and the reviewer opens nothing itself.
     Without this, REVIEW.md §5 checks 2 and 3 were judged from the auditor's
     own `quote` and `shows`, and both v2 reviews on 2026-09-01 passed every
     finding — including two whose quote appears nowhere in the document cited.
@@ -683,7 +705,7 @@ def retest(run: Path, world: str, model_path: Optional[Path], target: Path,
     from chat.chat_loop import ChatLoop                        # noqa: E402
     name, cfg = build_config(run, world, model_path, target)
     loop = ChatLoop(character_name=name, character_config=cfg)
-    method_text = load_workflow(REPO / REVIEW_PATH)
+    method_text = review_method(run)
     out: Dict[str, Any] = {"ran": True, "world": world,
                            "resolved_model": loop.backend.resolved_model(),
                            "results": {}}
@@ -776,51 +798,6 @@ def standings(first: Dict[str, Any], second: Dict[str, Any],
                   round(dis_s / (agree_s + dis_s), 2) if (agree_s + dis_s) else None}}
 
 
-BRIEF = """You are reviewing the claims audit in this run directory, per REVIEW.md.
-
-The audit's frozen claim surface (`claims.json`) and its findings
-(`findings.json`) are given in full at the end of this message, so you do not
-need to read those two files. Under `inspect`: the statistics the client's
-process computed (`review/statistics.json`) and the auditor's working record.
-The materials that audit examined are under `inspect_external`.
-
-Every mechanical property of the output has been checked already, per REVIEW §4.
-Each cited document exists, each line range is inside its file, and each quoted
-span was found at the lines it names. Do not re-check those; the statistics
-record what they found. Your subject is the citations that do resolve, where
-the only remaining question is what they mean.
-
-Read the findings and the materials now, and the working record last, per
-REVIEW §3. Work in as many legs as you need: end a leg with `yield` and I will
-say continue, or with `respond` when you have read what you need.
-
-Do not write the review in a leg. When you stop reading I will ask you for it,
-under the schema in REVIEW §8.
-"""
-
-
-def opening_brief(claims_doc: Dict[str, Any], findings_doc: Dict[str, Any]) -> str:
-    """BRIEF with the claim surface and the findings appended.
-
-    A reviewer told to read `findings.json` through `inspect` spent its steps
-    on that file instead of on the materials: `inspect` returns at most 10,000
-    characters a read and stops at 12 steps, and the chhoto README lane's file
-    is 144 KB. MiniMax M3.1 Flash spent 10 of its 16 steps re-reading windows
-    of it and hit max_iters (cmp-chhoto-mm31-low, 2026-10-23). The runner
-    already holds both files, so it hands them over.
-
-    Later legs see this text through the chat loop's history. Its conversation
-    history cuts a turn to 4,000 characters, but the first leg's trace carries
-    it whole while that trace is among the last three rendered in full, which
-    is through leg 4. Of 168 reviews on record, 3 ran past leg 4.
-    """
-    return (BRIEF
-            + "\nThe claim surface (`claims.json`):\n\n"
-            + json.dumps(claims_doc, ensure_ascii=False, indent=1)
-            + "\n\nThe findings (`findings.json`):\n\n"
-            + json.dumps(findings_doc, ensure_ascii=False, indent=1) + "\n")
-
-
 def _write_recall(out: Path, recall: Dict[str, Any]) -> None:
     """adverse_recall.json beside the review, and one issue per hit."""
     (out / "adverse_recall.json").write_text(
@@ -851,7 +828,7 @@ def run_adverse_recall_only(run: Path, out: Path, args) -> int:
     name, cfg = build_config(run, world, Path(args.model) if args.model else None,
                              target)
     loop = ChatLoop(character_name=name, character_config=cfg)
-    method_text = load_workflow(REPO / REVIEW_PATH)
+    method_text = review_method(run)
     max_tokens = int((cfg.get("chat") or {}).get("react_max_tokens", 32768))
     try:
         recall = adverse_recall(loop, method_text, run, frozen, findings,
@@ -876,7 +853,6 @@ def main() -> int:
     ap.add_argument("--model", help="YAML with an llm_config block")
     ap.add_argument("--retest-model", help="the second reviewer; defaults to --model")
     ap.add_argument("--world", help="fresh world name; defaults from the run")
-    ap.add_argument("--max-turns", type=int, default=12)
     ap.add_argument("--batch", type=int, default=10,
                     help="items per emission call (default 10); 0 asks for "
                          "each part at once")
@@ -889,9 +865,9 @@ def main() -> int:
                     help="run only that check, against a run that already "
                          "holds a review; writes review/adverse_recall.json")
     ap.add_argument("--parallel", type=int, default=1,
-                    help="review calls in flight at once outside the reading "
-                         "legs (default 1). The site's production jobs raise "
-                         "it; a measurement run keeps 1")
+                    help="review calls in flight at once (default 1). The "
+                         "site's production jobs raise it; a measurement run "
+                         "keeps 1")
     args = ap.parse_args()
     set_parallel(args.parallel)
 
@@ -942,41 +918,21 @@ def main() -> int:
     name, cfg = build_config(run, world, Path(args.model) if args.model else None,
                              target)
     loop = ChatLoop(character_name=name, character_config=cfg)
-    method_text = load_workflow(REPO / REVIEW_PATH)
+    method_text = review_method(run)
     max_tokens = int((cfg.get("chat") or {}).get("react_max_tokens", 32768))
-    legs, error, emission = [], None, None
+    error, emission = None, None
     t0 = datetime.datetime.now(datetime.timezone.utc)
 
     try:
-        # ---- part two: the reviewer reads ---------------------------------
-        text, reason = opening_brief(claims_doc, findings_doc), "opening brief"
-        for i in range(args.max_turns):
-            loop._process_user_turn(source=SOURCE, text=text, close=False)
-            reply = latest_reply(loop, SOURCE)
-            exit_reason = last_exit_reason(world, name)
-            legs.append({"leg": i + 1, "sent": reason,
-                         "exit_reason": exit_reason, "reply_chars": len(reply)})
-            logger.info("leg %d: exit=%s chars=%d", i + 1, exit_reason, len(reply))
-            if exit_reason in ("llm_error", "crashed"):
-                error = f"turn {i + 1} ended {exit_reason} — review is not valid"
-                break
-            if exit_reason == "max_iters":
-                error = f"turn {i + 1} hit max_iters — review is not valid"
-                break
-            if exit_reason != "yield":
-                break
-            text, reason = CONTINUE, "reviewer yielded — continue reading"
-
-        # ---- part three: the observations ---------------------------------
-        if not error:
-            emission = emit_parts(loop, method_text, stats, frozen, findings,
-                                  max_tokens, batch=args.batch, docs=docs,
-                                  partial=out / "review.partial.json")
-            for c in emission["calls"]:
-                if c["response_format_dropped"]:
-                    error = (f"the route dropped "
-                             f"{', '.join(c['response_format_dropped'])} on "
-                             f"{c['part']} — the review was not constrained")
+        # ---- part two: the observations -----------------------------------
+        emission = emit_parts(loop, method_text, stats, frozen, findings,
+                              max_tokens, batch=args.batch, docs=docs,
+                              partial=out / "review.partial.json")
+        for c in emission["calls"]:
+            if c["response_format_dropped"]:
+                error = (f"the route dropped "
+                         f"{', '.join(c['response_format_dropped'])} on "
+                         f"{c['part']} — the review was not constrained")
     except Exception as e:                                     # noqa: BLE001
         error = f"{type(e).__name__}: {e}"
         logger.exception("review failed")
@@ -1042,7 +998,7 @@ def main() -> int:
                            | ({"hits": [r.get("claim_id") for r in recall.get("hits", [])],
                                "calls": len(recall.get("calls", []))}
                               if "error" not in recall else {})),
-        "legs": legs, "wall_clock_s": wall,
+        "wall_clock_s": wall,
         "transient_events": getattr(loop, "transient_events", None),
         "emission": [{k: v for k, v in c.items() if k != "raw"}
                      for c in (emission or {}).get("calls", [])],
@@ -1051,7 +1007,7 @@ def main() -> int:
         "error": error,
     }, indent=2, default=str) + "\n", encoding="utf-8")
 
-    print(f"\n{len(legs)} legs, {wall}s, error={error}")
+    print(f"\n{wall}s, error={error}")
     print(f"observations: {check['figures']}")
     print(f"retest: {stand.get('exceptions')} on exceptions, "
           f"{stand.get('held_sample')} on the held sample")

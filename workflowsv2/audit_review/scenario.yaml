@@ -10,18 +10,13 @@
 # report never made is not a finding here, however material it looks —
 # REVIEW.md §2 and §10.
 #
-# THREE SOURCES:
-#
-#   inspect            the AUDIT RUN DIRECTORY: claims.json, findings.json,
-#                      run_meta, review/statistics.json, and working_record/
-#                      — including method_as_delivered.md, the method that
-#                      engagement actually received. The review checks the
-#                      findings against the method they were GIVEN, not
-#                      against any current version.
-#   inspect_external   the TARGET the audit examined, from that run's
-#                      run_meta.external_repo, so a citation resolves by the
-#                      path that produced it.
-#   workflow           workflowsv2/audit_review/method/REVIEW.md
+# WHAT THE REVIEWER IS GIVEN. Since 2026-10-24 the reviewer reads nothing
+# itself: the runner puts in each request what that part needs (statistics,
+# claims, findings with their cited lines), and the system text is REVIEW.md
+# followed by the run's working_record/method_as_delivered.md, the method that
+# engagement actually received. The tools below are still configured, because
+# the runner builds its model backend through this chat loop, but no review
+# step drives a ReAct turn.
 #
 # CITATIONS ARE RESOLVED BEFORE THE REVIEW STARTS. The runner checks every
 # cited line and records the result in review/statistics.json; at the
